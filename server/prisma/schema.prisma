@@ -1,0 +1,183 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoleType {
+  OWNER
+  DISPATCHER
+  RIDER
+  CUSTOMER
+}
+
+enum ErrandStatus {
+  PENDING
+  ASSIGNED
+  TRAVELING
+  AT_STORE
+  PURCHASED
+  EN_ROUTE
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+// 1. User Table (3NF: Atomic Names, Foreign Keys for Role & Addresses)
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         RoleType
+  firstName    String
+  middleName   String?
+  lastName     String
+  name         String   // Convenience full name string
+  email        String   @unique
+  phone        String
+  avatar       String?
+  status       String   @default("Active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  errandsAsCustomer Errand[]      @relation("CustomerErrands")
+  errandsAsRider    Errand[]      @relation("RiderErrands")
+  dispatchLogs      DispatchLog[] @relation("DispatcherLogs")
+  addresses         Address[]
+
+  @@map("users")
+}
+
+// 2. Roles Lookup Table (3NF)
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("roles_tbl")
+}
+
+// 3. Merchant Categories Table (3NF)
+model MerchantCategory {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  description   String?
+  merchantCount Int      @default(0)
+  status        String   @default("Active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("merchant_categories")
+}
+
+// 4. Payment Modes Table (3NF)
+model PaymentMode {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+
+  errands Errand[]
+
+  @@map("payment_modes")
+}
+
+// 5. Errand Table (3NF: Foreign Key references to Customer, Rider, PaymentMode, Addresses)
+model Errand {
+  id              String       @id @default(uuid())
+  category        String
+  description     String
+  pickupAddress   String
+  deliveryAddress String
+  estimatedCost   Float        @default(0)
+  deliveryFee     Float        @default(50)
+  tip             Float        @default(0)
+  totalCost       Float        @default(50)
+  status          ErrandStatus @default(PENDING)
+
+  customerId Int
+  customer   User @relation("CustomerErrands", fields: [customerId], references: [id])
+
+  riderId Int?
+  rider   User? @relation("RiderErrands", fields: [riderId], references: [id])
+
+  paymentModeId Int?
+  paymentMode   PaymentMode? @relation(fields: [paymentModeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pabiliDetails PabiliDetail[]
+  dispatchLogs  DispatchLog[]
+
+  @@map("errands")
+}
+
+// 6. Pabili Details Table (3NF: Separated itemized list)
+model PabiliDetail {
+  id                Int      @id @default(autoincrement())
+  errandId          String
+  errand            Errand   @relation(fields: [errandId], references: [id], onDelete: Cascade)
+  itemName          String
+  quantity          Int      @default(1)
+  unitPrice         Float    @default(0)
+  estimatedSubtotal Float    @default(0)
+  createdAt         DateTime @default(now())
+
+  @@map("pabili_details_tbl")
+}
+
+// 7. Dispatch Logs Table (3NF: Dispatcher assignment logs)
+model DispatchLog {
+  id           Int      @id @default(autoincrement())
+  errandId     String
+  errand       Errand   @relation(fields: [errandId], references: [id], onDelete: Cascade)
+  dispatcherId Int
+  dispatcher   User     @relation("DispatcherLogs", fields: [dispatcherId], references: [id])
+  notes        String?
+  dispatchedAt DateTime @default(now())
+
+  @@map("dispatch_logs")
+}
+
+// 8. Barangay Lookup Table (3NF)
+model Barangay {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  city      String    @default("Tacurong City")
+  province  String    @default("Sultan Kudarat")
+  addresses Address[]
+
+  @@map("barangays")
+}
+
+// 9. Address Table (3NF: Decomposed location attributes)
+model Address {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street     String
+  barangayId Int
+  barangay   Barangay @relation(fields: [barangayId], references: [id])
+  isDefault  Boolean  @default(false)
+
+  @@map("addresses")
+}
+
+// 10. Service Rates Configuration Table (3NF)
+model RateConfig {
+  id                Int      @id @default(1)
+  baseFee           Float    @default(50)
+  perKmRate         Float    @default(10)
+  serviceFeePercent Float    @default(5)
+  nightSurcharge    Float    @default(20)
+  updatedAt         DateTime @updatedAt
+
+  @@map("rate_configs")
+}
