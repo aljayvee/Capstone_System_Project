@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
+
 
 export interface ApiUser {
   id: number;
@@ -29,11 +30,53 @@ export interface ApiRateConfig {
   nightSurcharge: number;
 }
 
+function getAuthHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const token = localStorage.getItem("errand_system_jwt_token");
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export const apiService = {
+  // Authentication API
+  async login(username: string, password: string): Promise<{ user: any; token: string; message?: string } | { error: string }> {
+    try {
+      // Try /api/auth/login first, then /login fallback
+      let res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${API_BASE_URL.replace(/\/api$/, "")}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { error: data.error || "Authentication failed. Invalid username or password." };
+      }
+      return data;
+    } catch (err: any) {
+      console.warn("Backend auth failed, error:", err);
+      return { error: err.message || "Unable to connect to backend authentication server." };
+    }
+  },
+
   // Users API
   async getUsers(): Promise<ApiUser[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/users`);
+      const res = await fetch(`${API_BASE_URL}/users`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch users");
       return await res.json();
     } catch (err) {
@@ -42,25 +85,49 @@ export const apiService = {
     }
   },
 
-  async createUser(userData: Partial<ApiUser>): Promise<ApiUser | null> {
+  async createUser(userData: Partial<ApiUser> & { password?: string }): Promise<ApiUser | null> {
     try {
       const res = await fetch(`${API_BASE_URL}/users`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(userData),
       });
-      if (!res.ok) throw new Error("Failed to create user");
-      return await res.json();
-    } catch (err) {
-      console.warn("API Error:", err);
-      return null;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create user");
+      }
+      return data;
+    } catch (err: any) {
+      console.warn("API Error (createUser):", err);
+      throw err;
     }
   },
+
+  async updateUser(id: number, userData: Record<string, any>): Promise<ApiUser | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(userData),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update user");
+      }
+      return data;
+    } catch (err: any) {
+      console.warn("API Error (updateUser):", err);
+      throw err;
+    }
+  },
+
 
   // Merchant Categories API
   async getMerchantCategories(): Promise<ApiMerchantCategory[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/merchant-categories`);
+      const res = await fetch(`${API_BASE_URL}/merchant-categories`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch merchant categories");
       return await res.json();
     } catch (err) {
@@ -73,7 +140,7 @@ export const apiService = {
     try {
       const res = await fetch(`${API_BASE_URL}/merchant-categories`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error("Failed to create category");
@@ -87,7 +154,9 @@ export const apiService = {
   // Rate Config API
   async getRateConfig(): Promise<ApiRateConfig | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/rate-config`);
+      const res = await fetch(`${API_BASE_URL}/rate-config`, {
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Failed to fetch rate config");
       return await res.json();
     } catch (err) {
@@ -100,7 +169,7 @@ export const apiService = {
     try {
       const res = await fetch(`${API_BASE_URL}/rate-config`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify(config),
       });
       if (!res.ok) throw new Error("Failed to update rate config");
@@ -111,3 +180,4 @@ export const apiService = {
     }
   },
 };
+

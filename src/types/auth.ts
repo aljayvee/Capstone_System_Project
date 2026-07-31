@@ -1,4 +1,4 @@
-export type UserRole = "owner" | "dispatcher" | "rider" | "customer";
+export type UserRole = "owner" | "dispatcher" | "rider" | "customer" | "OWNER" | "DISPATCHER" | "RIDER" | "CUSTOMER";
 
 export interface User {
   id: number;
@@ -8,6 +8,7 @@ export interface User {
   email: string;
   phone: string;
   avatar: string;
+  token?: string;
   position?: string;
   vehicleType?: string;
   plateNumber?: string;
@@ -16,9 +17,18 @@ export interface User {
   landmark?: string;
 }
 
+export interface AuthResponse {
+  user: User;
+  token: string;
+  message?: string;
+  error?: string;
+}
+
 export interface AuthContextType {
   user: User | null;
-  login: (user: User) => void;
+  token: string | null;
+  login: (user: User, token?: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
+

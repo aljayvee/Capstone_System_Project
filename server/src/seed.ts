@@ -58,7 +58,7 @@ async function main() {
   // 5. 3NF User Accounts (Atomic Name Attributes)
   const hashedOwnerPass = await bcrypt.hash("owner123", 10);
   const hashedDispatchPass = await bcrypt.hash("dispatch123", 10);
-  const hashedRiderPass = await bcrypt.hash("rider123", 10);
+  const hashedRiderPass = await bcrypt.hash("password123", 10);
 
   const owner = await prisma.user.upsert({
     where: { username: "owner" },

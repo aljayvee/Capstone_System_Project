@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Eye, EyeOff, User, Lock, ChevronRight,
-  Bike, AlertCircle
+  Bike, AlertCircle, Loader2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { UserRole } from "../types/auth";
+import { apiService } from "../services/apiService";
+import { MobileAppNoticeModal } from "./MobileAppNoticeModal";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -14,38 +16,62 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [mobileAppRoleAlert, setMobileAppRoleAlert] = useState<string | null>(null);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       setError("Please enter your username and password.");
       return;
     }
 
-    const trimmedUser = username.trim().toLowerCase();
-    let detectedRole: UserRole = "owner";
-    if (trimmedUser.includes("dispatch")) {
-      detectedRole = "dispatcher";
-    } else if (trimmedUser.includes("rider")) {
-      detectedRole = "rider";
-    }
-
-    const userObj = {
-      id: Date.now(),
-      username: username.trim(),
-      role: detectedRole,
-      name: username.charAt(0).toUpperCase() + username.slice(1),
-      email: `${username.trim()}@capstone.ph`,
-      phone: "09170000000",
-      avatar: username.substring(0, 2).toUpperCase(),
-    };
-
     setError("");
-    login(userObj);
-    navigate(`/${detectedRole}`);
+    setIsLoading(true);
+
+    try {
+      const response = await apiService.login(username.trim(), password.trim());
+
+      if ("error" in response) {
+        setError(response.error || "Unable to connect to authentication server.");
+        setIsLoading(false);
+        return;
+      }
+
+      const rawUser = response.user || response;
+      const rawRole = (rawUser.role || "owner").toString().toLowerCase();
+
+      // Check if role is Rider or Customer
+      if (rawRole === "rider" || rawRole === "customer") {
+        setIsLoading(false);
+        setMobileAppRoleAlert(rawRole);
+        return;
+      }
+
+      // Valid Web Portal user (Owner or Dispatcher)
+      const userObj = {
+        id: rawUser.id || Date.now(),
+        username: rawUser.username || username.trim(),
+        role: rawRole as UserRole,
+
+        name: rawUser.name || rawUser.firstName || username.trim(),
+        email: rawUser.email || `${username.trim()}@capstone.ph`,
+        phone: rawUser.phone || "09170000000",
+        avatar: (rawUser.username || username).substring(0, 2).toUpperCase(),
+        token: response.token,
+      };
+
+      login(userObj, response.token);
+      setIsLoading(false);
+      navigate(`/${rawRole}`);
+    } catch (err: any) {
+      console.error("Login execution error:", err);
+      setError(err.message || "An unexpected error occurred during login.");
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleLogin();
+    if (e.key === "Enter" && !isLoading) handleLogin();
   };
 
   return (
@@ -72,7 +98,7 @@ export default function LoginPage() {
 
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-xl mb-4 bg-red-50 border border-red-200">
-              <AlertCircle size={16} className="text-red-500" />
+              <AlertCircle size={16} className="text-red-500 shrink-0" />
               <p className="text-red-600 text-sm font-medium">{error}</p>
             </div>
           )}
@@ -88,7 +114,8 @@ export default function LoginPage() {
                   onChange={(e) => { setUsername(e.target.value); setError(""); }}
                   onKeyDown={handleKeyDown}
                   placeholder="Enter username (e.g. owner, dispatcher)"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl outline-none border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:border-indigo-500"
+                  disabled={isLoading}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl outline-none border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:border-indigo-500 disabled:opacity-60"
                 />
               </div>
             </div>
@@ -103,7 +130,8 @@ export default function LoginPage() {
                   onChange={(e) => { setPassword(e.target.value); setError(""); }}
                   onKeyDown={handleKeyDown}
                   placeholder="Enter password"
-                  className="w-full pl-10 pr-10 py-3 rounded-xl outline-none border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:border-indigo-500"
+                  disabled={isLoading}
+                  className="w-full pl-10 pr-10 py-3 rounded-xl outline-none border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:border-indigo-500 disabled:opacity-60"
                 />
                 <button
                   type="button"
@@ -117,13 +145,29 @@ export default function LoginPage() {
 
             <button
               onClick={handleLogin}
-              className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md mt-2"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md mt-2 disabled:opacity-70 cursor-pointer"
             >
-              Sign In <ChevronRight size={16} />
+              {isLoading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span> <ChevronRight size={16} />
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
+
+      <MobileAppNoticeModal
+        isOpen={!!mobileAppRoleAlert}
+        roleName={mobileAppRoleAlert || ""}
+        onClose={() => setMobileAppRoleAlert(null)}
+      />
     </div>
   );
 }

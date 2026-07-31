@@ -3,16 +3,28 @@ import { useAuth } from "../../context/AuthContext";
 import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
 import { ErrandQueueTable } from "./components/ErrandQueueTable";
 import { RiderFleetRoster } from "./components/RiderFleetRoster";
+import { DispatcherChatPanel } from "./components/DispatcherChatPanel";
 import {
-  ClipboardList, Bike, LogOut, Plus, Clock, Zap, Navigation, ShieldCheck, Bike as BikeIcon
+  ClipboardList, Bike, LogOut, Plus, Clock, Zap, Navigation, Bike as BikeIcon
 } from "lucide-react";
 
 export default function DispatcherPortal() {
   const { user, logout } = useAuth();
-  const { activeTab, setActiveTab, errands, riders, handleUpdateStatus } = useDispatcherPortal();
+  const {
+    activeTab,
+    setActiveTab,
+    errands,
+    riders,
+    selectedErrandId,
+    fetchOrders,
+    handleClaimOrder,
+    handleOpenChat,
+    handleCloseChat,
+    handleUpdateStatus,
+  } = useDispatcherPortal();
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex">
+    <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex relative overflow-x-hidden">
       {/* Sidebar Navigation - Navy Blue Theme matching Figma prototype */}
       <aside className="w-64 bg-[#1E3A5F] text-white p-6 flex flex-col justify-between shadow-xl">
         <div className="space-y-8">
@@ -97,7 +109,7 @@ export default function DispatcherPortal() {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase">Pending Queue</p>
-              <p className="text-2xl font-extrabold text-slate-800">{errands.filter((e) => e.status === "Pending").length} Errands</p>
+              <p className="text-2xl font-extrabold text-slate-800">{errands.filter((e) => e.status === "Pending" || e.status === "PENDING").length} Errands</p>
             </div>
           </div>
 
@@ -107,7 +119,7 @@ export default function DispatcherPortal() {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase">En Route / Active</p>
-              <p className="text-2xl font-extrabold text-slate-800">{errands.filter((e) => e.status !== "Pending").length} Errands</p>
+              <p className="text-2xl font-extrabold text-slate-800">{errands.filter((e) => e.status !== "Pending" && e.status !== "PENDING").length} Errands</p>
             </div>
           </div>
 
@@ -123,10 +135,28 @@ export default function DispatcherPortal() {
         </section>
 
         {/* Modular Views */}
-        {activeTab === "queue" && <ErrandQueueTable errands={errands} onUpdateStatus={handleUpdateStatus} />}
+        {activeTab === "queue" && (
+          <ErrandQueueTable
+            errands={errands}
+            currentUser={user}
+            onClaimOrder={handleClaimOrder}
+            onOpenChat={handleOpenChat}
+            onUpdateStatus={handleUpdateStatus}
+          />
+        )}
         {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
         {activeTab === "live_map" && <RiderFleetRoster riders={riders} />}
       </main>
+
+      {/* Slide-In Side Drawer for Live Chat & Tools */}
+      {selectedErrandId && (
+        <DispatcherChatPanel
+          orderId={selectedErrandId}
+          dispatcher={user}
+          onClose={handleCloseChat}
+          onRefreshOrders={fetchOrders}
+        />
+      )}
     </div>
   );
 }

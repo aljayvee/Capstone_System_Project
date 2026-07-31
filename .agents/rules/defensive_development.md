@@ -19,3 +19,12 @@ Every feature implementation MUST handle non-happy-path scenarios before declari
 ## 4. State Machine Strictness
 - Define explicit, immutable state transitions for core business workflows (e.g., Errand Status: `PENDING` -> `ASSIGNED` -> `IN_TRANSIT` -> `DELIVERED` -> `COMPLETED` / `CANCELLED`).
 - Prevent illegal state skips (e.g., transitioning directly from `PENDING` to `DELIVERED`).
+
+## 5. Defensive Database Type Casting & Native Maps Type Safety
+- ALWAYS explicitly cast numerical/decimal database values (such as `latitude`, `longitude`, `price`, `totalCost`, `amount`) using `Number(val)` or `parseFloat(String(val))` before invoking numeric prototype methods like `.toFixed()`.
+- Perform null/undefined and `isNaN()` checks before dereferencing or passing coordinate objects to map markers or API payloads.
+- **`react-native-maps` Invariant**: `initialRegion.latitude`, `initialRegion.longitude`, and `Marker.coordinate` MUST strictly receive JavaScript numbers (`typeof lat === 'number' && !isNaN(lat)`). Passing unparsed string representations (e.g., `"6.6710000"` from MySQL/MariaDB DECIMAL columns) causes native Android `AirMapViewManager` casting crashes.
+
+## 6. React Rules of Hooks Top-Level Invariant
+- NEVER invoke React custom hooks (functions starting with `use`) inside inline event handlers, callbacks, condition branches, or loops.
+- ALWAYS destructure and call hooks strictly at the top level of function components, and pass destructured helper methods down to child props.

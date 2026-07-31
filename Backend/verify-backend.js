@@ -199,6 +199,48 @@ async function runVerification() {
   });
   assert(sysLoginRes.status === 200, `POST /api/system/login returns HTTP 200 OK (got ${sysLoginRes.status})`);
 
+  // ----------------------------------------------------
+  // Test 6: Pabili Order Creation POST /api/orders/pabili in `errand_system_db`
+  // ----------------------------------------------------
+  console.log("\n6. Testing Pabili Order Creation POST in `pabili_orders` table...");
+  const pabiliOrderData = {
+    orderId: `PABILI-${timestamp}`,
+    customerId: testCustomer.username,
+    customerName: `${testCustomer.firstName} ${testCustomer.lastName}`,
+    pabiliCats: ['Pharmacy', 'Grocery'],
+    catItems: { Pharmacy: ['Aspirin'], Grocery: ['Milk'] },
+    totalPurchaseAmount: 450.00,
+    baseFee: 70.00,
+    distanceKm: 2.5,
+    distanceFee: 10.00,
+    commission: 50.00,
+    grandTotal: 580.00,
+    paymentMethod: 'COD',
+    deliveryAddress: 'Tacurong City',
+    latitude: 6.671,
+    longitude: 124.6644,
+  };
+
+  const orderRes = await postJSON('/api/orders/pabili', pabiliOrderData);
+  assert(orderRes.status === 201, `POST /api/orders/pabili returns HTTP 201 Created (got ${orderRes.status})`);
+  assert(orderRes.body && orderRes.body.order?.orderId === pabiliOrderData.orderId, "Pabili order returns saved orderId");
+
+  try {
+    const dbConfig = getDBConfig();
+    connection = await mysql.createConnection(dbConfig);
+    const [pabiliRows] = await connection.execute(
+      'SELECT * FROM pabili_orders WHERE orderId = ?',
+      [pabiliOrderData.orderId]
+    );
+
+    assert(pabiliRows.length > 0, "Pabili order is persisted in `pabili_orders` table in `errand_system_db`");
+  } catch (dbErr) {
+    console.error(`  [FAIL] Pabili Orders Table Query Error: ${dbErr.message}`);
+    failed++;
+  } finally {
+    if (connection) await connection.end();
+  }
+
   console.log("\n==================================================");
   console.log(`Verification Complete: ${passed} PASSED, ${failed} FAILED`);
   console.log("==================================================");

@@ -1,6 +1,8 @@
-const bcrypt = require('bcryptjs');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 async function runVerificationTests() {
+
   console.log("==================================================");
   console.log("Backend Auth API Verification Test Suite (Remediated)");
   console.log("==================================================");
@@ -142,7 +144,12 @@ async function runVerificationTests() {
     }
 
     const { passwordHash: _, ...sanitizedUser } = user;
-    return { status: 200, body: sanitizedUser };
+    const token = jwt.sign(
+      { id: sanitizedUser.id, username: sanitizedUser.username, email: sanitizedUser.email, role: sanitizedUser.role },
+      "capstone_jwt_super_secret_key_2026",
+      { expiresIn: "24h" }
+    );
+    return { status: 200, body: { ...sanitizedUser, user: sanitizedUser, token, message: "Login successful" } };
   }
 
   // 3a. Successful Login
@@ -153,6 +160,8 @@ async function runVerificationTests() {
   assert(loginSuccess.status === 200, "Valid login returns 200 OK status");
   assert(loginSuccess.body.username === "john_doe", "Valid login returns sanitized user object");
   assert(loginSuccess.body.passwordHash === undefined, "Sanitized user object omits passwordHash");
+  assert(typeof loginSuccess.body.token === "string" && loginSuccess.body.token.startsWith("eyJ"), "Valid login returns signed JWT token starting with 'eyJ'");
+
 
   // 3b. Invalid Password
   const loginBadPass = await mockLoginHandler({

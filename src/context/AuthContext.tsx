@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, AuthContextType } from "../types/auth";
 
 const AUTH_STORAGE_KEY = "errand_system_auth_user";
+const TOKEN_STORAGE_KEY = "errand_system_jwt_token";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -15,6 +16,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  const [token, setToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(TOKEN_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
   useEffect(() => {
     if (user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
@@ -23,22 +32,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = (newUser: User) => {
+  useEffect(() => {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }, [token]);
+
+  const login = (newUser: User, newToken?: string) => {
     setUser(newUser);
+    if (newToken) {
+      setToken(newToken);
+    } else if (newUser.token) {
+      setToken(newUser.token);
+    }
   };
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token,
         login,
         logout,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !!token,
       }}
     >
       {children}
@@ -53,3 +78,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

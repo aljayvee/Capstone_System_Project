@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Pencil } from "lucide-react";
 import { AddUserModal } from "./components/AddUserModal";
+import { EditUserModal } from "./components/EditUserModal";
 import { UserRole } from "../../../../types/auth";
-import { apiService, ApiUser } from "../../../../services/apiService";
+import { apiService } from "../../../../services/apiService";
 
 export interface UserRecord {
   id: number;
@@ -23,41 +24,83 @@ export const UserManagementModule: React.FC = () => {
 
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
+
+  const loadBackendUsers = async () => {
+    const backendUsers = await apiService.getUsers();
+    if (backendUsers && backendUsers.length > 0) {
+      setUsers(
+        backendUsers.map((u) => ({
+          id: u.id,
+          name: u.name || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username,
+          username: u.username,
+          email: u.email,
+          phone: u.phone,
+          role: u.role.toLowerCase() as UserRole,
+          status: u.status || "Active",
+        }))
+      );
+    }
+  };
 
   useEffect(() => {
-    async function loadBackendUsers() {
-      const backendUsers = await apiService.getUsers();
-      if (backendUsers && backendUsers.length > 0) {
-        setUsers(
-          backendUsers.map((u) => ({
-            id: u.id,
-            name: u.name,
-            username: u.username,
-            email: u.email,
-            phone: u.phone,
-            role: u.role.toLowerCase() as UserRole,
-            status: u.status,
-          }))
-        );
-      }
-    }
     loadBackendUsers();
   }, []);
 
-  const handleAddUser = async (newUserData: { name: string; username: string; email: string; phone: string; role: UserRole }) => {
-    const created = await apiService.createUser(newUserData);
-    const newUser: UserRecord = {
-      id: created ? created.id : Date.now(),
-      ...newUserData,
-      status: "Active",
-    };
-    setUsers((prev) => [...prev, newUser]);
+  const handleAddUser = async (newUserData: { name: string; username: string; email: string; phone: string; role: UserRole; password?: string }) => {
+    try {
+      const created = await apiService.createUser(newUserData);
+      if (created) {
+        await loadBackendUsers();
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      throw err;
+    }
   };
 
-  const toggleUserStatus = (id: number) => {
+  const handleEditUser = async (updatedData: {
+    id: number;
+    name: string;
+    username: string;
+    email: string;
+    phone: string;
+    role: UserRole;
+    status: "Active" | "Inactive";
+    password?: string;
+  }) => {
+    try {
+      const updated = await apiService.updateUser(updatedData.id, updatedData);
+      if (updated) {
+        await loadBackendUsers();
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      throw err;
+    }
+  };
+
+  const toggleUserStatus = async (id: number) => {
+    const targetUser = users.find((u) => u.id === id);
+    if (!targetUser) return;
+    const newStatus = targetUser.status === "Active" ? "Inactive" : "Active";
+
+    // Optimistic UI update
     setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, status: u.status === "Active" ? "Inactive" : "Active" } : u))
+      prev.map((u) => (u.id === id ? { ...u, status: newStatus } : u))
     );
+
+    try {
+      await apiService.updateUser(id, { status: newStatus });
+    } catch (err) {
+      console.warn("Failed to toggle user status on API:", err);
+      // Revert if API failed
+      setUsers((prev) =>
+        prev.map((u) => (u.id === id ? { ...u, status: targetUser.status } : u))
+      );
+    }
   };
 
   const filteredUsers = users.filter(
@@ -134,12 +177,20 @@ export const UserManagementModule: React.FC = () => {
                   </span>
                 </td>
                 <td className="p-4 text-right">
-                  <button
-                    onClick={() => toggleUserStatus(u.id)}
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition"
-                  >
-                    {u.status === "Active" ? "Deactivate" : "Activate"}
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setEditingUser(u)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition flex items-center gap-1.5"
+                    >
+                      <Pencil size={14} /> Edit
+                    </button>
+                    <button
+                      onClick={() => toggleUserStatus(u.id)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition"
+                    >
+                      {u.status === "Active" ? "Deactivate" : "Activate"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -148,6 +199,8 @@ export const UserManagementModule: React.FC = () => {
       </div>
 
       {showAddModal && <AddUserModal onClose={() => setShowAddModal(false)} onSave={handleAddUser} />}
+      {editingUser && <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} onSave={handleEditUser} />}
     </div>
   );
 };
+

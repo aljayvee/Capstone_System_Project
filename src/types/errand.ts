@@ -1,5 +1,7 @@
 export type ErrandStatus =
   | "Pending"
+  | "PENDING"
+  | "ACCEPTED"
   | "Assigned"
   | "Traveling"
   | "At Store"
@@ -23,6 +25,8 @@ export interface Errand {
   tip: number;
   totalCost: number;
   status: ErrandStatus;
+  dispatcherId?: number | string;
+  dispatcherName?: string;
   riderId?: string;
   riderName?: string;
   createdAt: string;
@@ -31,7 +35,9 @@ export interface Errand {
 
 // Strict legal state transitions matrix for anti-happy-path validation
 const VALID_TRANSITIONS: Record<ErrandStatus, ErrandStatus[]> = {
-  Pending: ["Assigned", "Cancelled"],
+  Pending: ["ACCEPTED", "Assigned", "Cancelled"],
+  PENDING: ["ACCEPTED", "Assigned", "Cancelled"],
+  ACCEPTED: ["Assigned", "Traveling", "Cancelled"],
   Assigned: ["Traveling", "Cancelled"],
   Traveling: ["At Store", "Cancelled"],
   "At Store": ["Purchased", "Cancelled"],

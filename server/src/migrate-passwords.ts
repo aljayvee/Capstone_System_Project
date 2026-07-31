@@ -23,7 +23,7 @@ function isBcryptHash(value: string): boolean {
 }
 
 async function migratePasswords() {
-  console.log("🔐 Starting password migration...");
+  console.log(" Starting password migration...");
 
   const users = await prisma.user.findMany({
     select: { id: true, username: true, passwordHash: true },
@@ -36,7 +36,7 @@ async function migratePasswords() {
 
   for (const user of users) {
     if (isBcryptHash(user.passwordHash)) {
-      console.log(`  ✅ [${user.username}] already has a bcrypt hash — skipping.`);
+      console.log(` [${user.username}] already has a bcrypt hash — skipping.`);
       skipped++;
       continue;
     }
@@ -48,16 +48,16 @@ async function migratePasswords() {
       data: { passwordHash: newHash },
     });
 
-    console.log(`  🔄 [${user.username}] plain-text password migrated to bcrypt hash.`);
+    console.log(` [${user.username}] plain-text password migrated to bcrypt hash.`);
     migrated++;
   }
 
-  console.log(`\n✅ Migration complete! Migrated: ${migrated}, Already hashed: ${skipped}`);
+  console.log(`\nMigration complete! Migrated: ${migrated}, Already hashed: ${skipped}`);
 }
 
 migratePasswords()
   .catch((e) => {
-    console.error("❌ Migration failed:", e);
+    console.error(" Migration failed:", e);
     process.exit(1);
   })
   .finally(async () => {
