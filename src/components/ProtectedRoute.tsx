@@ -33,8 +33,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
   }
 
   if (!normalizedAllowed.includes(normalizedUserRole)) {
-    const handleExit = () => {
-      logout();
+    const handleExit = async () => {
+      await logout();
       window.location.href = "/";
     };
 

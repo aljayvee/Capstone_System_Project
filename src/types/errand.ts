@@ -1,4 +1,6 @@
 export type ErrandStatus =
+  | "Available"
+  | "AVAILABLE"
   | "Pending"
   | "PENDING"
   | "ACCEPTED"
@@ -6,11 +8,19 @@ export type ErrandStatus =
   | "Traveling"
   | "At Store"
   | "Purchased"
-  | "En Route"
+  | "In Route"
   | "Delivered"
   | "Completed"
   | "Cancelled"
   | "Disputed";
+
+export interface ErrandPinpoint {
+  id: number;
+  storeName: string;
+  latitude: number;
+  longitude: number;
+  sequence: number;
+}
 
 export interface Errand {
   id: string;
@@ -20,6 +30,9 @@ export interface Errand {
   description: string;
   pickupAddress: string;
   deliveryAddress: string;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
+  pinpoints?: ErrandPinpoint[];
   estimatedCost: number;
   deliveryFee: number;
   tip: number;
@@ -27,6 +40,7 @@ export interface Errand {
   status: ErrandStatus;
   dispatcherId?: number | string;
   dispatcherName?: string;
+  dispatchLogs?: any[];
   riderId?: string;
   riderName?: string;
   createdAt: string;
@@ -35,14 +49,16 @@ export interface Errand {
 
 // Strict legal state transitions matrix for anti-happy-path validation
 const VALID_TRANSITIONS: Record<ErrandStatus, ErrandStatus[]> = {
+  Available: ["Pending", "Cancelled"],
+  AVAILABLE: ["PENDING", "Cancelled"],
   Pending: ["ACCEPTED", "Assigned", "Cancelled"],
   PENDING: ["ACCEPTED", "Assigned", "Cancelled"],
   ACCEPTED: ["Assigned", "Traveling", "Cancelled"],
   Assigned: ["Traveling", "Cancelled"],
   Traveling: ["At Store", "Cancelled"],
   "At Store": ["Purchased", "Cancelled"],
-  Purchased: ["En Route", "Cancelled"],
-  "En Route": ["Delivered", "Cancelled"],
+  Purchased: ["In Route", "Cancelled"],
+  "In Route": ["Delivered", "Cancelled"],
   Delivered: ["Completed", "Disputed"],
   Completed: [],
   Cancelled: [],

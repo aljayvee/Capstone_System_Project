@@ -11,23 +11,21 @@ enum RoleType {
   OWNER
   DISPATCHER
   RIDER
-  CUSTOMER
 }
 
 enum ErrandStatus {
+  AVAILABLE
   PENDING
   ASSIGNED
-  TRAVELING
-  AT_STORE
-  PURCHASED
-  EN_ROUTE
+  IN_TRANSIT
   DELIVERED
   COMPLETED
   CANCELLED
-  DISPUTED
 }
 
 // 1. User Table (3NF: Atomic Names, Foreign Keys for Role & Addresses)
+// Operational staff only (Owner/Dispatcher/Rider) — customer accounts live in
+// CustomerAccount/CustomerInformation/CustomerTransaction below.
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @unique
@@ -36,7 +34,6 @@ model User {
   firstName    String
   middleName   String?
   lastName     String
-  name         String   // Convenience full name string
   email        String   @unique
   phone        String
   avatar       String?
@@ -44,12 +41,64 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  errandsAsCustomer Errand[]      @relation("CustomerErrands")
-  errandsAsRider    Errand[]      @relation("RiderErrands")
-  dispatchLogs      DispatchLog[] @relation("DispatcherLogs")
-  addresses         Address[]
+  expoPushToken String?
+
+  errandsAsRider Errand[]      @relation("RiderErrands")
+  dispatchLogs   DispatchLog[] @relation("DispatcherLogs")
+  addresses      Address[]
 
   @@map("users")
+}
+
+// 1b. Customer Account Table (3NF: auth/identity only, split from operational `users`)
+model CustomerAccount {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  email        String   @unique
+  status       String   @default("Active")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  information            CustomerInformation?
+  transactions           CustomerTransaction[]
+  errands                Errand[]                 @relation("CustomerErrands")
+  savedDeliveryLocations SavedDeliveryLocation[]
+
+  @@map("customer_accounts")
+}
+
+// 1c. Customer Information Table (3NF: profile/contact details)
+model CustomerInformation {
+  id         Int             @id @default(autoincrement())
+  customerId Int             @unique
+  customer   CustomerAccount @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  firstName  String
+  middleName String?
+  lastName   String
+  phone      String
+  avatar     String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@map("customer_information")
+}
+
+// 1d. Customer Transaction Table (3NF: order/payment history, one row per errand)
+model CustomerTransaction {
+  id            Int             @id @default(autoincrement())
+  customerId    Int
+  customer      CustomerAccount @relation(fields: [customerId], references: [id])
+  errandId      String          @unique
+  errand        Errand          @relation(fields: [errandId], references: [id])
+  amount        Float
+  paymentMethod String          @default("COD")
+  status        String          @default("PENDING")
+  paidAt        DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@map("customer_transactions")
 }
 
 // 2. Roles Lookup Table (3NF)
@@ -95,6 +144,8 @@ model Errand {
   description     String
   pickupAddress   String
   deliveryAddress String
+  deliveryLatitude  Float?
+  deliveryLongitude Float?
   estimatedCost   Float        @default(0)
   deliveryFee     Float        @default(50)
   tip             Float        @default(0)
@@ -102,7 +153,7 @@ model Errand {
   status          ErrandStatus @default(PENDING)
 
   customerId Int
-  customer   User @relation("CustomerErrands", fields: [customerId], references: [id])
+  customer   CustomerAccount @relation("CustomerErrands", fields: [customerId], references: [id])
 
   riderId Int?
   rider   User? @relation("RiderErrands", fields: [riderId], references: [id])
@@ -115,6 +166,8 @@ model Errand {
 
   pabiliDetails PabiliDetail[]
   dispatchLogs  DispatchLog[]
+  pinpoints     ErrandPinpoint[]
+  transaction   CustomerTransaction?
 
   @@map("errands")
 }
@@ -131,6 +184,20 @@ model PabiliDetail {
   createdAt         DateTime @default(now())
 
   @@map("pabili_details_tbl")
+}
+
+// 6b. Errand Pinpoints Table (3NF: dispatcher-committed store waypoints, max 3 per errand)
+model ErrandPinpoint {
+  id        Int      @id @default(autoincrement())
+  errandId  String
+  errand    Errand   @relation(fields: [errandId], references: [id], onDelete: Cascade)
+  sequence  Int      @default(0)
+  storeName String
+  latitude  Float
+  longitude Float
+  createdAt DateTime @default(now())
+
+  @@map("errand_pinpoints_tbl")
 }
 
 // 7. Dispatch Logs Table (3NF: Dispatcher assignment logs)
@@ -181,3 +248,30 @@ model RateConfig {
 
   @@map("rate_configs")
 }
+
+// 11. Saved Delivery Locations (Customer GPS pinpoints, max 5 per customer)
+model SavedDeliveryLocation {
+  id         Int             @id @default(autoincrement())
+  customerId Int
+  customer   CustomerAccount @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String
+  address    String
+  latitude   Float
+  longitude  Float
+  isDefault  Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+
+  @@map("saved_delivery_locations")
+}
+
+// 12. Token Blocklist Table (Server-Side Session Revocation)
+model TokenBlocklist {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(500)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("token_blocklist")
+}
+

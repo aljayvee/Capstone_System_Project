@@ -20,7 +20,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
   if (errands.length === 0) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-slate-500 shadow-sm">
-        <p className="text-sm font-medium">Errand queue is currently empty. New requests from MariaDB database will appear here live.</p>
+        <p className="text-sm font-medium">The errand queue is empty right now. New requests will appear here automatically as customers place them.</p>
       </div>
     );
   }
@@ -28,21 +28,26 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
   const currentFirstName = currentUser?.name ? currentUser.name.split(" ")[0] : "Dispatcher";
   const currentUserId = currentUser?.id;
 
-  const pendingErrands = errands.filter((e) => e.status === "Pending" || e.status === "PENDING");
-  const ongoingErrands = errands.filter((e) => e.status !== "Pending" && e.status !== "PENDING");
+  const availableErrands = errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE");
+  const ongoingErrands = errands.filter((e) => {
+    const s = String(e.status).toUpperCase();
+    return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED";
+  });
 
-  const renderTableRows = (list: Errand[], isPendingSection: boolean) => {
+  const renderTableRows = (list: Errand[], isAvailableSection: boolean) => {
     return list.map((e) => {
-      const isPending = e.status === "Pending" || e.status === "PENDING";
-      const isDoingErrand = e.status === "DOING ERRAND" || e.status === "Doing Errand";
-      const isPassingBy = e.status === "PASSING BY" || e.status === "Passing By";
+      const statusStr = String(e.status);
+      const isAvailable = statusStr === "Available" || statusStr === "AVAILABLE";
+      const isDoingErrand = statusStr === "DOING ERRAND" || statusStr === "Doing Errand";
+      const isPassingBy = statusStr === "PASSING BY" || statusStr === "Passing By";
 
       const claimedByMe =
         (e.dispatcherId && String(e.dispatcherId) === String(currentUserId)) ||
-        (e.dispatcherName && e.dispatcherName.toLowerCase() === currentFirstName.toLowerCase());
+        (e.dispatcherName && e.dispatcherName.toLowerCase().includes(currentFirstName.toLowerCase())) ||
+        (e.dispatchLogs && e.dispatchLogs.some((log: any) => String(log.dispatcherId) === String(currentUserId) || log.dispatcher?.name?.toLowerCase().includes(currentFirstName.toLowerCase())));
 
       let statusBadgeStyle = "bg-[#FFEEF3] text-[#F62459] border-rose-200";
-      if (isPending) {
+      if (isAvailable) {
         statusBadgeStyle = "bg-amber-50 text-amber-700 border-amber-200";
       } else if (isDoingErrand) {
         statusBadgeStyle = "bg-emerald-100 text-emerald-800 border-emerald-300 font-extrabold";
@@ -68,19 +73,19 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
             )}
           </td>
           <td className="p-4 text-right flex items-center justify-end gap-2">
-            {isPending ? (
+            {claimedByMe && !isPassingBy ? (
+              <button
+                onClick={() => onOpenChat(e.id)}
+                className="flex items-center gap-1.5 text-xs bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
+              >
+                <MessageSquare size={14} /> Chat with Customer
+              </button>
+            ) : isAvailable ? (
               <button
                 onClick={() => onClaimOrder(e.id, currentUser)}
                 className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
               >
                 <CheckCircle size={14} /> Accept & Chat
-              </button>
-            ) : claimedByMe && !isPassingBy ? (
-              <button
-                onClick={() => onOpenChat(e.id)}
-                className="flex items-center gap-1.5 text-xs bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
-              >
-                <MessageSquare size={14} /> Open Chat & Tools
               </button>
             ) : (
               <span className="text-xs bg-slate-100 text-slate-500 font-medium px-2.5 py-1 rounded-md border border-slate-200">
@@ -95,14 +100,14 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. PENDING ERRAND QUEUE */}
+      {/* 1. AVAILABLE ERRAND QUEUE */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Clock size={18} className="text-amber-500" /> Pending Errand Queue
+            <Clock size={18} className="text-amber-500" /> Available Errand Queue
           </h3>
           <span className="text-xs font-semibold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
-            {pendingErrands.length} Pending
+            {availableErrands.length} Available
           </span>
         </div>
 
@@ -119,14 +124,14 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pendingErrands.length === 0 ? (
+              {availableErrands.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-6 text-center text-slate-400 text-xs italic">
-                    No pending errand requests right now.
+                    No available errand requests right now.
                   </td>
                 </tr>
               ) : (
-                renderTableRows(pendingErrands, true)
+                renderTableRows(availableErrands, true)
               )}
             </tbody>
           </table>

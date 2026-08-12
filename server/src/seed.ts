@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding 3NF-compliant MariaDB database schema...");
+  console.log("🌱 Seeding database with core accounts...");
 
   // 1. Roles
   const roles = ["OWNER", "DISPATCHER", "RIDER", "CUSTOMER"];
@@ -16,46 +16,7 @@ async function main() {
     });
   }
 
-  // 2. Payment Modes
-  const paymentModes = [
-    { name: "Cash on Delivery (COD)", description: "Pay cash upon errand fulfillment" },
-    { name: "GCash Mobile Wallet", description: "Direct e-wallet payment transfer" },
-    { name: "Bank Transfer", description: "Online banking transfer" },
-  ];
-  for (const pm of paymentModes) {
-    await prisma.paymentMode.upsert({
-      where: { name: pm.name },
-      update: {},
-      create: pm,
-    });
-  }
-
-  // 3. Merchant Categories
-  const merchantCategories = [
-    { name: "Groceries & Supermarkets", description: "Food markets, fresh produce, daily essentials", merchantCount: 14 },
-    { name: "Pharmacies & Drugstores", description: "Medicines, healthcare, wellness supplies", merchantCount: 8 },
-    { name: "Restaurants & Fast Food", description: "Dine-in, takeout, fast food chains", merchantCount: 26 },
-    { name: "Hardware & Construction", description: "Tools, building supplies, electricals", merchantCount: 5 },
-  ];
-  for (const mc of merchantCategories) {
-    await prisma.merchantCategory.upsert({
-      where: { name: mc.name },
-      update: {},
-      create: mc,
-    });
-  }
-
-  // 4. Barangays in Tacurong City
-  const barangays = ["Poblacion", "New Isabela", "San Emmanuel", "EJC Montilla", "Grypa", "Lancheta"];
-  for (const b of barangays) {
-    await prisma.barangay.upsert({
-      where: { name: b },
-      update: {},
-      create: { name: b, city: "Tacurong City", province: "Sultan Kudarat" },
-    });
-  }
-
-  // 5. 3NF User Accounts (Atomic Name Attributes)
+  // 2. User Accounts (Owner, Dispatcher, Rider)
   const hashedOwnerPass = await bcrypt.hash("owner123", 10);
   const hashedDispatchPass = await bcrypt.hash("dispatch123", 10);
   const hashedRiderPass = await bcrypt.hash("password123", 10);
@@ -70,7 +31,6 @@ async function main() {
       firstName: "Aljayvee",
       middleName: "P.",
       lastName: "Versola",
-      name: "Aljayvee Versola",
       email: "aj.versola@company.ph",
       phone: "09171234567",
       avatar: "AV",
@@ -88,7 +48,6 @@ async function main() {
       firstName: "Mark Dennis",
       middleName: "G.",
       lastName: "Batcharo",
-      name: "Mark Dennis Batcharo",
       email: "md.batcharo@company.ph",
       phone: "09281234567",
       avatar: "MB",
@@ -106,7 +65,6 @@ async function main() {
       firstName: "Al-Dhen",
       middleName: "M.",
       lastName: "Musali",
-      name: "Al-Dhen Musali",
       email: "ad.musali@company.ph",
       phone: "09391234567",
       avatar: "AM",
@@ -114,7 +72,7 @@ async function main() {
     },
   });
 
-  // 6. Rate Config
+  // 3. Rate Config
   const rateConfig = await prisma.rateConfig.upsert({
     where: { id: 1 },
     update: {},
@@ -127,11 +85,10 @@ async function main() {
     },
   });
 
-  console.log("✅ 3NF MariaDB Seeding Completed Successfully!");
+  console.log("✅ Database Seeding Completed Successfully!");
   console.log(`- Owner: ${owner.firstName} ${owner.lastName} (${owner.username})`);
   console.log(`- Dispatcher: ${dispatcher.firstName} ${dispatcher.lastName} (${dispatcher.username})`);
   console.log(`- Rider: ${rider.firstName} ${rider.lastName} (${rider.username})`);
-  console.log(`- Base Delivery Fee: ₱${rateConfig.baseFee}, Per KM: ₱${rateConfig.perKmRate}`);
 }
 
 main()

@@ -4,11 +4,13 @@ import { UserRole } from "../../../../../types/auth";
 
 interface AddUserModalProps {
   onClose: () => void;
-  onSave: (user: { name: string; username: string; email: string; phone: string; role: UserRole; password?: string }) => Promise<boolean> | void;
+  onSave: (user: { firstName: string; middleName?: string; lastName: string; username: string; email: string; phone: string; role: UserRole; password?: string }) => Promise<boolean> | void;
 }
 
 export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) => {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -21,8 +23,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !username.trim() || !phone.trim()) {
-      setError("Please fill in Name, Username, and Phone.");
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !phone.trim()) {
+      setError("Please fill in First Name, Last Name, Username, and Phone.");
       return;
     }
 
@@ -45,7 +47,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
     setIsSubmitting(true);
 
     try {
-      const res = await onSave({ name, username, email, phone, role, password });
+      const res = await onSave({ firstName: firstName.trim(), middleName: middleName.trim(), lastName: lastName.trim(), username, email, phone, role, password });
       if (res !== false) {
         onClose();
       }
@@ -95,13 +97,36 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
             </select>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">First Name *</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Juan"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Last Name *</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Dela Cruz"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Full Name *</label>
+            <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Middle Name</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Juan Dela Cruz"
+              value={middleName}
+              onChange={(e) => setMiddleName(e.target.value)}
+              placeholder="Optional"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
             />
           </div>

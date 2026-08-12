@@ -5,9 +5,11 @@ import {
   Bike, AlertCircle, Loader2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { UserRole } from "../types/auth";
+import { UserRole, User as UserType } from "../types/auth";
 import { apiService } from "../services/apiService";
 import { MobileAppNoticeModal } from "./MobileAppNoticeModal";
+
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./ui/card";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ export default function LoginPage() {
         return;
       }
 
-      const rawUser = response.user || response;
+      const rawUser = response.user;
       const rawRole = (rawUser.role || "owner").toString().toLowerCase();
 
       // Check if role is Rider or Customer
@@ -48,7 +50,7 @@ export default function LoginPage() {
       }
 
       // Valid Web Portal user (Owner or Dispatcher)
-      const userObj = {
+      const userObj: UserType = {
         id: rawUser.id || Date.now(),
         username: rawUser.username || username.trim(),
         role: rawRole as UserRole,
@@ -86,24 +88,26 @@ export default function LoginPage() {
               <Bike className="text-white" size={28} />
             </div>
             <div className="text-left">
-              <h1 className="text-white text-2xl font-black tracking-wide">ERRAND SYSTEM</h1>
-              <p className="text-blue-300 text-xs font-semibold tracking-wider">MARIADB BACKEND SYSTEM</p>
+              <h1 className="text-white text-2xl font-black tracking-wide">SUGO SYSTEM PORTAL</h1>
+              <p className="text-blue-300 text-xs font-semibold tracking-wider">TACURONG CITY LOGISTICS & DISPATCH</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden p-8">
-          <h2 className="text-center mb-1 text-slate-800 font-bold text-xl">Sign In</h2>
-          <p className="text-center mb-6 text-slate-500 text-sm">Access your system portal workspace</p>
+        <Card className="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden border-slate-200">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-slate-800 font-bold text-xl">Sign In</CardTitle>
+            <CardDescription className="text-slate-500 text-sm">Access your system portal workspace</CardDescription>
+          </CardHeader>
 
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl mb-4 bg-red-50 border border-red-200">
-              <AlertCircle size={16} className="text-red-500 shrink-0" />
-              <p className="text-red-600 text-sm font-medium">{error}</p>
-            </div>
-          )}
+          <CardContent className="space-y-4 pt-4">
+            {error && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
+                <AlertCircle size={16} className="text-red-500 shrink-0" />
+                <p className="text-red-600 text-sm font-medium">{error}</p>
+              </div>
+            )}
 
-          <div className="space-y-4">
             <div>
               <label className="block mb-1.5 text-slate-700 text-sm font-medium">Username</label>
               <div className="relative">
@@ -142,11 +146,13 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+          </CardContent>
 
+          <CardFooter className="pt-2 border-t-0 bg-transparent">
             <button
               onClick={handleLogin}
               disabled={isLoading}
-              className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md mt-2 disabled:opacity-70 cursor-pointer"
+              className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md disabled:opacity-70 cursor-pointer"
             >
               {isLoading ? (
                 <>
@@ -159,8 +165,8 @@ export default function LoginPage() {
                 </>
               )}
             </button>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       </div>
 
       <MobileAppNoticeModal

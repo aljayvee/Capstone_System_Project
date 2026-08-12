@@ -1,60 +1,105 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, AuthContextType } from "../types/auth";
+import { setMemoryAccessToken, getMemoryAccessToken, setOnLogoutCallback, apiClient } from "../services/apiClient";
 
-const AUTH_STORAGE_KEY = "errand_system_auth_user";
-const TOKEN_STORAGE_KEY = "errand_system_jwt_token";
+const USER_SESSION_KEY = "errand_system_session_user";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+      const savedUser = sessionStorage.getItem(USER_SESSION_KEY);
       return savedUser ? JSON.parse(savedUser) : null;
     } catch {
       return null;
     }
   });
 
-  const [token, setToken] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem(TOKEN_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  });
+  const [token, setTokenState] = useState<string | null>(() => getMemoryAccessToken());
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
+  const updateToken = useCallback((newToken: string | null) => {
+    setMemoryAccessToken(newToken);
+    setTokenState(newToken);
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      if (getMemoryAccessToken()) {
+        await apiClient.post("/auth/logout").catch(() => {});
+      }
+    } finally {
+      setUser(null);
+      updateToken(null);
+      sessionStorage.removeItem(USER_SESSION_KEY);
+    }
+  }, [updateToken]);
+
+  const login = useCallback(
+    (newUser: User, newToken?: string) => {
+      setUser(newUser);
+      sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(newUser));
+      const authToken = newToken || newUser.token || null;
+      updateToken(authToken);
+    },
+    [updateToken]
+  );
+
+  // Register global logout callback for 401 refresh failures
+  useEffect(() => {
+    setOnLogoutCallback(logout);
+  }, [logout]);
+
+  // Sync user state to sessionStorage
   useEffect(() => {
     if (user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
     } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+      sessionStorage.removeItem(USER_SESSION_KEY);
     }
   }, [user]);
 
+  // Initial silent token refresh on page load/mount. Always attempted —
+  // the HttpOnly refresh cookie (not sessionStorage, which is per-tab) is
+  // the real source of truth for "is this user still logged in," so a
+  // fresh tab/reload must not skip this just because sessionStorage is empty.
   useEffect(() => {
-    if (token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
-  }, [token]);
+    let isMounted = true;
+    const initializeAuth = async () => {
+      try {
+        const res = await apiClient.post("/auth/refresh");
+        if (isMounted && res.data?.token) {
+          updateToken(res.data.token);
+          if (res.data.user) {
+            setUser(res.data.user);
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          // No valid refresh cookie (or it's expired/revoked) — genuinely logged out.
+          setUser(null);
+          updateToken(null);
+          sessionStorage.removeItem(USER_SESSION_KEY);
+        }
+      } finally {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+      }
+    };
 
-  const login = (newUser: User, newToken?: string) => {
-    setUser(newUser);
-    if (newToken) {
-      setToken(newToken);
-    } else if (newUser.token) {
-      setToken(newUser.token);
-    }
-  };
+    initializeAuth();
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-  };
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (isInitializing) {
+    // Prevent flash of unauthenticated login page while silent refresh is completing
+    return null;
+  }
 
   return (
     <AuthContext.Provider
@@ -78,4 +123,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

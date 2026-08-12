@@ -2,14 +2,20 @@ import React from "react";
 import { createBrowserRouter } from "react-router";
 import LoginPage from "../components/LoginPage";
 import { ProtectedRoute } from "../components/ProtectedRoute";
+import { GuestRoute } from "../components/GuestRoute";
 import OwnerPortal from "../portals/owner/OwnerPortal";
 import DispatcherPortal from "../portals/dispatcher/DispatcherPortal";
 import { MobileAppNoticeModal } from "../components/MobileAppNoticeModal";
+import { NotFoundPage } from "../components/NotFoundPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    Component: LoginPage,
+    element: (
+      <GuestRoute>
+        <LoginPage />
+      </GuestRoute>
+    ),
   },
   {
     path: "/owner",
@@ -50,6 +56,10 @@ export const router = createBrowserRouter([
         }}
       />
     ),
+  },
+  {
+    path: "*",
+    Component: NotFoundPage,
   },
 ]);
 

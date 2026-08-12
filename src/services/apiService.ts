@@ -1,5 +1,5 @@
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
-
+import { apiClient, setMemoryAccessToken } from "./apiClient";
+import { User } from "../types/auth";
 
 export interface ApiUser {
   id: number;
@@ -30,106 +30,65 @@ export interface ApiRateConfig {
   nightSurcharge: number;
 }
 
-function getAuthHeaders(): HeadersInit {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  const token = localStorage.getItem("errand_system_jwt_token");
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-}
-
 export const apiService = {
   // Authentication API
-  async login(username: string, password: string): Promise<{ user: any; token: string; message?: string } | { error: string }> {
+  async login(
+    username: string,
+    password: string
+  ): Promise<{ user: User; token: string; message?: string } | { error: string }> {
     try {
-      // Try /api/auth/login first, then /login fallback
-      let res = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${API_BASE_URL.replace(/\/api$/, "")}/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        });
-      }
-
-      const data = await res.json();
-      if (!res.ok) {
-        return { error: data.error || "Authentication failed. Invalid username or password." };
+      const response = await apiClient.post("/auth/login", { username, password });
+      const data = response.data;
+      if (data.token) {
+        setMemoryAccessToken(data.token);
       }
       return data;
     } catch (err: any) {
       console.warn("Backend auth failed, error:", err);
-      return { error: err.message || "Unable to connect to backend authentication server." };
+      const errorMessage =
+        err.response?.data?.error || err.message || "Unable to connect to backend authentication server.";
+      return { error: errorMessage };
     }
   },
 
   // Users API
   async getUsers(): Promise<ApiUser[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/users`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("Failed to fetch users");
-      return await res.json();
+      const response = await apiClient.get<ApiUser[]>("/users");
+      return response.data;
     } catch (err) {
-      console.warn("API unavailable, fallback to local state", err);
+      console.warn("API unavailable or access denied", err);
       return [];
     }
   },
 
   async createUser(userData: Partial<ApiUser> & { password?: string }): Promise<ApiUser | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/users`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(userData),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create user");
-      }
-      return data;
+      const response = await apiClient.post<ApiUser>("/users", userData);
+      return response.data;
     } catch (err: any) {
       console.warn("API Error (createUser):", err);
-      throw err;
+      const message = err.response?.data?.error || err.message || "Failed to create user";
+      throw new Error(message);
     }
   },
 
-  async updateUser(id: number, userData: Record<string, any>): Promise<ApiUser | null> {
+  async updateUser(id: number, userData: Record<string, unknown>): Promise<ApiUser | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/users/${id}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(userData),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update user");
-      }
-      return data;
+      const response = await apiClient.put<ApiUser>(`/users/${id}`, userData);
+      return response.data;
     } catch (err: any) {
       console.warn("API Error (updateUser):", err);
-      throw err;
+      const message = err.response?.data?.error || err.message || "Failed to update user";
+      throw new Error(message);
     }
   },
-
 
   // Merchant Categories API
   async getMerchantCategories(): Promise<ApiMerchantCategory[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/merchant-categories`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("Failed to fetch merchant categories");
-      return await res.json();
+      const response = await apiClient.get<ApiMerchantCategory[]>("/merchant-categories");
+      return response.data;
     } catch (err) {
       console.warn("API unavailable", err);
       return [];
@@ -138,13 +97,8 @@ export const apiService = {
 
   async createMerchantCategory(data: { name: string; description: string }): Promise<ApiMerchantCategory | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/merchant-categories`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to create category");
-      return await res.json();
+      const response = await apiClient.post<ApiMerchantCategory>("/merchant-categories", data);
+      return response.data;
     } catch (err) {
       console.warn("API Error:", err);
       return null;
@@ -154,11 +108,8 @@ export const apiService = {
   // Rate Config API
   async getRateConfig(): Promise<ApiRateConfig | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/rate-config`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error("Failed to fetch rate config");
-      return await res.json();
+      const response = await apiClient.get<ApiRateConfig>("/rate-config");
+      return response.data;
     } catch (err) {
       console.warn("API unavailable", err);
       return null;
@@ -167,17 +118,11 @@ export const apiService = {
 
   async updateRateConfig(config: Partial<ApiRateConfig>): Promise<ApiRateConfig | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/rate-config`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(config),
-      });
-      if (!res.ok) throw new Error("Failed to update rate config");
-      return await res.json();
+      const response = await apiClient.put<ApiRateConfig>("/rate-config", config);
+      return response.data;
     } catch (err) {
       console.warn("API Error:", err);
       return null;
     }
   },
 };
-

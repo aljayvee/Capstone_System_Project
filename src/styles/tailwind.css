@@ -2,3 +2,26 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+@theme {
+  --color-sidebar: #1E3A5F;
+  --color-sidebar-foreground: #ffffff;
+  --color-sidebar-primary: #ffffff;
+  --color-sidebar-primary-foreground: #1E3A5F;
+  --color-sidebar-accent: rgba(255, 255, 255, 0.15);
+  --color-sidebar-accent-foreground: #ffffff;
+  --color-sidebar-border: rgba(96, 165, 250, 0.2);
+  --color-sidebar-ring: #ffffff;
+}
+
+:root {
+  --sidebar-background: #1E3A5F;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1E3A5F;
+  --sidebar-accent: rgba(255, 255, 255, 0.15);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(96, 165, 250, 0.2);
+  --sidebar-ring: #ffffff;
+}
+

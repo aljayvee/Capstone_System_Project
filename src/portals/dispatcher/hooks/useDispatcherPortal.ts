@@ -1,52 +1,99 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router";
 import { io, Socket } from "socket.io-client";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { ErrandService, MockRider } from "../../../services/errandService";
 import { Errand, ErrandStatus } from "../../../types/errand";
+import { apiClient } from "../../../services/apiClient";
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
   : "http://localhost:5000";
 
-function mapOrderToErrand(rawOrder: any): Errand {
+type DispatcherTab = "queue" | "riders" | "recent_chats";
+const TAB_IDS: DispatcherTab[] = ["queue", "riders", "recent_chats"];
+
+// Map the strict Prisma Errand object to the frontend Errand interface
+function mapPrismaErrand(prismaErrand: any): Errand {
   return {
-    id: rawOrder.orderId || `ERR-${rawOrder.id}`,
-    customerName: rawOrder.customerName || "Customer",
-    customerPhone: rawOrder.customerPhone || "09123456789",
-    category: rawOrder.categories || "Pabili",
-    description: typeof rawOrder.items === "string" ? rawOrder.items : JSON.stringify(rawOrder.items || {}),
-    pickupAddress: rawOrder.categories || "Store",
-    deliveryAddress: rawOrder.deliveryAddress || "Tacurong City",
-    estimatedCost: parseFloat(rawOrder.totalPurchaseAmount) || 0,
-    deliveryFee: (parseFloat(rawOrder.baseFee) || 70) + (parseFloat(rawOrder.distanceFee) || 10),
-    tip: 0,
-    totalCost: parseFloat(rawOrder.grandTotal) || 80,
-    status: rawOrder.status === "PENDING" ? "Pending" : rawOrder.status,
-    dispatcherId: rawOrder.dispatcherId,
-    dispatcherName: rawOrder.dispatcherName,
-    createdAt: rawOrder.createdAt || new Date().toISOString(),
-    updatedAt: rawOrder.updatedAt || new Date().toISOString(),
+    id: prismaErrand.id,
+    customerName: prismaErrand.customer?.name || "Customer",
+    customerPhone: prismaErrand.customer?.phone || "09123456789",
+    category: prismaErrand.category,
+    description: prismaErrand.description,
+    pickupAddress: prismaErrand.pickupAddress,
+    deliveryAddress: prismaErrand.deliveryAddress,
+    estimatedCost: prismaErrand.estimatedCost,
+    deliveryFee: prismaErrand.deliveryFee,
+    tip: prismaErrand.tip,
+    totalCost: prismaErrand.totalCost,
+    status: prismaErrand.status,
+    dispatcherId: prismaErrand.dispatchLogs?.[0]?.dispatcherId,
+    dispatcherName: prismaErrand.dispatchLogs?.[0]?.dispatcher?.name,
+    riderId: prismaErrand.riderId,
+    riderName: prismaErrand.rider?.name,
+    createdAt: prismaErrand.createdAt,
+    updatedAt: prismaErrand.updatedAt,
   };
 }
 
-export function useDispatcherPortal() {
-  const [activeTab, setActiveTab] = useState<"queue" | "riders" | "live_map">("queue");
+// An errand is visible to this dispatcher if it's still unclaimed (AVAILABLE,
+// shown to everyone) or if this dispatcher is the one who claimed it — mirrors
+// the backend's findManyForDispatcher scoping, applied to live Socket.io
+// broadcasts too (those are global, unscoped io.emit() calls server-side, so
+// without this a claim by another dispatcher would otherwise still show up here).
+function isVisibleToDispatcher(errand: Errand, dispatcherId?: number): boolean {
+  if (String(errand.status).toUpperCase() === "AVAILABLE") return true;
+  if (!dispatcherId) return false;
+  return String(errand.dispatcherId) === String(dispatcherId);
+}
+
+export function useDispatcherPortal(currentUserId?: number) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [errands, setErrands] = useState<Errand[]>([]);
   const [riders, setRiders] = useState<MockRider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedErrandId, setSelectedErrandId] = useState<string | null>(null);
+
+  const requestedTab = searchParams.get("tab");
+  const activeTab: DispatcherTab = TAB_IDS.includes(requestedTab as DispatcherTab)
+    ? (requestedTab as DispatcherTab)
+    : "queue";
+  const selectedErrandId = searchParams.get("errand");
+
+  const setActiveTab = (tab: DispatcherTab) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const setSelectedErrandId = (id: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (id) {
+          next.set("errand", id);
+        } else {
+          next.delete("errand");
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/orders/pabili`);
-      if (res.ok) {
-        const data = await res.json();
-        const mapped = (data.orders || []).map(mapOrderToErrand);
-        setErrands(mapped);
-      }
+      const res = await apiClient.get("/errands");
+      const mapped = (res.data || []).map(mapPrismaErrand);
+      setErrands(mapped);
     } catch (err) {
-      console.warn("Failed to fetch MariaDB orders:", err);
+      console.warn("Failed to fetch errands:", err);
     }
   }, []);
 
@@ -55,8 +102,11 @@ export function useDispatcherPortal() {
       setIsLoading(true);
       await fetchOrders();
       try {
-        const fetchedRiders = await ErrandService.getRiders();
-        setRiders(fetchedRiders);
+        const ridersRes = await apiClient.get("/riders");
+        const riderList = Array.isArray(ridersRes.data)
+          ? ridersRes.data
+          : ridersRes.data?.riders || [];
+        setRiders(riderList);
       } catch (err) {
         console.error("Failed to load riders:", err);
       } finally {
@@ -70,52 +120,40 @@ export function useDispatcherPortal() {
 
     socket.on("order:new", (newOrder: any) => {
       console.log("[Socket.io] Received order:new:", newOrder);
-      const errand = mapOrderToErrand(newOrder);
+      const errand = mapPrismaErrand(newOrder);
       setErrands((prev) => [errand, ...prev.filter((e) => e.id !== errand.id)]);
     });
 
     socket.on("order:claimed", (claimedOrder: any) => {
       console.log("[Socket.io] Received order:claimed:", claimedOrder);
-      const errand = mapOrderToErrand(claimedOrder);
-      setErrands((prev) => prev.map((e) => (e.id === errand.id ? errand : e)));
+      const errand = mapPrismaErrand(claimedOrder);
+      setErrands((prev) =>
+        isVisibleToDispatcher(errand, currentUserId)
+          ? prev.map((e) => (e.id === errand.id ? errand : e))
+          : prev.filter((e) => e.id !== errand.id)
+      );
     });
 
     socket.on("order:updated", (updatedOrder: any) => {
-      const errand = mapOrderToErrand(updatedOrder);
-      setErrands((prev) => prev.map((e) => (e.id === errand.id ? errand : e)));
+      const errand = mapPrismaErrand(updatedOrder);
+      setErrands((prev) =>
+        isVisibleToDispatcher(errand, currentUserId)
+          ? prev.map((e) => (e.id === errand.id ? errand : e))
+          : prev.filter((e) => e.id !== errand.id)
+      );
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, currentUserId]);
 
   const handleClaimOrder = async (orderId: string, currentUser: any) => {
     const dispatcherFirstName = currentUser?.name ? currentUser.name.split(" ")[0] : "Dispatcher";
     const dispatcherId = currentUser?.id || 1;
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/orders/pabili/${orderId}/claim`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dispatcherId,
-          dispatcherName: dispatcherFirstName,
-        }),
-      });
-
-      if (res.status === 409) {
-        const data = await res.json();
-        alert(`This order was already accepted by ${data.claimedBy || "another dispatcher"}.`);
-        fetchOrders();
-        return;
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to claim order");
-        return;
-      }
+      const res = await apiClient.patch(`/errands/${orderId}/claim`);
 
       // Write meta info to Firebase Realtime Database
       try {
@@ -132,7 +170,12 @@ export function useDispatcherPortal() {
       setSelectedErrandId(orderId);
       fetchOrders();
     } catch (err: any) {
-      alert(err.message || "Failed to connect to backend for order claim.");
+      if (err.response?.status === 409) {
+        alert(err.response.data.error || "This order was already accepted.");
+        fetchOrders();
+      } else {
+        alert(err.response?.data?.error || err.message || "Failed to claim order");
+      }
     }
   };
 
@@ -146,21 +189,15 @@ export function useDispatcherPortal() {
 
   const handleUpdateStatus = async (errandId: string, targetStatus: ErrandStatus) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/orders/pabili/${errandId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: targetStatus }),
-      });
-      if (res.ok) {
-        setErrands((prev) =>
-          prev.map((e) => (e.id === errandId ? { ...e, status: targetStatus } : e))
-        );
-      } else {
-        const updated = await ErrandService.updateErrandStatus(errandId, targetStatus);
-        setErrands((prev) => prev.map((e) => (e.id === errandId ? updated : e)));
-      }
+      const res = await apiClient.patch(`/errands/${errandId}/status`, { status: targetStatus });
+      setErrands((prev) =>
+        prev.map((e) => (e.id === errandId ? { ...e, status: targetStatus } : e))
+      );
     } catch (err: any) {
-      alert(err.message || "Failed to update status");
+      alert(err.response?.data?.error || err.message || "Failed to update status");
+      // Fallback update if needed
+      const updated = await ErrandService.updateErrandStatus(errandId, targetStatus);
+      setErrands((prev) => prev.map((e) => (e.id === errandId ? updated : e)));
     }
   };
 

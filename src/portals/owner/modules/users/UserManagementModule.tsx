@@ -8,6 +8,9 @@ import { apiService } from "../../../../services/apiService";
 export interface UserRecord {
   id: number;
   name: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
   username: string;
   email: string;
   phone: string;
@@ -17,9 +20,9 @@ export interface UserRecord {
 
 export const UserManagementModule: React.FC = () => {
   const [users, setUsers] = useState<UserRecord[]>([
-    { id: 1, name: "Aljayvee Versola", username: "owner", email: "aj.versola@company.ph", phone: "09171234567", role: "owner", status: "Active" },
-    { id: 2, name: "Mark Dennis Batcharo", username: "dispatcher", email: "md.batcharo@company.ph", phone: "09281234567", role: "dispatcher", status: "Active" },
-    { id: 3, name: "Al-Dhen Musali", username: "rider01", email: "ad.musali@company.ph", phone: "09391234567", role: "rider", status: "Active" },
+    { id: 1, name: "Aljayvee Versola", firstName: "Aljayvee", middleName: "P.", lastName: "Versola", username: "owner", email: "aj.versola@company.ph", phone: "09171234567", role: "owner", status: "Active" },
+    { id: 2, name: "Mark Dennis Batcharo", firstName: "Mark Dennis", middleName: "G.", lastName: "Batcharo", username: "dispatcher", email: "md.batcharo@company.ph", phone: "09281234567", role: "dispatcher", status: "Active" },
+    { id: 3, name: "Al-Dhen Musali", firstName: "Al-Dhen", middleName: "M.", lastName: "Musali", username: "rider01", email: "ad.musali@company.ph", phone: "09391234567", role: "rider", status: "Active" },
   ]);
 
   const [search, setSearch] = useState("");
@@ -33,6 +36,9 @@ export const UserManagementModule: React.FC = () => {
         backendUsers.map((u) => ({
           id: u.id,
           name: u.name || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username,
+          firstName: u.firstName,
+          middleName: u.middleName,
+          lastName: u.lastName,
           username: u.username,
           email: u.email,
           phone: u.phone,
@@ -47,7 +53,7 @@ export const UserManagementModule: React.FC = () => {
     loadBackendUsers();
   }, []);
 
-  const handleAddUser = async (newUserData: { name: string; username: string; email: string; phone: string; role: UserRole; password?: string }) => {
+  const handleAddUser = async (newUserData: { firstName: string; middleName?: string; lastName: string; username: string; email: string; phone: string; role: UserRole; password?: string }) => {
     try {
       const created = await apiService.createUser(newUserData);
       if (created) {
@@ -62,7 +68,9 @@ export const UserManagementModule: React.FC = () => {
 
   const handleEditUser = async (updatedData: {
     id: number;
-    name: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
     username: string;
     email: string;
     phone: string;
@@ -136,7 +144,7 @@ export const UserManagementModule: React.FC = () => {
         <table className="w-full text-left text-sm text-slate-700">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold border-b border-slate-200">
             <tr>
-              <th className="p-4">User</th>
+              <th className="p-4">Name & Email</th>
               <th className="p-4">Role</th>
               <th className="p-4">Username</th>
               <th className="p-4">Phone</th>

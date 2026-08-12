@@ -8,6 +8,9 @@ export interface User {
   email: string;
   phone: string;
   avatar: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   token?: string;
   position?: string;
   vehicleType?: string;
@@ -31,4 +34,3 @@ export interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
 }
-

@@ -8,7 +8,9 @@ interface EditUserModalProps {
   onClose: () => void;
   onSave: (user: {
     id: number;
-    name: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
     username: string;
     email: string;
     phone: string;
@@ -19,7 +21,9 @@ interface EditUserModalProps {
 }
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onSave }) => {
-  const [name, setName] = useState(user.name);
+  const [firstName, setFirstName] = useState(user.firstName);
+  const [middleName, setMiddleName] = useState(user.middleName || "");
+  const [lastName, setLastName] = useState(user.lastName);
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);
   const [phone, setPhone] = useState(user.phone);
@@ -36,8 +40,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !username.trim() || !phone.trim()) {
-      setError("Name, Username, and Phone fields are required.");
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !phone.trim()) {
+      setError("First Name, Last Name, Username, and Phone fields are required.");
       return;
     }
 
@@ -58,7 +62,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     try {
       const payload: any = {
         id: user.id,
-        name: name.trim(),
+        firstName: firstName.trim(),
+        middleName: middleName.trim(),
+        lastName: lastName.trim(),
         username: username.trim(),
         email: email.trim(),
         phone: phone.trim(),
@@ -134,13 +140,36 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">First Name *</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Juan"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Last Name *</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Dela Cruz"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Full Name *</label>
+            <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Middle Name</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Juan Dela Cruz"
+              value={middleName}
+              onChange={(e) => setMiddleName(e.target.value)}
+              placeholder="Optional"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-indigo-500"
             />
           </div>
