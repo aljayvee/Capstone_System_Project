@@ -1,17 +1,19 @@
 import { prisma } from "../lib/prisma.js";
 import type { Prisma } from "@prisma/client";
 
-const WITH_INFORMATION = { information: true } as const;
+const WITH_INFORMATION = { information: true, profilePhoto: true } as const;
 
 export interface CustomerCreateData {
   username: string;
   passwordHash: string;
   email: string;
   status?: string;
+  emailVerified?: boolean;
   information: {
     firstName: string;
     middleName?: string;
     lastName: string;
+    birthdate?: Date | null;
     phone?: string;
     avatar?: string;
   };
@@ -21,13 +23,15 @@ export interface CustomerUpdateData {
   username?: string;
   email?: string;
   status?: string;
+  emailVerified?: boolean;
   passwordHash?: string;
   information?: {
     firstName?: string;
-    middleName?: string;
+    middleName?: string | null;
     lastName?: string;
-    phone?: string;
-    avatar?: string;
+    birthdate?: Date | null;
+    phone?: string | null;
+    avatar?: string | null;
   };
 }
 
@@ -68,5 +72,9 @@ export const customerRepository = {
       } as Prisma.CustomerAccountUpdateInput,
       include: WITH_INFORMATION,
     });
+  },
+
+  markEmailVerified(id: number) {
+    return prisma.customerAccount.update({ where: { id }, data: { emailVerified: true } });
   },
 };

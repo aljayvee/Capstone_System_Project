@@ -5,6 +5,7 @@ import { ProtectedRoute } from "../components/ProtectedRoute";
 import { GuestRoute } from "../components/GuestRoute";
 import OwnerPortal from "../portals/owner/OwnerPortal";
 import DispatcherPortal from "../portals/dispatcher/DispatcherPortal";
+import PlacesDirectoryScreen from "../portals/owner/screens/PlacesDirectoryScreen";
 import { MobileAppNoticeModal } from "../components/MobileAppNoticeModal";
 import { NotFoundPage } from "../components/NotFoundPage";
 
@@ -22,6 +23,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute allowedRoles={["owner"]}>
         <OwnerPortal />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/places",
+    element: (
+      <ProtectedRoute allowedRoles={["owner"]}>
+        <PlacesDirectoryScreen />
       </ProtectedRoute>
     ),
   },

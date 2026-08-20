@@ -5,6 +5,7 @@ import { loginSchema, customerRegisterSchema } from "../validators/authValidator
 import * as authService from "../services/authService.js";
 import type { AuthResult } from "../services/authService.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import * as riderPresenceService from "../services/riderPresenceService.js";
 
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ACCESS_TOKEN_FALLBACK_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -74,6 +75,10 @@ export const logout = asyncHandler<AuthenticatedRequest>(async (req, res) => {
   }
 
   await authService.revokeTokens(tokensToRevoke);
+
+  if (req.user?.id) {
+    void riderPresenceService.closeLoginSession(req.user.id);
+  }
 
   res.clearCookie("refreshToken");
   res.status(200).json({ message: "Logged out successfully." });

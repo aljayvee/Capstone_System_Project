@@ -4,10 +4,16 @@ import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
 import { ErrandQueueTable } from "./components/ErrandQueueTable";
 import { RiderFleetRoster } from "./components/RiderFleetRoster";
 import { DispatcherChatPanel } from "./components/DispatcherChatPanel";
+import { RecentChatsPanel } from "./components/RecentChatsPanel";
+import { DispatcherRiderMessagesPanel } from "./components/DispatcherRiderMessagesPanel";
+import { ActiveErrandsPanel } from "./components/ActiveErrandsPanel";
 import {
-  ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, X
+  ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, MessageCircle, X, Map as MapIcon, Activity
 } from "lucide-react";
 import { ServerStatusBadge } from "../../components/ServerStatusBadge";
+import { NotificationBell } from "../../components/NotificationBell";
+import LiveFleetMap from "../../components/LiveFleetMap";
+import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
 import {
   Sidebar,
   SidebarContent,
@@ -35,11 +41,11 @@ import {
 export default function DispatcherPortal() {
   const { user, logout } = useAuth();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showFleetMap, setShowFleetMap] = useState(false);
   const {
     activeTab,
     setActiveTab,
     errands,
-    riders,
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,
@@ -47,6 +53,7 @@ export default function DispatcherPortal() {
     handleCloseChat,
     handleUpdateStatus,
   } = useDispatcherPortal(user?.id);
+  const { riders } = useRiderFleetPresence();
 
   return (
     <TooltipProvider>
@@ -66,58 +73,162 @@ export default function DispatcherPortal() {
               </div>
             </SidebarHeader>
 
-            <SidebarContent className="px-2 py-1.5 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:py-3 transition-all duration-300 ease-in-out">
+            {/* Structured Navigation Groups */}
+            <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-1.5 space-y-4 transition-all duration-300">
               <SidebarGroup className="p-0">
+                <div className="px-3 mb-2 group-data-[collapsible=icon]:hidden">
+                  <span className="text-[10px] font-extrabold uppercase text-blue-300/60 tracking-wider">
+                    DISPATCH CONSOLE
+                  </span>
+                </div>
                 <SidebarGroupContent>
-                  <SidebarMenu className="gap-1">
+                  <SidebarMenu className="gap-1.5">
+                    {/* Errand Queue */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("queue")}
                         isActive={activeTab === "queue"}
                         tooltip="Errand Queue"
                         size="default"
-                        className={`w-full flex items-center gap-2.5 px-3 h-10.5 rounded-none border-l-[3px] text-sm font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
                           activeTab === "queue"
-                            ? "border-l-blue-400 bg-white/10 text-white"
-                            : "border-l-transparent text-white/55 hover:bg-white/5 hover:text-white"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <ClipboardList size={18} className="shrink-0 transition-all duration-300 ease-in-out" />
-                        <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">Errand Queue</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <ClipboardList size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Errand Queue
+                          </span>
+                        </div>
+                        {errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              activeTab === "queue"
+                                ? "bg-white/20 text-white"
+                                : "bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                            }`}
+                          >
+                            {errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length}
+                          </span>
+                        )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
+                    {/* Active Errand */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setActiveTab("active_errands")}
+                        isActive={activeTab === "active_errands"}
+                        tooltip="Active Errand"
+                        size="default"
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
+                          activeTab === "active_errands"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Activity size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Active Errand
+                          </span>
+                        </div>
+                        {errands.filter((e) => {
+                          const s = String(e.status).toUpperCase();
+                          return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "COMPLETED" && s !== "DELIVERED" && s !== "PASSING BY";
+                        }).length > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              activeTab === "active_errands"
+                                ? "bg-white/20 text-white"
+                                : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
+                            }`}
+                          >
+                            {errands.filter((e) => {
+                              const s = String(e.status).toUpperCase();
+                              return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "COMPLETED" && s !== "DELIVERED" && s !== "PASSING BY";
+                            }).length}
+                          </span>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    {/* Riders */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("riders")}
                         isActive={activeTab === "riders"}
-                        tooltip="Rider Monitoring"
+                        tooltip="Riders"
                         size="default"
-                        className={`w-full flex items-center gap-2.5 px-3 h-10.5 rounded-none border-l-[3px] text-sm font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
                           activeTab === "riders"
-                            ? "border-l-blue-400 bg-white/10 text-white"
-                            : "border-l-transparent text-white/55 hover:bg-white/5 hover:text-white"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <Bike size={18} className="shrink-0 transition-all duration-300 ease-in-out" />
-                        <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">Rider Monitoring</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Bike size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Live Map
+                          </span>
+                        </div>
+                        {riders.length > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              activeTab === "riders"
+                                ? "bg-white/20 text-white"
+                                : "bg-blue-400/20 text-blue-300 border border-blue-400/30"
+                            }`}
+                          >
+                            {riders.filter((r) => r.online).length}/{riders.length}
+                          </span>
+                        )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
+                    {/* Messages */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setActiveTab("messages")}
+                        isActive={activeTab === "messages"}
+                        tooltip="Messages"
+                        size="default"
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
+                          activeTab === "messages"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <MessageCircle size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Rider Messages
+                          </span>
+                        </div>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    {/* Customer Chats */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("recent_chats")}
                         isActive={activeTab === "recent_chats"}
-                        tooltip="Recent Customer Chats"
+                        tooltip="Customer Chats"
                         size="default"
-                        className={`w-full flex items-center gap-2.5 px-3 h-10.5 rounded-none border-l-[3px] text-sm font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
                           activeTab === "recent_chats"
-                            ? "border-l-blue-400 bg-white/10 text-white"
-                            : "border-l-transparent text-white/55 hover:bg-white/5 hover:text-white"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <MessageSquare size={18} className="shrink-0 transition-all duration-300 ease-in-out" />
-                        <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">Recent Customer Chats</span>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <MessageSquare size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Customer Chats History
+                          </span>
+                        </div>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   </SidebarMenu>
@@ -125,26 +236,37 @@ export default function DispatcherPortal() {
               </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className="p-2.5 border-t border-white/10 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:py-3 transition-all duration-300 ease-in-out gap-1.5">
-              <div className="flex items-center gap-2.5 mb-0.5 min-w-0 group-data-[collapsible=icon]:hidden transition-all duration-300 ease-in-out">
-                <div 
-                  className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md transition-all duration-300 ease-in-out"
-                  title={user?.name || "Mark Dennis Batcharo"}
+            {/* Sidebar User & Logout Footer */}
+            <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2 space-y-2">
+              <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                <div
+                  className="w-9 h-9 rounded-xl bg-blue-600/80 border border-blue-400/30 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm"
+                  title={user?.name || "Dispatcher"}
                 >
-                  {(user?.name || "Mark Dennis Batcharo").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  {(user?.name || "Dispatcher")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </div>
-                <div className="min-w-0 transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="text-[13px] font-bold text-white truncate">{user?.name || "Mark Dennis Batcharo"}</p>
-                  <p className="text-[10px] text-blue-200/70 truncate">{user?.email}</p>
+                <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+                  <p className="text-xs font-bold text-white truncate">
+                    {user?.name || "Dispatcher"}
+                  </p>
+                  <p className="text-[10px] text-blue-200/60 truncate font-mono">
+                    {user?.email || "dispatcher@errand.ph"}
+                  </p>
                 </div>
               </div>
+
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 h-10.5 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:gap-0"
+                className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-white/10 hover:bg-red-600 text-slate-300 hover:text-white text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:mx-auto"
                 title="Sign Out"
               >
-                <LogOut size={14} className="shrink-0 transition-all duration-300 ease-in-out" />
-                <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">Sign Out</span>
+                <LogOut size={15} />
+                <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
               </button>
             </SidebarFooter>
           </Sidebar>
@@ -184,120 +306,125 @@ export default function DispatcherPortal() {
 
           {/* Main Operations Console */}
           <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full relative">
-          <main className="flex-1 p-8 overflow-y-auto space-y-8 h-screen w-full">
-            <header className="flex items-center justify-between pb-4 border-b border-slate-200">
-              <div className="flex items-center gap-4">
+            <main className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 h-screen w-full">
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* 1. TOP HERO HEADER (Scrolls away with page)                   */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
                 <div>
-                  <h1 className="text-2xl font-extrabold text-slate-800">Live Dispatch Operations</h1>
-                  <p className="text-sm text-slate-500 mt-0.5">Your dedicated console for coordinating deliveries in real time</p>
-                </div>
-              </div>
-              <ServerStatusBadge />
-            </header>
-
-            {/* Operational Status Cards */}
-            <section className="grid grid-cols-3 gap-6">
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-                <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                  <Clock size={24} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Available Queue</p>
-                  <p className="text-2xl font-extrabold text-slate-800">{errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length} Errands</p>
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-                <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                  <Zap size={24} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">In Route / Active Deliveries</p>
-                  <p className="text-2xl font-extrabold text-slate-800">
-                    {
-                      errands.filter((e) => {
-                        const s = String(e.status).toUpperCase();
-                        return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED";
-                      }).length
-                    }{" "}
-                    Errands
+                  <div className="flex items-center gap-2.5 mb-1">
+                    <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+                      <ClipboardList size={20} />
+                    </span>
+                    <h1 className="text-xl font-extrabold text-slate-800">Dispatch Console</h1>
+                  </div>
+                  <p className="text-xs text-slate-500 max-w-xl">
+                    Coordinate customer errands, assign delivery riders, and monitor active orders in real time.
                   </p>
                 </div>
-              </div>
 
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-center gap-4 shadow-sm">
-                <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                  <Bike size={24} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Available Riders</p>
-                  <p className="text-2xl font-extrabold text-slate-800">{riders.filter((r) => r.status === "Available").length} Riders</p>
+                <div className="flex items-center gap-2.5">
+                  <NotificationBell />
+                  <ServerStatusBadge />
                 </div>
               </div>
-            </section>
 
-            {/* Modular Views */}
-            {activeTab === "queue" && (
-              <ErrandQueueTable
-                errands={errands}
-                currentUser={user}
-                onClaimOrder={handleClaimOrder}
-                onOpenChat={handleOpenChat}
-                onUpdateStatus={handleUpdateStatus}
-              />
-            )}
-            {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
-            {activeTab === "recent_chats" && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-                <h3 className="text-lg font-extrabold text-slate-800">💬 Recent Customer Chats — Closed & Archived</h3>
-                <p className="text-sm text-slate-500">A history of customer conversations from errands that have since been completed or handed off to a rider.</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] font-extrabold tracking-wider border-b border-slate-200">
-                      <tr>
-                        <th className="p-4">Errand ID</th>
-                        <th className="p-4">Customer</th>
-                        <th className="p-4">Category</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {errands
-                        .filter((e) => String(e.status).toUpperCase() !== "AVAILABLE")
-                        .map((e) => (
-                          <tr key={e.id} className="hover:bg-slate-50 transition">
-                            <td className="p-4 font-mono font-bold text-[#1E3A5F]">{e.id}</td>
-                            <td className="p-4 font-bold text-slate-800">{e.customerName}</td>
-                            <td className="p-4">{e.category}</td>
-                            <td className="p-4">
-                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                                {e.status}
-                              </span>
-                            </td>
-                            <td className="p-4 text-right">
-                              <button
-                                onClick={() => handleOpenChat(e.id)}
-                                className="text-xs bg-slate-800 hover:bg-slate-900 text-white font-semibold px-3 py-1.5 rounded-lg shadow-sm transition"
-                              >
-                                View Chat Logs
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      {errands.filter((e) => String(e.status).toUpperCase() !== "AVAILABLE").length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 italic">
-                            No closed customer chats recorded yet.
-                          </td>
-                        </tr>
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* 2. OPERATIONAL KPI SUMMARY CARDS (Sticky when hitting top)     */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              <section className="sticky top-0 z-30 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F9FAFB]/95 backdrop-blur-md py-2.5 -my-2.5 transition-all">
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                  <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
+                    <Clock size={22} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Awaiting Dispatch</p>
+                    <p className="text-xl font-black text-slate-900 mt-0.5">
+                      {errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length} Errands
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
+                    <Zap size={22} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Errands</p>
+                    <p className="text-xl font-black text-slate-900 mt-0.5">
+                      {
+                        errands.filter((e) => {
+                          const s = String(e.status).toUpperCase();
+                          return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED" && s !== "DELIVERED";
+                        }).length
+                      }{" "}
+                      Errands
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
+                    <Bike size={22} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Riders Ready</p>
+                    <p className="text-xl font-black text-slate-900 mt-0.5">
+                      {riders.filter((r) => r.online).length} of {riders.length} Riders
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* 3. MODULAR CONTENT VIEWS                                      */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              <div>
+                {activeTab === "queue" && (
+                  <div className="flex flex-col space-y-4">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => setShowFleetMap(!showFleetMap)}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-200"
+                      >
+                        <MapIcon size={18} />
+                        {showFleetMap ? 'Hide Fleet Map' : 'Show Fleet Map'}
+                      </button>
+                    </div>
+                    <div className="flex flex-1 gap-6 min-h-0">
+                      <div className={`transition-all duration-300 ${showFleetMap ? 'w-2/3 pr-2' : 'w-full'}`}>
+                        <ErrandQueueTable
+                          errands={errands}
+                          currentUser={user}
+                          onClaimOrder={handleClaimOrder}
+                          onOpenChat={handleOpenChat}
+                          onUpdateStatus={handleUpdateStatus}
+                        />
+                      </div>
+                      {showFleetMap && (
+                        <div className="w-1/3 h-[500px]">
+                          <LiveFleetMap riders={riders} />
+                        </div>
                       )}
-                    </tbody>
-                  </table>
-                </div>
+                    </div>
+                  </div>
+                )}
+                {activeTab === "active_errands" && (
+                  <ActiveErrandsPanel errands={errands} onOpenChat={handleOpenChat} />
+                )}
+                {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
+                {activeTab === "messages" && (
+                  <DispatcherRiderMessagesPanel
+                    errands={errands}
+                    riders={riders}
+                    dispatcher={user}
+                  />
+                )}
+                {activeTab === "recent_chats" && (
+                  <RecentChatsPanel errands={errands} onOpenChat={handleOpenChat} />
+                )}
               </div>
-            )}
-          </main>
+            </main>
           
           {/* Slide-In Side Drawer for Live Chat & Tools */}
           {selectedErrandId && (

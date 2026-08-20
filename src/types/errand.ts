@@ -33,6 +33,28 @@ export interface Errand {
   deliveryLatitude?: number | null;
   deliveryLongitude?: number | null;
   pinpoints?: ErrandPinpoint[];
+
+  // Road-network route the fare was actually billed on, persisted by
+  // errandService.recalculateFee. routeGeometry is an encoded polyline.
+  distanceKm?: number | null;
+  routeDistanceMeters?: number | null;
+  routeDurationSeconds?: number | null;
+  routeGeometry?: string | null;
+  routeProvider?: string | null;
+
+  // Estimated arrival as a RANGE, not a single time: most of an errand is the
+  // rider standing in a shop, which varies far more than the ride. See the
+  // server's etaStrategy.ts.
+  etaLowAt?: string | null;
+  etaHighAt?: string | null;
+  etaComputedAt?: string | null;
+  etaIsDegraded?: boolean;
+
+  // Lifecycle timestamps.
+  assignedAt?: string | null;
+  acceptedAt?: string | null;
+  deliveredAt?: string | null;
+  completedAt?: string | null;
   estimatedCost: number;
   deliveryFee: number;
   tip: number;

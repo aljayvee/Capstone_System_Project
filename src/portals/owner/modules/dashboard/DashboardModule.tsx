@@ -1,71 +1,142 @@
 import React, { useState } from "react";
-import { Bike, Clock, Package, CheckCircle, TrendingUp, DollarSign } from "lucide-react";
+import { Bike, Clock, Package, CheckCircle, TrendingUp, DollarSign, AlertTriangle, LayoutDashboard } from "lucide-react";
 import { MetricCard } from "./components/MetricCard";
 import { RevenueChart } from "./components/RevenueChart";
+import { useDashboardMetrics } from "../../hooks/useDashboardMetrics";
+import { ServerStatusBadge } from "../../../../components/ServerStatusBadge";
+import { NotificationBell } from "../../../../components/NotificationBell";
+import type { DashboardFrequency } from "../../../../services/apiService";
+
+const FREQUENCY_OPTIONS: Array<{ label: string; value: DashboardFrequency }> = [
+  { label: "Today", value: "TODAY" },
+  { label: "Week", value: "WEEK" },
+  { label: "Month", value: "MONTH" },
+  { label: "Year", value: "YEAR" },
+];
+
+function formatPeso(amount: number): string {
+  return `₱${Math.round(amount).toLocaleString("en-US")}`;
+}
 
 export const DashboardModule: React.FC = () => {
-  const [frequency, setFrequency] = useState<"Today" | "Week" | "Month" | "Year">("Today");
+  const [frequency, setFrequency] = useState<DashboardFrequency>("TODAY");
+  const { data, isLoading, error } = useDashboardMetrics(frequency);
+  const activeLabel = FREQUENCY_OPTIONS.find((f) => f.value === frequency)?.label ?? "Today";
 
-  const revenueMockData = {
-    Today: [
-      { x: "8 AM", revenue: 1200 },
-      { x: "10 AM", revenue: 2400 },
-      { x: "12 PM", revenue: 4800 },
-      { x: "2 PM", revenue: 3600 },
-      { x: "4 PM", revenue: 5200 },
-      { x: "6 PM", revenue: 6100 },
-    ],
-    Week: [
-      { x: "Mon", revenue: 14200 },
-      { x: "Tue", revenue: 18500 },
-      { x: "Wed", revenue: 16800 },
-      { x: "Thu", revenue: 21000 },
-      { x: "Fri", revenue: 24500 },
-      { x: "Sat", revenue: 29000 },
-      { x: "Sun", revenue: 22000 },
-    ],
-    Month: [
-      { x: "Week 1", revenue: 62000 },
-      { x: "Week 2", revenue: 78000 },
-      { x: "Week 3", revenue: 84000 },
-      { x: "Week 4", revenue: 91000 },
-    ],
-    Year: [
-      { x: "Q1", revenue: 240000 },
-      { x: "Q2", revenue: 310000 },
-      { x: "Q3", revenue: 290000 },
-      { x: "Q4", revenue: 420000 },
-    ],
-  };
+  const placeholder = isLoading ? "…" : "—";
+
+  const chartData = (data?.trend ?? []).map((t) => ({
+    x: t.label,
+    revenue: t.revenue,
+  }));
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-6">
-        <MetricCard title="Active Riders" value="18" sub="6 riders offline" icon={Bike} color="#3B82F6" />
-        <MetricCard title="Pending Errands" value="4" sub="Awaiting dispatch" icon={Clock} color="#F59E0B" />
-        <MetricCard title="Active Errands" value="12" sub="In progress" icon={Package} color="#8B5CF6" />
-        <MetricCard title="Completed Errands" value="1,240" sub="Fulfillments" icon={CheckCircle} color="#10B981" />
-        <MetricCard title="System Share" value="₱28,450" sub="Commissions & Surcharges" icon={TrendingUp} color="#1E3A5F" />
-        <MetricCard title="Rider Payouts" value="₱98,000" sub="Delivery Fees" icon={DollarSign} color="#10B981" />
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 1. TOP HERO HEADER WITH TIMEFRAME SWITCHER & STATUS           */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+              <LayoutDashboard size={20} />
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-800">Dashboard</h2>
+          </div>
+          <p className="text-xs text-slate-500 max-w-xl">
+            Overview of today's errands, active riders, and earnings.
+          </p>
+        </div>
+
+        {/* Timeframe & System Tools */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Frequency Segmented Control */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            {FREQUENCY_OPTIONS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFrequency(f.value)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                  frequency === f.value
+                    ? "bg-[#1E3A5F] text-white shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <NotificationBell />
+          <ServerStatusBadge />
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {(["Today", "Week", "Month", "Year"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFrequency(f)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${
-              frequency === f
-                ? "bg-[#1E3A5F] text-white shadow-sm"
-                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+      {error && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-4 py-3 rounded-2xl">
+          <AlertTriangle size={16} className="shrink-0" />
+          <span>{error} Figures below may be stale or unavailable.</span>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 2. OPERATIONAL METRIC CARDS                                   */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <MetricCard
+          title="Active Riders"
+          value={data ? String(data.riders.active) : placeholder}
+          sub={data ? `${data.riders.inactive} riders inactive` : "Loading..."}
+          icon={Bike}
+          color="#3B82F6"
+        />
+        <MetricCard
+          title="Pending Errands"
+          value={data ? String(data.errands.pending) : placeholder}
+          sub="Awaiting dispatch"
+          icon={Clock}
+          color="#F59E0B"
+        />
+        <MetricCard
+          title="Active Errands"
+          value={data ? String(data.errands.active) : placeholder}
+          sub="In transit"
+          icon={Package}
+          color="#10B981"
+        />
       </div>
 
-      <RevenueChart data={revenueMockData[frequency]} timeframe={frequency} />
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 3. REVENUE CHART & PERFORMANCE CARD                           */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <RevenueChart data={chartData} timeframe={activeLabel} />
+        </div>
+        <div className="space-y-4">
+          <MetricCard
+            title="Completed Errands"
+            value={data ? String(data.errands.completedAllTime) : placeholder}
+            sub="All time completed"
+            icon={CheckCircle}
+            color="#10B981"
+          />
+          <MetricCard
+            title="Gross Revenue"
+            value={data ? formatPeso(data.revenue.gross) : placeholder}
+            sub={`Earnings (${activeLabel.toLowerCase()})`}
+            icon={TrendingUp}
+            color="#8B5CF6"
+          />
+          <MetricCard
+            title="Estimated Payouts"
+            value={data ? formatPeso(data.revenue.estimatedRiderPayouts) : placeholder}
+            sub="Rider payout pool"
+            icon={DollarSign}
+            color="#059669"
+          />
+        </div>
+      </div>
     </div>
   );
 };

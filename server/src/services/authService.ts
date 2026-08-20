@@ -2,9 +2,11 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { userRepository } from "../repositories/userRepository.js";
 import { customerRepository } from "../repositories/customerRepository.js";
+import * as riderPresenceService from "./riderPresenceService.js";
 import { tokenBlocklistRepository } from "../repositories/tokenBlocklistRepository.js";
 import { markRevoked } from "../lib/blocklistCache.js";
 import { buildCustomerAccountCreateData, flattenCustomerAccount } from "./patterns/customerFactory.js";
+import { sendVerificationCode } from "./emailVerificationService.js";
 import { ServiceError } from "./ServiceError.js";
 import { JWT_SECRET, JWT_REFRESH_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN } from "../config/env.js";
 import type { TokenPayload } from "../middleware/auth.js";
@@ -12,7 +14,7 @@ import type { TokenPayload } from "../middleware/auth.js";
 // Computes a display-only "name" field from firstName/lastName.
 // Not stored in the DB (3NF: name is derivable from firstName + lastName,
 // so persisting it would be a transitive-dependency redundancy).
-export function withFullName<T extends { firstName: string; lastName: string }>(
+export function withFullName<T extends { id: number; firstName: string; lastName: string }>(
   user: T
 ): T & { name: string } {
   return { ...user, name: `${user.firstName} ${user.lastName}`.trim() };
@@ -61,6 +63,10 @@ async function authenticate(username: string, password: string, requirement?: Ro
     throw new ServiceError(401, "Invalid username or password");
   }
 
+  if (user.status !== "Active") {
+    throw new ServiceError(403, "This account has been deactivated.");
+  }
+
   if (requirement) {
     const userRole = String(user.role || "").toUpperCase();
     if (userRole !== requirement.role) {
@@ -92,11 +98,13 @@ export function loginGeneral(username: string, password: string) {
   return authenticate(username, password);
 }
 
-export function loginRider(username: string, password: string) {
-  return authenticate(username, password, {
+export async function loginRider(username: string, password: string) {
+  const result = await authenticate(username, password, {
     role: "RIDER",
     deniedMessage: "Access denied: Only Rider accounts are permitted to access the Rider Mobile App.",
   });
+  void riderPresenceService.openLoginSession(result.user.id);
+  return result;
 }
 
 export async function loginCustomer(username: string, password: string): Promise<AuthResult> {
@@ -132,7 +140,9 @@ export interface RegisterInput {
   firstName: string;
   middleName?: string;
   lastName: string;
+  birthdate?: string | Date | null;
   phone?: string;
+  emailVerified?: boolean;
 }
 
 export async function registerCustomer(input: RegisterInput): Promise<AuthResult> {
@@ -151,9 +161,16 @@ export async function registerCustomer(input: RegisterInput): Promise<AuthResult
     firstName: input.firstName,
     middleName: input.middleName,
     lastName: input.lastName,
+    birthdate: input.birthdate,
     phone: input.phone,
+    emailVerified: input.emailVerified ?? false,
   });
   const newCustomer = await customerRepository.create(createData);
+
+  // If not yet verified during registration, send email verification code
+  if (!input.emailVerified) {
+    void sendVerificationCode(newCustomer.id, cleanEmail);
+  }
 
   const flatCustomer = flattenCustomerAccount(newCustomer);
   const tokenPayload: TokenPayload = {

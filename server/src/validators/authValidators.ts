@@ -15,6 +15,8 @@ export const customerRegisterSchema = z.object({
   firstName: nonEmptyTrimmed("First name"),
   middleName: z.string().trim().optional().default(""),
   lastName: nonEmptyTrimmed("Last name"),
+  birthdate: z.string().trim().optional(),
   phone: z.string().trim().optional().default(""),
+  emailVerified: z.boolean().optional(),
 });
 export type CustomerRegisterInput = z.infer<typeof customerRegisterSchema>;

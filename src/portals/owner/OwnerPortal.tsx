@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { DashboardModule } from "./modules/dashboard/DashboardModule";
@@ -9,21 +9,37 @@ import { ServiceRatesModule } from "./modules/rates/ServiceRatesModule";
 import { FinancialReportsModule } from "./modules/reports/FinancialReportsModule";
 import { RiderTrackingModule } from "./modules/tracking/RiderTrackingModule";
 import {
-  LayoutDashboard, Users, Bike, Store, DollarSign, BarChart2, MapPin, LogOut, Bike as BikeIcon, X
+  LayoutDashboard,
+  Users,
+  Bike,
+  Store,
+  DollarSign,
+  BarChart2,
+  MapPin,
+  LogOut,
+  Bike as BikeIcon,
+  X,
+  ShieldCheck,
+  Activity,
+  Layers,
+  ChevronRight,
 } from "lucide-react";
 import { ServerStatusBadge } from "../../components/ServerStatusBadge";
+import { NotificationBell } from "../../components/NotificationBell";
+import { apiClient } from "../../services/apiClient";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarInset
+  SidebarInset,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -40,10 +56,73 @@ type ModuleId = "dashboard" | "users" | "riders" | "merchants" | "rates" | "repo
 
 const MODULE_IDS: ModuleId[] = ["dashboard", "users", "riders", "merchants", "rates", "reports", "tracking"];
 
+interface NavSection {
+  title: string;
+  items: {
+    id: ModuleId;
+    label: string;
+    icon: any;
+    badgeKey?: "users" | "riders" | "merchants";
+  }[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "Overview",
+    items: [
+      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { id: "reports", label: "Reports", icon: BarChart2 },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { id: "users", label: "Users", icon: Users, badgeKey: "users" },
+      { id: "riders", label: "Riders", icon: Bike, badgeKey: "riders" },
+      { id: "tracking", label: "Live Map", icon: MapPin },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { id: "merchants", label: "Store Categories", icon: Store, badgeKey: "merchants" },
+      { id: "rates", label: "Service Rates", icon: DollarSign },
+    ],
+  },
+];
+
 export default function OwnerPortal() {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  // Live Metric Badges
+  const [counts, setCounts] = useState<{ users: number; riders: number; merchants: number }>({
+    users: 0,
+    riders: 0,
+    merchants: 0,
+  });
+
+  useEffect(() => {
+    async function fetchSidebarCounts() {
+      try {
+        const [usersRes, ridersRes, merchantsRes] = await Promise.allSettled([
+          apiClient.get("/users"),
+          apiClient.get("/riders"),
+          apiClient.get("/merchant-categories"),
+        ]);
+
+        const uCount = usersRes.status === "fulfilled" ? (usersRes.value.data?.length || 0) : 0;
+        const rCount = ridersRes.status === "fulfilled" ? (ridersRes.value.data?.riders?.length || ridersRes.value.data?.length || 0) : 0;
+        const mCount = merchantsRes.status === "fulfilled" ? (merchantsRes.value.data?.length || 0) : 0;
+
+        setCounts({ users: uCount, riders: rCount, merchants: mCount });
+      } catch (err) {
+        console.warn("Sidebar counts fetch warning:", err);
+      }
+    }
+    fetchSidebarCounts();
+  }, []);
 
   const requestedModule = searchParams.get("module");
   const activeModule: ModuleId = MODULE_IDS.includes(requestedModule as ModuleId)
@@ -54,84 +133,138 @@ export default function OwnerPortal() {
     setSearchParams({ module: id }, { replace: true });
   };
 
-  const navItems = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "users", label: "User Management", icon: Users },
-    { id: "riders", label: "Rider Management", icon: Bike },
-    { id: "merchants", label: "Merchant Category", icon: Store },
-    { id: "rates", label: "Service Rates", icon: DollarSign },
-    { id: "reports", label: "Financial Reports", icon: BarChart2 },
-    { id: "tracking", label: "Rider Tracking", icon: MapPin },
-  ] as const;
+  const currentLabel =
+    NAV_SECTIONS.flatMap((s) => s.items).find((n) => n.id === activeModule)?.label || "Dashboard";
 
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
-        <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex w-full">
-          {/* Sidebar Navigation - Navy Blue Theme matching Figma prototype */}
-          <Sidebar collapsible="icon" className="border-none" variant="sidebar" style={{ "--sidebar-background": "#162D4A", "--sidebar-foreground": "white", "--sidebar-primary": "white", "--sidebar-primary-foreground": "#162D4A", "--sidebar-border": "rgba(96, 165, 250, 0.2)", "--sidebar-accent": "rgba(255, 255, 255, 0.1)", "--sidebar-accent-foreground": "white", "--sidebar-ring": "white" } as React.CSSProperties}>
-            <SidebarHeader className="p-4 border-b border-white/10 group-data-[collapsible=icon]:p-1.5 group-data-[collapsible=icon]:py-3.5 transition-all duration-300 ease-in-out">
-              <div className="flex items-center gap-2.5 overflow-hidden group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 w-full transition-all duration-300 ease-in-out">
-                <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0 transition-all duration-300 ease-in-out">
-                  <BikeIcon size={20} className="text-white transition-all duration-300 ease-in-out" />
+        <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex w-full">
+          {/* Sidebar Navigation - Navy Theme */}
+          <Sidebar
+            collapsible="icon"
+            className="border-r border-slate-800/20 shadow-xl select-none"
+            variant="sidebar"
+            style={
+              {
+                "--sidebar-background": "#0F2035",
+                "--sidebar-foreground": "white",
+                "--sidebar-primary": "white",
+                "--sidebar-primary-foreground": "#0F2035",
+                "--sidebar-border": "rgba(255, 255, 255, 0.08)",
+                "--sidebar-accent": "rgba(255, 255, 255, 0.08)",
+                "--sidebar-accent-foreground": "white",
+                "--sidebar-ring": "white",
+              } as React.CSSProperties
+            }
+          >
+            {/* Header Brand */}
+            <SidebarHeader className="p-4 border-b border-white/10 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3.5 transition-all duration-300">
+              <div className="flex items-center gap-3 overflow-hidden group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 w-full">
+                <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0 shadow-md">
+                  <BikeIcon size={20} className="text-white" />
                 </div>
-                <div className="min-w-0 transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <h2 className="font-black text-white text-sm tracking-wide leading-tight truncate">OWNER PORTAL</h2>
-                  <p className="text-[10px] text-blue-300/80 font-semibold tracking-wider truncate">SYSTEM ADMINISTRATION</p>
+                <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
+                    OWNER
+                  </h2>
+                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider truncate mt-0.5">
+                    ADMIN PANEL
+                  </p>
                 </div>
               </div>
             </SidebarHeader>
-            <SidebarContent className="px-2 py-1.5 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:py-3 transition-all duration-300 ease-in-out">
-              <SidebarGroup className="p-0">
-                <SidebarGroupContent>
-                  <SidebarMenu className="gap-1">
-                    {navItems.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = activeModule === item.id;
-                      return (
-                        <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton
-                            onClick={() => setActiveModule(item.id)}
-                            isActive={isActive}
-                            tooltip={item.label}
-                            size="default"
-                            className={`w-full flex items-center gap-2.5 px-3 h-10.5 rounded-none border-l-[3px] text-sm font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:size-9! ${
-                              isActive
-                                ? "border-l-blue-400 bg-white/10 text-white"
-                                : "border-l-transparent text-white/55 hover:bg-white/5 hover:text-white"
-                            }`}
-                          >
-                            <Icon size={18} className="shrink-0 transition-all duration-300 ease-in-out" />
-                            <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">{item.label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
+
+            {/* Structured Navigation Groups */}
+            <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-1.5 space-y-4 transition-all duration-300">
+              {NAV_SECTIONS.map((section, sIdx) => (
+                <SidebarGroup key={section.title} className="p-0 space-y-1">
+                  <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400/70 px-2 group-data-[collapsible=icon]:hidden">
+                    {section.title}
+                  </SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu className="gap-1">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeModule === item.id;
+                        const badgeValue = item.badgeKey ? counts[item.badgeKey] : null;
+
+                        return (
+                          <SidebarMenuItem key={item.id}>
+                            <SidebarMenuButton
+                              onClick={() => setActiveModule(item.id)}
+                              isActive={isActive}
+                              tooltip={item.label}
+                              size="default"
+                              className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                                isActive
+                                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/40"
+                                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <Icon
+                                  size={17}
+                                  className={`shrink-0 transition-colors ${
+                                    isActive ? "text-white" : "text-slate-400 group-hover:text-white"
+                                  }`}
+                                />
+                                <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                                  {item.label}
+                                </span>
+                              </div>
+
+                              {/* Badge Count (e.g. 5 categories, 8 users) */}
+                              {badgeValue !== null && badgeValue > 0 && (
+                                <span
+                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-all opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:hidden ${
+                                    isActive
+                                      ? "bg-white/20 text-white border-white/30"
+                                      : "bg-slate-800 text-slate-400 border-slate-700"
+                                  }`}
+                                >
+                                  {badgeValue}
+                                </span>
+                              )}
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ))}
             </SidebarContent>
 
-            <SidebarFooter className="p-2.5 border-t border-white/10 group-data-[collapsible=icon]:px-1.5 group-data-[collapsible=icon]:py-3 transition-all duration-300 ease-in-out gap-1.5">
-              <div className="flex items-center gap-2.5 mb-0.5 min-w-0 group-data-[collapsible=icon]:hidden transition-all duration-300 ease-in-out">
-                <div 
-                  className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md transition-all duration-300 ease-in-out"
+            {/* Sidebar User Profile & Sign Out Footer */}
+            <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-1.5 transition-all duration-300 gap-2">
+              <div className="flex items-center gap-2.5 p-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                <div
+                  className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-md ring-2 ring-white/10"
                   title={user?.name || "Aljayvee Versola"}
                 >
-                  {(user?.name || "Aljayvee Versola").split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                  {(user?.name || "Aljayvee Versola")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </div>
-                <div className="min-w-0 transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="text-[13px] font-bold text-white truncate">{user?.name || "Aljayvee Versola"}</p>
-                  <p className="text-[10px] text-blue-200/70 truncate">{user?.email}</p>
+                <div className="min-w-0 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  <p className="text-xs font-bold text-white truncate">{user?.name || "Aljayvee Versola"}</p>
+                  <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
                 </div>
               </div>
+
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 h-10.5 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-all duration-300 ease-in-out group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:gap-0"
+                className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto"
                 title="Sign Out"
               >
-                <LogOut size={14} className="shrink-0 transition-all duration-300 ease-in-out" />
-                <span className="inline-block truncate transition-all duration-300 ease-in-out opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">Sign Out</span>
+                <LogOut size={15} className="shrink-0" />
+                <span className="inline-block truncate opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  Sign Out
+                </span>
               </button>
             </SidebarFooter>
           </Sidebar>
@@ -171,21 +304,7 @@ export default function OwnerPortal() {
 
           {/* Main Workspace Console */}
           <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full">
-            <main className="flex-1 p-8 overflow-y-auto space-y-8 h-screen w-full">
-              <header className="flex items-center justify-between pb-4 border-b border-slate-200">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <h1 className="text-2xl font-extrabold text-slate-800">
-                      {navItems.find((n) => n.id === activeModule)?.label}
-                    </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">
-                      Errand Service System Administration
-                    </p>
-                  </div>
-                </div>
-                <ServerStatusBadge />
-              </header>
-
+            <main className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 h-screen w-full">
               {/* Dynamic Light Mode Modules */}
               {activeModule === "dashboard" && <DashboardModule />}
               {activeModule === "users" && <UserManagementModule />}

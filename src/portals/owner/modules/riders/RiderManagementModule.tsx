@@ -1,39 +1,45 @@
-import React, { useEffect, useState } from "react";
-import { Bike, CheckCircle, XCircle, Star, Phone } from "lucide-react";
+import React from "react";
+import { Bike, CheckCircle, XCircle, Star, Phone, ShieldCheck } from "lucide-react";
 import { MetricCard } from "../dashboard/components/MetricCard";
-import { apiClient } from "../../../../services/apiClient";
+import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
+import { ServerStatusBadge } from "../../../../components/ServerStatusBadge";
+import { NotificationBell } from "../../../../components/NotificationBell";
 
 export const RiderManagementModule: React.FC = () => {
-  const [riders, setRiders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { riders, isLoading } = useRiderFleetPresence();
 
-  useEffect(() => {
-    async function loadRiders() {
-      try {
-        const res = await apiClient.get("/riders");
-        const list = Array.isArray(res.data) ? res.data : res.data?.riders || [];
-        setRiders(list);
-      } catch (err) {
-        console.warn("Failed to fetch riders in RiderManagementModule:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadRiders();
-  }, []);
-
-  const availableCount = riders.filter(
-    (r) => r.status === "Available" || r.status === "ONLINE"
-  ).length;
-  const onErrandCount = riders.filter(
-    (r) => r.status === "On Errand" || r.status === "IN_TRANSIT" || r.status === "BUSY"
-  ).length;
-  const offlineCount = riders.length - availableCount - onErrandCount;
+  const availableCount = riders.filter((r) => r.online && r.activeOrdersCount === 0).length;
+  const onErrandCount = riders.filter((r) => r.online && r.activeOrdersCount > 0).length;
+  const offlineCount = riders.filter((r) => !r.online).length;
 
   return (
-    <div className="space-y-6">
-      {/* Rider Fleet Status Overview */}
-      <div className="grid grid-cols-3 gap-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 1. TOP HERO HEADER & ACTIONS                                  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <span className="p-2 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+              <Bike size={20} />
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-800">Riders</h2>
+          </div>
+          <p className="text-xs text-slate-500 max-w-xl">
+            View active delivery riders, contact info, and status.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <NotificationBell />
+          <ServerStatusBadge />
+        </div>
+      </div>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 2. RIDER FLEET STATUS OVERVIEW                                */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard
           title="Available Riders"
           value={String(availableCount)}
@@ -50,50 +56,50 @@ export const RiderManagementModule: React.FC = () => {
         />
         <MetricCard
           title="Offline Riders"
-          value={String(offlineCount < 0 ? 0 : offlineCount)}
-          sub="End of shift"
+          value={String(offlineCount)}
+          sub="Not currently connected"
           icon={XCircle}
           color="#94A3B8"
         />
       </div>
 
-      {/* Rider Status Roster */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800">Registered Rider Roster</h3>
-        {loading ? (
-          <p className="text-xs text-slate-400">Loading fleet roster...</p>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 3. REGISTERED RIDER ROSTER                                    */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
+        <h3 className="text-sm font-extrabold uppercase text-slate-800 tracking-wider">Rider List</h3>
+        {isLoading ? (
+          <p className="text-xs text-slate-400">Loading riders...</p>
         ) : riders.length === 0 ? (
-          <p className="text-xs text-slate-400">No riders currently registered in the database.</p>
+          <p className="text-xs text-slate-400">No riders registered yet.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {riders.map((r) => (
-              <div key={r.id} className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm">
+              <div key={r.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm">{r.name}</h4>
-                    <p className="text-xs text-slate-400 font-mono mt-0.5">ID: {r.id}</p>
+                    <h4 className="font-extrabold text-slate-900 text-sm">{r.name}</h4>
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">Rider ID: #{r.id}</p>
                   </div>
                   <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      r.status === "Available" || r.status === "ONLINE"
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : r.status === "On Errand" || r.status === "IN_TRANSIT"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "bg-slate-200 text-slate-600 border border-slate-300"
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                      r.online
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-slate-100 text-slate-500 border-slate-200"
                     }`}
                   >
-                    {r.status || "Offline"}
+                    {r.online ? (r.activeOrdersCount > 0 ? "On Errand" : "Available") : "Offline"}
                   </span>
                 </div>
 
-                <div className="text-xs text-slate-600 space-y-1.5 pt-2 border-t border-slate-200/80">
-                  <p className="flex items-center gap-2">
-                    <Phone size={14} className="text-slate-400" /> {r.phone || "N/A"}
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <Star size={14} className="text-amber-400 fill-amber-400" /> {r.rating || 5.0} Rating ({r.activeOrdersCount || 0} active orders)
-                  </p>
-                  <p className="text-slate-500">{r.vehicle || "Motorcycle"}</p>
+                <div className="pt-3 border-t border-slate-200/70 flex items-center justify-between text-xs text-slate-600">
+                  <span className="flex items-center gap-1.5 font-mono text-[11px]">
+                    <Phone size={13} className="text-slate-400" />
+                    <span>{r.phone || "—"}</span>
+                  </span>
+                  <span className="font-bold text-[11px] text-[#1E3A5F]">
+                    {r.activeOrdersCount} Active Order(s)
+                  </span>
                 </div>
               </div>
             ))}

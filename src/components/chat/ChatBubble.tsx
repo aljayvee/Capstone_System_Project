@@ -1,12 +1,18 @@
-import React from "react";
-import { CheckCheck, MapPin, Bike, User, ShieldCheck } from "lucide-react";
+import { CheckCheck, MapPin, Bike, User, ShieldCheck, ClipboardCheck, Store, Receipt, CheckCircle2, Clock } from "lucide-react";
 
 export interface ChatMessageData {
   id: string;
   senderId: string;
   senderName: string;
   role: "customer" | "dispatcher" | "system" | "rider";
+  type?: "text" | "pinpoints" | "payment_prompt" | "order_confirmation";
   text: string;
+  pinpoints?: Array<{ storeName: string; latitude: number; longitude: number }>;
+  items?: Array<{ itemName: string; storeCategory?: string; quantity: number }>;
+  groupedItems?: Record<string, Array<{ itemName: string; quantity: number; priceNote?: string }>>;
+  deliveryFee?: number;
+  totalCost?: number;
+  confirmed?: boolean;
   timestamp: number;
 }
 
@@ -25,6 +31,83 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     if (!ts) return "";
     return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
+
+  // Interactive Store-Grouped Order Confirmation Card
+  if (message.type === "order_confirmation") {
+    const grouped = message.groupedItems || {};
+    const storeKeys = Object.keys(grouped);
+
+    return (
+      <div className="my-3 mx-auto w-full max-w-[95%]">
+        <div className="bg-white rounded-2xl border-2 border-[#1E3A5F] shadow-lg overflow-hidden text-slate-800 text-xs">
+          <div className="bg-[#1E3A5F] text-white p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-blue-500/30 text-blue-200">
+                <ClipboardCheck size={16} />
+              </span>
+              <div>
+                <h4 className="font-extrabold text-xs tracking-wide">ORDER CONFIRMATION CARD</h4>
+                <p className="text-[10px] text-blue-200/80">Store-Grouped Breakdown & Upfront Pricing</p>
+              </div>
+            </div>
+            {message.confirmed ? (
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                <CheckCircle2 size={11} /> Approved ✓
+              </span>
+            ) : (
+              <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1">
+                <Clock size={11} /> Awaiting Customer
+              </span>
+            )}
+          </div>
+
+          <div className="p-3.5 space-y-3">
+            {storeKeys.length === 0 ? (
+              <div className="space-y-1.5">
+                {(message.items || []).map((it, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-none">
+                    <span className="font-medium text-slate-800">{it.itemName} <strong className="text-slate-500">x{it.quantity}</strong></span>
+                    <span className="text-[10px] text-slate-500 italic">Actual receipt upon purchase</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              storeKeys.map((storeName, idx) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-[#1E3A5F] border-b border-slate-200 pb-1">
+                    <Store size={13} className="text-red-600" />
+                    <span>{storeName}</span>
+                  </div>
+                  <div className="space-y-1 pl-1">
+                    {grouped[storeName].map((it, itemIdx) => (
+                      <div key={itemIdx} className="flex items-center justify-between text-xs">
+                        <span className="text-slate-700 font-medium">
+                          • {it.itemName} <strong className="text-slate-900 font-bold">x{it.quantity}</strong>
+                        </span>
+                        <span className="text-[10px] text-slate-500 italic">
+                          {it.priceNote || "Actual store receipt upon purchase"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+
+            <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-blue-900">
+                <Receipt size={14} className="text-blue-700" />
+                <span className="font-bold text-xs">Exact Delivery Fee (Upfront):</span>
+              </div>
+              <span className="font-black text-sm text-[#1E3A5F]">
+                ₱{Number(message.deliveryFee || 50).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const isSystemMsg = message.role === "system" || message.text.startsWith("📍") || message.text.startsWith("🛵");
 

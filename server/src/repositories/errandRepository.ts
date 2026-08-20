@@ -11,6 +11,7 @@ export const ERRAND_INCLUDE = {
   customer: { select: { information: { select: { firstName: true, lastName: true, phone: true } } } },
   rider: { select: { firstName: true, lastName: true, phone: true } },
   pabiliDetails: true,
+  pabiliItemRequests: true,
   pinpoints: { orderBy: { sequence: "asc" as const } },
   dispatchLogs: {
     include: { dispatcher: { select: { firstName: true, lastName: true } } },
@@ -24,12 +25,18 @@ export const errandRepository = {
     return prisma.errand.findMany({ include: ERRAND_INCLUDE, orderBy: { createdAt: "desc" } });
   },
 
-  // Dispatcher-scoped queue: every unclaimed (AVAILABLE) errand, plus every errand
-  // this dispatcher has personally claimed (any status) — hides other dispatchers'
-  // claims while keeping this dispatcher's own in-progress/completed work visible.
+  // Dispatcher-scoped queue: every unclaimed (AVAILABLE) errand, every errand
+  // cancelled before any dispatcher claimed it (same "unowned, visible to all"
+  // reasoning as AVAILABLE — otherwise it has no DispatchLog row and would be
+  // silently invisible to every dispatcher, including in Recent Chats), plus
+  // every errand this dispatcher has personally claimed (any status) — hides
+  // other dispatchers' claims while keeping this dispatcher's own in-progress/
+  // completed work visible.
   findManyForDispatcher(dispatcherId: number) {
     return prisma.errand.findMany({
-      where: { OR: [{ status: "AVAILABLE" }, { dispatchLogs: { some: { dispatcherId } } }] },
+      where: {
+        OR: [{ status: "AVAILABLE" }, { status: "CANCELLED" }, { dispatchLogs: { some: { dispatcherId } } }],
+      },
       include: ERRAND_INCLUDE,
       orderBy: { createdAt: "desc" },
     });
@@ -80,6 +87,82 @@ export const errandRepository = {
       by: ["riderId"],
       where: { riderId: { not: null }, status: { notIn: ["DELIVERED", "COMPLETED", "CANCELLED"] } },
       _count: { _all: true },
+    });
+  },
+
+  // All-time snapshot count per status — backs the Dashboard's live operational
+  // tiles (pending/active/completed). Deliberately unscoped by date: "4 pending
+  // errands" means right now, not "created today".
+  countByStatus() {
+    return prisma.errand.groupBy({ by: ["status"], _count: { _all: true } });
+  },
+
+  // Revenue/volume totals for one resolved period window (see reportPeriodStrategy.ts).
+  // Scoped strictly to realized/completed transactions (DELIVERED and COMPLETED)
+  // so pending, in-flight, or cancelled orders are not counted as realized revenue.
+  aggregateBetween(start: Date, end: Date) {
+    return prisma.errand.aggregate({
+      where: {
+        createdAt: { gte: start, lt: end },
+        status: { in: ["DELIVERED", "COMPLETED"] },
+      },
+      _sum: { totalCost: true, deliveryFee: true, estimatedCost: true, tip: true },
+      _count: { _all: true },
+    });
+  },
+
+  // Category breakdown for the Sales report. Groups on whatever `category` values
+  // exist strictly for realized/completed errands.
+  groupByCategoryBetween(start: Date, end: Date) {
+    return prisma.errand.groupBy({
+      by: ["category"],
+      where: {
+        createdAt: { gte: start, lt: end },
+        status: { in: ["DELIVERED", "COMPLETED"] },
+      },
+      _sum: { totalCost: true },
+      _count: { _all: true },
+    });
+  },
+
+  // Feeds the Settlement report's grossRevenue figure — includes each completed errand's
+  // real reconciled cash (SettlementRecord.collectedAmount) where one exists.
+  findWithSettlementBetween(start: Date, end: Date) {
+    return prisma.errand.findMany({
+      where: {
+        createdAt: { gte: start, lt: end },
+        status: { in: ["DELIVERED", "COMPLETED"] },
+      },
+      select: {
+        totalCost: true,
+        deliveryFee: true,
+        estimatedCost: true,
+        settlement: { select: { collectedAmount: true } },
+      },
+    });
+  },
+
+  // Raw rows for the Dashboard trend chart — fetched once strictly for completed errands
+  findRevenueRowsBetween(start: Date, end: Date) {
+    return prisma.errand.findMany({
+      where: {
+        createdAt: { gte: start, lt: end },
+        status: { in: ["DELIVERED", "COMPLETED"] },
+      },
+      select: { createdAt: true, totalCost: true },
+    });
+  },
+
+  // Feeds the Rider Performance report's per-rider completed-count and average-
+  // delivery-time math (computed in reportService.ts, not here — this just returns
+  // the raw rows). Treats DELIVERED and COMPLETED as both "finished": DELIVERED is
+  // what the rider app actually sets today (see modules/home's "Mark as Delivered"),
+  // COMPLETED is a separate settlement-closure step with no UI trigger built yet —
+  // counting only COMPLETED would silently report zero completions for every rider.
+  findFinishedBetween(start: Date, end: Date) {
+    return prisma.errand.findMany({
+      where: { status: { in: ["DELIVERED", "COMPLETED"] }, updatedAt: { gte: start, lt: end } },
+      select: { riderId: true, createdAt: true, updatedAt: true },
     });
   },
 

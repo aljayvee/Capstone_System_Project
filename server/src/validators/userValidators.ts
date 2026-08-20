@@ -41,6 +41,7 @@ export const updateUserSchema = z.object({
   phone: z.string().trim().optional(),
   status: z.enum(["Active", "Inactive", "active", "inactive"]).optional(),
   role: z.enum(ROLES).optional(),
+  version: z.number().int().positive("A version number is required to save changes."),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 

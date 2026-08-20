@@ -3,8 +3,14 @@ import { prisma } from "../lib/prisma.js";
 export interface RateConfigInput {
   baseFee: number;
   perKmRate: number;
-  serviceFeePercent: number;
-  nightSurcharge: number;
+  multiStoreFeePerStore: number;
+  maxAdditionalStores: number;
+  groceryFeeThreshold: number;
+  groceryFeePercent: number;
+  groceryFeeFlat: number;
+  nonCodThreshold: number;
+  nonCodFeeHigh: number;
+  nonCodFeeLow: number;
 }
 
 export const rateConfigRepository = {

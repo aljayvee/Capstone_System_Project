@@ -8,21 +8,33 @@ export interface CustomerFactoryInput {
   firstName: string;
   middleName?: string;
   lastName: string;
+  birthdate?: string | Date | null;
   phone?: string;
+  emailVerified?: boolean;
 }
 
 // Mirrors userFactory.ts's hash-password + build-object logic, but targets the
 // two-table CustomerAccount + CustomerInformation shape instead of the flat User row.
 export async function buildCustomerAccountCreateData(input: CustomerFactoryInput): Promise<CustomerCreateData> {
   const passwordHash = await bcrypt.hash(input.password.trim(), 10);
+  let parsedBirthdate: Date | null = null;
+  if (input.birthdate) {
+    parsedBirthdate = typeof input.birthdate === "string" ? new Date(input.birthdate) : input.birthdate;
+    if (isNaN(parsedBirthdate.getTime())) {
+      parsedBirthdate = null;
+    }
+  }
+
   return {
     username: input.username.trim(),
     passwordHash,
     email: input.email.trim().toLowerCase(),
+    emailVerified: input.emailVerified ?? false,
     information: {
       firstName: input.firstName.trim(),
       middleName: input.middleName ? input.middleName.trim() : "",
       lastName: input.lastName.trim(),
+      birthdate: parsedBirthdate,
       phone: input.phone ? input.phone.trim() : "",
     },
   };
@@ -33,6 +45,7 @@ type CustomerWithInformation = {
   username: string;
   email: string;
   status: string;
+  emailVerified?: boolean;
   passwordHash: string;
   createdAt: Date;
   updatedAt: Date;
@@ -40,8 +53,15 @@ type CustomerWithInformation = {
     firstName: string;
     middleName: string | null;
     lastName: string;
+    birthdate?: Date | null;
     phone: string;
     avatar: string | null;
+  } | null;
+  profilePhoto?: {
+    photoData: string;
+    mimeType: string;
+    fileSize: number;
+    fileName?: string | null;
   } | null;
 };
 
@@ -50,13 +70,14 @@ type CustomerWithInformation = {
 // mirrors the flat `User` row shape so authService/customerService don't need two
 // different response contracts for staff vs. customer accounts.
 export function flattenCustomerAccount<T extends CustomerWithInformation>(customer: T) {
-  const { information, passwordHash: _passwordHash, ...rest } = customer;
+  const { information, profilePhoto, passwordHash: _passwordHash, ...rest } = customer;
   return {
     ...rest,
     firstName: information?.firstName ?? "",
     middleName: information?.middleName ?? "",
     lastName: information?.lastName ?? "",
+    birthdate: information?.birthdate ? information.birthdate.toISOString().split("T")[0] : null,
     phone: information?.phone ?? "",
-    avatar: information?.avatar ?? null,
+    avatar: profilePhoto?.photoData ?? information?.avatar ?? null,
   };
 }

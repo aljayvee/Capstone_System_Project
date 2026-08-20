@@ -19,3 +19,7 @@ npm-debug.log*
 Thumbs.db
 
 .agents/
+
+# OSRM routing graph + downloaded OSM extracts (rebuilt via gis/build-graph.ps1)
+gis/data/
+gis/verified-places.geojson

@@ -1,4 +1,6 @@
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { parseOrThrow } from "../validators/validate.js";
+import { updateRateConfigSchema } from "../validators/rateConfigValidators.js";
 import * as rateConfigService from "../services/rateConfigService.js";
 
 export const getRateConfig = asyncHandler(async (req, res) => {
@@ -7,7 +9,7 @@ export const getRateConfig = asyncHandler(async (req, res) => {
 });
 
 export const updateRateConfig = asyncHandler(async (req, res) => {
-  const { baseFee, perKmRate, serviceFeePercent, nightSurcharge } = req.body;
-  const updated = await rateConfigService.updateRateConfig({ baseFee, perKmRate, serviceFeePercent, nightSurcharge });
+  const input = parseOrThrow(updateRateConfigSchema, req.body);
+  const updated = await rateConfigService.updateRateConfig(input);
   res.json(updated);
 });

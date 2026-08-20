@@ -17,13 +17,13 @@ export const createUser = asyncHandler(async (req, res) => {
   res.status(201).json(user);
 });
 
-export const updateUser = asyncHandler(async (req, res) => {
+export const updateUser = asyncHandler<AuthenticatedRequest>(async (req, res) => {
   const userId = parseInt(req.params.id, 10);
   if (isNaN(userId)) {
     throw new ServiceError(400, "Invalid user ID");
   }
   const input = parseOrThrow(updateUserSchema, req.body);
-  const user = await userService.updateUser(userId, input);
+  const user = await userService.updateUser(userId, input, req.user?.id);
   res.status(200).json(user);
 });
 

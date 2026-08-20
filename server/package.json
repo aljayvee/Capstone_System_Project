@@ -12,7 +12,9 @@
     "migrate:passwords": "tsx src/migrate-passwords.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:migrate": "prisma migrate deploy"
+    "prisma:migrate": "prisma migrate deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
@@ -30,6 +32,7 @@
     "lru-cache": "^11.5.2",
     "mysql2": "^3.9.2",
     "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5",
     "socket.io": "^4.8.3",
     "zod": "^4.4.3"
   },
@@ -39,9 +42,11 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.24",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.1",
     "@types/socket.io": "^3.0.1",
     "prisma": "^5.10.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.9"
   }
 }

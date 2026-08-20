@@ -1,6 +1,8 @@
 import React from "react";
 import { Errand, ErrandStatus } from "../../../types/errand";
+import { summarizeEta } from "../../../utils/eta";
 import { MessageSquare, CheckCircle, Clock, Bike, CheckCircle2 } from "lucide-react";
+import { formatErrandId } from "../../../utils/formatErrandId";
 
 interface ErrandQueueTableProps {
   errands: Errand[];
@@ -31,7 +33,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
   const availableErrands = errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE");
   const ongoingErrands = errands.filter((e) => {
     const s = String(e.status).toUpperCase();
-    return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED";
+    return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED" && s !== "DELIVERED";
   });
 
   const renderTableRows = (list: Errand[], isAvailableSection: boolean) => {
@@ -57,13 +59,41 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
 
       return (
         <tr key={e.id} className="hover:bg-slate-50/80 transition">
-          <td className="p-4 font-mono font-bold text-[#1E3A5F]">{e.id}</td>
+          <td className="p-4 font-mono font-bold text-[#1E3A5F]">{formatErrandId(e.id)}</td>
           <td className="p-4 font-bold text-slate-800">{e.customerName}</td>
           <td className="p-4">{e.category}</td>
           <td className="p-4">
             <span className={`px-2.5 py-1 rounded-full text-xs border ${statusBadgeStyle}`}>
               {e.status}
             </span>
+          </td>
+          <td className="p-4">
+            {(() => {
+              const eta = summarizeEta(e.etaLowAt, e.etaHighAt);
+              if (!eta) {
+                return <span className="text-xs text-slate-400 italic">—</span>;
+              }
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs border ${
+                    eta.isLate
+                      ? "bg-rose-50 text-rose-700 border-rose-200 font-semibold"
+                      : "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}
+                  // The band already communicates uncertainty; the tooltip says
+                  // why it is a band at all.
+                  title={
+                    e.etaIsDegraded
+                      ? "Estimate is wider than usual: limited routing or dwell-time data."
+                      : "Includes expected time inside each store, not just travel."
+                  }
+                >
+                  <Clock size={12} />
+                  {eta.label}
+                  {e.etaIsDegraded ? <span className="text-[10px] opacity-70">approx</span> : null}
+                </span>
+              );
+            })()}
           </td>
           <td className="p-4 text-slate-600">
             {e.dispatcherName ? (
@@ -104,7 +134,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Clock size={18} className="text-amber-500" /> Available Errand Queue
+            <Clock size={18} className="text-amber-500" /> Available Errands
           </h3>
           <span className="text-xs font-semibold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
             {availableErrands.length} Available
@@ -119,6 +149,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
                 <th className="p-4">Customer</th>
                 <th className="p-4">Category</th>
                 <th className="p-4">Status</th>
+                <th className="p-4">ETA</th>
                 <th className="p-4">Assigned Dispatcher</th>
                 <th className="p-4 text-right">Action</th>
               </tr>
@@ -126,7 +157,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
             <tbody className="divide-y divide-slate-100">
               {availableErrands.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-slate-400 text-xs italic">
+                  <td colSpan={7} className="p-6 text-center text-slate-400 text-xs italic">
                     No available errand requests right now.
                   </td>
                 </tr>
@@ -142,10 +173,10 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-            <Bike size={18} className="text-emerald-600" /> On-Going Errand Queue
+            <Bike size={18} className="text-emerald-600" /> Active Errands
           </h3>
           <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full border border-emerald-200">
-            {ongoingErrands.length} Active / Doing Errand
+            {ongoingErrands.length} In Progress
           </span>
         </div>
 
@@ -157,6 +188,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
                 <th className="p-4">Customer</th>
                 <th className="p-4">Category</th>
                 <th className="p-4">Status</th>
+                <th className="p-4">ETA</th>
                 <th className="p-4">Assigned Dispatcher</th>
                 <th className="p-4 text-right">Action</th>
               </tr>
@@ -164,7 +196,7 @@ export const ErrandQueueTable: React.FC<ErrandQueueTableProps> = ({
             <tbody className="divide-y divide-slate-100">
               {ongoingErrands.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-slate-400 text-xs italic">
+                  <td colSpan={7} className="p-6 text-center text-slate-400 text-xs italic">
                     No ongoing errands currently in progress.
                   </td>
                 </tr>

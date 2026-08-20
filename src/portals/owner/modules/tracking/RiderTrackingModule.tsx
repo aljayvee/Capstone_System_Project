@@ -1,317 +1,170 @@
-import React, { useEffect, useState, useRef } from "react";
-import { io, Socket } from "socket.io-client";
-import { Navigation, Bike, MapPin, Signal, Radio } from "lucide-react";
-import { apiClient } from "../../../../services/apiClient";
-import { loadGoogleMapsScript } from "../../../../utils/loadGoogleMaps";
-
-export interface RiderGPS {
-  id: string | number;
-  name: string;
-  lat: number;
-  lng: number;
-  errandId?: string;
-  status: string;
-  updatedAt?: string | number;
-}
-
-const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
-  ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
-  : "http://localhost:5000";
+import React, { useState } from "react";
+import { Navigation, Bike, Radio, Signal, BatteryLow } from "lucide-react";
+import LiveFleetMap from "../../../../components/LiveFleetMap";
+import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
+import { RIDER_STATUS_THEMES } from "../../../../constants/riderPresence";
+import { ServerStatusBadge } from "../../../../components/ServerStatusBadge";
+import { NotificationBell } from "../../../../components/NotificationBell";
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
 export const RiderTrackingModule: React.FC = () => {
-  const [activeRiders, setActiveRiders] = useState<RiderGPS[]>([]);
-  const [locations, setLocations] = useState<Record<string, { lat: number; lng: number; updatedAt?: string }>>({});
-  const [selectedRiderId, setSelectedRiderId] = useState<string | number | null>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const { riders, isLoading } = useRiderFleetPresence();
+  const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
 
-  const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapInstance = useRef<any>(null);
-  const markersMap = useRef<Record<string, any>>({});
+  const selectedRider = riders.find((r) => r.id === selectedRiderId) || riders[0];
+  const selectedTheme = selectedRider
+    ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE
+    : RIDER_STATUS_THEMES.AVAILABLE;
 
-  // 1. Initial Load: Fleet Roster + Locations
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      try {
-        const [ridersRes, locsRes] = await Promise.all([
-          apiClient.get("/riders").catch(() => null),
-          apiClient.get("/riders/locations").catch(() => null),
-        ]);
-
-        if (isMounted) {
-          let riderList: any[] = [];
-          if (ridersRes?.data) {
-            riderList = Array.isArray(ridersRes.data)
-              ? ridersRes.data
-              : ridersRes.data.riders || [];
-          }
-
-          const locMap: Record<string, { lat: number; lng: number; updatedAt?: string }> = {};
-          if (locsRes?.data) {
-            const locList = Array.isArray(locsRes.data)
-              ? locsRes.data
-              : locsRes.data.locations || [];
-            locList.forEach((l: any) => {
-              locMap[String(l.riderId)] = {
-                lat: Number(l.latitude),
-                lng: Number(l.longitude),
-                updatedAt: l.updatedAt,
-              };
-            });
-            setLocations(locMap);
-          }
-
-          const mappedGps: RiderGPS[] = riderList.map((r: any) => {
-            const idStr = String(r.id);
-            const liveLoc = locMap[idStr];
-            return {
-              id: r.id,
-              name: r.name,
-              status: r.status || "Offline",
-              lat: liveLoc ? liveLoc.lat : r.lat ? Number(r.lat) : TACURONG_CENTER.lat,
-              lng: liveLoc ? liveLoc.lng : r.lng ? Number(r.lng) : TACURONG_CENTER.lng,
-              errandId: r.currentErrandId,
-              updatedAt: liveLoc?.updatedAt,
-            };
-          });
-
-          setActiveRiders(mappedGps);
-          if (mappedGps.length > 0 && !selectedRiderId) {
-            setSelectedRiderId(mappedGps[0].id);
-          }
-        }
-      } catch (err) {
-        console.warn("[OwnerTracking] Error loading initial data:", err);
-      }
-    }
-
-    loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // 2. Real-Time Socket Listener
-  useEffect(() => {
-    const socket: Socket = io(BACKEND_URL);
-
-    socket.on("rider:location_updated", (payload: any) => {
-      if (payload && payload.riderId) {
-        const idStr = String(payload.riderId);
-        const newLat = Number(payload.latitude);
-        const newLng = Number(payload.longitude);
-
-        setLocations((prev) => ({
-          ...prev,
-          [idStr]: { lat: newLat, lng: newLng, updatedAt: payload.updatedAt || new Date().toISOString() },
-        }));
-
-        setActiveRiders((prev) =>
-          prev.map((r) =>
-            String(r.id) === idStr
-              ? { ...r, lat: newLat, lng: newLng, updatedAt: payload.updatedAt || new Date().toISOString() }
-              : r
-          )
-        );
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  // 3. Initialize Google Maps
-  useEffect(() => {
-    if (!mapRef.current || googleMapInstance.current) return;
-
-    loadGoogleMapsScript()
-      .then(() => {
-        const maps = (window as any).google.maps;
-        const map = new maps.Map(mapRef.current, {
-          center: TACURONG_CENTER,
-          zoom: 14,
-          disableDefaultUI: false,
-          zoomControl: true,
-          styles: [
-            {
-              featureType: "poi",
-              elementType: "labels",
-              stylers: [{ visibility: "off" }],
-            },
-          ],
-        });
-        googleMapInstance.current = map;
-        setIsMapLoaded(true);
-      })
-      .catch((err) => {
-        console.warn("[OwnerTracking] Google Maps load warning:", err);
-      });
-  }, []);
-
-  // 4. Update Markers on Google Map
-  useEffect(() => {
-    if (!isMapLoaded || !googleMapInstance.current) return;
-    const maps = (window as any).google.maps;
-
-    activeRiders.forEach((r) => {
-      const idStr = String(r.id);
-      const isOnline = r.status === "Available" || r.status === "On Errand" || r.status === "ONLINE" || r.status === "On Delivery";
-      const isSelected = selectedRiderId === r.id;
-
-      const pinColor = isOnline ? "#059669" : "#64748B";
-      const svgIcon = {
-        path: maps.SymbolPath.CIRCLE,
-        fillColor: pinColor,
-        fillOpacity: 1,
-        strokeColor: "#FFFFFF",
-        strokeWeight: 3,
-        scale: isSelected ? 12 : 9,
-      };
-
-      if (markersMap.current[idStr]) {
-        markersMap.current[idStr].setPosition({ lat: r.lat, lng: r.lng });
-        markersMap.current[idStr].setIcon(svgIcon);
-      } else {
-        const marker = new maps.Marker({
-          position: { lat: r.lat, lng: r.lng },
-          map: googleMapInstance.current,
-          title: `${r.name} (${r.status})`,
-          icon: svgIcon,
-        });
-
-        marker.addListener("click", () => {
-          setSelectedRiderId(r.id);
-          googleMapInstance.current.panTo({ lat: r.lat, lng: r.lng });
-        });
-
-        markersMap.current[idStr] = marker;
-      }
-    });
-  }, [activeRiders, isMapLoaded, selectedRiderId]);
-
-  const selectedRider = activeRiders.find((r) => r.id === selectedRiderId) || activeRiders[0];
+  const countReady = riders.filter((r) => r.presence === "AVAILABLE").length;
+  const countBusy = riders.filter((r) => r.presence === "BUSY").length;
 
   return (
-    <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 1. TOP HERO HEADER & ACTIONS                                  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Radio size={20} className="text-emerald-600 animate-pulse" /> Owner Live GPS Fleet Tracking
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Real-time geolocation & fleet monitoring across Tacurong City</p>
+          <div className="flex items-center gap-2.5 mb-1">
+            <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+              <Navigation size={20} />
+            </span>
+            <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+              <span>Live Fleet Map</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+            </h2>
+          </div>
+          <p className="text-xs text-slate-500 max-w-xl">
+            Live real-time telemetry and GPS locations of riders across Tacurong City.
+          </p>
         </div>
-        <span className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3.5 py-1.5 rounded-full shadow-sm">
-          <Navigation size={14} /> GPS Live Active
-        </span>
+
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl">
+            <Radio size={14} className="animate-pulse" /> {countReady} Ready • {countBusy} Delivering
+          </span>
+          <NotificationBell />
+          <ServerStatusBadge />
+        </div>
       </div>
 
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 2. FLEET MAP & RIDER DETAIL DRAWER                            */}
+      {/* ───────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Interactive Google Map Container */}
-        <div className="lg:col-span-2 bg-slate-100 border border-slate-200 rounded-2xl h-[440px] relative overflow-hidden shadow-inner">
-          <div ref={mapRef} className="w-full h-full" />
-          {!isMapLoaded && (
-            <div className="absolute inset-0 bg-slate-50 flex items-center justify-center text-slate-400 text-sm">
-              Loading Tacurong Fleet Map...
-            </div>
-          )}
+        <div className="lg:col-span-2 h-[500px] relative rounded-2xl overflow-hidden border border-slate-200 shadow-xs">
+          <LiveFleetMap
+            riders={riders}
+            center={TACURONG_CENTER}
+            selectedRiderId={selectedRider?.id}
+            onSelectRider={(id) => setSelectedRiderId(id)}
+          />
 
-          {/* Overlay card for selected rider info */}
           {selectedRider && (
-            <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-4 max-w-sm w-full space-y-2 shadow-lg z-10">
+            <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 max-w-sm w-full space-y-2 shadow-lg z-10">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <Bike size={16} className="text-emerald-600" />
+                <span className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <Bike size={16} style={{ color: selectedTheme.primaryColor }} />
                   {selectedRider.name}
                 </span>
                 <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                    selectedRider.status === "Available" || selectedRider.status === "ONLINE"
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : selectedRider.status === "On Delivery" || selectedRider.status === "On Errand"
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "bg-slate-200 text-slate-600 border border-slate-300"
-                  }`}
+                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${selectedTheme.badgeClassName}`}
                 >
-                  {selectedRider.status}
+                  {selectedTheme.badgeLabel}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-500 font-mono">
-                <span>Lat: {selectedRider.lat.toFixed(5)}°</span>
-                <span>Lng: {selectedRider.lng.toFixed(5)}°</span>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-2 border-t border-slate-100">
+                <div>
+                  <span className="text-slate-400">Phone:</span> {selectedRider.phone || "—"}
+                </div>
+                <div>
+                  <span className="text-slate-400">Active:</span> {selectedRider.activeOrdersCount} errand(s)
+                </div>
               </div>
-              {selectedRider.errandId && (
-                <p className="text-xs text-emerald-700 font-semibold pt-1 border-t border-slate-100">
-                  Assigned Errand: {selectedRider.errandId}
-                </p>
+
+              {selectedRider.batteryLevel !== null && selectedRider.batteryLevel !== undefined && (
+                <div className="flex items-center justify-between text-[11px] pt-1 text-slate-500">
+                  <span className="flex items-center gap-1">
+                    {(() => {
+                      const pct =
+                        selectedRider.batteryLevel <= 1
+                          ? Math.round(selectedRider.batteryLevel * 100)
+                          : Math.round(selectedRider.batteryLevel);
+                      return pct <= 20 ? <BatteryLow size={13} className="text-red-500" /> : null;
+                    })()}
+                    <span>Battery:</span>
+                  </span>
+                  <span
+                    className={`font-mono font-bold ${
+                      (() => {
+                        const pct =
+                          selectedRider.batteryLevel <= 1
+                            ? Math.round(selectedRider.batteryLevel * 100)
+                            : Math.round(selectedRider.batteryLevel);
+                        return pct <= 20 ? "text-red-600 font-black" : "text-slate-700";
+                      })()
+                    }`}
+                  >
+                    {selectedRider.batteryLevel <= 1
+                      ? `${Math.round(selectedRider.batteryLevel * 100)}%`
+                      : `${Math.round(selectedRider.batteryLevel)}%`}
+                  </span>
+                </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Monitored Fleet Roster */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm flex flex-col h-[440px]">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-            <span>Monitored Fleet Roster ({activeRiders.length})</span>
-            <Signal size={16} className="text-emerald-600" />
+        {/* Rider List Side Panel */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs flex flex-col h-[500px]">
+          <h3 className="font-extrabold text-slate-800 text-sm border-b border-slate-100 pb-2 flex items-center justify-between">
+            <span>Riders on Map</span>
+            <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+              {riders.length} Registered
+            </span>
           </h3>
-          <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-            {activeRiders.length === 0 ? (
-              <p className="text-xs text-slate-400 p-4">No active riders registered.</p>
+
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {isLoading ? (
+              <p className="text-xs text-slate-400 p-4 text-center">Loading live tracking...</p>
+            ) : riders.length === 0 ? (
+              <p className="text-xs text-slate-400 p-4 text-center">No riders currently streaming GPS.</p>
             ) : (
-              activeRiders.map((r) => {
-                const isSelected = selectedRiderId === r.id;
-                const isRecentlyUpdated =
-                  r.updatedAt && Date.now() - new Date(r.updatedAt).getTime() < 10000;
-                const isOnline =
-                  r.status === "Available" || r.status === "On Delivery" || r.status === "On Errand" || r.status === "ONLINE";
+              riders.map((r) => {
+                const isSelected = r.id === selectedRider?.id;
+                const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE;
 
                 return (
-                  <div
+                  <button
                     key={r.id}
-                    onClick={() => {
-                      setSelectedRiderId(r.id);
-                      if (googleMapInstance.current) {
-                        googleMapInstance.current.panTo({ lat: r.lat, lng: r.lng });
-                      }
-                    }}
-                    className={`border rounded-xl p-4 space-y-2 cursor-pointer transition ${
+                    onClick={() => setSelectedRiderId(r.id)}
+                    className={`w-full text-left p-3 rounded-xl border transition flex items-center justify-between ${
                       isSelected
-                        ? "bg-emerald-50/70 border-emerald-600 shadow-sm"
+                        ? "bg-blue-50/70 border-blue-300 ring-2 ring-blue-100"
                         : "bg-slate-50 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                            isOnline ? "bg-emerald-600" : "bg-slate-400"
-                          } ${isRecentlyUpdated ? "ring-4 ring-emerald-300 animate-pulse" : ""}`}
-                        >
-                          <Bike size={13} />
-                        </div>
-                        <span className="font-bold text-slate-800 text-sm">{r.name}</span>
-                      </div>
-                      <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                          isOnline
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border border-amber-200"
-                        }`}
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-8 h-8 rounded-lg text-white flex items-center justify-center font-bold text-xs shadow-xs"
+                        style={{ backgroundColor: theme.primaryColor }}
                       >
-                        {r.status}
-                      </span>
+                        {r.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-bold text-xs text-slate-800 truncate max-w-[120px]">{r.name}</p>
+                        <p className="text-[10px] text-slate-400 font-mono">#{r.id}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 font-mono pt-1 border-t border-slate-200/60">
-                      <span>Lat: {r.lat.toFixed(4)}, Lng: {r.lng.toFixed(4)}</span>
-                      <span className="text-[10px] text-slate-400">
-                        {isRecentlyUpdated ? "● Live" : "GPS Pin"}
-                      </span>
-                    </div>
-                  </div>
+                    <span
+                      className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase border ${theme.badgeClassName}`}
+                    >
+                      {theme.badgeLabel}
+                    </span>
+                  </button>
                 );
               })
             )}

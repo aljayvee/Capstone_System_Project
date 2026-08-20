@@ -11,7 +11,10 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
   }
 
   if (err instanceof ServiceError) {
-    return res.status(err.status).json({ error: err.message });
+    return res.status(err.status).json({
+      error: err.message,
+      ...(err.details !== undefined ? { details: err.details } : {}),
+    });
   }
 
   logger.error(`Unhandled error on ${req.method} ${req.originalUrl}:`, err);

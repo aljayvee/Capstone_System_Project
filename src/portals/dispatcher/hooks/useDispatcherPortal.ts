@@ -3,7 +3,8 @@ import { useSearchParams } from "react-router";
 import { io, Socket } from "socket.io-client";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
-import { ErrandService, MockRider } from "../../../services/errandService";
+import { ErrandService } from "../../../services/errandService";
+import { getMemoryAccessToken } from "../../../services/apiClient";
 import { Errand, ErrandStatus } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
 
@@ -11,8 +12,8 @@ const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
   : "http://localhost:5000";
 
-type DispatcherTab = "queue" | "riders" | "recent_chats";
-const TAB_IDS: DispatcherTab[] = ["queue", "riders", "recent_chats"];
+type DispatcherTab = "queue" | "active_errands" | "riders" | "recent_chats" | "messages";
+const TAB_IDS: DispatcherTab[] = ["queue", "active_errands", "riders", "recent_chats", "messages"];
 
 // Map the strict Prisma Errand object to the frontend Errand interface
 function mapPrismaErrand(prismaErrand: any): Errand {
@@ -52,7 +53,6 @@ function isVisibleToDispatcher(errand: Errand, dispatcherId?: number): boolean {
 export function useDispatcherPortal(currentUserId?: number) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [errands, setErrands] = useState<Errand[]>([]);
-  const [riders, setRiders] = useState<MockRider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const requestedTab = searchParams.get("tab");
@@ -101,22 +101,19 @@ export function useDispatcherPortal(currentUserId?: number) {
     async function loadData() {
       setIsLoading(true);
       await fetchOrders();
-      try {
-        const ridersRes = await apiClient.get("/riders");
-        const riderList = Array.isArray(ridersRes.data)
-          ? ridersRes.data
-          : ridersRes.data?.riders || [];
-        setRiders(riderList);
-      } catch (err) {
-        console.error("Failed to load riders:", err);
-      } finally {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
     loadData();
 
-    // Socket.io Real-Time Persistent Connection
-    const socket: Socket = io(BACKEND_URL);
+    // Socket.io real-time connection.
+    //
+    // Authenticated now: the server scopes private events (a rider's position,
+    // an ETA) to identified clients and joins staff into a role room on connect.
+    // An anonymous socket still receives the legacy broadcast events, but would
+    // silently miss everything scoped.
+    const socket: Socket = io(BACKEND_URL, {
+      auth: { token: getMemoryAccessToken() ?? undefined },
+    });
 
     socket.on("order:new", (newOrder: any) => {
       console.log("[Socket.io] Received order:new:", newOrder);
@@ -140,6 +137,36 @@ export function useDispatcherPortal(currentUserId?: number) {
         isVisibleToDispatcher(errand, currentUserId)
           ? prev.map((e) => (e.id === errand.id ? errand : e))
           : prev.filter((e) => e.id !== errand.id)
+      );
+    });
+
+    // Live ETA. Patched onto the errand already in state rather than refetching:
+    // this fires whenever the rider moves materially, and the payload carries
+    // everything the queue's ETA column renders.
+    socket.on("errand:eta_updated", (payload: any) => {
+      if (!payload?.errandId) return;
+      setErrands((prev) =>
+        prev.map((e) =>
+          e.id === payload.errandId
+            ? {
+                ...e,
+                etaLowAt: payload.etaLowAt,
+                etaHighAt: payload.etaHighAt,
+                etaIsDegraded: Boolean(payload.degraded),
+              }
+            : e
+        )
+      );
+    });
+
+    // A rider queueing far longer than that store type usually takes. Surfaced
+    // to the dispatcher at the same moment as the customer, so the two are never
+    // working from different information when the customer calls to ask.
+    socket.on("errand:stop_delayed", (payload: any) => {
+      if (!payload?.errandId) return;
+      console.info(
+        `[Dispatch] Errand ${payload.errandId} delayed at ${payload.storeName}: ` +
+          `${Math.round((payload.elapsedSeconds ?? 0) / 60)} min elapsed vs ~${Math.round((payload.typicalSeconds ?? 0) / 60)} min typical.`
       );
     });
 
@@ -205,7 +232,6 @@ export function useDispatcherPortal(currentUserId?: number) {
     activeTab,
     setActiveTab,
     errands,
-    riders,
     isLoading,
     selectedErrandId,
     fetchOrders,

@@ -18,23 +18,8 @@ export const userRepository = {
     return prisma.user.findMany();
   },
 
-  findRiders() {
-    return prisma.user.findMany({
-      where: { role: "RIDER", status: "Active" },
-      select: {
-        id: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        avatar: true,
-        status: true,
-      },
-    });
-  },
-
   // Full roster regardless of status — backs the dispatcher/owner fleet-monitoring
-  // views, unlike findRiders() above which only returns currently-Active riders.
+  // views, filtered further in userService for the online-only "Assign Rider" picker.
   findAllRiders() {
     return prisma.user.findMany({
       where: { role: "RIDER" },
@@ -56,6 +41,15 @@ export const userRepository = {
 
   update(id: number, data: Prisma.UserUpdateInput) {
     return prisma.user.update({ where: { id }, data });
+  },
+
+  // Conditional write: only applies if `version` still matches what the client
+  // last read. A resulting count of 0 means someone else changed this user first.
+  updateWithVersion(id: number, expectedVersion: number, data: Prisma.UserUpdateManyMutationInput) {
+    return prisma.user.updateMany({
+      where: { id, version: expectedVersion },
+      data: { ...data, version: { increment: 1 } },
+    });
   },
 
   updatePushToken(id: number, expoPushToken: string) {
