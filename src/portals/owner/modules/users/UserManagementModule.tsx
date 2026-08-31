@@ -28,6 +28,7 @@ import { EditUserModal } from "./components/EditUserModal";
 import { UserRole } from "../../../../types/auth";
 import { apiService } from "../../../../services/apiService";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 import { StaffAvatar } from "../../../../components/StaffAvatar";
 import { ROLE_BADGE_LABELS, ROLE_SORT_RANK } from "../../../../constants/userRoles";
 
@@ -308,6 +309,7 @@ export const UserManagementModule: React.FC = () => {
 
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <HeaderClock />
             <NotificationBell />
           </div>
 

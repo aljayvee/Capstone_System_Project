@@ -7,6 +7,7 @@ import { SettlementReportView } from "./components/SettlementReportView";
 import { TransactionSummaryReportView } from "./components/TransactionSummaryReportView";
 import { ExceptionReportView } from "./components/ExceptionReportView";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 
 type ReportTab = "sales" | "rider-performance" | "commission" | "settlement" | "transactions" | "exceptions";
 
@@ -39,6 +40,7 @@ export const FinancialReportsModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
+          <HeaderClock />
           <NotificationBell />
         </div>
       </div>

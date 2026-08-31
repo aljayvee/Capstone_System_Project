@@ -3,6 +3,7 @@ import { Bike, CheckCircle, XCircle, Star, Phone, ShieldCheck } from "lucide-rea
 import { MetricCard } from "../dashboard/components/MetricCard";
 import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 
 export const RiderManagementModule: React.FC = () => {
   const { riders, isLoading } = useRiderFleetPresence();
@@ -27,6 +28,7 @@ export const RiderManagementModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
+          <HeaderClock />
           <NotificationBell />
         </div>
       </div>

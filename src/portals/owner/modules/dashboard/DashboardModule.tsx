@@ -4,6 +4,7 @@ import { MetricCard } from "./components/MetricCard";
 import { RevenueChart } from "./components/RevenueChart";
 import { useDashboardMetrics } from "../../hooks/useDashboardMetrics";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 import type { DashboardFrequency } from "../../../../services/apiService";
 
 const FREQUENCY_OPTIONS: Array<{ label: string; value: DashboardFrequency }> = [
@@ -63,6 +64,7 @@ export const DashboardModule: React.FC = () => {
             ))}
           </div>
 
+          <HeaderClock />
           <NotificationBell />
         </div>
       </div>

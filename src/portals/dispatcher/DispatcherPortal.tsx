@@ -14,6 +14,7 @@ import {
   ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, MessageCircle, X, Map as MapIcon, Activity, AlertTriangle
 } from "lucide-react";
 import { NotificationBell } from "../../components/NotificationBell";
+import { HeaderClock } from "../../components/HeaderClock";
 import LiveFleetMap from "../../components/LiveFleetMap";
 import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
 import { fetchStaffPhoto } from "../../services/staffPhotoService";
@@ -382,6 +383,7 @@ export default function DispatcherPortal() {
                 </div>
 
                 <div className="flex items-center gap-2.5">
+                  <HeaderClock />
                   <NotificationBell />
                 </div>
               </div>

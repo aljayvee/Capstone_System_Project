@@ -22,6 +22,7 @@ import {
   ArrowDown,
 } from "lucide-react";
 import { NotificationBell } from "../../../components/NotificationBell";
+import { HeaderClock } from "../../../components/HeaderClock";
 
 export interface PlaceCategory {
   id: number;
@@ -417,6 +418,7 @@ export default function PlacesDirectoryScreen() {
         </div>
 
         <div className="flex items-center gap-3">
+          <HeaderClock />
           <NotificationBell />
         </div>
       </header>

@@ -23,6 +23,7 @@ import LiveFleetMap from "../../../../components/LiveFleetMap";
 import { useRiderFleetPresence, RiderFleetMember } from "../../../../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES, RiderPresenceState } from "../../../../constants/riderPresence";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
@@ -115,6 +116,7 @@ export const RiderTrackingModule: React.FC = () => {
               {countReady} Ready • {countBusy} Delivering
             </span>
           </span>
+          <HeaderClock />
           <NotificationBell />
         </div>
       </div>

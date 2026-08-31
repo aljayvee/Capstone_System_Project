@@ -18,6 +18,7 @@ import { apiService, type ApiMerchantCategory, type ApiRateConfig } from "../../
 import { CategoryRowCard } from "./components/CategoryCard";
 import PlacesTab from "./components/PlacesTab";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 
 type CategorySortOption = "name-asc" | "name-desc" | "stores-desc" | "stores-asc" | "newest" | "oldest";
 
@@ -177,6 +178,7 @@ export const MerchantCategoryModule: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
+          <HeaderClock />
           <NotificationBell />
           {activeTab === "categories" && (
             <button

@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { apiService } from "../../../../services/apiService";
 import { NotificationBell } from "../../../../components/NotificationBell";
+import { HeaderClock } from "../../../../components/HeaderClock";
 
 export const ServiceRatesModule: React.FC = () => {
   // Null until the owner's saved config loads. Seeding this with a number would
@@ -130,6 +131,7 @@ export const ServiceRatesModule: React.FC = () => {
               <CheckCircle2 size={15} /> Saved to Database
             </span>
           )}
+          <HeaderClock />
           <NotificationBell />
         </div>
       </div>
