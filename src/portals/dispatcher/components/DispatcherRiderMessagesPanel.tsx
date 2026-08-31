@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ref, push, onValue } from "firebase/database";
+import { ref, push, onValue, set } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { formatErrandId } from "../../../utils/formatErrandId";
 import {
@@ -139,6 +139,15 @@ export function DispatcherRiderMessagesPanel({
       lastMessage: text,
       lastSender: "dispatcher",
       updatedAt: Date.now(),
+    });
+
+    // Current-state identity of whichever dispatcher is corresponding with this
+    // rider right now — a stable node (set, not push) so the rider app can read
+    // "who am I chatting with" the same way CustomerApp reads chats/{id}/meta.
+    const dispatcherMetaRef = ref(database, `rider_chats/${selectedErrandId}/dispatcherMeta`);
+    set(dispatcherMetaRef, {
+      dispatcherId: dispatcher?.id ?? null,
+      dispatcherName,
     });
 
     setInputText("");

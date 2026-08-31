@@ -14,7 +14,4 @@ export default defineConfig({
     },
   },
   assetsInclude: ['**/*.svg', '**/*.csv'],
-  optimizeDeps: {
-    include: ['leaflet', 'react-leaflet'],
-  },
 });

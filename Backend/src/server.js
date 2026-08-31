@@ -60,52 +60,147 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Server-Side Validation Helpers
-function validateUserCreateInput(body) {
-  const { username, password, name, email, role } = body || {};
-  if (!username || typeof username !== 'string' || username.trim().length < 3) {
-    return { valid: false, error: 'Username is required and must be at least 3 characters long.' };
-  }
-  if (!/^[a-zA-Z0-9_.-]+$/.test(username.trim())) {
-    return { valid: false, error: 'Username can only contain letters, numbers, underscores, dots, and dashes.' };
-  }
-  if (!password || typeof password !== 'string' || password.length < 6) {
-    return { valid: false, error: 'Password is required and must be at least 6 characters long.' };
-  }
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    return { valid: false, error: 'Full Name is required.' };
-  }
-  if (email && typeof email === 'string' && email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return { valid: false, error: 'Invalid email address format.' };
-  }
-  return { valid: true };
+// ── Server-Side Validation Helpers ─────────────────────────────────────────
+// These mirror src/utils/userValidation.ts on the web dashboard. The client
+// copy exists for fast inline feedback; THIS copy is the actual gate — a
+// request crafted outside the form (curl, Postman) still has to pass it.
+
+// Roles an account in the `users` table may hold. "OWNER" is the stored value
+// for what the dashboard now labels "Admin" — the label changed, the wire
+// value did not (routing, JWT payloads and existing rows all carry OWNER).
+const ASSIGNABLE_USER_ROLES = ['RIDER', 'DISPATCHER', 'OWNER'];
+
+// Re-assigning one of these is a privileged action: it changes what the
+// account can do on the live dispatch board, so it costs the acting admin
+// their own password. See handleUpdateUser below.
+const ROLE_CHANGE_REAUTH_ROLES = ['DISPATCHER', 'RIDER'];
+
+// Allow-list rather than a shape check: a typo'd domain (gmial.com) passes any
+// regex but can never receive a password reset. Keep in sync with
+// ALLOWED_EMAIL_DOMAINS in src/utils/userValidation.ts.
+const ALLOWED_EMAIL_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'yahoo.com.ph', 'outlook.com', 'outlook.ph',
+  'hotmail.com', 'live.com', 'msn.com', 'icloud.com', 'proton.me',
+  'protonmail.com', 'aol.com', 'zoho.com', 'gmx.com', 'mail.com', 'yandex.com',
+];
+
+function validatePhonePH(phone) {
+  const value = typeof phone === 'string' ? phone.trim() : '';
+  if (!value) return 'Phone number is required.';
+  if (!/^\d+$/.test(value)) return 'Phone number may contain digits only — no letters, spaces, or symbols.';
+  if (!value.startsWith('09')) return 'Philippine mobile numbers must start with 09 (e.g. 09171234567).';
+  if (value.length !== 11) return 'Phone number must be exactly 11 digits.';
+  return null;
 }
 
+function validateEmailStrict(email) {
+  const value = typeof email === 'string' ? email.trim() : '';
+  if (!value) return 'Email address is required.';
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(value)) {
+    return 'Enter a complete email address (e.g. juandelacruz@gmail.com).';
+  }
+  const domain = value.split('@')[1].toLowerCase();
+  if (!ALLOWED_EMAIL_DOMAINS.includes(domain)) {
+    return `"@${domain}" is not an accepted email provider. Use @gmail.com, @outlook.com, @yahoo.com, or another major mail service.`;
+  }
+  return null;
+}
+
+function validatePasswordStrength(password) {
+  if (typeof password !== 'string' || password === '') return 'Password is required.';
+  if (password.trim() === '') return 'Password cannot be blank spaces.';
+  if (/\s/.test(password)) return 'Password cannot contain spaces or tabs.';
+  if (password.length < 8) return 'Password must be at least 8 characters long.';
+  if (!/[A-Za-z]/.test(password)) return 'Password must contain at least one letter.';
+  if (!/\d/.test(password)) return 'Password must contain at least one number.';
+  return null;
+}
+
+function validateUsernameStrict(username) {
+  const value = typeof username === 'string' ? username.trim() : '';
+  if (!value) return 'Username is required.';
+  if (value.length < 3) return 'Username must be at least 3 characters long.';
+  if (!/^[a-zA-Z0-9_.-]+$/.test(value)) {
+    return 'Username can only contain letters, numbers, underscores, dots, and dashes.';
+  }
+  return null;
+}
+
+function validatePersonName(value, label, required) {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return required ? `${label} is required.` : null;
+  if (trimmed.length < 2) return `${label} must be at least 2 characters long.`;
+  if (!/^[A-Za-zÑñ.\-'\s]+$/.test(trimmed)) {
+    return `${label} may only contain letters, spaces, hyphens, apostrophes, and dots.`;
+  }
+  return null;
+}
+
+function validateRoleValue(role) {
+  const value = typeof role === 'string' ? role.trim().toUpperCase() : '';
+  if (!value) return 'A role must be assigned — an account cannot be saved as Not Assigned.';
+  if (!ASSIGNABLE_USER_ROLES.includes(value)) {
+    return 'Role must be one of Rider, Dispatcher, or Admin.';
+  }
+  return null;
+}
+
+function validateUserCreateInput(body) {
+  const { username, password, name, email, role, phone, firstName, lastName, middleName } = body || {};
+
+  const checks = [
+    validateUsernameStrict(username),
+    validatePasswordStrength(password),
+    validateRoleValue(role),
+    validatePhonePH(phone),
+    validateEmailStrict(email),
+    validateMiddleName(middleName),
+  ];
+
+  // The dashboard sends firstName/lastName; older clients send a single `name`.
+  // Either shape is acceptable, but at least one of them must carry a real name.
+  if (firstName !== undefined || lastName !== undefined) {
+    checks.push(validatePersonName(firstName, 'First name', true));
+    checks.push(validatePersonName(lastName, 'Last name', true));
+  } else if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    checks.push('Full name is required.');
+  }
+
+  const error = checks.find(Boolean);
+  return error ? { valid: false, error } : { valid: true };
+}
+
+function validateMiddleName(middleName) {
+  return middleName === undefined || middleName === null || middleName === ''
+    ? null
+    : validatePersonName(middleName, 'Middle name', false);
+}
+
+// Only fields actually present in the body are checked — the dashboard sends a
+// partial patch containing just what the operator changed.
 function validateUserUpdateInput(body) {
-  const { username, password, name, email, status } = body || {};
-  if (username !== undefined) {
-    if (typeof username !== 'string' || username.trim().length < 3) {
-      return { valid: false, error: 'Username must be at least 3 characters long.' };
-    }
-    if (!/^[a-zA-Z0-9_.-]+$/.test(username.trim())) {
-      return { valid: false, error: 'Username can only contain letters, numbers, underscores, dots, and dashes.' };
-    }
-  }
+  const { username, password, name, email, status, phone, role, firstName, lastName, middleName } = body || {};
+
+  const checks = [];
+  if (username !== undefined) checks.push(validateUsernameStrict(username));
   if (password !== undefined && password !== null && password !== '') {
-    if (typeof password !== 'string' || password.length < 6) {
-      return { valid: false, error: 'Password must be at least 6 characters long if provided.' };
-    }
+    checks.push(validatePasswordStrength(password));
   }
+  if (role !== undefined) checks.push(validateRoleValue(role));
+  if (phone !== undefined) checks.push(validatePhonePH(phone));
+  if (email !== undefined) checks.push(validateEmailStrict(email));
+  if (firstName !== undefined) checks.push(validatePersonName(firstName, 'First name', true));
+  if (lastName !== undefined) checks.push(validatePersonName(lastName, 'Last name', true));
+  if (middleName !== undefined) checks.push(validateMiddleName(middleName));
   if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
-    return { valid: false, error: 'Full Name cannot be empty.' };
-  }
-  if (email && typeof email === 'string' && email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-    return { valid: false, error: 'Invalid email address format.' };
+    checks.push('Full name cannot be empty.');
   }
   if (status !== undefined && !['Active', 'Inactive', 'active', 'inactive'].includes(status)) {
-    return { valid: false, error: "Status must be either 'Active' or 'Inactive'." };
+    checks.push("Status must be either 'Active' or 'Inactive'.");
   }
-  return { valid: true };
+
+  const error = checks.find(Boolean);
+  return error ? { valid: false, error } : { valid: true };
 }
 
 
@@ -240,27 +335,33 @@ async function handleCustomerLogin(req, res) {
 // System User (Rider / Dispatcher / Owner) Registration Controller
 async function handleUserRegister(req, res) {
   try {
-    const { username, password, email, firstName, lastName, phone, role, name } = req.body || {};
+    const { username, password, email, firstName, middleName, lastName, phone, role, name } = req.body || {};
 
     if (!username || typeof username !== 'string' || !username.trim() ||
         !password || typeof password !== 'string' || !password.trim()) {
       return res.status(400).json({ error: 'Username and password are required non-empty strings' });
     }
 
-    const cleanUsername = username.trim();
-    const cleanPassword = password.trim();
-    const cleanEmail = (email && typeof email === 'string' && email.trim())
-      ? email.trim().toLowerCase()
-      : `${cleanUsername.toLowerCase()}@capstone.ph`;
     const userRole = (role && typeof role === 'string') ? role.trim().toUpperCase() : 'RIDER';
 
+    // Customers register through their own table and their own rules.
     if (userRole === 'CUSTOMER') {
       return handleCustomerRegister(req, res);
     }
 
+    const validation = validateUserCreateInput(req.body);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.error });
+    }
+
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
     const userFirstName = firstName || (name ? name.split(' ')[0] : 'User');
     const userLastName = lastName || (name && name.split(' ').length > 1 ? name.split(' ').slice(1).join(' ') : 'Account');
-    const userPhone = phone || '';
+    const userMiddleName = (typeof middleName === 'string' ? middleName.trim() : '');
+    const userPhone = phone.trim();
 
     const pool = getPool();
 
@@ -277,9 +378,9 @@ async function handleUserRegister(req, res) {
     const userName = name || `${userFirstName} ${userLastName}`.trim();
 
     const [result] = await pool.execute(
-      `INSERT INTO users (username, passwordHash, email, firstName, lastName, name, phone, role, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
-      [cleanUsername, passwordHash, cleanEmail, userFirstName, userLastName, userName, userPhone, userRole]
+      `INSERT INTO users (username, passwordHash, email, firstName, middleName, lastName, name, phone, role, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+      [cleanUsername, passwordHash, cleanEmail, userFirstName, userMiddleName, userLastName, userName, userPhone, userRole]
     );
 
     const [rows] = await pool.execute('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -290,6 +391,7 @@ async function handleUserRegister(req, res) {
       username: newUser.username,
       email: newUser.email,
       firstName: newUser.firstName,
+      middleName: newUser.middleName,
       lastName: newUser.lastName,
       phone: newUser.phone,
       role: newUser.role,
@@ -588,7 +690,7 @@ async function handleGetRiderProfile(req, res) {
 async function handleGetUsers(req, res) {
   try {
     const pool = getPool();
-    const [rows] = await pool.execute('SELECT id, username, email, name, firstName, lastName, phone, role, status FROM users ORDER BY id ASC');
+    const [rows] = await pool.execute('SELECT id, username, email, name, firstName, middleName, lastName, phone, role, status FROM users ORDER BY id ASC');
     return res.status(200).json(rows);
   } catch (err) {
     console.error('Get Users Error:', err);
@@ -608,7 +710,10 @@ async function handleUpdateUser(req, res) {
       return res.status(400).json({ error: validation.error });
     }
 
-    const { username, password, role, name, email, phone, status, firstName, lastName } = req.body || {};
+    const {
+      username, password, role, name, email, phone, status, firstName, middleName, lastName,
+      adminUsername, adminPassword,
+    } = req.body || {};
     const pool = getPool();
 
     const [rows] = await pool.execute('SELECT * FROM users WHERE id = ? LIMIT 1', [userId]);
@@ -617,16 +722,61 @@ async function handleUpdateUser(req, res) {
     }
 
     const existing = rows[0];
+    const existingRole = String(existing.role || '').toUpperCase();
+    const requestedRole = role !== undefined ? String(role).trim().toUpperCase() : existingRole;
+
+    // Privileged role change: moving a Dispatcher or Rider out of its role
+    // revokes what it can do on the live board, so the acting admin must prove
+    // it is really them. Enforced here — not only in the dashboard modal — so a
+    // request sent outside the form still has to pay the same price.
+    if (requestedRole !== existingRole && ROLE_CHANGE_REAUTH_ROLES.includes(existingRole)) {
+      if (typeof adminUsername !== 'string' || !adminUsername.trim() ||
+          typeof adminPassword !== 'string' || !adminPassword) {
+        return res.status(403).json({
+          error: 'Changing the role of a Dispatcher or Rider account requires your Admin password.',
+        });
+      }
+
+      const [adminRows] = await pool.execute(
+        'SELECT id, username, role, passwordHash FROM users WHERE username = ? LIMIT 1',
+        [adminUsername.trim()]
+      );
+      if (adminRows.length === 0) {
+        return res.status(403).json({ error: 'Admin account not found. Please sign in again.' });
+      }
+
+      const admin = adminRows[0];
+      if (String(admin.role || '').toUpperCase() !== 'OWNER') {
+        return res.status(403).json({ error: 'Only an Admin account can change the role of a Dispatcher or Rider.' });
+      }
+
+      const adminMatches = await bcrypt.compare(adminPassword, admin.passwordHash || admin.password_hash || '');
+      if (!adminMatches) {
+        return res.status(403).json({ error: 'Incorrect Admin password. The role change was not saved.' });
+      }
+    }
+
     const newUsername = username !== undefined ? username.trim() : existing.username;
-    const newEmail = email !== undefined ? email.trim() : existing.email;
+    const newEmail = email !== undefined ? email.trim().toLowerCase() : existing.email;
     const newPhone = phone !== undefined ? phone.trim() : existing.phone;
-    const newRole = role !== undefined ? role.toUpperCase() : existing.role;
+    const newRole = requestedRole;
     const newStatus = status !== undefined ? status : (existing.status || 'Active');
-    const newName = name !== undefined ? name.trim() : (existing.name || `${existing.firstName || ''} ${existing.lastName || ''}`.trim());
-    
-    const parts = newName.split(' ');
-    const newFName = firstName || parts[0] || existing.firstName || 'User';
-    const newLName = lastName || parts.slice(1).join(' ') || existing.lastName || 'Account';
+
+    // The dashboard sends firstName/middleName/lastName; older callers send a
+    // single `name`. Whichever arrives, both representations are rewritten
+    // together — otherwise renaming a person left the directory's display
+    // `name` column showing the old name forever.
+    const legacyParts = typeof name === 'string' ? name.trim().split(/\s+/) : [];
+    const newFName = firstName !== undefined
+      ? String(firstName).trim()
+      : (legacyParts[0] || existing.firstName || 'User');
+    const newMName = middleName !== undefined ? String(middleName).trim() : (existing.middleName || '');
+    const newLName = lastName !== undefined
+      ? String(lastName).trim()
+      : (legacyParts.slice(1).join(' ') || existing.lastName || 'Account');
+    const newName = (typeof name === 'string' && name.trim())
+      ? name.trim()
+      : `${newFName} ${newLName}`.trim();
 
     let newHash = existing.passwordHash || existing.password_hash;
     if (password && typeof password === 'string' && password.trim() !== '') {
@@ -634,13 +784,13 @@ async function handleUpdateUser(req, res) {
     }
 
     await pool.execute(
-      `UPDATE users 
-       SET username = ?, passwordHash = ?, email = ?, name = ?, firstName = ?, lastName = ?, phone = ?, role = ?, status = ?, updatedAt = NOW(3)
+      `UPDATE users
+       SET username = ?, passwordHash = ?, email = ?, name = ?, firstName = ?, middleName = ?, lastName = ?, phone = ?, role = ?, status = ?, updatedAt = NOW(3)
        WHERE id = ?`,
-      [newUsername, newHash, newEmail, newName, newFName, newLName, newPhone, newRole, newStatus, userId]
+      [newUsername, newHash, newEmail, newName, newFName, newMName, newLName, newPhone, newRole, newStatus, userId]
     );
 
-    const [updatedRows] = await pool.execute('SELECT id, username, email, name, firstName, lastName, phone, role, status FROM users WHERE id = ?', [userId]);
+    const [updatedRows] = await pool.execute('SELECT id, username, email, name, firstName, middleName, lastName, phone, role, status FROM users WHERE id = ?', [userId]);
     return res.status(200).json(updatedRows[0]);
   } catch (err) {
     console.error('Update User Error:', err);

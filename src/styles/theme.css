@@ -26,6 +26,12 @@
   --font-weight-normal: 400;
   --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
+
+  /* Dispatcher portal brand navy. Reconciles two hex literals (#1E3A5F,
+     #162D4A) that were both informally called "the sidebar navy" and
+     hand-copied as Tailwind arbitrary values 25+ times across the portal. */
+  --dispatcher-navy: #1E3A5F;
+  --dispatcher-navy-dark: #162D4A;
 }
 
 .dark {
@@ -51,6 +57,8 @@
 }
 
 @theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -72,4 +80,6 @@
   --color-input-background: var(--input-background);
   --color-switch-background: var(--switch-background);
   --color-ring: var(--ring);
+  --color-dispatcher-navy: var(--dispatcher-navy);
+  --color-dispatcher-navy-dark: var(--dispatcher-navy-dark);
 }

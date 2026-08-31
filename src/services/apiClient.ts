@@ -2,6 +2,16 @@ import axios from "axios";
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
+// Requests that must never trigger the silent-refresh retry below.
+const AUTH_ENDPOINT_PATHS = [
+  "/auth/login",
+  "/auth/refresh",
+  "/auth/logout",
+  "/auth/complete-profile",
+  "/auth/verify-login-otp",
+  "/auth/resend-login-otp",
+];
+
 // In-Memory Access Token Storage (Never written to localStorage/sessionStorage)
 let memoryAccessToken: string | null = null;
 let onLogoutCallback: (() => void) | null = null;
@@ -60,11 +70,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Avoid infinite refresh loops on login/refresh/logout endpoints
-    const isAuthEndpoint =
-      originalRequest?.url?.includes("/auth/login") ||
-      originalRequest?.url?.includes("/auth/refresh") ||
-      originalRequest?.url?.includes("/auth/logout");
+    // Avoid infinite refresh loops on the endpoints that establish a session in
+    // the first place. The sign-in challenge endpoints belong here too: they can
+    // legitimately 401 (expired or already-used challenge), and letting the
+    // interceptor react to that would silently re-submit an OTP — burning an
+    // attempt — and then log the user out of an unrelated tab when the refresh
+    // it attempted also failed.
+    const isAuthEndpoint = AUTH_ENDPOINT_PATHS.some((path) => originalRequest?.url?.includes(path));
 
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       if (isRefreshing) {

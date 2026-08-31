@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import { io, Socket } from "socket.io-client";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
+import { postUnderReview, postAccepted, postDeclined } from "../../../services/chatSystemMessages";
 import { ErrandService } from "../../../services/errandService";
 import { getMemoryAccessToken } from "../../../services/apiClient";
 import { Errand, ErrandStatus } from "../../../types/errand";
@@ -12,8 +13,23 @@ const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
   : "http://localhost:5000";
 
-type DispatcherTab = "queue" | "active_errands" | "riders" | "recent_chats" | "messages";
-const TAB_IDS: DispatcherTab[] = ["queue", "active_errands", "riders", "recent_chats", "messages"];
+type DispatcherTab =
+  | "queue"
+  | "active_errands"
+  | "exceptions"
+  | "riders"
+  | "recent_chats"
+  | "messages"
+  | "profile";
+const TAB_IDS: DispatcherTab[] = [
+  "queue",
+  "active_errands",
+  "exceptions",
+  "riders",
+  "recent_chats",
+  "messages",
+  "profile",
+];
 
 // Map the strict Prisma Errand object to the frontend Errand interface
 function mapPrismaErrand(prismaErrand: any): Errand {
@@ -25,13 +41,29 @@ function mapPrismaErrand(prismaErrand: any): Errand {
     description: prismaErrand.description,
     pickupAddress: prismaErrand.pickupAddress,
     deliveryAddress: prismaErrand.deliveryAddress,
-    estimatedCost: prismaErrand.estimatedCost,
-    deliveryFee: prismaErrand.deliveryFee,
-    tip: prismaErrand.tip,
-    totalCost: prismaErrand.totalCost,
+    deliveryLatitude: prismaErrand.deliveryLatitude != null ? Number(prismaErrand.deliveryLatitude) : null,
+    deliveryLongitude: prismaErrand.deliveryLongitude != null ? Number(prismaErrand.deliveryLongitude) : null,
+    pinpoints: prismaErrand.pinpoints || [],
+    pabiliDetails: prismaErrand.pabiliDetails || [],
+    pabiliItemRequests: prismaErrand.pabiliItemRequests || [],
+    storeCount: prismaErrand.storeCount,
+    distanceKm: prismaErrand.distanceKm != null ? Number(prismaErrand.distanceKm) : null,
+    routeDistanceMeters: prismaErrand.routeDistanceMeters,
+    routeDurationSeconds: prismaErrand.routeDurationSeconds,
+    routeGeometry: prismaErrand.routeGeometry,
+    routeProvider: prismaErrand.routeProvider,
+    etaLowAt: prismaErrand.etaLowAt,
+    etaHighAt: prismaErrand.etaHighAt,
+    etaComputedAt: prismaErrand.etaComputedAt,
+    etaIsDegraded: Boolean(prismaErrand.etaIsDegraded),
+    estimatedCost: Number(prismaErrand.estimatedCost || 0),
+    deliveryFee: Number(prismaErrand.deliveryFee || 0),
+    tip: Number(prismaErrand.tip || 0),
+    totalCost: Number(prismaErrand.totalCost || 0),
     status: prismaErrand.status,
     dispatcherId: prismaErrand.dispatchLogs?.[0]?.dispatcherId,
     dispatcherName: prismaErrand.dispatchLogs?.[0]?.dispatcher?.name,
+    dispatchLogs: prismaErrand.dispatchLogs || [],
     riderId: prismaErrand.riderId,
     riderName: prismaErrand.rider?.name,
     createdAt: prismaErrand.createdAt,
@@ -50,7 +82,7 @@ function isVisibleToDispatcher(errand: Errand, dispatcherId?: number): boolean {
   return String(errand.dispatcherId) === String(dispatcherId);
 }
 
-export function useDispatcherPortal(currentUserId?: number) {
+export function useDispatcherPortal(currentUserId?: number, currentUserName?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [errands, setErrands] = useState<Errand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,6 +202,46 @@ export function useDispatcherPortal(currentUserId?: number) {
       );
     });
 
+    // The rider settled at a catalogue place that is not the pinned stop — the
+    // wrong branch of a chain, which the geofence cannot see because the two
+    // branches are further apart than its radius. Dispatcher-only on purpose:
+    // the customer can do nothing with this, but dispatch can call the rider
+    // before the errand finishes against the wrong store.
+    // The rider's confirmed receipt total is far from what OCR read. Small
+    // corrections are silent by design — OCR misreads a digit on creased thermal
+    // paper routinely, and alerting on those trains dispatch to ignore the alert.
+    // This only fires past ₱100 or 20%, whichever is greater.
+    socket.on("errand:receipt_mismatch", (payload: any) => {
+      if (!payload?.errandId) return;
+      console.warn(
+        `[Dispatch] Errand ${payload.errandId}: rider entered ₱${payload.confirmedTotal} but the ` +
+          `receipt scanned as ₱${payload.extractedTotal} (₱${payload.gap} apart). Worth a call before it settles.`
+      );
+    });
+
+    // A purchase from a shop that issues no receipt — a sari-sari store, a market
+    // stall. The amount is the rider's word and nothing corroborates it, so it is
+    // surfaced as it happens rather than found in a report a week later. Not an
+    // accusation: it is the ordinary way half of Tacurong sells things, and the
+    // point is that dispatch knows which purchases carry no paper behind them.
+    socket.on("errand:unverified_purchase", (payload: any) => {
+      if (!payload?.errandId) return;
+      console.warn(
+        `[Dispatch] Errand ${payload.errandId}: rider ${payload.riderId} declared ` +
+          `₱${payload.declaredTotal} at a shop that issued no receipt. Unverified — ` +
+          `the photo shows the goods, not a printed total.`
+      );
+    });
+
+    socket.on("errand:stop_mismatch", (payload: any) => {
+      if (!payload?.errandId) return;
+      console.warn(
+        `[Dispatch] Errand ${payload.errandId}: rider is at "${payload.observedPlaceName}", ` +
+          `but the stop is pinned to "${payload.pinnedStoreName}" ` +
+          `(${payload.metersFromPinnedStop} m away).`
+      );
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -192,6 +264,12 @@ export function useDispatcherPortal(currentUserId?: number) {
       } catch (fbErr) {
         console.warn("Firebase RTDB meta write warning:", fbErr);
       }
+
+      // Introduce the dispatcher in the conversation. Until now claiming an
+      // errand only wrote a `meta` node, so the chat the customer was pushed
+      // into opened completely empty — the least reassuring possible result of
+      // "your errand was accepted".
+      void postAccepted(orderId, currentUser?.name || dispatcherFirstName);
 
       // Open slide-in chat drawer
       setSelectedErrandId(orderId);
@@ -228,6 +306,26 @@ export function useDispatcherPortal(currentUserId?: number) {
     }
   };
 
+  const handleDeclineOrder = async (orderId: string, reason?: string) => {
+    const finalReason = (reason || "").trim() || "Declined during dispatcher review";
+    try {
+      // The dedicated endpoint, not PATCH /status. The old call passed `reason`
+      // to a handler that only reads `status`, so every explanation a
+      // dispatcher wrote was silently discarded and the customer was left with
+      // a cancelled errand and no idea why. This one persists it to
+      // `errand_decline_reasons` and notifies the customer.
+      await apiClient.patch(`/errands/${orderId}/dispatcher-decline`, { reason: finalReason });
+
+      void postDeclined(orderId, finalReason, currentUserName);
+      setErrands((prev) =>
+        prev.map((e) => (e.id === orderId ? { ...e, status: "Cancelled" as ErrandStatus } : e))
+      );
+      fetchOrders();
+    } catch (err: any) {
+      alert(err.response?.data?.error || err.message || "Failed to decline order");
+    }
+  };
+
   return {
     activeTab,
     setActiveTab,
@@ -236,6 +334,7 @@ export function useDispatcherPortal(currentUserId?: number) {
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,
+    handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,
     handleUpdateStatus,

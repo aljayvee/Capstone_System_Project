@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { DashboardModule } from "./modules/dashboard/DashboardModule";
@@ -24,9 +24,6 @@ import {
   Layers,
   ChevronRight,
 } from "lucide-react";
-import { ServerStatusBadge } from "../../components/ServerStatusBadge";
-import { NotificationBell } from "../../components/NotificationBell";
-import { apiClient } from "../../services/apiClient";
 import {
   Sidebar,
   SidebarContent,
@@ -62,7 +59,6 @@ interface NavSection {
     id: ModuleId;
     label: string;
     icon: any;
-    badgeKey?: "users" | "riders" | "merchants";
   }[];
 }
 
@@ -77,15 +73,15 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Operations",
     items: [
-      { id: "users", label: "Users", icon: Users, badgeKey: "users" },
-      { id: "riders", label: "Riders", icon: Bike, badgeKey: "riders" },
+      { id: "users", label: "Users", icon: Users },
+      { id: "riders", label: "Riders", icon: Bike },
       { id: "tracking", label: "Live Map", icon: MapPin },
     ],
   },
   {
     title: "Settings",
     items: [
-      { id: "merchants", label: "Store Categories", icon: Store, badgeKey: "merchants" },
+      { id: "merchants", label: "Merchants & Places", icon: Store },
       { id: "rates", label: "Service Rates", icon: DollarSign },
     ],
   },
@@ -95,34 +91,6 @@ export default function OwnerPortal() {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-
-  // Live Metric Badges
-  const [counts, setCounts] = useState<{ users: number; riders: number; merchants: number }>({
-    users: 0,
-    riders: 0,
-    merchants: 0,
-  });
-
-  useEffect(() => {
-    async function fetchSidebarCounts() {
-      try {
-        const [usersRes, ridersRes, merchantsRes] = await Promise.allSettled([
-          apiClient.get("/users"),
-          apiClient.get("/riders"),
-          apiClient.get("/merchant-categories"),
-        ]);
-
-        const uCount = usersRes.status === "fulfilled" ? (usersRes.value.data?.length || 0) : 0;
-        const rCount = ridersRes.status === "fulfilled" ? (ridersRes.value.data?.riders?.length || ridersRes.value.data?.length || 0) : 0;
-        const mCount = merchantsRes.status === "fulfilled" ? (merchantsRes.value.data?.length || 0) : 0;
-
-        setCounts({ users: uCount, riders: rCount, merchants: mCount });
-      } catch (err) {
-        console.warn("Sidebar counts fetch warning:", err);
-      }
-    }
-    fetchSidebarCounts();
-  }, []);
 
   const requestedModule = searchParams.get("module");
   const activeModule: ModuleId = MODULE_IDS.includes(requestedModule as ModuleId)
@@ -139,7 +107,7 @@ export default function OwnerPortal() {
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
-        <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex w-full">
+        <div className="h-screen w-full bg-[#F8FAFC] text-slate-900 flex overflow-hidden">
           {/* Sidebar Navigation - Navy Theme */}
           <Sidebar
             collapsible="icon"
@@ -187,7 +155,6 @@ export default function OwnerPortal() {
                       {section.items.map((item) => {
                         const Icon = item.icon;
                         const isActive = activeModule === item.id;
-                        const badgeValue = item.badgeKey ? counts[item.badgeKey] : null;
 
                         return (
                           <SidebarMenuItem key={item.id}>
@@ -196,7 +163,7 @@ export default function OwnerPortal() {
                               isActive={isActive}
                               tooltip={item.label}
                               size="default"
-                              className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                              className={`w-full flex items-center justify-start px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                                 isActive
                                   ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/40"
                                   : "text-slate-300 hover:bg-white/10 hover:text-white"
@@ -213,19 +180,6 @@ export default function OwnerPortal() {
                                   {item.label}
                                 </span>
                               </div>
-
-                              {/* Badge Count (e.g. 5 categories, 8 users) */}
-                              {badgeValue !== null && badgeValue > 0 && (
-                                <span
-                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-all opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:hidden ${
-                                    isActive
-                                      ? "bg-white/20 text-white border-white/30"
-                                      : "bg-slate-800 text-slate-400 border-slate-700"
-                                  }`}
-                                >
-                                  {badgeValue}
-                                </span>
-                              )}
                             </SidebarMenuButton>
                           </SidebarMenuItem>
                         );
@@ -303,8 +257,8 @@ export default function OwnerPortal() {
           </Dialog>
 
           {/* Main Workspace Console */}
-          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full">
-            <main className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 h-screen w-full">
+          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full h-full min-h-0 flex flex-col overflow-hidden">
+            <main className="flex-1 p-3 sm:p-4 md:p-5 flex flex-col h-full w-full min-h-0 overflow-hidden">
               {/* Dynamic Light Mode Modules */}
               {activeModule === "dashboard" && <DashboardModule />}
               {activeModule === "users" && <UserManagementModule />}

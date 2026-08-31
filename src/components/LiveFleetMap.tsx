@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Bike, Navigation, WifiOff, Package, Moon, BatteryLow, Target, Sparkles } from "lucide-react";
+import { Bike, Navigation, WifiOff, Package, Moon, Target, Eye, EyeOff } from "lucide-react";
 import { createRoot, Root } from "react-dom/client";
+import { createMarkerTween, type MarkerTween } from "./markerTween";
 import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
 import type { RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES } from "../constants/riderPresence";
 import { decodePolyline } from "../utils/polyline";
+
+/** For a stop pinned outside the catalogue. Mirrors the server's default. */
+const DEFAULT_ARRIVAL_RADIUS_METERS = 75;
 
 interface LiveFleetMapProps {
   riders: RiderFleetMember[];
@@ -12,6 +16,7 @@ interface LiveFleetMapProps {
   selectedRiderId?: number | null;
   onSelectRider?: (riderId: number) => void;
   hideOffline?: boolean;
+  onToggleHideOffline?: () => void;
   filterStatus?: RiderPresenceState | "ALL";
   /**
    * Encoded polyline of the selected errand's road-network route
@@ -21,7 +26,14 @@ interface LiveFleetMapProps {
    */
   routeGeometry?: string | null;
   /** Ordered store stops for the selected errand. */
-  routeStops?: Array<{ latitude: number; longitude: number; storeName: string }>;
+  routeStops?: Array<{
+    latitude: number;
+    longitude: number;
+    storeName: string;
+    /** The arrival circle for this stop, resolved server-side per category. */
+    geofenceRadiusMeters?: number | null;
+    departedAt?: string | null;
+  }>;
   /** Delivery destination for the selected errand. */
   routeDestination?: { latitude: number; longitude: number } | null;
 }
@@ -135,6 +147,7 @@ export default function LiveFleetMap({
   selectedRiderId,
   onSelectRider,
   hideOffline = false,
+  onToggleHideOffline,
   filterStatus = "ALL",
   routeGeometry = null,
   routeStops = [],
@@ -142,9 +155,16 @@ export default function LiveFleetMap({
 }: LiveFleetMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<{ [key: string]: { marker: google.maps.marker.AdvancedMarkerElement; root: Root } }>({});
+  const markersRef = useRef<{
+    [key: string]: {
+      marker: google.maps.marker.AdvancedMarkerElement;
+      root: Root;
+      tween: MarkerTween;
+    };
+  }>({});
   const routePolylineRef = useRef<google.maps.Polyline | null>(null);
   const routeMarkersRef = useRef<google.maps.Marker[]>([]);
+  const routeCirclesRef = useRef<google.maps.Circle[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const markerLibraryRef = useRef<any>(null);
 
@@ -161,6 +181,8 @@ export default function LiveFleetMap({
     routePolylineRef.current = null;
     routeMarkersRef.current.forEach((marker) => marker.setMap(null));
     routeMarkersRef.current = [];
+    routeCirclesRef.current.forEach((circle) => circle.setMap(null));
+    routeCirclesRef.current = [];
 
     if (!routeGeometry) return;
 
@@ -173,6 +195,27 @@ export default function LiveFleetMap({
       strokeColor: "#1E3A5F",
       strokeOpacity: 0.85,
       strokeWeight: 4,
+    });
+
+    // The circle each stop is reached inside. Dispatch reads these pins to
+    // judge whether a rider has actually got there, and until now the boundary
+    // that decides it was invisible — an arrival appeared to happen at an
+    // arbitrary moment.
+    routeStops.forEach((stop) => {
+      const done = Boolean(stop.departedAt);
+      routeCirclesRef.current.push(
+        new g.maps.Circle({
+          map: mapInstance.current,
+          center: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
+          radius: Number(stop.geofenceRadiusMeters) || DEFAULT_ARRIVAL_RADIUS_METERS,
+          strokeColor: done ? "#6B7280" : "#2563EB",
+          strokeOpacity: done ? 0.35 : 0.5,
+          strokeWeight: 1.5,
+          fillColor: done ? "#6B7280" : "#2563EB",
+          fillOpacity: done ? 0.05 : 0.09,
+          clickable: false,
+        })
+      );
     });
 
     routeStops.forEach((stop, index) => {
@@ -247,7 +290,10 @@ export default function LiveFleetMap({
 
     return () => {
       isMounted = false;
-      Object.values(markersRef.current).forEach(({ marker, root }) => {
+      Object.values(markersRef.current).forEach(({ marker, root, tween }) => {
+        // Cancel first: an in-flight frame would otherwise write a position to
+        // a marker that has already been torn down.
+        tween.cancel();
         marker.map = null;
         root.unmount();
       });
@@ -274,8 +320,9 @@ export default function LiveFleetMap({
       const isSelected = selectedRiderId === rider.id;
 
       if (markersRef.current[idStr]) {
-        // Update position
-        markersRef.current[idStr].marker.position = position;
+        // Slide to the new fix rather than assigning `position` outright, which
+        // teleported the pin between Firebase updates.
+        markersRef.current[idStr].tween.moveTo(position);
         markersRef.current[idStr].marker.zIndex = isSelected ? 999 : 10;
         // Re-render React root content
         markersRef.current[idStr].root.render(
@@ -307,13 +354,18 @@ export default function LiveFleetMap({
           zIndex: isSelected ? 999 : 10,
         });
 
-        markersRef.current[idStr] = { marker, root };
+        markersRef.current[idStr] = {
+          marker,
+          root,
+          tween: createMarkerTween(marker as unknown as { position: google.maps.LatLngLiteral | null }, position),
+        };
       }
     });
 
     // Cleanup markers that are no longer visible or plottable
     Object.keys(markersRef.current).forEach((idStr) => {
       if (!plottableIds.has(idStr)) {
+        markersRef.current[idStr].tween.cancel();
         markersRef.current[idStr].marker.map = null;
         markersRef.current[idStr].root.unmount();
         delete markersRef.current[idStr];
@@ -345,39 +397,57 @@ export default function LiveFleetMap({
         bounds.extend({ lat: r.plottableLocation.lat, lng: r.plottableLocation.lng });
       }
     });
-    mapInstance.current.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+    mapInstance.current.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
   }, [visibleRiders]);
 
   const activeReadyCount = riders.filter((r) => r.presence === "AVAILABLE").length;
   const activeBusyCount = riders.filter((r) => r.presence === "BUSY").length;
 
   return (
-    <div className="w-full h-full relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-slate-50">
+    <div className="w-full h-full relative rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200/90 shadow-inner bg-slate-50">
       <div ref={mapRef} className="w-full h-full bg-slate-100" />
 
       {!isMapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-50/80 backdrop-blur-xs z-30">
-          <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin rounded-full h-9 w-9 border-b-2 border-blue-600"></div>
-            <p className="text-xs font-bold text-slate-600">Loading Live Fleet Map...</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-50/85 backdrop-blur-xs z-30">
+          <div className="flex flex-col items-center gap-2.5 p-6 rounded-2xl bg-white/90 border border-slate-200 shadow-md">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#1E3A5F] border-t-transparent"></div>
+            <p className="text-xs font-bold text-slate-700">Loading Live Fleet Map...</p>
           </div>
         </div>
       )}
 
       {/* Floating Status & Controls Bar */}
-      <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
+      <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-wrap items-center justify-end gap-2 z-20">
+        {/* Toggle Hide Offline */}
+        {onToggleHideOffline && (
+          <button
+            type="button"
+            onClick={onToggleHideOffline}
+            title={hideOffline ? "Show off-duty riders" : "Hide off-duty riders"}
+            className={`h-9 px-3 text-xs font-bold rounded-xl shadow-md border transition flex items-center gap-1.5 ${
+              hideOffline
+                ? "bg-slate-800 text-white border-slate-800"
+                : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900"
+            }`}
+          >
+            {hideOffline ? <EyeOff size={14} /> : <Eye size={14} />}
+            <span className="hidden sm:inline">{hideOffline ? "Off-Duty Hidden" : "Hide Off-Duty"}</span>
+          </button>
+        )}
+
         {/* Re-center / Fit Bounds Button */}
         <button
+          type="button"
           onClick={handleFitBounds}
-          title="Fit all riders on map"
-          className="h-9 px-3 bg-white/95 hover:bg-white text-slate-700 text-xs font-bold rounded-xl shadow-md border border-slate-200 flex items-center gap-1.5 transition active:scale-95"
+          title="Fit all visible riders on map"
+          className="h-9 px-3 bg-white/95 hover:bg-white text-slate-700 text-xs font-bold rounded-xl shadow-md border border-slate-200/80 flex items-center gap-1.5 transition active:scale-95 hover:text-[#1E3A5F]"
         >
-          <Target size={15} className="text-blue-600" />
+          <Target size={15} className="text-[#1E3A5F]" />
           <span className="hidden sm:inline">Fit All</span>
         </button>
 
         {/* Live Active Pill */}
-        <div className="bg-white/95 backdrop-blur-xs px-3 py-2 rounded-xl shadow-md border border-slate-200 text-xs font-extrabold text-slate-800 flex items-center gap-2">
+        <div className="bg-white/95 backdrop-blur-xs px-3 py-2 rounded-xl shadow-md border border-slate-200/80 text-xs font-extrabold text-slate-800 flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>

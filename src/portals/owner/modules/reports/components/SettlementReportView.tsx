@@ -46,10 +46,6 @@ export const SettlementReportView: React.FC = () => {
       {data && (
         <>
           <p className="text-xs text-slate-500 font-semibold">{data.rangeLabel} Settlement</p>
-          <p className="text-xs text-slate-400 italic -mt-1">
-            Rider share is a fixed 70% of gross revenue; the business retains the remaining 30% — see the
-            Commission Report for the same split.
-          </p>
 
           <div className="grid grid-cols-3 gap-6">
             <MetricCard

@@ -13,21 +13,10 @@ export interface MockRider {
   lng: number;
 }
 
-export interface RateConfig {
-  baseFee: number;
-  perKmRate: number;
-  serviceFeePercent: number;
-}
-
 export class ErrandService {
   private static errands: Errand[] = [];
   private static riders: MockRider[] = [];
   private static users: User[] = [];
-  private static rates: RateConfig = {
-    baseFee: 50,
-    perKmRate: 10,
-    serviceFeePercent: 5,
-  };
 
   public static async getErrands(): Promise<Errand[]> {
     return [...this.errands];
@@ -61,15 +50,6 @@ export class ErrandService {
 
   public static async getRiders(): Promise<MockRider[]> {
     return [...this.riders];
-  }
-
-  public static async getRateConfig(): Promise<RateConfig> {
-    return { ...this.rates };
-  }
-
-  public static async updateRateConfig(newConfig: RateConfig): Promise<RateConfig> {
-    this.rates = { ...newConfig };
-    return { ...this.rates };
   }
 
   public static async getUsers(): Promise<User[]> {

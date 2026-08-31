@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldAlert, ArrowLeft, Layers, Lock, Check, Copy, SearchX } from "lucide-react";
+import { ShieldAlert, ArrowLeft, Layers, Lock, Check, Copy, SearchX, Info } from "lucide-react";
 import { formatErrandId } from "../../../utils/formatErrandId";
 
 interface UnauthorizedErrandScreenProps {
@@ -24,8 +24,8 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
   const isNotFound = variant === "not_found";
 
   const defaultReason = isNotFound
-    ? "The requested errand reference could not be found in the database. It may have been removed or contains an invalid identifier."
-    : "This errand is currently claimed and being handled by another dispatcher.";
+    ? "We couldn't find this order. It may have been removed, or the link may be incorrect."
+    : "Another dispatcher is currently handling this order.";
 
   const displayReason = reason || defaultReason;
 
@@ -61,16 +61,16 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
         {/* HEADER TEXT */}
         <div className="space-y-1.5">
           <h3 className="text-xl font-black text-slate-900 tracking-tight">
-            {isNotFound ? "Errand Not Found" : "Errand Under Active Dispatch"}
+            {isNotFound ? "Order not found" : "Already being handled"}
           </h3>
           <p
-            className={`text-xs font-semibold uppercase tracking-wider ${
+            className={`text-xs font-semibold ${
               isNotFound ? "text-amber-600" : "text-rose-600"
             }`}
           >
             {isNotFound
-              ? "Invalid or Expired Transaction Reference"
-              : "Access Restricted to Assigned Dispatcher"}
+              ? "This link doesn't match any order"
+              : "Only the assigned dispatcher can open this"}
           </p>
           <p className="text-xs text-slate-500 max-w-md mx-auto pt-1 leading-relaxed">
             {displayReason}
@@ -81,12 +81,13 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
         <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left space-y-3 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              {isNotFound ? "Queried Reference:" : "Transaction Ref:"}
+              Order:
             </span>
             <button
               onClick={handleCopyId}
-              className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[#1E3A5F] bg-white px-2.5 py-1 rounded-lg border border-slate-200 hover:border-blue-400 transition"
-              title="Copy UUID"
+              className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-dispatcher-navy bg-white px-2.5 py-1 rounded-lg border border-slate-200 hover:border-blue-400 transition"
+              title="Copy order ID"
+              aria-label={copied ? "Order ID copied" : `Copy order ID ${formattedId}`}
             >
               #{formattedId}
               {copied ? (
@@ -103,18 +104,19 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
                 Assigned Dispatcher:
               </span>
               <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-lg">
-                <span>🛡️ {claimantName}</span>
+                <ShieldAlert size={12} />
+                <span>{claimantName}</span>
               </div>
             </div>
           )}
 
           <div className="pt-2 border-t border-slate-200/60">
             <p className="text-[11px] text-slate-500 leading-normal flex items-start gap-1.5">
-              <span className="text-amber-500 font-bold">ℹ️</span>
+              <Info size={13} className="text-amber-500 shrink-0 mt-0.5" />
               <span>
                 {isNotFound
-                  ? "Please verify the link from the customer chat or return to the Errand Queue to select an active transaction."
-                  : "To prevent concurrent conflicts, store-item modifications and rider dispatches are locked to the claiming dispatcher."}
+                  ? "Check the link from the customer chat, or return to the queue to pick an active order."
+                  : "This keeps two dispatchers from editing the same order at once."}
               </span>
             </p>
           </div>
@@ -124,7 +126,7 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
           <button
             onClick={onReturnToQueue}
-            className="w-full sm:flex-1 bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs transition"
+            className="w-full sm:flex-1 bg-dispatcher-navy hover:bg-dispatcher-navy-dark text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs transition"
           >
             <ArrowLeft size={15} /> Return to Queue
           </button>

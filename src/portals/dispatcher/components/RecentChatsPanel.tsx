@@ -1,16 +1,15 @@
 import React, { useState, useMemo } from "react";
 import { formatErrandId } from "../../../utils/formatErrandId";
 import {
-  Search,
   MessageSquare,
   ChevronLeft,
   ChevronRight,
   Eye,
 } from "lucide-react";
+import { DispatcherSearchField } from "./ui/DispatcherSearchField";
 
 const STATUS_FILTERS = [
   { id: "ALL", label: "All" },
-  { id: "PENDING", label: "Pending" },
   { id: "ASSIGNED", label: "Assigned" },
   { id: "IN_TRANSIT", label: "In Transit" },
   { id: "DELIVERED", label: "Delivered" },
@@ -30,7 +29,17 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
   const [currentPage, setCurrentPage] = useState(1);
 
   const closedErrands = useMemo(() => {
-    return errands.filter((e) => String(e.status).toUpperCase() !== "AVAILABLE");
+    return errands.filter((e) => {
+      const s = String(e.status).toUpperCase();
+      // AVAILABLE is unclaimed — no dispatcher conversation exists yet.
+      // PENDING is claimed and actively being worked (see errandService's
+      // claimErrand): the dispatcher is right now pinning stores, editing
+      // items, or otherwise mid-conversation. Neither belongs in a "recent"
+      // history list — that's ActiveErrandsPanel's job, and letting a
+      // currently-active chat also show up here made it look closed when it
+      // very much was not.
+      return s !== "AVAILABLE" && s !== "PENDING";
+    });
   }, [errands]);
 
   const filteredErrands = useMemo(() => {
@@ -90,23 +99,18 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
-              <MessageSquare size={18} className="text-[#1E3A5F]" />
+              <MessageSquare size={18} className="text-dispatcher-navy" />
               <span>Customer Conversations</span>
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Review chat transcripts, customer instructions, and delivery agreements.
-            </p>
           </div>
 
           {/* Quick Search */}
-          <div className="relative w-full sm:w-72">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
+          <div className="w-full sm:w-72">
+            <DispatcherSearchField
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search ID, customer, store..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-2 text-xs text-slate-800 placeholder:text-slate-400 font-medium outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:bg-white transition"
+              aria-label="Search conversations"
             />
           </div>
         </div>
@@ -121,7 +125,7 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
                 onClick={() => handleStatusFilterChange(f.id)}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                   isActive
-                    ? "bg-[#1E3A5F] text-white shadow-xs"
+                    ? "bg-dispatcher-navy text-white shadow-xs"
                     : "bg-slate-100 text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -151,7 +155,7 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
             <tbody className="divide-y divide-slate-100">
               {paginatedErrands.map((e) => (
                 <tr key={e.id} className="hover:bg-slate-50/80 transition">
-                  <td className="p-4 font-mono font-bold text-[#1E3A5F]">
+                  <td className="p-4 font-mono font-bold text-dispatcher-navy">
                     {formatErrandId(e.id)}
                   </td>
                   <td className="p-4 font-extrabold text-slate-900">
@@ -172,7 +176,7 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
                   <td className="p-4 text-right">
                     <button
                       onClick={() => onOpenChat(e.id)}
-                      className="inline-flex items-center gap-1.5 bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition"
+                      className="inline-flex items-center gap-1.5 bg-dispatcher-navy hover:bg-dispatcher-navy-dark text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs transition"
                     >
                       <Eye size={13} />
                       <span>View Chat</span>
@@ -184,8 +188,8 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
                 <tr>
                   <td colSpan={5} className="p-10 text-center text-slate-400 italic">
                     {closedErrands.length === 0
-                      ? "No customer conversations recorded yet."
-                      : "No conversations match your search or filter."}
+                      ? "No conversations yet."
+                      : "No conversations match your search."}
                   </td>
                 </tr>
               )}
@@ -212,6 +216,7 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage <= 1}
+              aria-label="Previous page"
               className={`p-1.5 rounded-lg border transition ${
                 currentPage <= 1
                   ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
@@ -228,6 +233,7 @@ export function RecentChatsPanel({ errands, onOpenChat }: RecentChatsPanelProps)
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage >= totalPages}
+              aria-label="Next page"
               className={`p-1.5 rounded-lg border transition ${
                 currentPage >= totalPages
                   ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"

@@ -44,9 +44,6 @@ export const CommissionReportView: React.FC = () => {
       {data && (
         <>
           <p className="text-xs text-slate-500 font-semibold">{data.rangeLabel}</p>
-          <p className="text-xs text-slate-400 italic -mt-1">
-            Commission is a fixed 30% of this period's order value — the rider retains the remaining 70%.
-          </p>
           <div className="grid grid-cols-2 gap-6">
             <MetricCard
               title="Estimated Commission"

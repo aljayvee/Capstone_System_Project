@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
 import { ErrandQueueTable } from "./components/ErrandQueueTable";
@@ -7,13 +7,16 @@ import { DispatcherChatPanel } from "./components/DispatcherChatPanel";
 import { RecentChatsPanel } from "./components/RecentChatsPanel";
 import { DispatcherRiderMessagesPanel } from "./components/DispatcherRiderMessagesPanel";
 import { ActiveErrandsPanel } from "./components/ActiveErrandsPanel";
+import { ExceptionQueuePanel } from "./components/ExceptionQueuePanel";
+import { DispatcherProfilePanel } from "./components/DispatcherProfilePanel";
+import { useOpenExceptions } from "./hooks/useOpenExceptions";
 import {
-  ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, MessageCircle, X, Map as MapIcon, Activity
+  ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, MessageCircle, X, Map as MapIcon, Activity, AlertTriangle
 } from "lucide-react";
-import { ServerStatusBadge } from "../../components/ServerStatusBadge";
 import { NotificationBell } from "../../components/NotificationBell";
 import LiveFleetMap from "../../components/LiveFleetMap";
 import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
+import { fetchStaffPhoto } from "../../services/staffPhotoService";
 import {
   Sidebar,
   SidebarContent,
@@ -49,11 +52,28 @@ export default function DispatcherPortal() {
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,
+    handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,
     handleUpdateStatus,
-  } = useDispatcherPortal(user?.id);
+  } = useDispatcherPortal(user?.id, user?.name);
   const { riders } = useRiderFleetPresence();
+  const exceptionQueue = useOpenExceptions();
+
+  const [sidebarPhotoUri, setSidebarPhotoUri] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setSidebarPhotoUri(null);
+      return;
+    }
+    fetchStaffPhoto(user.id).then((uri) => {
+      if (!cancelled) setSidebarPhotoUri(uri);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   return (
     <TooltipProvider>
@@ -155,6 +175,39 @@ export default function DispatcherPortal() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
+                    {/* Needs a decision */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setActiveTab("exceptions")}
+                        isActive={activeTab === "exceptions"}
+                        tooltip="Needs a Decision"
+                        size="default"
+                        className={`w-full flex items-center justify-between px-3.5 h-11 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-10 ${
+                          activeTab === "exceptions"
+                            ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/30"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <AlertTriangle size={18} className="shrink-0" />
+                          <span className="truncate group-data-[collapsible=icon]:hidden">
+                            Needs a Decision
+                          </span>
+                        </div>
+                        {exceptionQueue.openCount > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              activeTab === "exceptions"
+                                ? "bg-white/20 text-white"
+                                : "bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                            }`}
+                          >
+                            {exceptionQueue.openCount}
+                          </span>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
                     {/* Riders */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
@@ -238,19 +291,27 @@ export default function DispatcherPortal() {
 
             {/* Sidebar User & Logout Footer */}
             <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2 space-y-2">
-              <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-                <div
-                  className="w-9 h-9 rounded-xl bg-blue-600/80 border border-blue-400/30 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm"
-                  title={user?.name || "Dispatcher"}
-                >
-                  {(user?.name || "Dispatcher")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
+              <button
+                type="button"
+                onClick={() => setActiveTab("profile")}
+                title="Profile & Settings"
+                className={`w-full flex items-center gap-3 px-1 py-1 rounded-xl transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 ${
+                  activeTab === "profile" ? "bg-white/10" : "hover:bg-white/10"
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-600/80 border border-blue-400/30 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-sm overflow-hidden">
+                  {sidebarPhotoUri ? (
+                    <img src={sidebarPhotoUri} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (user?.name || "Dispatcher")
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()
+                  )}
                 </div>
-                <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+                <div className="min-w-0 text-left group-data-[collapsible=icon]:hidden">
                   <p className="text-xs font-bold text-white truncate">
                     {user?.name || "Dispatcher"}
                   </p>
@@ -258,7 +319,7 @@ export default function DispatcherPortal() {
                     {user?.email || "dispatcher@errand.ph"}
                   </p>
                 </div>
-              </div>
+              </button>
 
               <button
                 onClick={() => setShowSignOutConfirm(true)}
@@ -312,69 +373,67 @@ export default function DispatcherPortal() {
               {/* ───────────────────────────────────────────────────────────── */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
                 <div>
-                  <div className="flex items-center gap-2.5 mb-1">
+                  <div className="flex items-center gap-2.5">
                     <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
                       <ClipboardList size={20} />
                     </span>
                     <h1 className="text-xl font-extrabold text-slate-800">Dispatch Console</h1>
                   </div>
-                  <p className="text-xs text-slate-500 max-w-xl">
-                    Coordinate customer errands, assign delivery riders, and monitor active orders in real time.
-                  </p>
                 </div>
 
                 <div className="flex items-center gap-2.5">
                   <NotificationBell />
-                  <ServerStatusBadge />
                 </div>
               </div>
 
               {/* ───────────────────────────────────────────────────────────── */}
-              {/* 2. OPERATIONAL KPI SUMMARY CARDS (Sticky when hitting top)     */}
+              {/* 2. OPERATIONAL KPI SUMMARY CARDS (Errand Queue Only)          */}
               {/* ───────────────────────────────────────────────────────────── */}
-              <section className="sticky top-0 z-30 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F9FAFB]/95 backdrop-blur-md py-2.5 -my-2.5 transition-all">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
-                  <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
-                    <Clock size={22} />
+              {activeTab === "queue" && (
+                <section className="sticky top-0 z-30 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F9FAFB]/95 backdrop-blur-md py-2.5 -my-2.5 transition-all">
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                    <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center font-bold">
+                      <Clock size={22} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Awaiting Dispatch</p>
+                      <p className="text-xl font-black text-slate-900 mt-0.5">
+                        {errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length} Errands
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Awaiting Dispatch</p>
-                    <p className="text-xl font-black text-slate-900 mt-0.5">
-                      {errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length} Errands
-                    </p>
-                  </div>
-                </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
-                  <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
-                    <Zap size={22} />
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center font-bold">
+                      <Zap size={22} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Errands</p>
+                      <p className="text-xl font-black text-slate-900 mt-0.5">
+                        {
+                          errands.filter((e) => {
+                            const s = String(e.status).toUpperCase();
+                            return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED" && s !== "DELIVERED";
+                          }).length
+                        }{" "}
+                        Errands
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Errands</p>
-                    <p className="text-xl font-black text-slate-900 mt-0.5">
-                      {
-                        errands.filter((e) => {
-                          const s = String(e.status).toUpperCase();
-                          return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "PASSING BY" && s !== "COMPLETED" && s !== "DELIVERED";
-                        }).length
-                      }{" "}
-                      Errands
-                    </p>
-                  </div>
-                </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
-                    <Bike size={22} />
+                  <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center gap-3.5 hover:shadow-sm transition">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-bold">
+                      <Bike size={22} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Riders Ready</p>
+                      <p className="text-xl font-black text-slate-900 mt-0.5">
+                        {riders.filter((r) => r.online).length} of {riders.length} Riders
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Riders Ready</p>
-                    <p className="text-xl font-black text-slate-900 mt-0.5">
-                      {riders.filter((r) => r.online).length} of {riders.length} Riders
-                    </p>
-                  </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* ───────────────────────────────────────────────────────────── */}
               {/* 3. MODULAR CONTENT VIEWS                                      */}
@@ -397,6 +456,7 @@ export default function DispatcherPortal() {
                           errands={errands}
                           currentUser={user}
                           onClaimOrder={handleClaimOrder}
+                          onDeclineOrder={handleDeclineOrder}
                           onOpenChat={handleOpenChat}
                           onUpdateStatus={handleUpdateStatus}
                         />
@@ -412,6 +472,7 @@ export default function DispatcherPortal() {
                 {activeTab === "active_errands" && (
                   <ActiveErrandsPanel errands={errands} onOpenChat={handleOpenChat} />
                 )}
+                {activeTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
                 {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
                 {activeTab === "messages" && (
                   <DispatcherRiderMessagesPanel
@@ -423,6 +484,7 @@ export default function DispatcherPortal() {
                 {activeTab === "recent_chats" && (
                   <RecentChatsPanel errands={errands} onOpenChat={handleOpenChat} />
                 )}
+                {activeTab === "profile" && <DispatcherProfilePanel />}
               </div>
             </main>
           

@@ -6,6 +6,7 @@ import { GuestRoute } from "../components/GuestRoute";
 import OwnerPortal from "../portals/owner/OwnerPortal";
 import DispatcherPortal from "../portals/dispatcher/DispatcherPortal";
 import PlacesDirectoryScreen from "../portals/owner/screens/PlacesDirectoryScreen";
+
 import { MobileAppNoticeModal } from "../components/MobileAppNoticeModal";
 import { NotFoundPage } from "../components/NotFoundPage";
 
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+
   {
     path: "/dispatcher",
     element: (

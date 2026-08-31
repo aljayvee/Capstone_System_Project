@@ -230,11 +230,6 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders }) =>
                 </span>
               </div>
 
-              {/* Status Description */}
-              <p className="text-[11px] text-slate-500 italic bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
-                {selectedTheme.description}
-              </p>
-
               <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1 border-t border-slate-100">
                 <div className="flex items-center gap-1">
                   <Phone size={12} className="text-slate-400" />

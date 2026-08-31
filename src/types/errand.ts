@@ -22,6 +22,17 @@ export interface ErrandPinpoint {
   sequence: number;
 }
 
+export interface ErrandItem {
+  id?: number;
+  errandId?: string;
+  itemName: string;
+  storeCategory?: string;
+  quantity?: number;
+  unitPrice?: number;
+  estimatedSubtotal?: number;
+  notes?: string;
+}
+
 export interface Errand {
   id: string;
   customerName: string;
@@ -33,6 +44,9 @@ export interface Errand {
   deliveryLatitude?: number | null;
   deliveryLongitude?: number | null;
   pinpoints?: ErrandPinpoint[];
+  pabiliDetails?: ErrandItem[];
+  pabiliItemRequests?: ErrandItem[];
+  storeCount?: number;
 
   // Road-network route the fare was actually billed on, persisted by
   // errandService.recalculateFee. routeGeometry is an encoded polyline.

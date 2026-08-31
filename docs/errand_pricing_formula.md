@@ -14,7 +14,7 @@ This document defines the mathematical formulation, algorithmic workflow, and co
 | $S_1, S_2, \dots, S_n$ | Ordered merchant/store waypoints | Locations in Service Area |
 | $C$ | Customer Drop-off Destination | e.g. STI College Tacurong |
 | $D_{\text{total}}$ | Cumulative sequential route distance | $\text{km}$ |
-| $D_{\text{excess}}$ | Billable distance exceeding base allowance | $\max(0, D_{\text{total}} - R_{\text{base}})$ |
+| $D_{\text{excess}}$ | Billable distance exceeding base allowance, rounded UP to the next whole km | $\lceil \max(0, D_{\text{total}} - R_{\text{base}}) \rceil$ |
 | $F_{\text{dist}}$ | Distance Surcharge | $D_{\text{excess}} \times P_{\text{km}}$ |
 | $F_{\text{delivery}}$ | Total Delivery Fee | $B + F_{\text{dist}}$ |
 | $I_{\text{subtotal}}$ | Estimated Items Purchase Subtotal (for Pabili) | ₱ |
@@ -32,10 +32,10 @@ $$D_{\text{total}} = \sum_{k=1}^{n-1} \text{Distance}(S_k, S_{k+1}) + \text{Dist
 - **Multi-Stop Errand ($n \ge 2$)**: Sum of distances between successive stops plus distance from last stop to customer drop-off.
 
 ### B. Excess Distance Calculation ($D_{\text{excess}}$)
-$$D_{\text{excess}} = \max(0, D_{\text{total}} - R_{\text{base}})$$
+$$D_{\text{excess}} = \left\lceil \max(0, D_{\text{total}} - R_{\text{base}}) \right\rceil$$
 
 - If $D_{\text{total}} \le R_{\text{base}}$ (e.g. $\le 2.0\text{ km}$), $D_{\text{excess}} = 0\text{ km}$.
-- If $D_{\text{total}} > R_{\text{base}}$, only the portion beyond $2.0\text{ km}$ is charged.
+- If $D_{\text{total}} > R_{\text{base}}$, distance is billed in whole started kilometres: any fraction of a kilometre beyond the allowance is rounded UP and charged as a full km. A route of $2.1\text{ km}$ and a route of $2.9\text{ km}$ both bill exactly $1\text{ km}$ of excess; a route of $3.0\text{ km}$ still bills $1\text{ km}$, and $3.1\text{ km}$ bills $2\text{ km}$.
 
 ### C. Distance Surcharge ($F_{\text{dist}}$)
 $$F_{\text{dist}} = D_{\text{excess}} \times P_{\text{km}}$$
@@ -63,13 +63,13 @@ $$G_{\text{total}} = I_{\text{subtotal}} + F_{\text{delivery}}$$
    $$D_{\text{total}} = 0.8\text{ km} + 2.7\text{ km} = \mathbf{3.5\text{ km}}$$
 4. **Base Allowance ($R_{\text{base}}$)**: First **$2.0\text{ km}$** covered by flat **₱50.00** base fee.
 5. **Excess Distance ($D_{\text{excess}}$)**: 
-   $$D_{\text{excess}} = \max(0, 3.5\text{ km} - 2.0\text{ km}) = \mathbf{1.5\text{ km}}$$
+   $$D_{\text{excess}} = \left\lceil \max(0, 3.5\text{ km} - 2.0\text{ km}) \right\rceil = \left\lceil 1.5\text{ km} \right\rceil = \mathbf{2\text{ km}}$$
 6. **Distance Surcharge ($F_{\text{dist}}$)**: 
-   $$F_{\text{dist}} = 1.5\text{ km} \times \text{₱10.00/km} = \mathbf{₱15.00}$$
+   $$F_{\text{dist}} = 2\text{ km} \times \text{₱10.00/km} = \mathbf{₱20.00}$$
 7. **Total Delivery Fee ($F_{\text{delivery}}$)**: 
-   $$F_{\text{delivery}} = \text{₱50.00} + \text{₱15.00} = \mathbf{₱65.00}$$
+   $$F_{\text{delivery}} = \text{₱50.00} + \text{₱20.00} = \mathbf{₱70.00}$$
 8. **Grand Total ($G_{\text{total}}$)**: 
-   $$G_{\text{total}} = \text{₱350.00} + \text{₱65.00} = \mathbf{₱415.00}$$
+   $$G_{\text{total}} = \text{₱350.00} + \text{₱70.00} = \mathbf{₱420.00}$$
 
 ---
 
@@ -80,5 +80,5 @@ $$G_{\text{total}} = I_{\text{subtotal}} + F_{\text{delivery}}$$
    Until this was built the server priced on a straight-line Haversine sum while the customer's map displayed the real road route from a different code path — so the fare was computed from a distance shorter than the route they could watch on their own screen. Measured on real Tacurong pairs, road distance runs **~1.48x** straight-line, so the gap was material, not cosmetic.
 
    **Fallback behaviour**: when no routing engine is reachable, distance is `haversine x ROAD_DETOUR_FACTOR` at `FALLBACK_AVG_SPEED_KMH`. Both constants are measured against the live road network by `server/gis/calibrate.ts`, not guessed, and re-measured after any OSM data refresh. Any result produced this way is flagged `degraded` and any ETA built on it is widened.
-2. **Deterministic Rounding**: Excess distance may be rounded to 1 decimal place or computed as continuous floating-point before multiplying by $P_{\text{km}}$.
+2. **Deterministic Rounding** — *implemented*. Excess distance is rounded UP (ceiling) to the next whole kilometre before multiplying by $P_{\text{km}}$ — see `pricingStrategy.ts`'s `excessKm`. A partial kilometre still costs the rider the fuel and time of a full one, so it is billed as one. The resulting distance surcharge is therefore always an exact multiple of $P_{\text{km}}$; only the OTHER fee components (the purchase handling fee's percentage tier) can still carry centavos, which is why the delivery fee is rounded to the nearest whole peso only once, over the sum of all five components — see `StandardPricingStrategy.calculate`'s final `Math.round`.
 3. **3NF Database Storage** — *implemented*. `errands` now stores `deliveryFee`, `totalCost`, and `distanceKm`, plus `routeDistanceMeters`, `routeDurationSeconds`, `routeGeometry` (encoded polyline), `routeProvider`, and `routedAt`. Distance was previously computed inside `recalculateFee` and discarded, leaving no record of why a customer was charged what they were charged.

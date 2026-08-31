@@ -8,17 +8,16 @@ interface RevenueChartProps {
 
 export const RevenueChart: React.FC<RevenueChartProps> = ({ data, timeframe }) => {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+    <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-xs border border-slate-200/90 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-bold text-slate-800">{timeframe} Revenue Overview</h3>
-          <p className="text-slate-500 text-xs mt-0.5">Real-time financial performance breakdown</p>
+          <h3 className="text-sm sm:text-base font-extrabold text-slate-900">{timeframe} Revenue Overview</h3>
         </div>
-        <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold">
+        <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-extrabold tracking-wider uppercase">
           Live Sync
         </span>
       </div>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={210}>
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -27,8 +26,8 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({ data, timeframe }) =
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-          <XAxis dataKey="x" tick={{ fontSize: 11, fill: "#64748B" }} />
-          <YAxis tick={{ fontSize: 11, fill: "#64748B" }} />
+          <XAxis dataKey="x" tick={{ fontSize: 10, fill: "#64748B" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#64748B" }} />
           <Tooltip formatter={(v: any) => [`₱${v.toLocaleString()}`, "Revenue"]} />
           <Area type="monotone" dataKey="revenue" stroke="#1E3A5F" fill="url(#colorRevenue)" strokeWidth={2} />
         </AreaChart>
