@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer App — Account & Profile Screen Design Options</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0A0F1D;
+      --card: #131B2E;
+      --card-hover: #1A243D;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-highlight: rgba(246, 36, 89, 0.35);
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --primary: #F62459;
+      --primary-subtle: rgba(246, 36, 89, 0.12);
+      --accent-blue: #38BDF8;
+      --accent-amber: #F59E0B;
+      --accent-emerald: #10B981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 36px 24px 90px;
+      line-height: 1.5;
+    }
+    .header {
+      max-width: 1280px;
+      margin: 0 auto 40px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      background: var(--primary-subtle);
+      border: 1px solid rgba(246, 36, 89, 0.25);
+      border-radius: 9999px;
+      color: #FF527B;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+    p.sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 28px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .option-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .option-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border-highlight);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+    }
+    .option-header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .option-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .option-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .tag-1 { background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .tag-2 { background: rgba(246, 36, 89, 0.15); color: #FF527B; border: 1px solid rgba(246, 36, 89, 0.3); }
+    .tag-3 { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    .option-desc {
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.45;
+    }
+    .preview-container {
+      padding: 20px;
+      background: #080D1A;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 480px;
+    }
+    .preview-container img {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      cursor: zoom-in;
+      transition: transform 0.2s ease;
+    }
+    .preview-container img:hover {
+      transform: scale(1.02);
+    }
+    .details {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .feature-list li {
+      font-size: 13px;
+      color: var(--text-main);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .feature-list li::before {
+      content: "•";
+      color: var(--primary);
+      font-weight: bold;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .stats-pill-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .stat-pill strong {
+      color: var(--text-main);
+    }
+    .stat-pill span {
+      color: var(--text-muted);
+    }
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      cursor: zoom-out;
+    }
+    .lightbox img {
+      max-height: 92vh;
+      max-width: 90vw;
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="badge">UI/UX Architecture & Selection</div>
+    <h1>Customer App: Account & Profile Layout Options</h1>
+    <p class="sub">Three distinct layout architectures for customer profile and account management, engineered to comply with Anti-AI-Slop standards, zero-jargon copy, and Maya/Foodpanda visual hygiene.</p>
+  </div>
+
+  <div class="grid">
+    <!-- OPTION 1 -->
+    <div class="option-card">
+      <div class="option-header">
+        <div>
+          <div class="option-title">Option 1: Bento Modular Dashboard</div>
+          <div class="option-desc">Structured Bento tiles unifying identity, live delivery pinpoint preview, and security in a glanceable grid.</div>
+        </div>
+        <span class="option-tag tag-1">Recommended</span>
+      </div>
+      <div class="preview-container">
+        <img src="account_bento_deck_1788623515020.jpg" alt="Option 1: Bento Modular Dashboard" onclick="openLightbox(this.src)">
+      </div>
+      <div class="details">
+        <div>
+          <div class="section-title">Core Philosophy</div>
+          <div class="option-desc">Extends the proven Home Screen Bento language into the Account tab. Information is parsed in compact, high-contrast modules rather than endless scrolling tables.</div>
+        </div>
+        <div>
+          <div class="section-title">Key Ergonomics</div>
+          <ul class="feature-list">
+            <li><strong>Interactive Identity Card:</strong> Prominent member avatar, verified status badge, and 1-tap "Edit Profile" action.</li>
+            <li><strong>Live Delivery Pinpoint Tile:</strong> Mini-map thumbnail previewing the active default address in Tacurong with direct pinpoint changer.</li>
+            <li><strong>Inline Preferences Bento:</strong> 2x2 grid for Quick Stats, Appearance (Dark/Light toggle), Security & Passwords, and Help Center.</li>
+            <li><strong>Subtle Ghost Sign Out:</strong> Restrained outline button at the base, completely isolated from destructive primary buttons.</li>
+          </ul>
+        </div>
+        <div class="stats-pill-row">
+          <div class="stat-pill"><strong>Style:</strong> <span>Bento Mosaic</span></div>
+          <div class="stat-pill"><strong>Scroll Depth:</strong> <span>Minimal (1 Viewport)</span></div>
+          <div class="stat-pill"><strong>Visual Density:</strong> <span>High Signal</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPTION 2 -->
+    <div class="option-card">
+      <div class="option-header">
+        <div>
+          <div class="option-title">Option 2: Segmented Tab Inspector</div>
+          <div class="option-desc">Multi-tab navigation separating Personal Info, Saved Places, and System Settings into dedicated capsule panes.</div>
+        </div>
+        <span class="option-tag tag-2">High Focus</span>
+      </div>
+      <div class="preview-container">
+        <img src="account_segmented_hub_1788623548624.jpg" alt="Option 2: Segmented Tab Inspector" onclick="openLightbox(this.src)">
+      </div>
+      <div class="details">
+        <div>
+          <div class="section-title">Core Philosophy</div>
+          <div class="option-desc">Inspired by macOS HIG and modern banking portals. Prevents vertical clutter by dividing dense profile forms, delivery pins, and preferences into 3 distinct tab segments.</div>
+        </div>
+        <div>
+          <div class="section-title">Key Ergonomics</div>
+          <ul class="feature-list">
+            <li><strong>Header Hero:</strong> Clean profile banner with circular avatar, user name, phone number, and verified checkmark.</li>
+            <li><strong>3-Segment Capsule Bar:</strong> <code>[ Profile & Info | Saved Places | Security & Settings ]</code> with smooth animated indicator.</li>
+            <li><strong>Inline Form Editing:</strong> Tap any pencil icon to edit Full Name, Phone, Email, or Birthdate directly without full-page navigation.</li>
+            <li><strong>Contextual Stats:</strong> Completed Errands count and Saved Locations badge immediately visible in the active tab.</li>
+          </ul>
+        </div>
+        <div class="stats-pill-row">
+          <div class="stat-pill"><strong>Style:</strong> <span>Segmented Inspector</span></div>
+          <div class="stat-pill"><strong>Scroll Depth:</strong> <span>Zero (Paging)</span></div>
+          <div class="stat-pill"><strong>Form Editing:</strong> <span>Inline Instant</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPTION 3 -->
+    <div class="option-card">
+      <div class="option-header">
+        <div>
+          <div class="option-title">Option 3: Minimalist Dock & Cards</div>
+          <div class="option-desc">Obsidian dark mode with circular quick-action dock and grouped floating settings cards.</div>
+        </div>
+        <span class="option-tag tag-3">Clean & Muted</span>
+      </div>
+      <div class="preview-container">
+        <img src="account_minimal_dock_1788623568294.jpg" alt="Option 3: Minimalist Dock & Cards" onclick="openLightbox(this.src)">
+      </div>
+      <div class="details">
+        <div>
+          <div class="section-title">Core Philosophy</div>
+          <div class="option-desc">Tailored for deep dark mode (#000000) lovers. Features high-frequency quick-action circular shortcuts followed by clean, iOS-style grouped settings lists.</div>
+        </div>
+        <div>
+          <div class="section-title">Key Ergonomics</div>
+          <ul class="feature-list">
+            <li><strong>Centered Avatar Spotlight:</strong> Hero avatar with subtle Foodpanda Pink accent ring and customer rating pill.</li>
+            <li><strong>4-Icon Quick Action Dock:</strong> Direct 1-tap circular buttons for Saved Places, Order Receipts, Notifications, and Security.</li>
+            <li><strong>Grouped Settings Cards:</strong> Rounded-xl card blocks with Lucide line icons and disclosure chevrons.</li>
+            <li><strong>High Contrast & Battery Efficient:</strong> True black background saves OLED battery life on mobile devices.</li>
+          </ul>
+        </div>
+        <div class="stats-pill-row">
+          <div class="stat-pill"><strong>Style:</strong> <span>Dock + Grouped Cards</span></div>
+          <div class="stat-pill"><strong>Theme:</strong> <span>Obsidian Black (#000000)</span></div>
+          <div class="stat-pill"><strong>Ergonomics:</strong> <span>Thumb-Friendly</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="Full Resolution Preview">
+  </div>
+
+  <script>
+    function openLightbox(src) {
+      const lb = document.getElementById('lightbox');
+      const img = document.getElementById('lightbox-img');
+      img.src = src;
+      lb.style.display = 'flex';
+    }
+    function closeLightbox() {
+      document.getElementById('lightbox').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

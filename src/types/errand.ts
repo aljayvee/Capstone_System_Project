@@ -34,6 +34,28 @@ export interface ErrandItem {
 }
 
 export interface Errand {
+  /** The payment mode the customer confirmed, if they have. */
+  paymentSelection?: { paymentMode: { name: string } } | null;
+  /**
+   * Where this errand's money stands, server-derived. Null on COD and on any
+   * errand with no ledger behind it.
+   */
+  paymentPlan?: {
+    hasLedger: boolean;
+    /** Half the goods — what must arrive before a rider is sent. */
+    dueUpFront: number;
+    amountPaid: number;
+    /** What the rider collects at the door. */
+    balanceDue: number;
+    state:
+      | "AWAITING_UPFRONT"
+      | "OVERAGE_PENDING"
+      | "AWAITING_BALANCE"
+      | "SETTLED"
+      | "REFUNDED";
+  } | null;
+  /** The basket the customer agreed to; the handling fee is never billed above it. */
+  quotedHandlingBasket?: number | null;
   id: string;
   customerName: string;
   customerPhone: string;

@@ -75,13 +75,13 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "users", label: "Users", icon: Users },
       { id: "riders", label: "Riders", icon: Bike },
-      { id: "tracking", label: "Live Map", icon: MapPin },
+      { id: "tracking", label: "Tracking", icon: MapPin },
     ],
   },
   {
     title: "Settings",
     items: [
-      { id: "merchants", label: "Merchants & Places", icon: Store },
+      { id: "merchants", label: "Merchants Category", icon: Store },
       { id: "rates", label: "Service Rates", icon: DollarSign },
     ],
   },

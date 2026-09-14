@@ -26,9 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
-      if (getMemoryAccessToken()) {
-        await apiClient.post("/auth/logout").catch(() => {});
-      }
+      await apiClient.post("/auth/logout").catch(() => {});
     } finally {
       setUser(null);
       updateToken(null);

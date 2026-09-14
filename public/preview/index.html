@@ -1,0 +1,132 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dispatch Management - Unified Apple Design Layout</title>
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --card-bg: rgba(255, 255, 255, 0.95);
+      --border: rgba(226, 232, 240, 0.9);
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --accent: #2563EB;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+    .container { max-width: 1240px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; }
+    .badge {
+      display: inline-block;
+      background: #EFF6FF;
+      color: #1D4ED8;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      border: 1px solid #DBEAFE;
+      margin-bottom: 12px;
+    }
+    h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 8px; }
+    p.sub { font-size: 15px; color: var(--text-muted); max-width: 650px; margin: 0 auto; }
+    .hero-card {
+      background: var(--card-bg);
+      border: 2px solid #BFDBFE;
+      border-radius: 24px;
+      padding: 28px;
+      margin-bottom: 48px;
+      box-shadow: 0 12px 36px -4px rgba(37, 99, 235, 0.1);
+    }
+    .hero-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .hero-head h2 { font-size: 24px; font-weight: 800; color: #1E3A5F; }
+    .hero-head p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .pill-hero {
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: #2563EB;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    }
+    .img-box {
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #CBD5E1;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      background: #000;
+    }
+    .img-box img { width: 100%; height: auto; display: block; }
+    .pillars-grid {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .pillar {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      padding: 16px;
+    }
+    .pillar h3 { font-size: 14px; font-weight: 800; color: #0F172A; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .pillar p { font-size: 12.5px; color: #475569; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">macOS Human Interface Guidelines (HIG)</div>
+      <h1>Merged Apple Design Proposal: Dispatch Studio</h1>
+      <p class="sub">The best of all three layouts merged into a single cohesive, high-productivity macOS workspace.</p>
+    </header>
+
+    <!-- Unified Merged Hero -->
+    <div class="hero-card">
+      <div class="hero-head">
+        <div>
+          <h2>The Merged Layout: Master-Detail + Bento Cards + Pro Toolbar</h2>
+          <p>Zero context-switching split view • Rich Bento card telemetry • Segmented Apple filters</p>
+        </div>
+        <span class="pill-hero">Merged Best-of-Breed</span>
+      </div>
+      <div class="img-box">
+        <a href="/preview/merged_apple_layout.jpg" target="_blank" title="Click to view full size">
+          <img src="/preview/merged_apple_layout.jpg" alt="Merged Apple Dispatch Management Layout">
+        </a>
+      </div>
+
+      <div class="pillars-grid">
+        <div class="pillar">
+          <h3>⚡ 1. Top Pro Toolbar & Frosted KPIs</h3>
+          <p>Title, Cmd+K instant search, and Apple segmented pills <code>[Incoming (3) | Active (5) | Needs Decision | All]</code> with 3 frosted glass telemetry cards.</p>
+        </div>
+        <div class="pillar">
+          <h3>🎴 2. Master Stream Bento Cards (Left 38%)</h3>
+          <p>Rich cards with store logos, <code>2m ago</code> urgency badges, customer name, route pills, and live 4-stage delivery progress tracks for in-transit orders.</p>
+        </div>
+        <div class="pillar">
+          <h3>📋 3. Deep Detail Inspector (Right 62%)</h3>
+          <p>Embedded segmented tabs <code>[Order Overview & Items | Live Customer Chat]</code>, itemized shopping checklist, map route snapshot, and <code>[Claim & Start Review]</code> CTA.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

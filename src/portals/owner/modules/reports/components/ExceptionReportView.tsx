@@ -4,13 +4,12 @@ import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { MetricCard } from "../../dashboard/components/MetricCard";
 import { useReport } from "../../../hooks/useReport";
-import { apiService, type ExceptionKind, type ReportPeriod } from "../../../../../services/apiService";
+import { useReportPdf } from "../../../hooks/useReportPdf";
+import { apiService, type ExceptionKind } from "../../../../../services/apiService";
+import type { DateRange } from "../../../../../components/DateRangePicker";
+import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatPeso } from "../../../../../utils/format";
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Plain names, because a reader should not need the enum to read the report. */
 const KIND_LABEL: Record<ExceptionKind, string> = {
@@ -20,6 +19,10 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
   WRONG_BRANCH: "Wrong branch",
   MISSING_RECEIPT: "No receipt at a stop",
   STALLED_STOP: "Long stop",
+  // Named for what the reader has to do about it. "Goods held" says a rider is
+  // waiting; "Balance never collected" says the money is simply gone.
+  OVERAGE_PENDING: "Goods held — overage unapproved",
+  UNPAID_BALANCE: "Balance never collected",
 };
 
 /**
@@ -31,15 +34,19 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
  * the part that has teeth in a dispute.
  */
 export const ExceptionReportView: React.FC = () => {
-  const [period, setPeriod] = useState<ReportPeriod>("MONTHLY");
-  const [date, setDate] = useState(todayISO());
+  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [range, setRange] = useState<DateRange | null>(null);
+  // Rebuilt each render; the hooks key on its values, not its identity.
+  const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { data, isLoading, error } = useReport(apiService.getExceptionReport, period, date);
+  const { data, isLoading, error } = useReport(apiService.getExceptionReport, apiRange);
+  const pdf = useReportPdf("exceptions", apiRange);
 
   const handleExportCSV = () => {
     if (!data) return;
     downloadCSV(
-      `Sugo_Exception_Report_${period}_${date}.csv`,
+      // Exceptions nests its window under `meta`, unlike the other five.
+      `Sugo_Exception_Report_${(data.meta?.rangeLabel ?? "report").replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       ["Errand", "Kind", "At Risk (PHP)", "Rider", "Occurred", "Detail", "Resolved By", "Reason"],
       data.exceptions.map((e) => [
         e.errandId,
@@ -57,13 +64,14 @@ export const ExceptionReportView: React.FC = () => {
   return (
     <div className="space-y-6">
       <ReportPeriodToolbar
-        period={period}
-        onPeriodChange={setPeriod}
-        date={date}
-        onDateChange={setDate}
-        onPrint={() => setReviewOpen(true)}
+        preset={preset}
+        onPresetChange={setPreset}
+        range={range}
+        onRangeChange={setRange}
+        onPreview={() => setReviewOpen(true)}
         onExportCSV={handleExportCSV}
         exportDisabled={!data}
+        isGeneratingPdf={pdf.isGenerating}
       />
 
       {isLoading && <p className="text-sm text-slate-500">Loading exceptions…</p>}
@@ -227,7 +235,9 @@ export const ExceptionReportView: React.FC = () => {
         onOpenChange={setReviewOpen}
         reportName="Exception Report"
         rangeLabel={data?.meta?.rangeLabel ?? ""}
-        onPrintNow={() => window.print()}
+        onDownloadPdf={pdf.generate}
+        isGenerating={pdf.isGenerating}
+        generateError={pdf.error}
       >
         {data && (
           <div className="space-y-2 text-xs">

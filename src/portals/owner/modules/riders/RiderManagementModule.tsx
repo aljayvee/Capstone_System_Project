@@ -1,16 +1,24 @@
 import React from "react";
 import { Bike, CheckCircle, XCircle, Star, Phone, ShieldCheck } from "lucide-react";
 import { MetricCard } from "../dashboard/components/MetricCard";
-import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
+import { useRiderFleetPresence, RIDER_STATUS_THEMES } from "../../../../hooks/useRiderFleetPresence";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
 
 export const RiderManagementModule: React.FC = () => {
   const { riders, isLoading } = useRiderFleetPresence();
 
-  const availableCount = riders.filter((r) => r.online && r.activeOrdersCount === 0).length;
-  const onErrandCount = riders.filter((r) => r.online && r.activeOrdersCount > 0).length;
-  const offlineCount = riders.filter((r) => !r.online).length;
+  // Counted from `presence` — the same state the Live Map paints its pins from.
+  //
+  // These used to be derived from `online` and `activeOrdersCount` directly,
+  // which is how this board could report three Available riders while the map
+  // showed the same three as signal-lost: two derivations of one fact, from a
+  // hook that returns both.
+  const availableCount = riders.filter((r) => r.presence === "AVAILABLE").length;
+  const onErrandCount = riders.filter((r) => r.presence === "BUSY").length;
+  const offlineCount = riders.filter(
+    (r) => r.presence === "DISCONNECTED" || r.presence === "OFF_DUTY"
+  ).length;
 
   return (
     <div className="flex flex-col h-full space-y-3 max-w-7xl mx-auto w-full overflow-hidden">
@@ -80,14 +88,20 @@ export const RiderManagementModule: React.FC = () => {
                       <h4 className="font-extrabold text-slate-900 text-sm">{r.name}</h4>
                       <p className="text-[10.5px] text-slate-400 font-mono mt-0.5">Rider ID: #{r.id}</p>
                     </div>
+                    {/* Same theme table the map's pins and legend read, so a
+                        rider's badge here and their pin colour there can never
+                        say different things. */}
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                        r.online
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-slate-100 text-slate-500 border-slate-200"
+                        RIDER_STATUS_THEMES[r.presence].badgeClassName
                       }`}
+                      title={
+                        r.presence === "DISCONNECTED" && r.presumed
+                          ? "Presumed offline — no beacon received. A powered-off handset and one in a dead zone send identically nothing."
+                          : RIDER_STATUS_THEMES[r.presence].description
+                      }
                     >
-                      {r.online ? (r.activeOrdersCount > 0 ? "On Errand" : "Available") : "Offline"}
+                      {RIDER_STATUS_THEMES[r.presence].badgeLabel}
                     </span>
                   </div>
 

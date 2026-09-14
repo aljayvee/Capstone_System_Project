@@ -66,6 +66,18 @@ function mapPrismaErrand(prismaErrand: any): Errand {
     dispatchLogs: prismaErrand.dispatchLogs || [],
     riderId: prismaErrand.riderId,
     riderName: prismaErrand.rider?.name,
+    // The payment mode the customer confirmed, and where the money stands.
+    //
+    // This mapper is an explicit allow-list, not a spread — anything not named
+    // here is silently dropped before any dispatcher component sees it. That is
+    // deliberate and worth keeping, but it means a new server field reaches the
+    // UI only when it is added here too. The inspector's fee note read
+    // "Payment mode not chosen yet" on an errand that plainly had one, for
+    // exactly this reason.
+    paymentSelection: prismaErrand.paymentSelection ?? null,
+    paymentPlan: prismaErrand.paymentPlan ?? null,
+    quotedHandlingBasket:
+      prismaErrand.quotedHandlingBasket != null ? Number(prismaErrand.quotedHandlingBasket) : null,
     createdAt: prismaErrand.createdAt,
     updatedAt: prismaErrand.updatedAt,
   };
@@ -269,19 +281,44 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       // errand only wrote a `meta` node, so the chat the customer was pushed
       // into opened completely empty — the least reassuring possible result of
       // "your errand was accepted".
-      void postAccepted(orderId, currentUser?.name || dispatcherFirstName);
+      // Deliberately NOT postAccepted here any more.
+      //
+      // Claiming now means "opened for review", not "accepted". Greeting the
+      // customer with "I've reviewed your order and it's good to go" before
+      // anyone has checked a single item was a promise the dispatcher had not
+      // made yet — and could not keep if the shop turned out to be out of stock.
+      // The queue posts the under-review line instead, and postAccepted moves to
+      // handleVerifyErrand below, where it is finally true.
 
-      // Open slide-in chat drawer
-      setSelectedErrandId(orderId);
       fetchOrders();
     } catch (err: any) {
-      if (err.response?.status === 409) {
-        alert(err.response.data.error || "This order was already accepted.");
-        fetchOrders();
-      } else {
-        alert(err.response?.data?.error || err.message || "Failed to claim order");
-      }
+      // Rethrown, not alerted. The caller opens a customer-facing chat on
+      // success, so it has to be able to tell success from failure — swallowing
+      // the 409 here would drop a second dispatcher into a conversation the
+      // first one already owns.
+      fetchOrders();
+      throw err;
     }
+  };
+
+  /**
+   * The dispatcher has checked the items with the customer and is taking it on.
+   *
+   * This is where the customer is finally told who their dispatcher is, because
+   * this is the first moment it is true.
+   */
+  const handleVerifyErrand = async (orderId: string, currentUser: any) => {
+    const dispatcherFirstName = currentUser?.name ? currentUser.name.split(" ")[0] : "Dispatcher";
+    await apiClient.patch(`/errands/${orderId}/verify`);
+    void postAccepted(orderId, currentUser?.name || dispatcherFirstName);
+    fetchOrders();
+  };
+
+  /** Hands a request back to the queue without cancelling it on the customer. */
+  const handleReleaseErrand = async (orderId: string) => {
+    await apiClient.patch(`/errands/${orderId}/release`);
+    setSelectedErrandId(null);
+    fetchOrders();
   };
 
   const handleOpenChat = (orderId: string) => {
@@ -334,6 +371,8 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,
+    handleVerifyErrand,
+    handleReleaseErrand,
     handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,

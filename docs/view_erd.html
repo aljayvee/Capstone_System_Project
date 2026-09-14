@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Capstone Conceptual Database Model (PNG Exporter)</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 24px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: #64748b;
+    }
+    .card {
+      max-width: 1200px;
+      margin: 0 auto 32px auto;
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      padding: 24px;
+      overflow: hidden;
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      background: #1d4ed8;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .diagram-container {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Capstone Conceptual Database Model — PNG Exporter</h1>
+    <p>Click the blue <strong>"Download .PNG"</strong> button on either diagram below to save a crisp, high-resolution image directly into your Downloads folder for your Word (<code>.docx</code>) paper.</p>
+  </div>
+
+  <!-- DIAGRAM 1: FULL CONCEPTUAL ERD -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">1. Full Conceptual Database ERD (24 Entities / 6 Domains)</div>
+        <p style="margin-top: 4px; font-size: 13px;">Complete 3NF normalized system architecture for Chapter 3 & Technical Appendix</p>
+      </div>
+      <button class="btn" onclick="exportSvgToPng('erd-container', 'conceptual_database_erd.png')">
+        📥 Download Full ERD (.PNG)
+      </button>
+    </div>
+    <div class="diagram-container" id="erd-container">
+      <div class="mermaid">
+erDiagram
+    USER ||--o| RIDER_PROFILE_PHOTO : "has"
+    USER ||--o| RIDER_PRESENCE : "reports"
+    USER ||--o{ RIDER_LOGIN_SESSION : "logs"
+    USER ||--o{ RIDER_STATUS_LOG : "records"
+    CUSTOMER_ACCOUNT ||--|| CUSTOMER_INFORMATION : "owns"
+    CUSTOMER_ACCOUNT ||--o| CUSTOMER_PROFILE_PHOTO : "has"
+    CUSTOMER_ACCOUNT ||--o{ SAVED_DELIVERY_LOCATION : "saves"
+    CUSTOMER_ACCOUNT ||--o{ PASSWORD_RESET_ATTEMPT : "attempts"
+
+    CUSTOMER_ACCOUNT ||--o{ ERRAND : "requests"
+    USER ||--o{ ERRAND : "fulfills as Rider"
+    USER ||--o{ DISPATCH_LOG : "claims as Dispatcher"
+    ERRAND ||--o{ DISPATCH_LOG : "tracked by"
+    ERRAND ||--o{ ERRAND_DECLINE_REASON : "records declines"
+    USER ||--o{ ERRAND_DECLINE_REASON : "declined by"
+
+    ERRAND ||--o{ PABILI_ITEM_REQUEST : "contains original ask"
+    ERRAND ||--o{ PABILI_DETAIL : "contains working items"
+    ERRAND ||--o{ ERRAND_PINPOINT : "visits store waypoints"
+    ERRAND_PINPOINT ||--o{ PABILI_DETAIL : "allocates items to stop"
+    ERRAND_PINPOINT ||--o{ PABILI_ITEM_REQUEST : "matches request"
+
+    MERCHANT_CATEGORY ||--o| STORE_CATEGORY_IMAGE : "has hero photo"
+    MERCHANT_CATEGORY ||--o{ VERIFIED_PLACE : "categorizes"
+    VERIFIED_PLACE ||--o{ ERRAND_PINPOINT : "pinned as store"
+    VERIFIED_PLACE ||--o{ DWELL_OBSERVATION : "measures stop time"
+    ERRAND_PINPOINT ||--o{ DWELL_OBSERVATION : "generates dwell"
+
+    RATE_CONFIG ||..|| ERRAND : "prices via formula"
+    ERRAND ||--o| PAYMENT_SELECTION : "confirms mode"
+    PAYMENT_MODE ||--o{ PAYMENT_SELECTION : "applies to"
+    PAYMENT_MODE ||--o{ ERRAND : "selected on"
+    ERRAND ||--o| CUSTOMER_TRANSACTION : "bills customer"
+    ERRAND ||--o| SETTLEMENT_RECORD : "reconciles COD"
+    ERRAND ||--o| RIDER_COMMISSION : "calculates payout"
+
+    ERRAND ||--o{ ERRAND_PROOF_IMAGE : "photographs proof"
+    ERRAND_PINPOINT ||--o{ ERRAND_PROOF_IMAGE : "attaches receipt"
+    ERRAND_PROOF_IMAGE ||--o| RECEIPT_EXTRACTION : "processes via OCR"
+    ERRAND ||--o{ EXCEPTION_REVIEW : "flags and clears"
+    USER ||--o{ EXCEPTION_REVIEW : "reviewed by staff"
+
+    ERRAND ||--o{ ERRAND_TRACK_POINT : "records breadcrumbs"
+    USER ||--o{ ERRAND_TRACK_POINT : "generated by Rider"
+    USER ||--o{ CONNECTIVITY_INCIDENT : "logs signal loss"
+    ERRAND ||--o| RATING : "receives review"
+    USER ||--o{ NOTIFICATION : "receives alert"
+    CUSTOMER_ACCOUNT ||--o{ NOTIFICATION : "receives alert"
+      </div>
+    </div>
+  </div>
+
+  <!-- DIAGRAM 2: SIMPLIFIED CORE WORKFLOW -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">2. Simplified 5-Entity Workflow (For Presentation & Slides)</div>
+        <p style="margin-top: 4px; font-size: 13px;">High-level business flow for Chapter 3 introduction and defense slides</p>
+      </div>
+      <button class="btn" onclick="exportSvgToPng('simple-container', 'simplified_errand_workflow.png')">
+        📥 Download Simplified Workflow (.PNG)
+      </button>
+    </div>
+    <div class="diagram-container" id="simple-container">
+      <div class="mermaid">
+flowchart LR
+    Customer["👤 Customer\n(Requests Errand)"] -->|places 1:N| Errand["📦 Errand\n(Lifecycle & Pricing)"]
+    Errand -->|contains 1:N| Items["📝 Errand Items\n(Shopping List)"]
+    Items -->|bought at 1:N| Store["🏪 Store / Place\n(Verified Catalog)"]
+    Dispatcher["🧑‍💻 Dispatcher\n(Assigns & Audits)"] -->|dispatches 1:N| Errand
+    Errand -->|fulfilled by 1:N| Rider["🛵 Rider\n(Delivers & Collects COD)"]
+      </div>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+
+    function exportSvgToPng(containerId, filename) {
+      const container = document.getElementById(containerId);
+      const svgElement = container.querySelector('svg');
+      if (!svgElement) {
+        alert('Diagram is still rendering, please wait a moment.');
+        return;
+      }
+
+      // Clone SVG and compute bounds
+      const svgString = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const URL = window.URL || window.webkitURL || window;
+      const blobURL = URL.createObjectURL(svgBlob);
+
+      const image = new Image();
+      image.onload = function () {
+        const scale = 2; // 2x scale for crisp, high-DPI output in Word
+        const canvas = document.createElement('canvas');
+        canvas.width = (svgElement.scrollWidth || svgElement.clientWidth || 1000) * scale;
+        canvas.height = (svgElement.scrollHeight || svgElement.clientHeight || 800) * scale;
+
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.scale(scale, scale);
+        context.drawImage(image, 0, 0);
+
+        const pngURL = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngURL;
+        downloadLink.download = filename;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(blobURL);
+      };
+      image.src = blobURL;
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { apiClient, setMemoryAccessToken } from "./apiClient";
+import { filenameFromDisposition } from "../utils/downloadBlob";
 import { User } from "../types/auth";
 
 export interface ApiUser {
@@ -40,7 +41,14 @@ export interface LoginSuccessResponse {
   message?: string;
 }
 
-export type LoginResponse = LoginSuccessResponse | LoginChallengeResponse | { error: string };
+export interface LoginErrorResponse {
+  error: string;
+  statusCode?: number;
+  retryAfterSeconds?: number;
+  isRateLimit?: boolean;
+}
+
+export type LoginResponse = LoginSuccessResponse | LoginChallengeResponse | LoginErrorResponse;
 
 export function isLoginChallenge(res: LoginResponse): res is LoginChallengeResponse {
   return "challengeToken" in res;
@@ -73,14 +81,39 @@ function isConflictResponse(err: any): boolean {
   return err?.response?.status === 409;
 }
 
+/**
+ * The server's beacon-derived liveness state — the one authority on whether a
+ * rider is reachable (see server/src/lib/riderAvailability.ts).
+ *
+ * Thresholds are counted in BEACONS, not seconds: 2.5 missed beacons at the
+ * cadence the device reports, so 25s on an errand and 75s idle. A flat number
+ * marked healthy idle riders as lost two thirds of the time.
+ */
+export type RiderAvailabilityState =
+  | "AVAILABLE"
+  | "SIGNAL_LOST"
+  | "OFFLINE"
+  | "NEEDS_PERMISSIONS"
+  | "OFF_DUTY"
+  | "LOGGED_OUT";
+
+export type RiderImpediment = "background_location" | "notifications" | "exact_alarms";
+
 export interface ApiRider {
   id: number;
   name: string;
   phone: string;
   avatar: string | null;
+  /** ACCOUNT status — enabled or disabled by an owner. Not presence. */
   status: "Active" | "Inactive";
   activeOrdersCount: number;
+  /** True only for AVAILABLE. The single question dispatch asks. */
   online: boolean;
+  availability: RiderAvailabilityState;
+  /** True when OFFLINE was inferred from silence rather than reported. */
+  presumed: boolean;
+  /** Why an otherwise-present rider cannot be offered work. */
+  impediments: RiderImpediment[];
 }
 
 // Metadata for the category's hero photo (`store_cat_image`). The list
@@ -177,7 +210,9 @@ export type ExceptionKind =
   | "UNVERIFIED_PURCHASE"
   | "WRONG_BRANCH"
   | "MISSING_RECEIPT"
-  | "STALLED_STOP";
+  | "STALLED_STOP"
+  | "OVERAGE_PENDING"
+  | "UNPAID_BALANCE";
 
 export interface ApiErrandException {
   errandId: string;
@@ -212,7 +247,7 @@ export interface ApiProofImage {
 }
 
 export interface ApiExceptionReport {
-  meta?: { period: ReportPeriod; rangeLabel: string; start: string; end: string };
+  meta?: { period: ReportPeriod | "CUSTOM"; rangeLabel: string; start: string; end: string };
   exceptions: ApiErrandException[];
   summary: {
     openCount: number;
@@ -234,7 +269,19 @@ export interface ApiExceptionReport {
 export type DashboardFrequency = "TODAY" | "WEEK" | "MONTH" | "YEAR";
 
 export interface ApiDashboardSummary {
-  riders: { total: number; active: number; inactive: number };
+  /** What window these figures cover, so the page can say so. */
+  rangeLabel: string;
+  riders: {
+    total: number;
+    /** In contact and on duty right now — NOT the count of enabled accounts. */
+    active: number;
+    inactive: number;
+    signalLost: number;
+    offline: number;
+    offDuty: number;
+    /** Accounts an owner has disabled. What `active` used to mean, wrongly. */
+    disabledAccounts: number;
+  };
   errands: { pending: number; active: number; completedAllTime: number; cancelled: number };
   revenue: { gross: number; estimatedCommission: number; estimatedRiderPayouts: number; orderCount: number };
   trend: Array<{ label: string; revenue: number }>;
@@ -242,49 +289,226 @@ export interface ApiDashboardSummary {
 
 export type ReportPeriod = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 
+/**
+ * The window a dated view is asking for.
+ *
+ * Either a named preset with a reference date, or an explicit `start`/`end` pair
+ * as `YYYY-MM-DD` with BOTH ENDS INCLUSIVE — the server pushes the end to the
+ * following midnight for its own `lt` bound, so no caller has to remember to.
+ * Where both are present the explicit range wins.
+ */
+export interface ApiDateRange {
+  period?: ReportPeriod;
+  date?: string;
+  start?: string;
+  end?: string;
+}
+
+/** Drops undefined keys so axios does not serialise `?start=undefined`. */
+function rangeParams(range: ApiDateRange): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (range.period) params.period = range.period;
+  if (range.date) params.date = range.date;
+  if (range.start && range.end) {
+    params.start = range.start;
+    params.end = range.end;
+  }
+  return params;
+}
+
 interface ReportMeta {
-  period: ReportPeriod;
+  /** "CUSTOM" when the caller drew its own range. */
+  period: ReportPeriod | "CUSTOM";
   rangeLabel: string;
   start: string;
   end: string;
 }
 
+/**
+ * One merchant category's share of a period.
+ *
+ * `orderCount` counts each errand once, in whichever category held most of its
+ * money, so it sums to `totalOrders`. `touchedOrderCount` counts every errand
+ * that touched the category and legitimately sums to MORE than `totalOrders` —
+ * never put the two in the same column.
+ */
+export interface ApiCategoryBreakdown {
+  category: string;
+  revenue: number;
+  itemCost: number;
+  deliveryFee: number;
+  tip: number;
+  /** Alias of orderCount, kept so older callers keep resolving. */
+  count: number;
+  orderCount: number;
+  touchedOrderCount: number;
+}
+
 export interface ApiSalesReport extends ReportMeta {
   totalRevenue: number;
   totalOrders: number;
-  byCategory: Array<{ category: string; revenue: number; count: number }>;
+  byCategory: ApiCategoryBreakdown[];
+  /** `difference` must be 0. Rendered, so a regression is visible on the page. */
+  reconciliation: { totalRevenue: number; allocatedRevenue: number; difference: number };
+  uncategorisedRevenue: number;
+  notes: string[];
+}
+
+export interface ApiRiderMetrics {
+  riderId: number;
+  name: string;
+  throughput: {
+    completedCount: number;
+    avgDeliveryMinutes: number | null;
+    deliveryTimedCount: number;
+    avgAcceptMinutes: number | null;
+    acceptTimedCount: number;
+    activeHours: number;
+    errandsPerActiveHour: number | null;
+  };
+  reliability: {
+    onTimeRate: number | null;
+    /** Errands that carried an ETA — the only fair denominator, so it is shown. */
+    onTimeDenominator: number;
+    degradedEtaCount: number;
+    cancellationRate: number | null;
+    reachedCount: number;
+    cancelledCount: number;
+    connectivityDrops: number;
+    unresolvedDrops: number;
+  };
+  earnings: {
+    riderShareEarned: number;
+    commissionCount: number;
+    settlementVarianceTotal: number;
+    shortageCount: number;
+    settlementCount: number;
+  };
+  quality: {
+    /** All-time, not period-scoped. The count beside it is not optional. */
+    averageRatingAllTime: number | null;
+    ratingCountAllTime: number;
+    exceptionCount: number;
+    exceptionErrandCount: number;
+    exceptionRate: number | null;
+    exceptionsAtRisk: number;
+  };
+  completedCount: number;
+  avgDeliveryMinutes: number | null;
+  averageRating: number | null;
 }
 
 export interface ApiRiderPerformanceReport extends ReportMeta {
-  riders: Array<{
-    riderId: number;
-    name: string;
+  riders: ApiRiderMetrics[];
+  fleet: {
+    riderCount: number;
     completedCount: number;
     avgDeliveryMinutes: number | null;
-    averageRating: number | null;
-  }>;
+    deliveryTimedCount: number;
+    onTimeRate: number | null;
+    onTimeDenominator: number;
+    degradedEtaCount: number;
+    riderShareEarned: number;
+    settlementVarianceTotal: number;
+    shortageCount: number;
+    exceptionCount: number;
+    connectivityDrops: number;
+  };
+  notes: string[];
 }
 
 export interface ApiCommissionReport extends ReportMeta {
   estimatedCommission: number;
   totalDeliveryFees: number;
   orderCount: number;
-  byCategory: Array<{ category: string; orderCount: number; revenue: number }>;
+  /** The rider's fraction of delivery fees. Captions derive from this. */
+  commissionRate: number;
+  byCategory: Array<{
+    category: string;
+    orderCount: number;
+    touchedOrderCount: number;
+    revenue: number;
+    deliveryFee: number;
+    businessShare: number;
+    riderShare: number;
+  }>;
+  notes: string[];
 }
 
+export interface ApiSettlementLine {
+  errandId: string;
+  riderName: string | null;
+  expected: number;
+  collected: number;
+  variance: number;
+  status: string;
+  shortReason: string | null;
+  settledAt: string;
+}
+
+/**
+ * Two blocks on two different clocks, deliberately not merged.
+ *
+ * `revenue` is windowed on when errands were placed; `cash` on when they were
+ * settled. An errand placed at the end of a period settles in the next one, so
+ * the two are not expected to agree — and presenting them as one figure makes
+ * that ordinary gap read as missing money.
+ */
 export interface ApiSettlementReport extends ReportMeta {
+  commissionRate: number;
+  revenue: {
+    basis: string;
+    grossRevenue: number;
+    /**
+     * What grossRevenue is made of: money a rider reconciled, and money that is
+     * only priced. Optional because a server not yet carrying the split still
+     * returns a valid report — the view falls back to zero rather than NaN.
+     */
+    collectedRevenue?: number;
+    awaitingCollection?: number;
+    awaitingCount?: number;
+    totalDeliveryFees: number;
+    businessShare: number;
+    riderShare: number;
+    orderCount: number;
+  };
+  cash: {
+    basis: string;
+    expectedTotal: number;
+    collectedTotal: number;
+    varianceTotal: number;
+    settlementCount: number;
+    shortageCount: number;
+    byRider: Array<{
+      riderId: number;
+      riderName: string | null;
+      settlementCount: number;
+      expected: number;
+      collected: number;
+      variance: number;
+      shortageCount: number;
+    }>;
+    lines: ApiSettlementLine[];
+  };
+  // Flat mirrors of the revenue block, kept so nothing breaks mid-migration.
   grossRevenue: number;
+  collectedRevenue?: number;
+  awaitingCollection?: number;
   totalDeliveryFees: number;
   businessShare: number;
   riderShare: number;
   orderCount: number;
+  notes: string[];
 }
 
 export interface ApiTransactionSummaryReport extends ReportMeta {
   transactions: Array<{
     transactionId: number;
     errandId: string;
+    /** The resolved merchant category, not the literal "Pabili". */
     category: string;
+    /** Every category the errand touched; more than one on a multi-stop run. */
+    categories: string[];
     riderName: string | null;
     customerName: string | null;
     deliveryAddress: string;
@@ -292,15 +516,60 @@ export interface ApiTransactionSummaryReport extends ReportMeta {
     deliveryFee: number;
     paymentMethod: string;
     status: string;
+    errandStatus: string;
+    /** Written once at creation and never advanced — see the report's notes. */
+    paymentStatus: string;
     createdAt: string;
   }>;
+  byPaymentMethod: Array<{ paymentMethod: string; count: number; amount: number }>;
+  byErrandStatus: Array<{ status: string; count: number; amount: number }>;
+  byPaymentStatus: Array<{ status: string; count: number; amount: number }>;
+  totals: { count: number; amount: number; deliveryFee: number };
+  notes: string[];
+}
+
+/** The six reports, matching the path segment the PDF endpoint expects. */
+export type ReportPdfType =
+  | "sales"
+  | "rider-performance"
+  | "commission"
+  | "settlement"
+  | "transactions"
+  | "exceptions";
+
+/**
+ * The message out of a failed blob request.
+ *
+ * When `responseType: "blob"` is set, axios hands back the ERROR body as a Blob
+ * too — so `err.response.data.error` is undefined and the naive path shows the
+ * owner "[object Blob]". The JSON has to be read out of the blob first.
+ */
+async function readBlobError(err: unknown): Promise<string> {
+  const fallback = "Could not generate this report. Please try again.";
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
+
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text());
+      return parsed?.error ?? parsed?.message ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  if (data && typeof data === "object") {
+    const body = data as { error?: string; message?: string };
+    return body.error ?? body.message ?? fallback;
+  }
+
+  return fallback;
 }
 
 // Shared by the 5 report methods below — same query shape ({period, date}), same
 // fetch-fails-soft behavior as every other method in this file.
-async function fetchReport<T>(endpoint: string, period: ReportPeriod, date?: string): Promise<T | null> {
+async function fetchReport<T>(endpoint: string, range: ApiDateRange): Promise<T | null> {
   try {
-    const response = await apiClient.get<T>(endpoint, { params: { period, date } });
+    const response = await apiClient.get<T>(endpoint, { params: rangeParams(range) });
     return response.data;
   } catch (err) {
     console.warn(`API unavailable (${endpoint})`, err);
@@ -325,9 +594,23 @@ export const apiService = {
       return data;
     } catch (err: any) {
       console.warn("Backend auth failed, error:", err);
+      const statusCode = err.response?.status;
+      const isRateLimit = statusCode === 429;
+      const retryHeader = err.response?.headers?.["retry-after"];
+      const parsedRetry = retryHeader ? parseInt(retryHeader, 10) : undefined;
+      const retryAfterSeconds =
+        err.response?.data?.details?.retryAfterSeconds ||
+        parsedRetry ||
+        (isRateLimit ? 900 : undefined);
+
       const errorMessage =
         err.response?.data?.error || err.message || "Unable to connect to backend authentication server.";
-      return { error: errorMessage };
+      return {
+        error: errorMessage,
+        statusCode,
+        isRateLimit,
+        retryAfterSeconds,
+      };
     }
   },
 
@@ -553,9 +836,14 @@ export const apiService = {
   },
 
   // Analytics API
-  async getDashboardSummary(frequency: DashboardFrequency): Promise<ApiDashboardSummary | null> {
+  async getDashboardSummary(
+    frequency: DashboardFrequency,
+    range?: { start: string; end: string }
+  ): Promise<ApiDashboardSummary | null> {
     try {
-      const response = await apiClient.get<ApiDashboardSummary>("/analytics/dashboard", { params: { frequency } });
+      const response = await apiClient.get<ApiDashboardSummary>("/analytics/dashboard", {
+        params: { frequency, ...(range ? { start: range.start, end: range.end } : {}) },
+      });
       return response.data;
     } catch (err) {
       console.warn("API unavailable", err);
@@ -564,23 +852,64 @@ export const apiService = {
   },
 
   // Reports API
-  getSalesReport(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiSalesReport>("/reports/sales", period, date);
+  getSalesReport(range: ApiDateRange) {
+    return fetchReport<ApiSalesReport>("/reports/sales", range);
   },
-  getRiderPerformanceReport(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiRiderPerformanceReport>("/reports/rider-performance", period, date);
+  getRiderPerformanceReport(range: ApiDateRange) {
+    return fetchReport<ApiRiderPerformanceReport>("/reports/rider-performance", range);
   },
-  getCommissionReport(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiCommissionReport>("/reports/commission", period, date);
+  getCommissionReport(range: ApiDateRange) {
+    return fetchReport<ApiCommissionReport>("/reports/commission", range);
   },
-  getSettlementReport(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiSettlementReport>("/reports/settlement", period, date);
+  getSettlementReport(range: ApiDateRange) {
+    return fetchReport<ApiSettlementReport>("/reports/settlement", range);
   },
-  getTransactionSummary(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiTransactionSummaryReport>("/reports/transactions", period, date);
+  getTransactionSummary(range: ApiDateRange) {
+    return fetchReport<ApiTransactionSummaryReport>("/reports/transactions", range);
   },
-  getExceptionReport(period: ReportPeriod, date?: string) {
-    return fetchReport<ApiExceptionReport>("/reports/exceptions", period, date);
+  getExceptionReport(range: ApiDateRange) {
+    return fetchReport<ApiExceptionReport>("/reports/exceptions", range);
+  },
+
+  /**
+   * One report as a PDF, generated by the server in the standard format.
+   *
+   * Goes through `apiClient` rather than an anchor or `window.open`, and that is
+   * the whole point: the access token lives only in memory (apiClient.ts keeps
+   * it in a module variable, never localStorage) and is attached per request by
+   * the interceptor. A browser navigation never passes through axios, so it
+   * would carry no Authorization header and get a 401.
+   *
+   * The 401 refresh-and-retry path is already safe for this — the interceptor
+   * re-invokes with the ORIGINAL config object, and `responseType` lives on that
+   * config, so the retry still resolves to a Blob. Do not "simplify" it into
+   * rebuilding the request.
+   *
+   * Returns a discriminated result rather than throwing, matching how the rest
+   * of this file fails soft.
+   */
+  async downloadReportPdf(
+    reportType: ReportPdfType,
+    range: ApiDateRange
+  ): Promise<{ blob: Blob; filename: string } | { error: string }> {
+    try {
+      const response = await apiClient.get<Blob>(`/reports/${reportType}/pdf`, {
+        params: rangeParams(range),
+        responseType: "blob",
+      });
+
+      // The server names the file; this only covers the case where CORS is
+      // misconfigured and Content-Disposition is hidden from JS.
+      const window =
+        range.start && range.end ? `${range.start}_to_${range.end}` : range.period ?? "report";
+      const filename =
+        filenameFromDisposition(response.headers["content-disposition"]) ??
+        `Sugo_${reportType}_${window}.pdf`;
+
+      return { blob: response.data, filename };
+    } catch (err) {
+      return { error: await readBlobError(err) };
+    }
   },
 
   /** The dispatcher's working queue — what is still open, right now. */

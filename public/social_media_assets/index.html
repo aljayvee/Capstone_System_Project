@@ -1,0 +1,360 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hav Innove - Sugo Express System Screenshots & Post Assets</title>
+  <style>
+    :root {
+      --bg: #0B132B;
+      --card-bg: #1C2541;
+      --surface: #24325A;
+      --accent: #F62459;
+      --accent-hover: #E53935;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border: rgba(255, 255, 255, 0.08);
+      --success: #10B981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 40px; }
+    .badge {
+      display: inline-block;
+      background: rgba(246, 36, 89, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(246, 36, 89, 0.3);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      margin-bottom: 14px;
+    }
+    h1 { font-size: 32px; font-weight: 800; margin-bottom: 8px; }
+    p.sub { font-size: 15px; color: var(--text-muted); max-width: 680px; margin: 0 auto; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 28px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .img-wrap {
+      background: #000;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 260px;
+      max-height: 380px;
+      border-bottom: 1px solid var(--border);
+    }
+    .img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .post-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .title { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: #FFF; }
+    .desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    
+    .caption-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12.5px;
+      color: #E2E8F0;
+      white-space: pre-wrap;
+      max-height: 150px;
+      overflow-y: auto;
+      font-family: monospace;
+      margin-bottom: 14px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+    }
+    button, a.btn {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--success);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      display: none;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="badge">Hav Innove • Capstone Devlog Assets</div>
+      <h1>Sugo Express Logistics System Screenshots</h1>
+      <p class="sub">Curated production screenshots from our Web Management Portal and React Native Customer Mobile App, paired with ready-to-post Facebook devlog captions.</p>
+    </header>
+
+    <div class="grid">
+      
+      <!-- Card 1: Web Dispatch Console -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="01_web_dispatch_console.jpg" alt="Web Dispatch Console">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 01 • Web Management Portal</div>
+          <h2 class="title">Dispatcher Mission Control Studio</h2>
+          <p class="desc">macOS HIG Master-Detail console showing incoming orders, fee breakdown, store mapping, and 1-click review/claim.</p>
+          <div class="caption-box" id="cap1">Dev Update #02: Dispatcher Mission Control & Live Fleet Operations 🗺️🛵
+
+Dispatchers are the air-traffic controllers of local delivery. A slow dispatch workflow creates delays before a rider even hits the road.
+
+Here is a look at our Dispatch Management Portal for Sugo Express Logistics On the Go Services:
+• Live Order Intake: Instantly review incoming Pabili requests from local merchants (Jollibee Tacurong, Mercury Drug, and more).
+• Detailed Receipt Breakdown: Automatic calculation of subtotal, delivery fare, and handling charges before order dispatch.
+• Single-Click Review: Protects against double-dispatching by locking active orders to the claiming operator.
+
+Built to keep logistics swift, organized, and reliable across Tacurong City.
+
+(Lead Developer: Aljayvee Versola)
+
+#CapstoneProject #HavInnove #SugoExpress #WebDevelopment #SystemDesign #TacurongCity</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap1')">📋 Copy Caption</button>
+            <a href="01_web_dispatch_console.jpg" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Live Tracking Map -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="03_customer_live_tracking_map.png" alt="Customer App Live Tracking">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 02 • Customer Mobile App</div>
+          <h2 class="title">Live Multi-Stop Rider GPS Tracking</h2>
+          <p class="desc">Dark mode live Google Map with multi-stop errand route, live rider telemetry, and 5-stage progress stepper.</p>
+          <div class="caption-box" id="cap2">Dev Update #03: Live Multi-Stop Rider Tracking & Real-Time Telemetry 📍🛵
+
+When ordering errands, customers shouldn't be left guessing where their rider is or which store is being visited first.
+
+In the Sugo Express Customer App:
+• Live Route Polyline: Visualizes real-time delivery paths through Tacurong City streets (Poblacion, New Isabela, Buenaflor).
+• Multi-Stop Sequential Routing: Automatically sequences multiple errand stops (e.g. Stop 1: Jollibee, Stop 2: Mercury Drug) directly to your door.
+• Transparent Status Stepper: Tracks progress from 'Received' ➔ 'To Store' ➔ 'Purchasing' ➔ 'In Route' ➔ 'Delivered'.
+
+Smooth, high-precision tracking powered by real-time database sync.
+
+(Lead Developer: Aljayvee Versola)
+
+#MobileAppDevelopment #ReactNative #GoogleMaps #Firebase #SugoExpress #HavInnove</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap2')">📋 Copy Caption</button>
+            <a href="03_customer_live_tracking_map.png" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Customer App Home Dashboard -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="04_customer_home_dashboard.png" alt="Customer Home Dashboard">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 03 • Customer Mobile App</div>
+          <h2 class="title">Customer Home & Active Errand Hero</h2>
+          <p class="desc">Clean personalized dashboard with active order hero card, live tracking quick-action, and merchant categories.</p>
+          <div class="caption-box" id="cap3">Dev Update #04: Designed for Speed: The Customer App Home Experience 🛍️✨
+
+Good UI should get out of the user's way. When customers open the Sugo Express app, they want immediate access to ongoing deliveries and quick errand booking.
+
+Key Highlights:
+• Active Errand Hero Card: Displays your ongoing delivery with live status, item count, and a 1-tap 'Track Live' button.
+• Smart Address Recognition: Auto-loads your default delivery location without retyping.
+• Flexible Pabili Services: Easily book custom purchases from any local grocery, bakery, pharmacy, or fast food store in Tacurong.
+
+Engineered for budget-friendly Android devices with fluid, responsive performance.
+
+(Lead Developer: Aljayvee Versola)
+
+#UIUXDesign #MobileDev #Android #SugoExpress #CapstoneProject #HavInnove</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap3')">📋 Copy Caption</button>
+            <a href="04_customer_home_dashboard.png" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: In-App Chat & Item Review -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="06_customer_dispatcher_chat_review.png" alt="In-App Chat & Review">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 04 • Customer & Dispatcher Flow</div>
+          <h2 class="title">Interactive Errand Item Review in Chat</h2>
+          <p class="desc">Real-time chat with dispatcher verification card, item checklist confirmation, and accept/adjust controls.</p>
+          <div class="caption-box" id="cap4">Dev Update #05: Closing the Communication Gap: Real-Time Chat & Item Review 💬📝
+
+What happens if an item is out of stock or needs substitution? Traditional delivery apps often cancel orders outright or leave customers hanging.
+
+Our system introduces an in-chat Item Review workflow:
+• Direct Dispatcher Chat: Direct channel between customer and dispatch team to clarify requests in real-time.
+• Interactive Item Check Card: Dispatchers verify and adjust store items with customers directly inside the conversation before rider dispatch.
+• Transparent Customer Approval: Tap 'Proceed with Changes' or 'Decline / Adjust' to ensure total agreement on what is purchased.
+
+Human-centered customer support backed by automated order records.
+
+(Lead Developer: Aljayvee Versola)
+
+#FullStackDevelopment #RealTimeMessaging #CustomerCare #LogisticsInnovation #HavInnove</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap4')">📋 Copy Caption</button>
+            <a href="06_customer_dispatcher_chat_review.png" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5: Order History & Receipts -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="05_customer_order_history.png" alt="Order History">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 05 • Customer Mobile App</div>
+          <h2 class="title">Errand History, Digital Receipts & 1-Tap Reorder</h2>
+          <p class="desc">Complete audit trail of fulfilled deliveries in Tacurong City with itemized receipts and reorder action.</p>
+          <div class="caption-box" id="cap5">Dev Update #06: Errand Receipts & 1-Tap Reordering 🧾🔄
+
+Keeping track of past grocery runs and pharmacy errands should be effortless.
+
+In the 'My Errands' tab:
+• Complete Order Receipts: View exact timestamps, rider names, and transparent breakdown of cash charges.
+• Clear Status Records: Instantly distinguish delivered, completed, and voided/cancelled orders.
+• 1-Tap 'Order Again': Save time on routine household purchases by repeating previous grocery or food lists with a single tap.
+
+Building a dependable digital record for our community.
+
+(Lead Developer: Aljayvee Versola)
+
+#AppArchitecture #DatabaseDesign #SugoExpress #Capstone2026 #HavInnove</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap5')">📋 Copy Caption</button>
+            <a href="05_customer_order_history.png" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 6: Web Portal Login -->
+      <div class="card">
+        <div class="img-wrap">
+          <img src="02_web_portal_login.jpg" alt="Web Portal Login">
+        </div>
+        <div class="content">
+          <div class="post-num">Asset 06 • Web Management Portal</div>
+          <h2 class="title">Secure Operator Portal Entry</h2>
+          <p class="desc">Branded split-screen authentication with Tacurong City GIS background, system status heartbeat, and role security.</p>
+          <div class="caption-box" id="cap6">Dev Update #07: Enterprise Security & Dispatch Portal Authentication 🔐🖥️
+
+Behind every smooth dispatch team is secure, role-based access control.
+
+Here is the entry portal for Sugo Express Logistics On the Go Services:
+• Role-Based Access: Dedicated authentication gates for Owners, Dispatchers, and Riders with strict permissions.
+• Branded Experience: Custom Tacurong City GIS street map interface reflecting local operations.
+• Token Security: Secure rotating session tokens and defensive rate-limiting against unauthorized access.
+
+Security and system stability from day one.
+
+(Lead Developer: Aljayvee Versola)
+
+#CyberSecurity #SystemArchitecture #Auth #FullStack #HavInnove #SugoExpress</div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="copyCaption('cap6')">📋 Copy Caption</button>
+            <a href="02_web_portal_login.jpg" download class="btn btn-secondary">💾 Save Image</a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Caption copied to clipboard!</div>
+
+  <script>
+    function copyCaption(id) {
+      const text = document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 2200);
+      });
+    }
+  </script>
+</body>
+</html>

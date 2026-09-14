@@ -46,27 +46,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/rider",
-    element: (
-      <MobileAppNoticeModal
-        isOpen={true}
-        roleName="Rider"
-        onClose={() => {
-          window.location.href = "/";
-        }}
-      />
-    ),
+    element: <MobileAppNoticeModal isOpen={true} roleName="Rider" />,
   },
   {
     path: "/customer",
-    element: (
-      <MobileAppNoticeModal
-        isOpen={true}
-        roleName="Customer"
-        onClose={() => {
-          window.location.href = "/";
-        }}
-      />
-    ),
+    element: <MobileAppNoticeModal isOpen={true} roleName="Customer" />,
   },
   {
     path: "*",

@@ -171,7 +171,7 @@ export function DispatcherRiderMessagesPanel({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <MessageCircle className="text-blue-600" size={20} />
-              <h2 className="font-extrabold text-slate-800 text-base">Rider Messages</h2>
+              <h2 className="font-extrabold text-slate-800 text-base">Messages</h2>
             </div>
             <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
               {assignedErrands.length} Channels

@@ -27,7 +27,8 @@ export type SystemMessageKind =
   | 'order_submitted'
   | 'under_review'
   | 'accepted'
-  | 'declined';
+  | 'declined'
+  | 'item_revision';
 
 export interface OrderSummaryItem {
   storeCategory: string;
@@ -147,6 +148,98 @@ export function postDeclined(
       `Reason: ${reason}\n\n` +
       `Nothing has been charged. You can place a new errand any time.`,
     reason,
+    dispatcherName: dispatcherName || null,
+  });
+}
+
+/** One line of a proposed revision, as the customer will read it. */
+export interface RevisedItem {
+  itemName: string;
+  storeCategory?: string;
+  /** Quantity being proposed. 0 means the dispatcher wants to drop the line. */
+  quantity: number;
+  /**
+   * What the customer originally asked for, carried so the card can show the
+   * change rather than just the outcome.
+   *
+   * Without it a revision reads as a plain list: a customer looking at
+   * "Burger Meal x2" under a heading demanding their approval has no way to see
+   * that they ordered one. Approving something you cannot tell has changed is
+   * not consent.
+   */
+  previousQuantity?: number;
+  /** False when the shop does not have it — the reason most revisions exist. */
+  available: boolean;
+  /** What the dispatcher found, in their own words. */
+  note?: string;
+}
+
+export type ItemRevisionStatus = 'pending' | 'approved' | 'rejected';
+
+/**
+ * The dispatcher's proposed changes to the basket, put to the customer.
+ *
+ * Sent during review, before the order is accepted, whenever verifying items
+ * turns up something the customer did not ask for: a product the shop is out of,
+ * a quantity that has to change, a line that cannot be bought at all. The
+ * customer approves or rejects it in their own chat, and the dispatcher cannot
+ * accept the order while one is outstanding.
+ *
+ * A REPLACEMENT for guessing. Substituting quietly and letting the customer
+ * discover it from the receipt is how a delivery arrives with the wrong thing in
+ * the bag and nobody able to say who decided that.
+ *
+ * `revisionId` rather than relying on the message key: the customer's approve
+ * and the dispatcher's gate have to be talking about the same proposal, and a
+ * second revision sent while the first is still on screen must not be answerable
+ * by tapping the older card.
+ */
+export function postItemRevision(
+  errandId: string,
+  params: {
+    revisionId: string;
+    items: RevisedItem[];
+    dispatcherName?: string;
+    /** Free-text context the dispatcher adds, e.g. what the shop offered instead. */
+    note?: string;
+  }
+): Promise<void> {
+  const { revisionId, items, dispatcherName, note } = params;
+
+  const unavailable = items.filter((i) => !i.available || i.quantity === 0);
+  const keeping = items.filter((i) => i.available && i.quantity > 0);
+
+  const lines: string[] = ['ITEM CHECK', ''];
+  if (unavailable.length > 0) {
+    lines.push('Not available:');
+    lines.push(...unavailable.map((i) => `• ${i.itemName}${i.note ? ` — ${i.note}` : ''}`));
+    lines.push('');
+  }
+  if (keeping.length > 0) {
+    lines.push('Still going ahead:');
+    lines.push(
+      ...keeping.map((i) => {
+        const changed = i.previousQuantity !== undefined && i.previousQuantity !== i.quantity;
+        return changed
+          ? `• ${i.itemName} — ${i.previousQuantity} changed to ${i.quantity}`
+          : `• ${i.quantity} × ${i.itemName}`;
+      })
+    );
+    lines.push('');
+  }
+  if (note) {
+    lines.push(note, '');
+  }
+  lines.push('Approve this and I will carry on, or reject it and tell me what you would prefer.');
+
+  return postSystemMessage(errandId, {
+    systemKind: 'item_revision',
+    text: lines.join('\n'),
+    revisionId,
+    revision: { items },
+    // Updated in place when the customer answers, the same way the existing
+    // order_confirmation card carries `confirmed`.
+    status: 'pending' satisfies ItemRevisionStatus,
     dispatcherName: dispatcherName || null,
   });
 }

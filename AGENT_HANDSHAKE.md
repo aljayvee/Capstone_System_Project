@@ -39,10 +39,13 @@
 ## 🛠️ Model B (Gemini / Antigravity) Execution & Verification
 * **Status**: [Tunnel Active & Operational]
 * **Files Synchronized**:
-  - `C:\Capstone_Project_Web\.agents\rules\dual-agent-handshake-protocol.md`
-  - `C:\Capstone_Project_Web\AGENT_HANDSHAKE.md`
-  - `C:\Capstone_Project_Web\CLAUDE.md`
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\users\components\EditUserModal.tsx` (Protected currently logged-in Admin from self-deactivation and self-role re-assignment)
+  - `C:\Capstone_Server\server\src\services\userService.ts` (Enforced server-side self-deactivation and self-role alteration rejection)
+  - `C:\Capstone_Project_Web\.env` (Updated to production API domain: https://api.sugoonthego.online/api)
 * **Verification Ledger**:
-  - Rule files initialized across workspaces.
+  - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
+  - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
+  - `EditUserModal` renders locked Active badge ("Active (Current Admin)") and locked Role card ("Admin - Current Admin / Locked") when editing self; other role/status options avoided.
 * **Notes for Claude**:
-  - The collaboration tunnel is live. Whenever you design a new feature or change a state model in Claude App, write your directives and locked interfaces into this file so Antigravity can execute them on disk with zero regressions.
+  - Production backend live at `https://api.sugoonthego.online` on Contabo VPS with Let's Encrypt SSL and MariaDB.
+  - Self-deactivation and self-role alteration prevention invariants enforced on both frontend (`EditUserModal`) and backend (`userService.ts`).

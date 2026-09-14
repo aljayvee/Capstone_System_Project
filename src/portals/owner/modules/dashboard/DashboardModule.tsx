@@ -5,23 +5,32 @@ import { RevenueChart } from "./components/RevenueChart";
 import { useDashboardMetrics } from "../../hooks/useDashboardMetrics";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
+import { formatRangeLabel, toApiDate, type DateRange } from "../../../../components/DateRangePicker";
+import { RangeSelector, PRESET_OPTIONS } from "../../../../components/RangeSelector";
 import type { DashboardFrequency } from "../../../../services/apiService";
-
-const FREQUENCY_OPTIONS: Array<{ label: string; value: DashboardFrequency }> = [
-  { label: "Today", value: "TODAY" },
-  { label: "Week", value: "WEEK" },
-  { label: "Month", value: "MONTH" },
-  { label: "Year", value: "YEAR" },
-];
 
 function formatPeso(amount: number): string {
   return `₱${Math.round(amount).toLocaleString("en-US")}`;
 }
 
 export const DashboardModule: React.FC = () => {
+  // The dashboard's frequency enum and RangeSelector's preset enum are the same
+  // four values, so the pills drive this directly.
   const [frequency, setFrequency] = useState<DashboardFrequency>("TODAY");
-  const { data, isLoading, error } = useDashboardMetrics(frequency);
-  const activeLabel = FREQUENCY_OPTIONS.find((f) => f.value === frequency)?.label ?? "Today";
+
+  // The presets and the calendar are two ways to ask, and only one can be in
+  // force — RangeSelector owns that coordination for both this page and the
+  // reports, so the rule is written once.
+  const [customRange, setCustomRange] = useState<DateRange | null>(null);
+
+  const { data, isLoading, error } = useDashboardMetrics(
+    frequency,
+    customRange ? { start: toApiDate(customRange.start), end: toApiDate(customRange.end) } : undefined
+  );
+
+  const activeLabel = customRange
+    ? formatRangeLabel(customRange)
+    : PRESET_OPTIONS.find((f) => f.value === frequency)?.label ?? "Today";
 
   const placeholder = isLoading ? "…" : "—";
 
@@ -47,22 +56,13 @@ export const DashboardModule: React.FC = () => {
 
         {/* Timeframe & System Tools */}
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 flex-wrap">
-          {/* Frequency Segmented Control */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60">
-            {FREQUENCY_OPTIONS.map((f) => (
-              <button
-                key={f.value}
-                onClick={() => setFrequency(f.value)}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-bold transition ${
-                  frequency === f.value
-                    ? "bg-[#1E3A5F] text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          {/* Period presets + calendar — the same control the reports use. */}
+          <RangeSelector
+            preset={frequency}
+            onPresetChange={setFrequency}
+            range={customRange}
+            onRangeChange={setCustomRange}
+          />
 
           <HeaderClock />
           <NotificationBell />
@@ -83,9 +83,19 @@ export const DashboardModule: React.FC = () => {
         {/* 2. OPERATIONAL METRIC CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-3.5">
           <MetricCard
-            title="Active Riders"
+            title="Riders On Duty"
             value={data ? String(data.riders.active) : placeholder}
-            sub={data ? `${data.riders.inactive} riders inactive` : "Loading..."}
+            // Says what it counted. "Active Riders / N inactive" read as presence
+            // but counted enabled ACCOUNTS, so it showed the full roster while
+            // the map showed every one of them signal-lost.
+            sub={
+              data
+                ? [
+                    `${data.riders.signalLost + data.riders.offline} no signal`,
+                    `${data.riders.offDuty} off duty`,
+                  ].join(" · ")
+                : "Loading..."
+            }
             icon={Bike}
             color="#3B82F6"
           />

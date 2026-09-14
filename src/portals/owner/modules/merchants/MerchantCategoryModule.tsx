@@ -13,10 +13,13 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Archive,
 } from "lucide-react";
 import { apiService, type ApiMerchantCategory, type ApiRateConfig } from "../../../../services/apiService";
+import { apiClient } from "../../../../services/apiClient";
 import { CategoryRowCard } from "./components/CategoryCard";
 import PlacesTab from "./components/PlacesTab";
+import { ArchiveTab, type ArchivedPlace } from "./components/ArchiveTab";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
 
@@ -27,10 +30,36 @@ export const MerchantCategoryModule: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "Active" | "Inactive">("ALL");
+
   const [sortBy, setSortBy] = useState<CategorySortOption>("name-asc");
 
-  const [activeTab, setActiveTab] = useState<"categories" | "places">("categories");
+  const [activeTab, setActiveTab] = useState<"categories" | "places" | "archive">("categories");
+  /**
+   * Retired stores, fetched here rather than inside the Archive tab so the tab
+   * badge can show a count before anyone opens it - an archive nobody knows has
+   * anything in it is the same as no archive.
+   */
+  const [archivedPlaces, setArchivedPlaces] = useState<ArchivedPlace[]>([]);
+  const [isLoadingArchivedPlaces, setIsLoadingArchivedPlaces] = useState(true);
+
+  const archivedCount =
+    categories.filter((c) => c.status !== "Active").length + archivedPlaces.length;
+
+  const loadArchivedPlaces = React.useCallback(async () => {
+    setIsLoadingArchivedPlaces(true);
+    try {
+      const res = await apiClient.get<ArchivedPlace[]>("/places?includeInactive=true");
+      setArchivedPlaces((res.data || []).filter((p) => !p.isActive));
+    } catch (err) {
+      console.warn("Could not load retired stores:", err);
+    } finally {
+      setIsLoadingArchivedPlaces(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadArchivedPlaces();
+  }, [loadArchivedPlaces]);
   const [selectedCategoryForPlaces, setSelectedCategoryForPlaces] = useState<number | "ALL">("ALL");
 
   // Create Category Modal State
@@ -124,11 +153,19 @@ export const MerchantCategoryModule: React.FC = () => {
     () => categories.reduce((sum, c) => sum + (c._count?.places ?? 0), 0),
     [categories]
   );
+  /**
+   * What each tab actually shows. Archived things moved out, so a badge counting
+   * everything would sit above a shorter list and quietly contradict it.
+   */
+  const liveCategories = activeCategories;
+  const livePlaces = Math.max(0, totalLinkedPlaces - archivedPlaces.length);
 
   // Filter and Sort Categories
   const sortedCategories = useMemo(() => {
     const filtered = categories.filter((c) => {
-      const matchesStatus = statusFilter === "ALL" || c.status === statusFilter;
+      // Archived categories live in the Archive tab and nowhere else - that is
+      // what makes archiving a move rather than a relabelled filter.
+      const matchesStatus = c.status === "Active";
       if (!matchesStatus) return false;
 
       const q = search.trim().toLowerCase();
@@ -158,7 +195,7 @@ export const MerchantCategoryModule: React.FC = () => {
           return 0;
       }
     });
-  }, [categories, statusFilter, search, sortBy]);
+  }, [categories, search, sortBy]);
 
   return (
     <div className="flex flex-col h-full space-y-3 max-w-7xl mx-auto w-full overflow-hidden">
@@ -172,7 +209,7 @@ export const MerchantCategoryModule: React.FC = () => {
               <Store size={18} />
             </span>
             <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-              Merchants & Places Directory
+              Merchants Category
             </h2>
           </div>
         </div>
@@ -209,7 +246,7 @@ export const MerchantCategoryModule: React.FC = () => {
           <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
             activeTab === "categories" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
           }`}>
-            {totalCategories}
+            {liveCategories}
           </span>
         </button>
         <button
@@ -225,8 +262,26 @@ export const MerchantCategoryModule: React.FC = () => {
           <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
             activeTab === "places" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
           }`}>
-            {totalLinkedPlaces}
+            {livePlaces}
           </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("archive")}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-extrabold transition ${
+            activeTab === "archive"
+              ? "bg-white text-[#1E3A5F] shadow-xs"
+              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+          }`}
+        >
+          <Archive size={13} />
+          <span>Archive</span>
+          {archivedCount > 0 && (
+            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
+              activeTab === "archive" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
+            }`}>
+              {archivedCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -249,41 +304,9 @@ export const MerchantCategoryModule: React.FC = () => {
               />
             </div>
 
-            {/* Right Group: Status Filter + Sorting */}
+            {/* Right Group: Sorting. Archived categories are not filtered here -
+                they live in the Archive tab. */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              {/* Status Segmented Filter */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                <button
-                  onClick={() => setStatusFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    statusFilter === "ALL"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  All ({totalCategories})
-                </button>
-                <button
-                  onClick={() => setStatusFilter("Active")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    statusFilter === "Active"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Active ({activeCategories})
-                </button>
-                <button
-                  onClick={() => setStatusFilter("Inactive")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    statusFilter === "Inactive"
-                      ? "bg-slate-700 text-white shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Inactive ({totalCategories - activeCategories})
-                </button>
-              </div>
 
               {/* Sort Dropdown */}
               <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
@@ -345,10 +368,22 @@ export const MerchantCategoryModule: React.FC = () => {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === "places" ? (
         <PlacesTab
           categories={categories}
           preSelectedCategory={selectedCategoryForPlaces}
+        />
+      ) : (
+        <ArchiveTab
+          categories={categories}
+          places={archivedPlaces}
+          isLoadingPlaces={isLoadingArchivedPlaces}
+          onCategoryRestored={(updated) => {
+            setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          }}
+          onPlaceRestored={() => {
+            void loadArchivedPlaces();
+          }}
         />
       )}
 

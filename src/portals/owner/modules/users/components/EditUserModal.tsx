@@ -106,6 +106,9 @@ const ROLE_METADATA: Record<
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onSave }) => {
   const { user: currentUser } = useAuth();
+  const isSelf = Boolean(
+    currentUser && (currentUser.id === user.id || currentUser.username === user.username)
+  );
 
   const [firstName, setFirstName] = useState(user.firstName);
   const [middleName, setMiddleName] = useState(user.middleName || "");
@@ -175,8 +178,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     if (trimmedUsername !== user.username) payload.username = trimmedUsername;
     if (trimmedEmail !== user.email) payload.email = trimmedEmail;
     if (trimmedPhone !== user.phone) payload.phone = trimmedPhone;
-    if (role !== user.role) payload.role = role;
-    if (status !== user.status) payload.status = status;
+    if (!isSelf && role !== user.role) payload.role = role;
+    if (!isSelf && status !== user.status) payload.status = status;
     if (showPasswordSection && password) payload.password = password;
 
     return payload;
@@ -383,81 +386,116 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                   1. Operational Role & Status
                 </label>
                 {/* Status Segmented Capsule */}
-                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setStatus("Active")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
-                      status === "Active"
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
+                {isSelf ? (
+                  <div
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold select-none"
+                    title="You cannot deactivate your own account while logged in"
                   >
-                    <CheckCircle2 size={12} />
-                    <span>Active</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatus("Inactive")}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
-                      status === "Inactive"
-                        ? "bg-slate-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <XCircle size={12} />
-                    <span>Inactive</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Role Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {ASSIGNABLE_ROLES.map((option) => {
-                  const meta = ROLE_METADATA[option.value];
-                  const Icon = meta.icon;
-                  const isSelected = role === option.value;
-
-                  return (
+                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    <span>Active (Current Admin)</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                     <button
-                      key={option.value}
                       type="button"
-                      onClick={() => {
-                        setRole(option.value);
-                        clearFieldError("role");
-                      }}
-                      className={`p-3 rounded-xl border text-left transition-all duration-150 relative flex flex-col justify-between ${
-                        isSelected
-                          ? `border-[#1E3A5F] ring-2 ring-[#1E3A5F]/20 bg-slate-50 shadow-xs`
-                          : `border-slate-200 hover:border-slate-300 hover:bg-slate-50/50`
+                      onClick={() => setStatus("Active")}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                        status === "Active"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                            isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
-                          }`}
-                        >
-                          <Icon size={14} />
-                        </div>
-                        {isSelected && (
-                          <span className="w-4 h-4 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center text-[10px]">
-                            <Check size={10} strokeWidth={3} />
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs font-black text-slate-800">{meta.label}</p>
-                        <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
-                          {meta.description}
-                        </p>
-                      </div>
+                      <CheckCircle2 size={12} />
+                      <span>Active</span>
                     </button>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={() => setStatus("Inactive")}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                        status === "Inactive"
+                          ? "bg-slate-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <XCircle size={12} />
+                      <span>Inactive</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {roleChangeNeedsApproval && (
+              {/* Role Display / Selection */}
+              {isSelf ? (
+                <div className="p-3.5 rounded-xl border border-purple-200 bg-purple-50/60 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                      <ShieldCheck size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-black text-slate-800">{roleLabel(user.role)}</p>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
+                          Current Admin
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                        Your administrative role is locked while logged into this account.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-white/80 px-2.5 py-1 rounded-lg border border-purple-200/80 shadow-2xs shrink-0">
+                    <Lock size={12} className="text-purple-600" />
+                    <span>Locked</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {ASSIGNABLE_ROLES.map((option) => {
+                    const meta = ROLE_METADATA[option.value];
+                    const Icon = meta.icon;
+                    const isSelected = role === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setRole(option.value);
+                          clearFieldError("role");
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all duration-150 relative flex flex-col justify-between ${
+                          isSelected
+                            ? `border-[#1E3A5F] ring-2 ring-[#1E3A5F]/20 bg-slate-50 shadow-xs`
+                            : `border-slate-200 hover:border-slate-300 hover:bg-slate-50/50`
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                              isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
+                            }`}
+                          >
+                            <Icon size={14} />
+                          </div>
+                          {isSelected && (
+                            <span className="w-4 h-4 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center text-[10px]">
+                              <Check size={10} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-800">{meta.label}</p>
+                          <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                            {meta.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {roleChangeNeedsApproval && !isSelf && (
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold leading-relaxed">
                   <ShieldAlert size={15} className="shrink-0 mt-0.5 text-amber-600" />
                   <span>

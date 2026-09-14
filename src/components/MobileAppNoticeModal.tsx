@@ -1,10 +1,11 @@
-import React from "react";
-import { Smartphone, LogOut, ShieldAlert } from "lucide-react";
+import React, { useState } from "react";
+import { Smartphone, LogOut, ShieldAlert, Loader2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface MobileAppNoticeModalProps {
   isOpen: boolean;
   roleName: string;
-  onClose?: () => void;
+  onClose?: () => Promise<void> | void;
 }
 
 export const MobileAppNoticeModal: React.FC<MobileAppNoticeModalProps> = ({
@@ -12,12 +13,24 @@ export const MobileAppNoticeModal: React.FC<MobileAppNoticeModalProps> = ({
   roleName,
   onClose,
 }) => {
+  const { logout } = useAuth();
+  const [isExiting, setIsExiting] = useState(false);
+
   if (!isOpen) return null;
 
-  const handleExit = () => {
-    if (onClose) onClose();
-    // Refresh the page as specified in requirements
-    window.location.reload();
+  const handleExit = async () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    try {
+      if (onClose) {
+        await onClose();
+      }
+      await logout();
+    } catch (err) {
+      console.error("Failed to cleanly exit mobile role session:", err);
+    } finally {
+      window.location.replace("/");
+    }
   };
 
   const formattedRole = roleName.toUpperCase();
@@ -25,7 +38,7 @@ export const MobileAppNoticeModal: React.FC<MobileAppNoticeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl overflow-hidden text-center">
+      <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl overflow-hidden text-center">
         {/* Top Accent Gradient Bar */}
         <div className={`absolute top-0 left-0 right-0 h-2.5 ${isRider ? "bg-amber-500" : "bg-sky-500"}`} />
 
@@ -56,11 +69,22 @@ export const MobileAppNoticeModal: React.FC<MobileAppNoticeModalProps> = ({
         {/* Exit Button */}
         <div className="mt-8">
           <button
+            type="button"
             onClick={handleExit}
-            className="w-full py-3.5 px-5 rounded-2xl font-semibold text-sm text-white bg-red-600 hover:bg-red-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 active:scale-98 cursor-pointer"
+            disabled={isExiting}
+            className="w-full py-3.5 px-5 rounded-xl font-semibold text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 active:scale-98 cursor-pointer"
           >
-            <LogOut size={18} />
-            <span>Exit & Refresh Page</span>
+            {isExiting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>Signing Out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut size={18} />
+                <span>Exit & Return to Login</span>
+              </>
+            )}
           </button>
         </div>
       </div>

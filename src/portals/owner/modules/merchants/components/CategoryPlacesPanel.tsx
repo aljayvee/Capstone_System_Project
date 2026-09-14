@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Building2, Compass, Loader2, MapPin, Plus, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
+import { Building2, Compass, Loader2, MapPin, Plus, RefreshCw, AlertCircle, ExternalLink, List, Map as MapIcon } from "lucide-react";
+import { PlacesMiniMap } from "../../../../../components/PlacesMiniMap";
 import { apiService, type ApiVerifiedPlace } from "../../../../../services/apiService";
 
 interface CategoryPlacesPanelProps {
@@ -19,6 +20,9 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
   onSelectCategoryForPlaces,
 }) => {
   const [places, setPlaces] = useState<ApiVerifiedPlace[] | null>(null);
+  const [view, setView] = useState<"list" | "map">("list");
+  /** Which row the cursor is on, so the map can point at the same shop. */
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
@@ -117,29 +121,84 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
             </span>
           )}
         </p>
-        {onSelectCategoryForPlaces ? (
-          <button
-            type="button"
-            onClick={() => onSelectCategoryForPlaces(categoryId)}
-            className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
-          >
-            <Compass size={13} />
-            <span>Open in Stores Tab</span>
-          </button>
-        ) : (
-          <Link
-            to={directoryHref}
-            className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
-          >
-            <Compass size={13} />
-            <span>Open in Directory</span>
-          </Link>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* View only - the editor lives in the Stores tab. Browsing a category
+              should never be able to move a store's ground truth by misclick. */}
+          <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg" role="group" aria-label="View stores as">
+            <button
+              type="button"
+              onClick={() => setView("list")}
+              aria-pressed={view === "list"}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition ${
+                view === "list" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <List size={12} />
+              <span>List</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("map")}
+              aria-pressed={view === "map"}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition ${
+                view === "map" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <MapIcon size={12} />
+              <span>Map</span>
+            </button>
+          </div>
+
+          {onSelectCategoryForPlaces ? (
+            <button
+              type="button"
+              onClick={() => onSelectCategoryForPlaces(categoryId)}
+              className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
+            >
+              <Compass size={13} />
+              <span>Open in Stores Tab</span>
+            </button>
+          ) : (
+            <Link
+              to={directoryHref}
+              className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
+            >
+              <Compass size={13} />
+              <span>Open in Directory</span>
+            </Link>
+          )}
+        </div>
       </div>
 
+      {view === "map" ? (
+        <div className="p-3 space-y-2">
+          {/* The map shows EVERY store in the category, not the first five the
+              list truncates to - a map has the room, and a partial map of
+              store coverage would be misleading in a way a partial list is not. */}
+          <PlacesMiniMap places={places} heightClass="h-64" focusId={hoveredId} />
+          <div className="flex items-center justify-between gap-3 text-[10px] text-slate-500">
+            <span className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active
+              </span>
+              {inactiveCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-slate-400" /> Retired
+                </span>
+              )}
+            </span>
+            <span>Showing all {places.length} · tap a pin for details</span>
+          </div>
+        </div>
+      ) : (
       <ul className="divide-y divide-slate-100">
         {visible.map((place) => (
-          <li key={place.id} className="hover:bg-slate-50/70 transition">
+          <li
+            key={place.id}
+            className="hover:bg-slate-50/70 transition"
+            onMouseEnter={() => setHoveredId(place.id)}
+            onMouseLeave={() => setHoveredId(null)}
+          >
             <div className="flex items-center justify-between gap-3 px-3.5 py-2">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <span
@@ -165,8 +224,9 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
           </li>
         ))}
       </ul>
+      )}
 
-      {hiddenCount > 0 && (
+      {view === "list" && hiddenCount > 0 && (
         <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 text-center">
           {onSelectCategoryForPlaces ? (
             <button

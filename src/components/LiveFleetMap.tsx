@@ -265,20 +265,18 @@ export default function LiveFleetMap({
         markerLibraryRef.current = markerLibrary;
         if (!mapRef.current || !isMounted) return;
 
-        mapInstance.current = new Map(mapRef.current, {
+        const googleMapId = (import.meta as any).env?.VITE_GOOGLE_MAP_ID || "DEMO_MAP_ID";
+        const mapOptions: any = {
           center,
           zoom: 14,
-          // AdvancedMarkerElement requires a Map ID. "DEMO_MAP_ID" is Google's
-          // placeholder: it renders, but silently ignores cloud styling and is
-          // rate-limited. Set VITE_GOOGLE_MAP_ID to a real one from the Google
-          // Cloud console; the placeholder stays as a fallback so a missing env
-          // var degrades rather than breaking the map outright.
-          mapId: (import.meta as any).env?.VITE_GOOGLE_MAP_ID || "DEMO_MAP_ID",
           disableDefaultUI: true,
           zoomControl: true,
           fullscreenControl: false,
           streetViewControl: false,
-        });
+          mapId: googleMapId,
+        };
+
+        mapInstance.current = new Map(mapRef.current, mapOptions);
 
         setIsMapLoaded(true);
       } catch (err) {

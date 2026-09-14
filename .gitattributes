@@ -1,0 +1,12 @@
+# Line-ending policy for the dual-agent contract registry.
+#
+# core.autocrlf is true in the system gitconfig, so without this rule Git
+# rewrites AGENT_HANDSHAKE.md to CRLF the next time it touches the file. Both
+# Claude and Antigravity edit that file on Windows, and a whole-file
+# line-ending diff would bury the one or two bullets that actually changed,
+# defeating the zero-regression review the registry exists to support.
+#
+# Deliberately narrow in scope. Do NOT add a repo-wide `* text=auto` rule
+# while the working tree carries uncommitted work: that renormalizes every
+# tracked file at once and produces exactly the unreadable diff this prevents.
+AGENT_HANDSHAKE.md text eol=lf

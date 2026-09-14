@@ -3,7 +3,43 @@
 
 @import 'tw-animate-css';
 
+/*
+ * `animate-fade-in` and `animate-scale-up` are written in 16 places across the
+ * app — inline banners, modals, the offline banner, the unauthorized screen —
+ * but nothing ever defined them, so every one of those was a silent no-op that
+ * rendered with no animation at all. Verified against the built stylesheet:
+ * neither class appeared in the output.
+ *
+ * `tw-animate-css` supplies `fade-in` only as a MODIFIER for `animate-in`
+ * (`animate-in fade-in`), not as a standalone animation, which is why the
+ * bare names never resolved. These two declarations make the existing markup
+ * do what it always read as doing.
+ */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scale-up {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes fade-in {
+    from { opacity: 1; }
+    to   { opacity: 1; }
+  }
+  @keyframes scale-up {
+    from { opacity: 1; transform: none; }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
 @theme {
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-scale-up: scale-up 0.18s ease-out;
+
   --color-sidebar: #1E3A5F;
   --color-sidebar-foreground: #ffffff;
   --color-sidebar-primary: #ffffff;

@@ -13,6 +13,11 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
   WRONG_BRANCH: "Wrong branch",
   MISSING_RECEIPT: "No receipt at a stop",
   STALLED_STOP: "Long stop",
+  // The dispatcher's version is an instruction, not a category: this queue is
+  // today's work, and a rider is standing at a door waiting for someone here to
+  // ring the customer.
+  OVERAGE_PENDING: "Goods held — call the customer",
+  UNPAID_BALANCE: "Balance never collected",
 };
 
 /**

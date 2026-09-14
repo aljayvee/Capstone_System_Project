@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   MapPin,
   Loader2,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "../../../../services/apiService";
@@ -21,12 +22,12 @@ export const ServiceRatesModule: React.FC = () => {
   const [perKmRate, setPerKmRate] = useState(10);
   const [multiStoreFeePerStore, setMultiStoreFeePerStore] = useState(30);
   const [maxAdditionalStores, setMaxAdditionalStores] = useState(2);
-  const [groceryFeeThreshold, setGroceryFeeThreshold] = useState(3000);
+  const [groceryFeeThreshold, setGroceryFeeThreshold] = useState(1001);
   const [groceryFeePercent, setGroceryFeePercent] = useState(10);
   const [groceryFeeFlat, setGroceryFeeFlat] = useState(50);
   const [nonCodThreshold, setNonCodThreshold] = useState(3000);
-  const [nonCodFeeHigh, setNonCodFeeHigh] = useState(50);
-  const [nonCodFeeLow, setNonCodFeeLow] = useState(15);
+  const [nonCodFeeHigh, setNonCodFeeHigh] = useState(15);
+  const [nonCodFeeLow, setNonCodFeeLow] = useState(0);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,12 +51,12 @@ export const ServiceRatesModule: React.FC = () => {
         setPerKmRate(config.perKmRate);
         setMultiStoreFeePerStore(config.multiStoreFeePerStore ?? 30);
         setMaxAdditionalStores(config.maxAdditionalStores ?? 2);
-        setGroceryFeeThreshold(config.groceryFeeThreshold ?? 3000);
+        setGroceryFeeThreshold(config.groceryFeeThreshold ?? 1001);
         setGroceryFeePercent(config.groceryFeePercent ?? 10);
         setGroceryFeeFlat(config.groceryFeeFlat ?? 50);
         setNonCodThreshold(config.nonCodThreshold ?? 3000);
-        setNonCodFeeHigh(config.nonCodFeeHigh ?? 50);
-        setNonCodFeeLow(config.nonCodFeeLow ?? 15);
+        setNonCodFeeHigh(config.nonCodFeeHigh ?? 15);
+        setNonCodFeeLow(config.nonCodFeeLow ?? 0);
 
         // The parts of the formula the owner cannot edit, sent so this
         // simulator reads them rather than carrying its own copy.
@@ -283,9 +284,14 @@ export const ServiceRatesModule: React.FC = () => {
               {/* Below the threshold is the FLAT fee and above it is the
                   PERCENTAGE — the inverse of how these two cards used to sit.
                   The inputs are bound accordingly: this card edits
-                  groceryFeeFlat, the next edits groceryFeePercent. */}
+                  groceryFeeFlat, the next edits groceryFeePercent.
+
+                  Labelled "Under" and "At or Above" because the comparison is
+                  `>=`: an order sitting exactly on the threshold pays the
+                  percentage, and "Above Threshold" invited the opposite reading
+                  of the one boundary anybody actually asks about. */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-                <label className="text-[10.5px] font-bold uppercase text-slate-700">Below Threshold</label>
+                <label className="text-[10.5px] font-bold uppercase text-slate-700">Under Threshold</label>
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-400 font-black text-base">₱</span>
                   <input
@@ -300,7 +306,7 @@ export const ServiceRatesModule: React.FC = () => {
               </div>
 
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-                <label className="text-[10.5px] font-bold uppercase text-slate-700">Above Threshold</label>
+                <label className="text-[10.5px] font-bold uppercase text-slate-700">At or Above</label>
                 <div className="flex items-center gap-1.5">
                   <input
                     type="number"
@@ -315,6 +321,95 @@ export const ServiceRatesModule: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <p className="text-[10.5px] text-slate-500 leading-relaxed">
+              An order of exactly{" "}
+              <span className="font-bold text-slate-700">₱{groceryFeeThreshold - 1}</span> pays the
+              flat ₱{groceryFeeFlat}; from{" "}
+              <span className="font-bold text-slate-700">₱{groceryFeeThreshold}</span> it pays{" "}
+              {groceryFeePercent}%. Crossing that line never costs more than the order grew — the
+              fee eases in rather than jumping.
+            </p>
+          </div>
+
+          {/* SECTION D: NON-COD SURCHARGE
+
+              These three fields were saved and loaded all along but had no
+              inputs, so the owner could neither see nor correct them. A fee
+              nobody can look at is a fee nobody can notice is wrong. */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
+              <div className="w-7 h-7 rounded-lg bg-violet-50 text-violet-700 flex items-center justify-center font-bold">
+                <CreditCard size={15} />
+              </div>
+              <div>
+                <h3 className="text-xs font-extrabold text-slate-800">Non-Cash Payment Surcharge</h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="text-[10.5px] font-bold uppercase text-slate-700">
+                  Purchase Threshold
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-black text-base">₱</span>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={nonCodThreshold}
+                    onChange={(e) => setNonCodThreshold(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 font-black text-base outline-none focus:ring-2 focus:ring-[#1E3A5F]"
+                  />
+                </div>
+              </div>
+
+              {/* Named for WHERE each applies, not for its size — the server
+                  rejects a save where the larger purchase carries the smaller
+                  fee, because that inversion is invisible otherwise. */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="text-[10.5px] font-bold uppercase text-slate-700">
+                  Under Threshold
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-black text-base">₱</span>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={nonCodFeeLow}
+                    onChange={(e) => setNonCodFeeLow(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 font-black text-base outline-none focus:ring-2 focus:ring-[#1E3A5F]"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="text-[10.5px] font-bold uppercase text-slate-700">
+                  At or Above
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 font-black text-base">₱</span>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={nonCodFeeHigh}
+                    onChange={(e) => setNonCodFeeHigh(Number(e.target.value))}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-900 font-black text-base outline-none focus:ring-2 focus:ring-[#1E3A5F]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10.5px] text-slate-500 leading-relaxed">
+              Applies only once a confirmed payment mode is not Cash on Delivery. A purchase under{" "}
+              <span className="font-bold text-slate-700">₱{nonCodThreshold}</span> pays ₱
+              {nonCodFeeLow}; at{" "}
+              <span className="font-bold text-slate-700">₱{nonCodThreshold}</span> or more it pays ₱
+              {nonCodFeeHigh}.
+            </p>
           </div>
 
           {/* SAVE BUTTON */}

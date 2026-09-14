@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { apiClient } from "../../../services/apiClient";
 import { loadGoogleMapsScript, importGoogleMapsLibrary } from "../../../utils/loadGoogleMaps";
+import { GOOGLE_MAP_ID, canUseAdvancedMarkers } from "../../../utils/googleMapId";
+import {
+  findDuplicatePlace,
+  describePlaceDuplicate,
+  type PlaceDuplicateWarning,
+} from "../../../utils/placeDuplicates";
 import {
   MapPin,
   Plus,
@@ -78,6 +84,12 @@ export default function PlacesDirectoryScreen() {
   const [formIsActive, setFormIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * A save held back because the place looks like one already in the directory.
+   * Held rather than blocked - a mall really can hold two shops a few metres
+   * apart, and the owner is the one who can tell.
+   */
+  const [duplicateWarning, setDuplicateWarning] = useState<PlaceDuplicateWarning | null>(null);
 
   // Google Maps State
   const mapRef = useRef<HTMLDivElement>(null);
@@ -153,13 +165,18 @@ export default function PlacesDirectoryScreen() {
         const currentLng = parseFloat(formLongitude) || 124.6752;
         const centerPos = { lat: currentLat, lng: currentLng };
 
-        const map = new MapClass(mapRef.current, {
+        const googleMapId = GOOGLE_MAP_ID;
+        const mapOptions: any = {
           center: centerPos,
           zoom: 15,
-          mapId: "DEMO_MAP_ID",
           mapTypeControl: false,
           streetViewControl: false,
-        });
+        };
+        if (googleMapId) {
+          mapOptions.mapId = googleMapId;
+        }
+
+        const map = new MapClass(mapRef.current, mapOptions);
 
         map.addListener("click", (e: any) => {
           const lat = e.latLng.lat();
@@ -195,7 +212,7 @@ export default function PlacesDirectoryScreen() {
       activeMarkerRef.current = null;
     }
 
-    if (g.maps.marker && g.maps.marker.AdvancedMarkerElement) {
+    if (canUseAdvancedMarkers(g)) {
       const pinGlyph = new g.maps.marker.PinElement({
         background: "#EF4444",
         glyphColor: "#FFFFFF",
@@ -273,6 +290,13 @@ export default function PlacesDirectoryScreen() {
     setShowForm(true);
   };
 
+  // A warning only licenses saving THIS place at THIS spot. Editing the name or
+  // moving the pin makes it stale, so it clears and the next save re-checks -
+  // otherwise one dismissed warning would wave through every later edit too.
+  useEffect(() => {
+    setDuplicateWarning(null);
+  }, [formName, formLatitude, formLongitude]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -297,6 +321,23 @@ export default function PlacesDirectoryScreen() {
       return;
     }
 
+    // Nothing stops the same shop being registered twice - the table has no
+    // uniqueness of any kind and the API does no pre-existence check - and a
+    // duplicate then splits the dispatcher's store search, the reverse lookup
+    // and the wrong-branch check between two rows. Warn once; a second press
+    // saves anyway.
+    if (!duplicateWarning) {
+      const clash = findDuplicatePlace(
+        { name: formName.trim(), latitude: latNum, longitude: lngNum },
+        places,
+        isEditing ? editingId : null
+      );
+      if (clash) {
+        setDuplicateWarning(clash);
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const payload = {
@@ -318,6 +359,7 @@ export default function PlacesDirectoryScreen() {
 
       await fetchPlaces();
       resetForm();
+      setDuplicateWarning(null);
       setShowForm(false);
     } catch (err: any) {
       setFormError(err.response?.data?.message || "Failed to save establishment details.");
@@ -397,7 +439,7 @@ export default function PlacesDirectoryScreen() {
           <Link
             to="/owner?module=merchants"
             className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition flex items-center gap-2 text-xs font-bold shadow-2xs"
-            title="Back to Merchants & Places"
+            title="Back to Merchants Category"
           >
             <ArrowLeft size={15} />
             <span className="hidden sm:inline">Back to Categories</span>
@@ -713,6 +755,18 @@ export default function PlacesDirectoryScreen() {
                   </p>
                 </div>
               </div>
+
+              {duplicateWarning && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold m-0">{describePlaceDuplicate(duplicateWarning)}</p>
+                    <p className="m-0 mt-1 opacity-80">
+                      Press Save again to add it anyway, or change the name and location.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {formError && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700 flex items-center gap-2">
