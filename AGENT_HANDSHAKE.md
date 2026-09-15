@@ -48,4 +48,5 @@
   - `EditUserModal` renders locked Active badge ("Active (Current Admin)") and locked Role card ("Admin - Current Admin / Locked") when editing self; other role/status options avoided.
 * **Notes for Claude**:
   - Production backend live at `https://api.sugoonthego.online` on Contabo VPS with Let's Encrypt SSL and MariaDB.
+  - Production web dashboard live at `https://sugoonthego.online` on Contabo VPS with Let's Encrypt SSL serving built React bundle via Nginx.
   - Self-deactivation and self-role alteration prevention invariants enforced on both frontend (`EditUserModal`) and backend (`userService.ts`).
