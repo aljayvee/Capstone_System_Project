@@ -316,7 +316,7 @@ export default function LoginPage() {
   };
 
   const headings: Record<Stage, { title: string; description: string }> = {
-    CREDENTIALS: { title: "Operations & Dispatch Console", description: "Tacurong City Logistics & Fleet Management" },
+    CREDENTIALS: { title: "Sugo On the Go Portal", description: "Tacurong City Logistics & Fleet Management" },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
     OTP: { title: "Verify Your Email", description: "Enter the 6-digit verification code sent to your email" },
   };
@@ -332,15 +332,6 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md z-10 my-auto selection:bg-red-950 selection:text-white">
         {/* Header Section */}
         <div className="pb-6 text-center pt-2">
-          <div className="flex flex-col items-center justify-center mb-3">
-            <div className="w-11 h-11 rounded-xl bg-[#DC2626] flex items-center justify-center text-white font-black text-sm tracking-wider mb-2 select-none shadow-none">
-              SUGO
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium tracking-wide">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Dispatch Engine Online
-            </div>
-          </div>
           <h1 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
             {headings[stage].title}
           </h1>
@@ -481,23 +472,6 @@ export default function LoginPage() {
                   </>
                 )}
               </button>
-            </div>
-
-            {/* Operational Security Footnote */}
-            <div className="pt-2 text-center space-y-1">
-              <p className="text-[11px] text-slate-400 font-medium">
-                Authorized dispatch and administrative personnel only
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Rider or Customer?{" "}
-                <button
-                  type="button"
-                  onClick={() => setMobileAppRoleAlert("customer")}
-                  className="text-red-400 hover:text-red-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
-                >
-                  Get Mobile App
-                </button>
-              </p>
             </div>
           </div>
         )}
