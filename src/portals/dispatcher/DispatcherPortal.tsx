@@ -330,6 +330,12 @@ export default function DispatcherPortal() {
                 <LogOut size={15} />
                 <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
               </button>
+
+              <div className="pt-1 text-center group-data-[collapsible=icon]:hidden">
+                <p className="text-[10px] text-slate-500 font-medium">
+                  &copy; {new Date().getFullYear()} Sugo on the Go
+                </p>
+              </div>
             </SidebarFooter>
           </Sidebar>
 

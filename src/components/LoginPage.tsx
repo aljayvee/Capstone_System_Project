@@ -330,7 +330,7 @@ export default function LoginPage() {
   return (
     <main
       role="main"
-      className="min-h-screen flex items-center justify-center p-4 relative select-none bg-[#0B132B]"
+      className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
       {/* Flat Minimalist Console */}
       <div className="relative w-full max-w-md z-10">
@@ -545,6 +545,16 @@ export default function LoginPage() {
           )}
 
         </div>
+
+        {/* Website Copyright Footer */}
+        <footer className="mt-6 text-center select-none" role="contentinfo">
+          <p className="text-xs text-slate-500 font-medium tracking-wide">
+            &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
+          </p>
+          <p className="text-[11px] text-slate-600 mt-1 font-medium">
+            Tacurong City Logistics &amp; Fleet Operations
+          </p>
+        </footer>
       </div>
 
       {/* Rider / Customer Mobile Redirection Modal */}
