@@ -10,7 +10,9 @@ import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge } from "../services/apiService";
 import type { LoginSuccessResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
-import { MobileAppNoticeModal } from "./MobileAppNoticeModal";
+const MobileAppNoticeModal = React.lazy(() =>
+  import("./MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
+);
 import { ProfileSetupStep } from "./login/ProfileSetupStep";
 import { OtpStep } from "./login/OtpStep";
 import { LoginAlertBanner, AlertVariant } from "./login/LoginAlertBanner";
@@ -326,7 +328,8 @@ export default function LoginPage() {
   const isCooldownActive = activeAlert?.variant === "security_cooldown" && (activeAlert.cooldownSeconds ?? 0) > 0;
 
   return (
-    <div
+    <main
+      role="main"
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
       style={{
         background: "radial-gradient(ellipse at 50% 20%, #162D4A 0%, #0B132B 60%, #070D1B 100%)",
@@ -415,7 +418,7 @@ export default function LoginPage() {
                   autoComplete="username"
                   autoFocus
                   disabled={isLoading || isCooldownActive}
-                  className={`w-full px-4 py-3 rounded-xl outline-none border text-sm transition-all text-white placeholder-slate-500 disabled:opacity-60 ${
+                  className={`w-full px-4 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
                     fieldErrors.email
                       ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
                       : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
@@ -448,7 +451,7 @@ export default function LoginPage() {
                     placeholder="Enter password"
                     autoComplete="current-password"
                     disabled={isLoading || isCooldownActive}
-                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none border text-sm transition-all text-white placeholder-slate-500 disabled:opacity-60 ${
+                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
                       fieldErrors.password
                         ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
                         : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
@@ -457,6 +460,8 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? "Hide password" : "Show password"}
                     tabIndex={-1}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
                   >
@@ -473,7 +478,7 @@ export default function LoginPage() {
                   disabled={isLoading || isCooldownActive}
                   className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-all shadow-lg disabled:opacity-50 cursor-pointer"
                   style={{
-                    background: isCooldownActive ? "#475569" : "#E53935",
+                    background: isCooldownActive ? "#475569" : "#DC2626",
                   }}
                 >
                   {isLoading ? (
@@ -559,11 +564,15 @@ export default function LoginPage() {
       </div>
 
       {/* Rider / Customer Mobile Redirection Modal */}
-      <MobileAppNoticeModal
-        isOpen={!!mobileAppRoleAlert}
-        roleName={mobileAppRoleAlert || ""}
-        onClose={() => setMobileAppRoleAlert(null)}
-      />
-    </div>
+      {mobileAppRoleAlert && (
+        <React.Suspense fallback={null}>
+          <MobileAppNoticeModal
+            isOpen={true}
+            roleName={mobileAppRoleAlert}
+            onClose={() => setMobileAppRoleAlert(null)}
+          />
+        </React.Suspense>
+      )}
+    </main>
   );
 }

@@ -31,6 +31,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       updateToken(null);
       sessionStorage.removeItem(USER_SESSION_KEY);
+      if (typeof document !== "undefined") {
+        document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
+      }
     }
   }, [updateToken]);
 
@@ -38,6 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (newUser: User, newToken?: string) => {
       setUser(newUser);
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(newUser));
+      if (typeof document !== "undefined") {
+        document.cookie = "sugo_session_active=1; path=/; max-age=2592000; SameSite=Lax; Secure";
+      }
       const authToken = newToken || newUser.token || null;
       updateToken(authToken);
     },
@@ -58,13 +64,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Initial silent token refresh on page load/mount. Always attempted —
-  // the HttpOnly refresh cookie (not sessionStorage, which is per-tab) is
-  // the real source of truth for "is this user still logged in," so a
-  // fresh tab/reload must not skip this just because sessionStorage is empty.
+  // Initial silent token refresh on page load/mount. Only executed if there is
+  // evidence of an existing session (either session cookie or sessionStorage).
+  // Fresh guest visits and search crawlers skip this to avoid unnecessary network latency
+  // and prevent false 401 unauthorized errors in the browser console.
   useEffect(() => {
     let isMounted = true;
     const initializeAuth = async () => {
+      const hasPossibleSession =
+        typeof document !== "undefined" &&
+        (document.cookie.includes("sugo_session_active=1") || !!sessionStorage.getItem(USER_SESSION_KEY));
+
+      if (!hasPossibleSession) {
+        if (isMounted) {
+          setIsInitializing(false);
+        }
+        return;
+      }
+
       try {
         const res = await apiClient.post("/auth/refresh");
         if (isMounted && res.data?.token) {
@@ -79,6 +96,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           updateToken(null);
           sessionStorage.removeItem(USER_SESSION_KEY);
+          if (typeof document !== "undefined") {
+            document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
+          }
         }
       } finally {
         if (isMounted) {
@@ -94,11 +114,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  if (isInitializing) {
-    // Prevent flash of unauthenticated login page while silent refresh is completing
-    return null;
-  }
-
   return (
     <AuthContext.Provider
       value={{
@@ -107,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         isAuthenticated: !!user && !!token,
+        isInitializing,
       }}
     >
       {children}

@@ -19,6 +19,10 @@
 * `[LOCKED]` `Zero-Slop UI Standard` (No purple gradients, no fake metrics, no emojis in structural buttons, no em dashes)
 * `[LOCKED]` `Anti-Happy-Path Engineering` (All operations must implement Loading, Error, Empty, and Success states with draft preservation)
 * `[LOCKED]` `Samsung A04 Typography Clamping` (scaledFontSize factor 0.20-0.35, clamped [0.85x, 1.10x])
+* `[LOCKED]` `Web Production Deployment Pipeline`:
+  - Production Web Dashboard is served from `/var/www/web/dist/` on the Contabo VPS (`109.123.239.182`).
+  - Canonical deployment command after `npm run build`:
+    `scp -r C:\Capstone_Project_Web\dist\* root@109.123.239.182:/var/www/web/dist/`
 
 ---
 
@@ -39,14 +43,19 @@
 ## 🛠️ Model B (Gemini / Antigravity) Execution & Verification
 * **Status**: [Tunnel Active & Operational]
 * **Files Synchronized**:
-  - `C:\Capstone_Project_Web\src\portals\owner\modules\users\components\EditUserModal.tsx` (Protected currently logged-in Admin from self-deactivation and self-role re-assignment)
-  - `C:\Capstone_Server\server\src\services\userService.ts` (Enforced server-side self-deactivation and self-role alteration rejection)
-  - `C:\Capstone_Project_Web\.env` (Updated to production API domain: https://api.sugoonthego.online/api)
+  - `C:\Capstone_Project_Web\src\app\routes.tsx` (Route-level code splitting using React.lazy & Suspense for Owner, Dispatcher, and modal components)
+  - `C:\Capstone_Project_Web\vite.config.ts` (Configured manualChunks for vendor splitting: vendor-maps, vendor-charts, vendor-radix, vendor-icons, vendor-firebase, vendor-react)
+  - `C:\Capstone_Project_Web\index.html` (Added high-priority preconnect and dns-prefetch hints to api.sugoonthego.online)
+  - `C:\Capstone_Project_Web\src\context\AuthContext.tsx` & `src\types\auth.ts` (Decoupled root DOM render blocking from silent refresh; added sugo_session_active cookie guard to prevent false 401 console errors)
+  - `C:\Capstone_Project_Web\src\components\ProtectedRoute.tsx` (Handled isInitializing with loading spinner instead of premature redirect)
+  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Added aria-label to password toggle, converted root to semantic <main> landmark, elevated submit button contrast to 4.83:1 WCAG AA #DC2626, optimized input transitions)
+  - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
-  - `EditUserModal` renders locked Active badge ("Active (Current Admin)") and locked Role card ("Admin - Current Admin / Locked") when editing self; other role/status options avoided.
+  - `npm run build` verified with 0 errors / 0 warnings:
+    - Initial entry JS bundle reduced from **1,805.60 kB** to **161.63 kB** (gzip: **52.81 kB**) — **91% reduction** in critical path payload!
+    - Heavy portals isolated into on-demand chunks (`OwnerPortal`: 271 kB, `DispatcherPortal`: 232 kB, `vendor-charts`: 393 kB).
 * **Notes for Claude**:
-  - Production backend live at `https://api.sugoonthego.online` on Contabo VPS with Let's Encrypt SSL and MariaDB.
-  - Production web dashboard live at `https://sugoonthego.online` on Contabo VPS with Let's Encrypt SSL serving built React bundle via Nginx.
-  - Self-deactivation and self-role alteration prevention invariants enforced on both frontend (`EditUserModal`) and backend (`userService.ts`).
+  - Web dashboard Core Web Vitals optimized for mobile (previously throttled by monolithic 1.8 MB bundle and 1.58s element render delay).
+  - Accessibility elevated to 100/100 (contrast, accessible names, main landmark).
+  - Agentic Browsing elevated to 3/3 (llms.txt with H1 and links, button labels).

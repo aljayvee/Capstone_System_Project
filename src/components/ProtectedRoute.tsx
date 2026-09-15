@@ -3,7 +3,10 @@ import { Navigate, useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { UserRole } from "../types/auth";
 import { ShieldAlert, LogOut } from "lucide-react";
-import { MobileAppNoticeModal } from "./MobileAppNoticeModal";
+
+const MobileAppNoticeModal = React.lazy(() =>
+  import("./MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
+);
 
 interface ProtectedRouteProps {
   allowedRoles: UserRole[];
@@ -11,8 +14,17 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, isInitializing } = useAuth();
   const location = useLocation();
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white">
+        <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-slate-400 text-xs font-medium tracking-wider uppercase">Verifying Session...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/" state={{ from: location }} replace />;
@@ -24,11 +36,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
   // Dedicated Mobile App Notice Modal for Rider and Customer accounts
   if (normalizedUserRole === "rider" || normalizedUserRole === "customer") {
     return (
-      <MobileAppNoticeModal
-        isOpen={true}
-        roleName={user.role}
-        onClose={() => logout()}
-      />
+      <React.Suspense fallback={null}>
+        <MobileAppNoticeModal
+          isOpen={true}
+          roleName={user.role}
+          onClose={() => logout()}
+        />
+      </React.Suspense>
     );
   }
 

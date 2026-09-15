@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Allow: /logo.png
+Allow: /favicon.png
+
+# Prevent public search indexing of internal operational portals
+Disallow: /dispatcher/
+Disallow: /owner/
+Disallow: /api/
+
+Sitemap: https://sugoonthego.online/sitemap.xml
