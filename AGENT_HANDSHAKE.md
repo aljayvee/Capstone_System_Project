@@ -22,8 +22,12 @@
 * `[LOCKED]` `Web Production Deployment Pipeline`:
   - Production Web Dashboard is served from `/var/www/web/dist/` on the Contabo VPS (`109.123.239.182`).
   - The build is generated locally via `npm run build` in `C:\Capstone_Project_Web`.
-  - Deployment command (executed manually by the USER):
+  - **User-Exclusive Execution Boundary**: The agent is STRICTLY FORBIDDEN from running `scp`. Deployment is executed exclusively and manually by the USER via:
     `scp -r C:\Capstone_Project_Web\dist\* root@109.123.239.182:/var/www/web/dist/`
+* `[LOCKED]` `Outdated FigmaPrototype Folder Quarantine`:
+  - `C:\Capstone_Project_Web\FigmaPrototype\` contains obsolete prototype code and must NEVER be referenced, inspected, or modified.
+* `[LOCKED]` `Flat Design Surface Purity & Zero-Shadow Invariant`:
+  - Flat design surfaces (e.g. login portal, flat operator consoles) strictly prohibit `backdrop-blur-*`, radial/ambient gradient blooms, heavy drop shadows (`shadow-2xl`, `shadow-lg`, `shadow-md`, `shadow-sm`), and decorative card hairline borders. Pure solid flat fills only.
 
 ---
 
