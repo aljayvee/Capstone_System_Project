@@ -82,19 +82,19 @@ export const OtpStep: React.FC<OtpStepProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-        <MailCheck size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-        <p className="text-emerald-800 text-xs font-medium leading-relaxed">
+      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60">
+        <MailCheck size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+        <p className="text-emerald-300 text-xs font-medium leading-relaxed">
           We sent a 6-digit verification code to{" "}
-          <span className="font-bold">{maskedEmail || "your email address"}</span>. This one-time check
+          <span className="font-bold text-white">{maskedEmail || "your email address"}</span>. This one-time check
           confirms the account belongs to you.
         </p>
       </div>
 
       {serverError && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
-          <AlertCircle size={16} className="text-red-500 shrink-0" />
-          <p className="text-red-600 text-sm font-medium">{serverError}</p>
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-800/60">
+          <AlertCircle size={16} className="text-rose-400 shrink-0" />
+          <p className="text-rose-300 text-sm font-medium">{serverError}</p>
         </div>
       )}
 
@@ -115,7 +115,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         >
           <InputOTPGroup>
             {[0, 1, 2, 3, 4, 5].map((index) => (
-              <InputOTPSlot key={index} index={index} />
+              <InputOTPSlot key={index} index={index} className="border-slate-700 bg-slate-800 text-white" />
             ))}
           </InputOTPGroup>
         </InputOTP>
@@ -129,7 +129,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         type="button"
         onClick={() => submit(code)}
         disabled={code.length !== 6 || isSubmitting || expired}
-        className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-colors disabled:opacity-50 cursor-pointer"
+        className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer"
       >
         {isSubmitting ? (
           <>
@@ -145,7 +145,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition"
+          className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
         >
           Use a different account
         </button>
@@ -154,7 +154,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
           type="button"
           onClick={() => void onResend()}
           disabled={!canResend}
-          className="flex items-center gap-1.5 text-xs font-semibold text-[#1E3A5F] hover:text-[#162D4A] transition disabled:text-slate-400 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition disabled:text-slate-600 disabled:cursor-not-allowed cursor-pointer"
         >
           {isResending ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}
           <span>{resendIn > 0 ? `Resend in ${formatCountdown(resendIn)}` : "Resend code"}</span>

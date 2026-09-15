@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Eye, EyeOff, ChevronRight,
-  Bike, Loader2
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -332,219 +332,200 @@ export default function LoginPage() {
       role="main"
       className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
-      {/* Flat Minimalist Console */}
+      {/* Flat Minimalist Form */}
       <div className="relative w-full max-w-md z-10 my-auto">
-        <div className="bg-slate-900 rounded-2xl overflow-hidden">
-          
-          {/* Header Section */}
-          <div className="px-6 pt-8 pb-4 text-center">
-            {/* Flat Red Brand Badge */}
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-[#DC2626]"
-            >
-              <Bike className="text-white" size={24} strokeWidth={2.4} />
+        {/* Header Section */}
+        <div className="pb-6 text-center">
+          <h1 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+            {headings[stage].title}
+          </h1>
+          <p className="text-slate-400 text-xs sm:text-sm font-medium tracking-wide mt-1.5">
+            {headings[stage].description}
+          </p>
+        </div>
+
+        {/* STAGE 1: CREDENTIALS (Sign In) */}
+        {stage === "CREDENTIALS" && (
+          <div className="space-y-4">
+            
+            {/* Alert Banner System */}
+            {activeAlert && (
+              <LoginAlertBanner
+                variant={activeAlert.variant}
+                title={activeAlert.title}
+                message={activeAlert.message}
+                cooldownSeconds={activeAlert.cooldownSeconds}
+                actionText={activeAlert.actionText}
+                onAction={activeAlert.onAction}
+                onDismiss={() => setActiveAlert(null)}
+                onCooldownExpire={activeAlert.onCooldownExpire}
+                autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
+              />
+            )}
+
+            {/* Email / Username Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                  Email
+                </label>
+                {fieldErrors.email && (
+                  <span className="text-rose-400 text-[11px] font-medium">
+                    {fieldErrors.email}
+                  </span>
+                )}
+              </div>
+              <input
+                ref={usernameInputRef}
+                type="text"
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value);
+                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  if (activeAlert?.variant === "error") setActiveAlert(null);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Enter Email or Username"
+                autoComplete="username"
+                autoFocus
+                disabled={isLoading || isCooldownActive}
+                className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                  fieldErrors.email
+                    ? "border border-rose-500 bg-rose-950/30"
+                    : "border border-slate-700 bg-slate-800 focus:border-red-500"
+                }`}
+              />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold text-slate-300 tracking-wider uppercase mb-2">
-              SUGO Express
-            </div>
-
-            <h1 className="text-white text-2xl font-bold tracking-tight">
-              {headings[stage].title}
-            </h1>
-            <p className="text-slate-400 text-xs font-medium tracking-wide mt-1">
-              {headings[stage].description}
-            </p>
-          </div>
-
-          {/* STAGE 1: CREDENTIALS (Sign In) */}
-          {stage === "CREDENTIALS" && (
-            <div className="px-6 pb-8 space-y-4">
-              
-              {/* Alert Banner System */}
-              {activeAlert && (
-                <LoginAlertBanner
-                  variant={activeAlert.variant}
-                  title={activeAlert.title}
-                  message={activeAlert.message}
-                  cooldownSeconds={activeAlert.cooldownSeconds}
-                  actionText={activeAlert.actionText}
-                  onAction={activeAlert.onAction}
-                  onDismiss={() => setActiveAlert(null)}
-                  onCooldownExpire={activeAlert.onCooldownExpire}
-                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                />
-              )}
-
-              {/* Email / Username Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                    Email
-                  </label>
-                  {fieldErrors.email && (
-                    <span className="text-rose-400 text-[11px] font-medium">
-                      {fieldErrors.email}
-                    </span>
-                  )}
-                </div>
+            {/* Password Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                  Password
+                </label>
+                {fieldErrors.password && (
+                  <span className="text-rose-400 text-[11px] font-medium">
+                    {fieldErrors.password}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
                 <input
-                  ref={usernameInputRef}
-                  type="text"
-                  value={identifier}
+                  type={showPassword ? "text" : "password"}
+                  value={password}
                   onChange={(e) => {
-                    setIdentifier(e.target.value);
-                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
                     if (activeAlert?.variant === "error") setActiveAlert(null);
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Enter Email or Username"
-                  autoComplete="username"
-                  autoFocus
+                  placeholder="Enter password"
+                  autoComplete="current-password"
                   disabled={isLoading || isCooldownActive}
-                  className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
-                    fieldErrors.email
+                  className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                    fieldErrors.password
                       ? "border border-rose-500 bg-rose-950/30"
                       : "border border-slate-700 bg-slate-800 focus:border-red-500"
                   }`}
                 />
-              </div>
-
-              {/* Password Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                    Password
-                  </label>
-                  {fieldErrors.password && (
-                    <span className="text-rose-400 text-[11px] font-medium">
-                      {fieldErrors.password}
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                      if (activeAlert?.variant === "error") setActiveAlert(null);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Enter password"
-                    autoComplete="current-password"
-                    disabled={isLoading || isCooldownActive}
-                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
-                      fieldErrors.password
-                        ? "border border-rose-500 bg-rose-950/30"
-                        : "border border-slate-700 bg-slate-800 focus:border-red-500"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    title={showPassword ? "Hide password" : "Show password"}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit CTA Button */}
-              <div className="pt-2">
                 <button
                   type="button"
-                  onClick={handleLogin}
-                  disabled={isLoading || isCooldownActive}
-                  className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700"
-                  style={{
-                    background: isCooldownActive ? "#475569" : "#DC2626",
-                  }}
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Authenticating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Sign In</span>
-                      <ChevronRight size={16} />
-                    </>
-                  )}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-
-              {/* Operational Security Footnote */}
-              <div className="pt-2 text-center">
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Authorized dispatch and administrative personnel only
-                </p>
-              </div>
             </div>
-          )}
 
-          {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}
-          {stage === "PROFILE_SETUP" && (
-            <div className="px-6 pb-8">
-              {activeAlert && (
-                <div className="mb-4">
-                  <LoginAlertBanner
-                    variant={activeAlert.variant}
-                    title={activeAlert.title}
-                    message={activeAlert.message}
-                    onDismiss={() => setActiveAlert(null)}
-                    autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                  />
-                </div>
-              )}
-              <div className="bg-slate-800 rounded-xl p-4">
-                <ProfileSetupStep
-                  onSubmit={handleProfileSubmit}
-                  onCancel={() => resetToCredentials()}
-                  serverError={activeAlert?.message || ""}
-                  isSubmitting={isLoading}
+            {/* Submit CTA Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleLogin}
+                disabled={isLoading || isCooldownActive}
+                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700"
+                style={{
+                  background: isCooldownActive ? "#475569" : "#DC2626",
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ChevronRight size={16} />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Operational Security Footnote */}
+            <div className="pt-2 text-center">
+              <p className="text-[11px] text-slate-500 font-medium">
+                Authorized dispatch and administrative personnel only
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}
+        {stage === "PROFILE_SETUP" && (
+          <div className="space-y-4">
+            {activeAlert && (
+              <div className="mb-4">
+                <LoginAlertBanner
+                  variant={activeAlert.variant}
+                  title={activeAlert.title}
+                  message={activeAlert.message}
+                  onDismiss={() => setActiveAlert(null)}
+                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
                 />
               </div>
-            </div>
-          )}
+            )}
+            <ProfileSetupStep
+              onSubmit={handleProfileSubmit}
+              onCancel={() => resetToCredentials()}
+              serverError={activeAlert?.message || ""}
+              isSubmitting={isLoading}
+            />
+          </div>
+        )}
 
-          {/* STAGE 3: OTP VERIFICATION */}
-          {stage === "OTP" && (
-            <div className="px-6 pb-8">
-              {activeAlert && (
-                <div className="mb-4">
-                  <LoginAlertBanner
-                    variant={activeAlert.variant}
-                    title={activeAlert.title}
-                    message={activeAlert.message}
-                    onDismiss={() => setActiveAlert(null)}
-                    autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                  />
-                </div>
-              )}
-              <div className="bg-slate-800 rounded-xl p-4">
-                <OtpStep
-                  maskedEmail={maskedEmail}
-                  expiresAt={challengeExpiresAt}
-                  resendAvailableAt={resendAvailableAt}
-                  serverError={activeAlert?.message || ""}
-                  isSubmitting={isLoading}
-                  isResending={isResending}
-                  onSubmit={handleOtpSubmit}
-                  onResend={handleResend}
-                  onExpire={handleChallengeExpired}
-                  onCancel={() => resetToCredentials()}
+        {/* STAGE 3: OTP VERIFICATION */}
+        {stage === "OTP" && (
+          <div className="space-y-4">
+            {activeAlert && (
+              <div className="mb-4">
+                <LoginAlertBanner
+                  variant={activeAlert.variant}
+                  title={activeAlert.title}
+                  message={activeAlert.message}
+                  onDismiss={() => setActiveAlert(null)}
+                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
                 />
               </div>
-            </div>
-          )}
-
-        </div>
+            )}
+            <OtpStep
+              maskedEmail={maskedEmail}
+              expiresAt={challengeExpiresAt}
+              resendAvailableAt={resendAvailableAt}
+              serverError={activeAlert?.message || ""}
+              isSubmitting={isLoading}
+              isResending={isResending}
+              onSubmit={handleOtpSubmit}
+              onResend={handleResend}
+              onExpire={handleChallengeExpired}
+              onCancel={() => resetToCredentials()}
+            />
+          </div>
+        )}
       </div>
 
       {/* Website Copyright Footer at Bottom Edge */}

@@ -21,10 +21,10 @@ interface ProfileSetupStepProps {
 type FieldKey = "firstName" | "middleName" | "lastName" | "email";
 
 const fieldClass = (hasError: boolean) =>
-  `w-full px-4 py-3 rounded-xl outline-none border bg-slate-50 text-slate-800 text-sm transition disabled:opacity-60 ${
+  `w-full px-4 py-3 rounded-xl outline-none border bg-slate-800 text-white placeholder-slate-500 text-sm transition disabled:opacity-60 ${
     hasError
-      ? "border-red-300 focus:border-red-500 bg-red-50/40"
-      : "border-slate-200 focus:border-indigo-500"
+      ? "border-rose-500 bg-rose-950/30"
+      : "border-slate-700 focus:border-red-500"
   }`;
 
 export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
@@ -66,28 +66,28 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
   };
 
   const fieldError = (key: FieldKey) =>
-    errors[key] ? <p className="mt-1 text-[11px] font-semibold text-red-600">{errors[key]}</p> : null;
+    errors[key] ? <p className="mt-1 text-[11px] font-semibold text-rose-400">{errors[key]}</p> : null;
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50 border border-blue-200">
-        <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
-        <p className="text-blue-800 text-xs font-medium leading-relaxed">
+      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-950/40 border border-blue-800/60">
+        <ShieldCheck size={16} className="text-blue-400 shrink-0 mt-0.5" />
+        <p className="text-blue-300 text-xs font-medium leading-relaxed">
           This administrator account is still using its default setup details. Enter your real name and a
           working email address to continue — we'll send a verification code there next.
         </p>
       </div>
 
       {serverError && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
-          <AlertCircle size={16} className="text-red-500 shrink-0" />
-          <p className="text-red-600 text-sm font-medium">{serverError}</p>
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-800/60">
+          <AlertCircle size={16} className="text-rose-400 shrink-0" />
+          <p className="text-rose-300 text-sm font-medium">{serverError}</p>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block mb-1.5 text-slate-700 text-sm font-medium">First Name</label>
+          <label className="block mb-1.5 text-slate-300 text-xs font-semibold uppercase tracking-wider">First Name</label>
           <input
             type="text"
             value={firstName}
@@ -102,7 +102,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
           {fieldError("firstName")}
         </div>
         <div>
-          <label className="block mb-1.5 text-slate-700 text-sm font-medium">Last Name</label>
+          <label className="block mb-1.5 text-slate-300 text-xs font-semibold uppercase tracking-wider">Last Name</label>
           <input
             type="text"
             value={lastName}
@@ -119,8 +119,8 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
       </div>
 
       <div>
-        <label className="block mb-1.5 text-slate-700 text-sm font-medium">
-          Middle Name <span className="text-slate-400 font-normal">(optional)</span>
+        <label className="block mb-1.5 text-slate-300 text-xs font-semibold uppercase tracking-wider">
+          Middle Name <span className="text-slate-500 font-normal lowercase">(optional)</span>
         </label>
         <input
           type="text"
@@ -137,7 +137,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
       </div>
 
       <div>
-        <label className="block mb-1.5 text-slate-700 text-sm font-medium">Email Address</label>
+        <label className="block mb-1.5 text-slate-300 text-xs font-semibold uppercase tracking-wider">Email Address</label>
         <input
           type="email"
           value={email}
@@ -152,7 +152,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         {errors.email ? (
           fieldError("email")
         ) : (
-          <p className="mt-1 text-[11px] text-slate-400 font-medium">
+          <p className="mt-1 text-[11px] text-slate-500 font-medium">
             Use a real inbox you can open now — the verification code goes here.
           </p>
         )}
@@ -163,14 +163,14 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50 transition disabled:opacity-60"
+          className="px-4 py-3 rounded-xl border border-slate-700 text-slate-300 font-semibold text-sm hover:bg-slate-800 transition disabled:opacity-60 cursor-pointer"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-colors disabled:opacity-70 cursor-pointer"
+          className="flex-1 py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-70 cursor-pointer"
         >
           {isSubmitting ? (
             <>
