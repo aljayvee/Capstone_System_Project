@@ -333,7 +333,7 @@ export default function LoginPage() {
       className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
       {/* Flat Minimalist Console */}
-      <div className="relative w-full max-w-md z-10">
+      <div className="relative w-full max-w-md z-10 my-auto">
         <div className="bg-slate-900 rounded-2xl overflow-hidden">
           
           {/* Header Section */}
@@ -545,17 +545,17 @@ export default function LoginPage() {
           )}
 
         </div>
-
-        {/* Website Copyright Footer */}
-        <footer className="mt-6 text-center select-none" role="contentinfo">
-          <p className="text-xs text-slate-500 font-medium tracking-wide">
-            &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
-          </p>
-          <p className="text-[11px] text-slate-600 mt-1 font-medium">
-            Tacurong City Logistics &amp; Fleet Operations
-          </p>
-        </footer>
       </div>
+
+      {/* Website Copyright Footer at Bottom Edge */}
+      <footer className="w-full pt-6 pb-4 md:absolute md:bottom-4 md:left-0 md:right-0 text-center select-none z-10" role="contentinfo">
+        <p className="text-xs text-slate-500 font-medium tracking-wide">
+          &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
+        </p>
+        <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+          Tacurong City Logistics &amp; Fleet Operations
+        </p>
+      </footer>
 
       {/* Rider / Customer Mobile Redirection Modal */}
       {mobileAppRoleAlert && (
