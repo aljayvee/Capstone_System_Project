@@ -21,7 +21,8 @@
 * `[LOCKED]` `Samsung A04 Typography Clamping` (scaledFontSize factor 0.20-0.35, clamped [0.85x, 1.10x])
 * `[LOCKED]` `Web Production Deployment Pipeline`:
   - Production Web Dashboard is served from `/var/www/web/dist/` on the Contabo VPS (`109.123.239.182`).
-  - Canonical deployment command after `npm run build`:
+  - The build is generated locally via `npm run build` in `C:\Capstone_Project_Web`.
+  - Deployment command (executed manually by the USER):
     `scp -r C:\Capstone_Project_Web\dist\* root@109.123.239.182:/var/www/web/dist/`
 
 ---
@@ -53,9 +54,12 @@
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
   - `npm run build` verified with 0 errors / 0 warnings:
-    - Initial entry JS bundle reduced from **1,805.60 kB** to **161.63 kB** (gzip: **52.81 kB**) — **91% reduction** in critical path payload!
-    - Heavy portals isolated into on-demand chunks (`OwnerPortal`: 271 kB, `DispatcherPortal`: 232 kB, `vendor-charts`: 393 kB).
+    - Initial entry JS bundle reduced from **1,805.60 kB** to **137.02 kB** (gzip: **44.53 kB**).
+    - Isolated `vendor-utils` (25.59 kB / gzip 8.23 kB) containing `clsx`, `tailwind-merge`, and `class-variance-authority`.
+    - Completely severed `vendor-charts` (392.74 kB) from critical entry path — 0 chart bytes preloaded on `/`!
+    - Portals dynamically isolated (`OwnerPortal`: 271 kB, `DispatcherPortal`: 232 kB, `PlacesDirectoryScreen`: 22 kB).
 * **Notes for Claude**:
   - Web dashboard Core Web Vitals optimized for mobile (previously throttled by monolithic 1.8 MB bundle and 1.58s element render delay).
+  - Critical path JS reduced by >70% on root `/` login route.
   - Accessibility elevated to 100/100 (contrast, accessible names, main landmark).
   - Agentic Browsing elevated to 3/3 (llms.txt with H1 and links, button labels).
