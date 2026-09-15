@@ -129,7 +129,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         type="button"
         onClick={() => submit(code)}
         disabled={code.length !== 6 || isSubmitting || expired}
-        className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md disabled:opacity-50 cursor-pointer"
+        className="w-full py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-colors disabled:opacity-50 cursor-pointer"
       >
         {isSubmitting ? (
           <>

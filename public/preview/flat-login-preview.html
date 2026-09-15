@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUGO System Portal — Flat Design Layout Proposals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070B14;
+      --card: #0F172A;
+      --border: #1E293B;
+      --border-accent: #334155;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --primary: #DC2626;
+      --accent-blue: #38BDF8;
+      --accent-amber: #F59E0B;
+      --accent-emerald: #10B981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 36px 20px 80px;
+      line-height: 1.5;
+    }
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 36px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      background: #1E293B;
+      border: 1px solid var(--border-accent);
+      border-radius: 6px;
+      color: #F8FAFC;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    p.sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 28px;
+      max-width: 1200px;
+      margin: 0 auto 48px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .img-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #020617;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .img-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .content {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+    .opt-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    p.desc {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 18px;
+      flex-grow: 1;
+    }
+    .specs {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      font-size: 12.5px;
+      color: #CBD5E1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .spec-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bullet {
+      width: 6px;
+      height: 6px;
+      border-radius: 2px;
+      background: var(--primary);
+      flex-shrink: 0;
+    }
+    .principles-card {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #0F172A;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .principles-card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .principles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .principles-grid strong {
+      color: var(--text-main);
+      display: block;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="badge">UI/UX Optimization Proposals</div>
+    <h1>Flat Design Login Page Architecture</h1>
+    <p class="sub">Eliminating all glassmorphic noise, radial backdrop blurs, and heavy drop shadows in favor of crisp flat surfaces, high-contrast typography, and restrained 1px hairline borders.</p>
+  </div>
+
+  <div class="grid">
+    <!-- Option 1: Modern Minimalist Flat Console -->
+    <div class="card">
+      <div class="img-container">
+        <img src="/preview/login_flat_console.jpg" alt="Option 1: Modern Minimalist Flat Console">
+      </div>
+      <div class="content">
+        <span class="opt-tag">Layout Option 1 (Recommended)</span>
+        <h2>Modern Minimalist Flat Console</h2>
+        <p class="desc">A streamlined, centered flat console with solid dark canvas (#070B14), solid slate card (#0F172A), and clean 1px hairline border (#1E293B). Removes all frosted glass, radial blurs, and box shadows for instantaneous visual comprehension and peak performance.</p>
+        <div class="specs">
+          <div class="spec-item"><span class="bullet"></span> <strong>Zero Shadows & Zero Blur:</strong> Pure flat solid surfaces for optimal mobile and desktop rendering.</div>
+          <div class="spec-item"><span class="bullet"></span> <strong>Crisp Flat Inputs:</strong> Solid #020617 background with 1px border (#334155) and sharp red focus state.</div>
+          <div class="spec-item"><span class="bullet"></span> <strong>Compact & Ergonomic:</strong> Retains existing centered workflow, 3-stage state machine, and rate-limit banners.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 2: Flat Split-Pane Enterprise Layout -->
+    <div class="card">
+      <div class="img-container">
+        <img src="/preview/login_flat_split.jpg" alt="Option 2: Flat Split-Pane Enterprise Layout">
+      </div>
+      <div class="content">
+        <span class="opt-tag">Layout Option 2</span>
+        <h2>Flat Split-Pane Enterprise Layout</h2>
+        <p class="desc">A dual-column flat enterprise layout. The left pane provides flat brand identity, Tacurong City logistics status, and key operational capabilities. The right pane hosts the focused flat authentication form.</p>
+        <div class="specs">
+          <div class="spec-item"><span class="bullet"></span> <strong>Dual-Pane Structure:</strong> 45% Brand briefing panel + 55% Authentication console on wide screens.</div>
+          <div class="spec-item"><span class="bullet"></span> <strong>Responsive Mobile Adaptation:</strong> Collapses seamlessly into single-column flat card on mobile screens.</div>
+          <div class="spec-item"><span class="bullet"></span> <strong>Institutional Tone:</strong> Reinforces operational security and municipal dispatch identity.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="principles-card">
+    <h3>Flat Design Technical Invariants & Surface Hygiene</h3>
+    <div class="principles-grid">
+      <div>
+        <strong>1. Pure Flat Surfaces</strong>
+        No `backdrop-blur`, no `radial-gradient` background blooms, no translucent alpha stacking. All containers use solid hex tokens.
+      </div>
+      <div>
+        <strong>2. Zero Blurred Drop Shadows</strong>
+        All `shadow-2xl`, `shadow-lg`, and `shadow-md` classes removed. Depth is communicated strictly through 1px hairline borders (`border-slate-800`).
+      </div>
+      <div>
+        <strong>3. Flat WCAG AA Controls</strong>
+        Flat inputs with solid `#020617` backgrounds and crisp borders. Flat submit button with solid `#DC2626` (4.83:1 contrast ratio) and zero elevation shadows.
+      </div>
+      <div>
+        <strong>4. Complete Logic Preservation</strong>
+        All 3 stages (Credentials, Profile Setup, OTP), rate-limit cooldowns, session cookies, and mobile-role modals remain 100% intact.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -170,7 +170,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-all shadow-md disabled:opacity-70 cursor-pointer"
+          className="flex-1 py-3 rounded-xl text-white flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] font-semibold text-sm transition-colors disabled:opacity-70 cursor-pointer"
         >
           {isSubmitting ? (
             <>

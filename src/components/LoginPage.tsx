@@ -330,38 +330,22 @@ export default function LoginPage() {
   return (
     <main
       role="main"
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
-      style={{
-        background: "radial-gradient(ellipse at 50% 20%, #162D4A 0%, #0B132B 60%, #070D1B 100%)",
-      }}
+      className="min-h-screen flex items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
-      {/* Subtle Vector Topography Grid Pattern */}
-      <div className="absolute inset-0 pointer-events-none opacity-10">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255, 255, 255, 0.4)" strokeWidth="0.75" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid-pattern)" />
-        </svg>
-      </div>
-
-      {/* Floating Command Glass Console (Layout 2) */}
+      {/* Flat Minimalist Console */}
       <div className="relative w-full max-w-md z-10">
-        <div className="backdrop-blur-xl bg-slate-900/80 border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+        <div className="bg-slate-900 rounded-2xl overflow-hidden">
           
           {/* Header Section */}
           <div className="px-6 pt-8 pb-4 text-center">
-            {/* Red Brand Badge */}
+            {/* Flat Red Brand Badge */}
             <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md mx-auto mb-3"
-              style={{ background: "#E53935" }}
+              className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 bg-[#DC2626]"
             >
               <Bike className="text-white" size={24} strokeWidth={2.4} />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold text-slate-300 tracking-wider uppercase mb-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-slate-800 text-[11px] font-bold text-slate-300 tracking-wider uppercase mb-2">
               SUGO Express
             </div>
 
@@ -418,10 +402,10 @@ export default function LoginPage() {
                   autoComplete="username"
                   autoFocus
                   disabled={isLoading || isCooldownActive}
-                  className={`w-full px-4 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                  className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
                     fieldErrors.email
-                      ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
-                      : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
+                      ? "border border-rose-500 bg-rose-950/30"
+                      : "border border-slate-700 bg-slate-800 focus:border-red-500"
                   }`}
                 />
               </div>
@@ -451,10 +435,10 @@ export default function LoginPage() {
                     placeholder="Enter password"
                     autoComplete="current-password"
                     disabled={isLoading || isCooldownActive}
-                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
                       fieldErrors.password
-                        ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
-                        : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
+                        ? "border border-rose-500 bg-rose-950/30"
+                        : "border border-slate-700 bg-slate-800 focus:border-red-500"
                     }`}
                   />
                   <button
@@ -476,7 +460,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleLogin}
                   disabled={isLoading || isCooldownActive}
-                  className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-all shadow-lg disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700"
                   style={{
                     background: isCooldownActive ? "#475569" : "#DC2626",
                   }}
@@ -518,7 +502,7 @@ export default function LoginPage() {
                   />
                 </div>
               )}
-              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700">
+              <div className="bg-slate-800 rounded-xl p-4">
                 <ProfileSetupStep
                   onSubmit={handleProfileSubmit}
                   onCancel={() => resetToCredentials()}
@@ -543,7 +527,7 @@ export default function LoginPage() {
                   />
                 </div>
               )}
-              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700">
+              <div className="bg-slate-800 rounded-xl p-4">
                 <OtpStep
                   maskedEmail={maskedEmail}
                   expiresAt={challengeExpiresAt}
