@@ -35,13 +35,19 @@
 ---
 
 ## 🧠 Model A (Claude) Blueprint & Directives
-* **Status**: [Claude Ingested 2026-09-11]
+* **Status**: [Claude Synchronized 2026-09-16]
 * **Architectural Decisions**: 
   - Standardized all 4 project workspaces to share the bidirectional handshake protocol.
   - Corrected the locked Prisma schema path to the relocated backend root `C:\Capstone_Server\server`. The previous value pointed at a non-existent `server/` directory inside the web repo.
   - Verified dispatcher component deletions (`DispatcherChatPanel.tsx`, `ReviewErrandModal.tsx`) breach no locked interface: zero live imports remain in `src/`.
+* **Sidebar Alignment Contract (apply to any new sidebar row or footer element)**:
+  - **Expanded (256px)**: Container gutter `px-3` (12px) on Header/Content/Footer; every row box spans 12->243. Icon/chrome axis = 24px (row `px-3`): brand text, group labels (`px-3`), nav icons, footer avatar, Sign Out icon, copyright. Label axis = 50px. Count pills right-align to 231.
+  - **Collapsed (56px, `--sidebar-width-icon: 3.5rem`)**: Container padding `p-2.5` (10px) yields an exact 36px tile column at 10->46, centred on the rail axis (28). Every tile is 36px: logo, trigger, nav buttons (`size-9!`), Sign Out.
+  - **Zero Gap Rule**: Any flex row holding a collapse-hidden label (`w-0 opacity-0`) MUST also carry `group-data-[collapsible=icon]:gap-0`, or the dead gap pushes the icon off-axis.
+  - **Icon Render Rule**: Nav icons render at 16px regardless of the lucide `size` prop (`[&_svg]:size-4` in the SidebarMenuButton cva). Do not size against 17.
 * **Directives for Gemini**:
   - Maintain exact interface compatibility on all frontend components and API endpoints.
+  - Strictly observe the Sidebar Alignment Contract across both Owner and Dispatcher consoles.
   - Treat `C:\Capstone_Project_Web` as frontend-only. All Prisma, Express, and migration work targets `C:\Capstone_Server\server`.
   - Before any `prisma generate`, stop the dev server first. The query-engine DLL is file-locked while it runs and will throw EPERM.
   - Do not run `prisma migrate dev`. The shadow-database replay fails on the 2026-08-20 migration history. Apply new migrations by hand.
@@ -61,16 +67,15 @@
   - `C:\Capstone_Project_Web\src\components\login\OtpStep.tsx` (Added font-mono tabular-nums to expiry/resend countdowns, upgraded disabled contrast to slate-500, added focus-visible rings)
   - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
   - `C:\Capstone_Project_Web\src\components\ui\sidebar.tsx` (Eliminated involuntary hover auto-expansion; desktop sidebar state strictly obeys intentional user actions via SidebarTrigger, SidebarRail, or Ctrl+B shortcut)
-  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Unified single-elevation border without shadow-xl; elevated SidebarGroupLabel and copyright text contrast to WCAG 2.2 AA; added accessible header SidebarTrigger; replaced hardcoded name with session role fallback; added focus-visible rings; hid logo when expanded and centered red bike logo when collapsed)
-  - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Unified theme palette to #0F2035 and Sugo Red bg-red-600 branding; standardized nav items to h-10 40px; replaced gradients/colored shadows with flat design; resolved line 327 [gray-on-color] detector warning; added collapsed-mode telemetry alert pips for Queue, Active, Exceptions, and Riders; chunked navigation into Operations and Communications with disambiguated icons; added workspace header SidebarTrigger; replaced hardcoded name; hid logo when expanded and centered red bike logo when collapsed; hid profile photo/avatar and user details when collapsed)
+  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Sidebar alignment pass: gutter px-3 across sections; row boxes 12->243; icon/chrome axis at 24px; label axis at 50px; collapsed 36px tile column at 10->46 with p-2.5 padding; group-data-[collapsible=icon]:gap-0; trigger/logo size-9; LogOut size-16; copyright px-3 text-left)
+  - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Sidebar alignment pass: gutter px-3 across sections; row boxes 12->243; icon/chrome axis at 24px; label axis at 50px; count pills right-aligned to 231; collapsed 36px tile column at 10->46 with p-2.5 padding; group-data-[collapsible=icon]:gap-0; trigger/logo size-9; LogOut size-16; copyright px-3 text-left)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings (built in 27.60s).
+  - `npm run build` verified with 0 errors / 0 warnings (built in 27.91s).
   - `impeccable detect` verified with 0 anti-patterns across all target files.
   - Impeccable critique snapshots persisted at `.impeccable/critique/2026-09-15T20-46-18Z__src-components-loginpage-tsx.md` and `.impeccable/critique/2026-09-15T21-06-03Z__sidebar.md`.
 * **Notes for Claude**:
-  - Sidebar navigation panel across Owner and Dispatcher consoles fully harmonized into a cohesive Sugo on the Go operations console.
-  - Telemetry blindspot in collapsed mode completely eliminated via high-contrast status pips (Queue = amber, Active = emerald, Exceptions = pulsing red, Fleet = emerald).
-  - Header logo toggle: Red bike icon logo is hidden when expanded (showing text branding + trigger) and displayed centered when collapsed.
-  - Dispatcher footer profile toggle: Profile photo/avatar and credentials are hidden when collapsed, keeping the narrow rail clean with only the Sign Out action button.
+  - Sidebar Alignment Pass fully ingested, verified, and locked in bidirectional memory.
+  - Collapsed 36px tile column (10->46) and expanded axes (12 / 24 / 50 / 70) verified across Owner and Dispatcher portals.
+  - Zero-gap rule (`group-data-[collapsible=icon]:gap-0`) confirmed preventing off-axis icon shift when labels collapse to width 0.
   - Production build in `dist/` is verified and ready for manual user SCP deployment.

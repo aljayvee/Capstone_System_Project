@@ -110,10 +110,10 @@ export default function DispatcherPortal() {
             }
           >
             {/* Header Brand */}
-            <SidebarHeader className="p-3.5 border-b border-white/10 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3 transition-all duration-300">
-              <div className="flex items-center justify-between gap-2 overflow-hidden w-full">
+            <SidebarHeader className="px-3 py-3.5 border-b border-white/10 group-data-[collapsible=icon]:p-2.5 transition-all duration-300">
+              <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:gap-0 overflow-hidden w-full">
                 {/* Expanded Text Branding (Hidden when collapsed) */}
-                <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                <div className="min-w-0 px-3 group-data-[collapsible=icon]:px-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
                   <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
                     SUGO ON THE GO
                   </h2>
@@ -123,21 +123,21 @@ export default function DispatcherPortal() {
                 </div>
 
                 {/* Collapsed Brand Icon Logo (Shown ONLY when collapsed) */}
-                <div className="w-10 h-10 rounded-xl bg-red-600 hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 shadow-xs mx-auto">
+                <div className="size-9 rounded-lg bg-red-600 hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 shadow-xs mx-auto">
                   <BikeIcon size={20} className="text-white" />
                 </div>
 
                 {/* Sidebar Trigger Button */}
                 <SidebarTrigger className="text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg shrink-0 group-data-[collapsible=icon]:hidden focus-visible:ring-2 focus-visible:ring-white/70" />
               </div>
-              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg mx-auto mt-2 focus-visible:ring-2 focus-visible:ring-white/70" />
+              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-9 rounded-lg mx-auto mt-2 focus-visible:ring-2 focus-visible:ring-white/70" />
             </SidebarHeader>
 
             {/* Structured Navigation Groups */}
-            <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-1.5 space-y-4 transition-all duration-300">
+            <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-2.5 space-y-4 transition-all duration-300">
               {/* Operations Group */}
               <SidebarGroup className="p-0 space-y-1">
-                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-2 group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-3 group-data-[collapsible=icon]:hidden">
                   Operations
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -155,7 +155,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <ClipboardList
                               size={17}
@@ -198,7 +198,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <Activity
                               size={17}
@@ -241,7 +241,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <AlertTriangle
                               size={17}
@@ -284,7 +284,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <Bike
                               size={17}
@@ -319,7 +319,7 @@ export default function DispatcherPortal() {
 
               {/* Communications Group */}
               <SidebarGroup className="p-0 space-y-1">
-                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-2 group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-3 group-data-[collapsible=icon]:hidden">
                   Communications
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -337,7 +337,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <MessageSquare
                             size={17}
                             className={`shrink-0 transition-colors ${
@@ -364,7 +364,7 @@ export default function DispatcherPortal() {
                             : "text-slate-300 hover:bg-white/10 hover:text-white"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <MessageCircle
                             size={17}
                             className={`shrink-0 transition-colors ${
@@ -383,12 +383,12 @@ export default function DispatcherPortal() {
             </SidebarContent>
 
             {/* Sidebar User & Logout Footer */}
-            <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-1.5 transition-all duration-300 gap-2">
+            <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2.5 transition-all duration-300 gap-2">
               <button
                 type="button"
                 onClick={() => setActiveTab("profile")}
                 title="Profile & Settings"
-                className={`w-full flex items-center gap-2.5 p-1 rounded-xl transition-colors group-data-[collapsible=icon]:hidden ${
+                className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-xl transition-colors group-data-[collapsible=icon]:hidden ${
                   activeTab === "profile" ? "bg-white/10" : "hover:bg-white/10"
                 } focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none`}
               >
@@ -416,16 +416,16 @@ export default function DispatcherPortal() {
 
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition-colors shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+                className="w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition-colors shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
                 title="Sign Out"
               >
-                <LogOut size={15} className="shrink-0" />
+                <LogOut size={16} className="shrink-0" />
                 <span className="inline-block truncate opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
                   Sign Out
                 </span>
               </button>
 
-              <div className="pt-1 text-center group-data-[collapsible=icon]:hidden">
+              <div className="pt-1 px-3 text-left group-data-[collapsible=icon]:hidden">
                 <p className="text-[10px] text-slate-400 font-medium">
                   &copy; {new Date().getFullYear()} Sugo on the Go
                 </p>
