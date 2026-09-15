@@ -60,11 +60,15 @@
   - `C:\Capstone_Project_Web\src\components\login\ProfileSetupStep.tsx` (Removed em-dashes, upgraded placeholder contrast to slate-400, added caret-red-500 and focus-visible rings)
   - `C:\Capstone_Project_Web\src\components\login\OtpStep.tsx` (Added font-mono tabular-nums to expiry/resend countdowns, upgraded disabled contrast to slate-500, added focus-visible rings)
   - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
+  - `C:\Capstone_Project_Web\src\components\ui\sidebar.tsx` (Eliminated involuntary hover auto-expansion; desktop sidebar state strictly obeys intentional user actions via SidebarTrigger, SidebarRail, or Ctrl+B shortcut)
+  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Unified single-elevation border without shadow-xl; elevated SidebarGroupLabel and copyright text contrast to WCAG 2.2 AA; added accessible header SidebarTrigger; replaced hardcoded name with session role fallback; added focus-visible rings)
+  - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Unified theme palette to #0F2035 and Sugo Red bg-red-600 branding; standardized nav items to h-10 40px; replaced gradients/colored shadows with flat design; resolved line 327 [gray-on-color] detector warning; added collapsed-mode telemetry alert pips for Queue, Active, Exceptions, and Riders; chunked navigation into Operations and Communications with disambiguated icons; added workspace header SidebarTrigger; replaced hardcoded name)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings (built in 27.29s).
-  - Impeccable critique snapshot persisted at `.impeccable/critique/2026-09-15T20-46-18Z__src-components-loginpage-tsx.md`.
+  - `npm run build` verified with 0 errors / 0 warnings (built in 34.72s).
+  - `impeccable detect` verified with 0 anti-patterns across all 3 sidebar target files.
+  - Impeccable critique snapshots persisted at `.impeccable/critique/2026-09-15T20-46-18Z__src-components-loginpage-tsx.md` and `.impeccable/critique/2026-09-15T21-06-03Z__sidebar.md`.
 * **Notes for Claude**:
-  - Web dashboard Core Web Vitals optimized for mobile (critical path JS reduced by >70% on root `/` login route).
-  - Login page converted to pure flat layout and hardened with Impeccable UI/UX standards (sticky error states, full WCAG 2.2 AA contrast, Caps Lock detection, tabular numbers).
-  - Production build in `dist/` is ready for user manual deployment via SCP.
+  - Sidebar navigation panel across Owner and Dispatcher consoles fully harmonized into a cohesive Sugo on the Go operations console.
+  - Telemetry blindspot in collapsed mode completely eliminated via high-contrast status pips (Queue = amber, Active = emerald, Exceptions = pulsing red, Fleet = emerald).
+  - Production build in `dist/` is verified and ready for manual user SCP deployment.

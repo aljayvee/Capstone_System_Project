@@ -223,16 +223,6 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
-      onMouseEnter={() => {
-        if (!isMobile && collapsible === "icon") {
-          setOpen(true)
-        }
-      }}
-      onMouseLeave={() => {
-        if (!isMobile && collapsible === "icon") {
-          setOpen(false)
-        }
-      }}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div

@@ -37,6 +37,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarInset,
+  SidebarTrigger,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -111,7 +113,7 @@ export default function OwnerPortal() {
           {/* Sidebar Navigation - Navy Theme */}
           <Sidebar
             collapsible="icon"
-            className="border-r border-slate-800/20 shadow-xl select-none"
+            className="border-r border-white/10 select-none"
             variant="sidebar"
             style={
               {
@@ -127,27 +129,31 @@ export default function OwnerPortal() {
             }
           >
             {/* Header Brand */}
-            <SidebarHeader className="p-4 border-b border-white/10 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3.5 transition-all duration-300">
-              <div className="flex items-center gap-3 overflow-hidden group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 w-full">
-                <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0 shadow-md">
-                  <BikeIcon size={20} className="text-white" />
+            <SidebarHeader className="p-3.5 border-b border-white/10 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3 transition-all duration-300">
+              <div className="flex items-center justify-between gap-2 overflow-hidden w-full">
+                <div className="flex items-center gap-3 min-w-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:w-full">
+                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0 shadow-xs">
+                    <BikeIcon size={20} className="text-white" />
+                  </div>
+                  <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                    <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
+                      SUGO ON THE GO
+                    </h2>
+                    <p className="text-[10px] text-slate-300/90 font-semibold tracking-wider truncate mt-0.5">
+                      Owner Console • Tacurong
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
-                    OWNER
-                  </h2>
-                  <p className="text-[10px] text-slate-400 font-semibold tracking-wider truncate mt-0.5">
-                    ADMIN PANEL
-                  </p>
-                </div>
+                <SidebarTrigger className="text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg shrink-0 group-data-[collapsible=icon]:hidden focus-visible:ring-2 focus-visible:ring-white/70" />
               </div>
+              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg mx-auto mt-1 focus-visible:ring-2 focus-visible:ring-white/70" />
             </SidebarHeader>
 
             {/* Structured Navigation Groups */}
             <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-1.5 space-y-4 transition-all duration-300">
               {NAV_SECTIONS.map((section, sIdx) => (
                 <SidebarGroup key={section.title} className="p-0 space-y-1">
-                  <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400/70 px-2 group-data-[collapsible=icon]:hidden">
+                  <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-2 group-data-[collapsible=icon]:hidden">
                     {section.title}
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
@@ -165,7 +171,7 @@ export default function OwnerPortal() {
                               size="default"
                               className={`w-full flex items-center justify-start px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                                 isActive
-                                  ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-900/40"
+                                  ? "bg-red-600 text-white font-semibold shadow-xs"
                                   : "text-slate-300 hover:bg-white/10 hover:text-white"
                               }`}
                             >
@@ -194,10 +200,10 @@ export default function OwnerPortal() {
             <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-1.5 transition-all duration-300 gap-2">
               <div className="flex items-center gap-2.5 p-1 min-w-0 group-data-[collapsible=icon]:hidden">
                 <div
-                  className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-md ring-2 ring-white/10"
-                  title={user?.name || "Aljayvee Versola"}
+                  className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs ring-1 ring-white/10"
+                  title={user?.name || "System Administrator"}
                 >
-                  {(user?.name || "Aljayvee Versola")
+                  {(user?.name || "System Administrator")
                     .split(" ")
                     .map((n) => n[0])
                     .join("")
@@ -205,14 +211,14 @@ export default function OwnerPortal() {
                     .toUpperCase()}
                 </div>
                 <div className="min-w-0 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="text-xs font-bold text-white truncate">{user?.name || "Aljayvee Versola"}</p>
-                  <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
+                  <p className="text-xs font-bold text-white truncate">{user?.name || "System Administrator"}</p>
+                  <p className="text-[10px] text-slate-300/80 truncate font-mono">{user?.email || "owner@sugo.ph"}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto"
+                className="w-full flex items-center justify-center gap-2 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition-colors shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
                 title="Sign Out"
               >
                 <LogOut size={15} className="shrink-0" />
@@ -222,11 +228,12 @@ export default function OwnerPortal() {
               </button>
 
               <div className="pt-1 text-center group-data-[collapsible=icon]:hidden">
-                <p className="text-[10px] text-slate-500 font-medium">
+                <p className="text-[10px] text-slate-400 font-medium">
                   &copy; {new Date().getFullYear()} Sugo on the Go
                 </p>
               </div>
             </SidebarFooter>
+            <SidebarRail />
           </Sidebar>
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
@@ -240,7 +247,7 @@ export default function OwnerPortal() {
                 </DialogClose>
               </DialogHeader>
               <DialogDescription>
-                Thank you for your work today, {(user?.name || "Aljayvee Versola").split(" ")[0]}. Are you sure you want to sign out of the Owner Portal? You'll need to log back in to continue managing the system.
+                Thank you for your work today, {(user?.name || "System Administrator").split(" ")[0]}. Are you sure you want to sign out of the Owner Portal? You'll need to log back in to continue managing the system.
               </DialogDescription>
               <DialogFooter className="flex-row gap-3">
                 <button
