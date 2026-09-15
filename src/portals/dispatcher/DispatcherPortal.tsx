@@ -112,22 +112,25 @@ export default function DispatcherPortal() {
             {/* Header Brand */}
             <SidebarHeader className="p-3.5 border-b border-white/10 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:py-3 transition-all duration-300">
               <div className="flex items-center justify-between gap-2 overflow-hidden w-full">
-                <div className="flex items-center gap-3 min-w-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:w-full">
-                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0 shadow-xs">
-                    <BikeIcon size={20} className="text-white" />
-                  </div>
-                  <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                    <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
-                      SUGO ON THE GO
-                    </h2>
-                    <p className="text-[10px] text-slate-300/90 font-semibold tracking-wider truncate mt-0.5">
-                      Dispatcher Console • Tacurong
-                    </p>
-                  </div>
+                {/* Expanded Text Branding (Hidden when collapsed) */}
+                <div className="min-w-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
+                    SUGO ON THE GO
+                  </h2>
+                  <p className="text-[10px] text-slate-300/90 font-semibold tracking-wider truncate mt-0.5">
+                    Dispatcher Console • Tacurong
+                  </p>
                 </div>
+
+                {/* Collapsed Brand Icon Logo (Shown ONLY when collapsed) */}
+                <div className="w-10 h-10 rounded-xl bg-red-600 hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 shadow-xs mx-auto">
+                  <BikeIcon size={20} className="text-white" />
+                </div>
+
+                {/* Sidebar Trigger Button */}
                 <SidebarTrigger className="text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg shrink-0 group-data-[collapsible=icon]:hidden focus-visible:ring-2 focus-visible:ring-white/70" />
               </div>
-              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg mx-auto mt-1 focus-visible:ring-2 focus-visible:ring-white/70" />
+              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg mx-auto mt-2 focus-visible:ring-2 focus-visible:ring-white/70" />
             </SidebarHeader>
 
             {/* Structured Navigation Groups */}
@@ -385,7 +388,7 @@ export default function DispatcherPortal() {
                 type="button"
                 onClick={() => setActiveTab("profile")}
                 title="Profile & Settings"
-                className={`w-full flex items-center gap-2.5 p-1 rounded-xl transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 ${
+                className={`w-full flex items-center gap-2.5 p-1 rounded-xl transition-colors group-data-[collapsible=icon]:hidden ${
                   activeTab === "profile" ? "bg-white/10" : "hover:bg-white/10"
                 } focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none`}
               >

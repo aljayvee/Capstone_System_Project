@@ -61,14 +61,16 @@
   - `C:\Capstone_Project_Web\src\components\login\OtpStep.tsx` (Added font-mono tabular-nums to expiry/resend countdowns, upgraded disabled contrast to slate-500, added focus-visible rings)
   - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
   - `C:\Capstone_Project_Web\src\components\ui\sidebar.tsx` (Eliminated involuntary hover auto-expansion; desktop sidebar state strictly obeys intentional user actions via SidebarTrigger, SidebarRail, or Ctrl+B shortcut)
-  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Unified single-elevation border without shadow-xl; elevated SidebarGroupLabel and copyright text contrast to WCAG 2.2 AA; added accessible header SidebarTrigger; replaced hardcoded name with session role fallback; added focus-visible rings)
-  - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Unified theme palette to #0F2035 and Sugo Red bg-red-600 branding; standardized nav items to h-10 40px; replaced gradients/colored shadows with flat design; resolved line 327 [gray-on-color] detector warning; added collapsed-mode telemetry alert pips for Queue, Active, Exceptions, and Riders; chunked navigation into Operations and Communications with disambiguated icons; added workspace header SidebarTrigger; replaced hardcoded name)
+  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Unified single-elevation border without shadow-xl; elevated SidebarGroupLabel and copyright text contrast to WCAG 2.2 AA; added accessible header SidebarTrigger; replaced hardcoded name with session role fallback; added focus-visible rings; hid logo when expanded and centered red bike logo when collapsed)
+  - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Unified theme palette to #0F2035 and Sugo Red bg-red-600 branding; standardized nav items to h-10 40px; replaced gradients/colored shadows with flat design; resolved line 327 [gray-on-color] detector warning; added collapsed-mode telemetry alert pips for Queue, Active, Exceptions, and Riders; chunked navigation into Operations and Communications with disambiguated icons; added workspace header SidebarTrigger; replaced hardcoded name; hid logo when expanded and centered red bike logo when collapsed; hid profile photo/avatar and user details when collapsed)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings (built in 34.72s).
-  - `impeccable detect` verified with 0 anti-patterns across all 3 sidebar target files.
+  - `npm run build` verified with 0 errors / 0 warnings (built in 27.60s).
+  - `impeccable detect` verified with 0 anti-patterns across all target files.
   - Impeccable critique snapshots persisted at `.impeccable/critique/2026-09-15T20-46-18Z__src-components-loginpage-tsx.md` and `.impeccable/critique/2026-09-15T21-06-03Z__sidebar.md`.
 * **Notes for Claude**:
   - Sidebar navigation panel across Owner and Dispatcher consoles fully harmonized into a cohesive Sugo on the Go operations console.
   - Telemetry blindspot in collapsed mode completely eliminated via high-contrast status pips (Queue = amber, Active = emerald, Exceptions = pulsing red, Fleet = emerald).
+  - Header logo toggle: Red bike icon logo is hidden when expanded (showing text branding + trigger) and displayed centered when collapsed.
+  - Dispatcher footer profile toggle: Profile photo/avatar and credentials are hidden when collapsed, keeping the narrow rail clean with only the Sign Out action button.
   - Production build in `dist/` is verified and ready for manual user SCP deployment.
