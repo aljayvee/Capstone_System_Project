@@ -28,6 +28,9 @@
   - `C:\Capstone_Project_Web\FigmaPrototype\` contains obsolete prototype code and must NEVER be referenced, inspected, or modified.
 * `[LOCKED]` `Flat Design Surface Purity & Zero-Shadow Invariant`:
   - Flat design surfaces (e.g. login portal, flat operator consoles) strictly prohibit `backdrop-blur-*`, radial/ambient gradient blooms, heavy drop shadows (`shadow-2xl`, `shadow-lg`, `shadow-md`, `shadow-sm`), and decorative card hairline borders. Pure solid flat fills only.
+* `[LOCKED]` `Impeccable UI/UX Design System & CLI Installation`:
+  - Installed via `npx impeccable install -y --project` provisioning `.agents/skills/impeccable/`, `.claude/skills/impeccable/`, `.claude/agents/`, and native engine binaries.
+  - All frontend interfaces across Web, CustomerApp, and RiderMobileApp strictly enforce the Impeccable craft floor (contrast >= 4.5:1, tinted neutrals, asymmetric vertical rhythm, browser surface theming, zero nested cards, no identical card grids, and visitor mode classification: Persuade/Experience vs Operate/Read vs Native).
 
 ---
 
