@@ -121,7 +121,14 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         </InputOTP>
 
         <p className="text-[11px] text-slate-400 font-medium">
-          {expired ? "This sign-in expired." : `This sign-in expires in ${formatCountdown(expiresAt - now)}`}
+          {expired ? (
+            "This sign-in expired."
+          ) : (
+            <>
+              This sign-in expires in{" "}
+              <span className="font-mono tabular-nums text-slate-300 font-semibold">{formatCountdown(expiresAt - now)}</span>
+            </>
+          )}
         </p>
       </div>
 
@@ -129,7 +136,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         type="button"
         onClick={() => submit(code)}
         disabled={code.length !== 6 || isSubmitting || expired}
-        className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer"
+        className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
       >
         {isSubmitting ? (
           <>
@@ -145,7 +152,7 @@ export const OtpStep: React.FC<OtpStepProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
+          className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer focus-visible:ring-1 focus-visible:ring-slate-400 rounded px-1"
         >
           Use a different account
         </button>
@@ -154,10 +161,10 @@ export const OtpStep: React.FC<OtpStepProps> = ({
           type="button"
           onClick={() => void onResend()}
           disabled={!canResend}
-          className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition disabled:text-slate-600 disabled:cursor-not-allowed cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-semibold text-red-400 hover:text-red-300 transition disabled:text-slate-500 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-1 focus-visible:ring-red-400 rounded px-1"
         >
           {isResending ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}
-          <span>{resendIn > 0 ? `Resend in ${formatCountdown(resendIn)}` : "Resend code"}</span>
+          <span className="font-mono tabular-nums">{resendIn > 0 ? `Resend in ${formatCountdown(resendIn)}` : "Resend code"}</span>
         </button>
       </div>
     </div>

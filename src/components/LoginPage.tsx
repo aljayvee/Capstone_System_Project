@@ -69,6 +69,7 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [mobileAppRoleAlert, setMobileAppRoleAlert] = useState<string | null>(null);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
 
   const [stage, setStage] = useState<Stage>("CREDENTIALS");
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -214,7 +215,6 @@ export default function LoginPage() {
           variant: "error",
           title: "Invalid Credentials",
           message: response.error || "Unable to connect to authentication server. Please check your credentials.",
-          autoDismissMs: 1500,
         });
         return;
       }
@@ -234,7 +234,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Connection Error",
         message: err.message || "An unexpected error occurred during login.",
-        autoDismissMs: 1500,
       });
     }
   };
@@ -255,7 +254,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Profile Error",
         message: result.error,
-        autoDismissMs: 1500,
       });
       setIsLoading(false);
       return;
@@ -275,7 +273,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Verification Failed",
         message: result.error,
-        autoDismissMs: 1500,
       });
       setIsLoading(false);
       return;
@@ -296,7 +293,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Resend Failed",
         message: result.error,
-        autoDismissMs: 1500,
       });
       if (result.retryAfterSeconds) {
         setResendAvailableAt(Date.now() + result.retryAfterSeconds * 1000);
@@ -320,7 +316,7 @@ export default function LoginPage() {
   };
 
   const headings: Record<Stage, { title: string; description: string }> = {
-    CREDENTIALS: { title: "System Portal", description: "Tacurong City Logistics & Fleet Operations" },
+    CREDENTIALS: { title: "Operations & Dispatch Console", description: "Tacurong City Logistics & Fleet Management" },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
     OTP: { title: "Verify Your Email", description: "Enter the 6-digit verification code sent to your email" },
   };
@@ -333,9 +329,18 @@ export default function LoginPage() {
       className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
       {/* Flat Minimalist Form */}
-      <div className="relative w-full max-w-md z-10 my-auto">
+      <div className="relative w-full max-w-md z-10 my-auto selection:bg-red-950 selection:text-white">
         {/* Header Section */}
-        <div className="pb-6 text-center">
+        <div className="pb-6 text-center pt-2">
+          <div className="flex flex-col items-center justify-center mb-3">
+            <div className="w-11 h-11 rounded-xl bg-[#DC2626] flex items-center justify-center text-white font-black text-sm tracking-wider mb-2 select-none shadow-none">
+              SUGO
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Dispatch Engine Online
+            </div>
+          </div>
           <h1 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
             {headings[stage].title}
           </h1>
@@ -359,7 +364,7 @@ export default function LoginPage() {
                 onAction={activeAlert.onAction}
                 onDismiss={() => setActiveAlert(null)}
                 onCooldownExpire={activeAlert.onCooldownExpire}
-                autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
+                autoDismissMs={activeAlert.autoDismissMs}
               />
             )}
 
@@ -389,7 +394,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 autoFocus
                 disabled={isLoading || isCooldownActive}
-                className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-400 caret-red-500 disabled:opacity-60 ${
                   fieldErrors.email
                     ? "border border-rose-500 bg-rose-950/30"
                     : "border border-slate-700 bg-slate-800 focus:border-red-500"
@@ -400,9 +405,16 @@ export default function LoginPage() {
             {/* Password Input */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                  Password
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                    Password
+                  </label>
+                  {isCapsLockOn && (
+                    <span className="text-amber-400 text-[10px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
+                      Caps Lock ON
+                    </span>
+                  )}
+                </div>
                 {fieldErrors.password && (
                   <span className="text-rose-400 text-[11px] font-medium">
                     {fieldErrors.password}
@@ -419,10 +431,15 @@ export default function LoginPage() {
                     if (activeAlert?.variant === "error") setActiveAlert(null);
                   }}
                   onKeyDown={handleKeyDown}
+                  onKeyUp={(e) => {
+                    if (e.getModifierState) {
+                      setIsCapsLockOn(e.getModifierState("CapsLock"));
+                    }
+                  }}
                   placeholder="Enter password"
                   autoComplete="current-password"
                   disabled={isLoading || isCooldownActive}
-                  className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
+                  className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-400 caret-red-500 disabled:opacity-60 ${
                     fieldErrors.password
                       ? "border border-rose-500 bg-rose-950/30"
                       : "border border-slate-700 bg-slate-800 focus:border-red-500"
@@ -434,7 +451,7 @@ export default function LoginPage() {
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   title={showPassword ? "Hide password" : "Show password"}
                   tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer p-1 rounded focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -447,7 +464,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleLogin}
                 disabled={isLoading || isCooldownActive}
-                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700"
+                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
                 style={{
                   background: isCooldownActive ? "#475569" : "#DC2626",
                 }}
@@ -467,9 +484,19 @@ export default function LoginPage() {
             </div>
 
             {/* Operational Security Footnote */}
-            <div className="pt-2 text-center">
-              <p className="text-[11px] text-slate-500 font-medium">
+            <div className="pt-2 text-center space-y-1">
+              <p className="text-[11px] text-slate-400 font-medium">
                 Authorized dispatch and administrative personnel only
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Rider or Customer?{" "}
+                <button
+                  type="button"
+                  onClick={() => setMobileAppRoleAlert("customer")}
+                  className="text-red-400 hover:text-red-300 font-semibold underline underline-offset-2 transition-colors cursor-pointer"
+                >
+                  Get Mobile App
+                </button>
               </p>
             </div>
           </div>
@@ -485,7 +512,7 @@ export default function LoginPage() {
                   title={activeAlert.title}
                   message={activeAlert.message}
                   onDismiss={() => setActiveAlert(null)}
-                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
+                  autoDismissMs={activeAlert.autoDismissMs}
                 />
               </div>
             )}
@@ -508,7 +535,7 @@ export default function LoginPage() {
                   title={activeAlert.title}
                   message={activeAlert.message}
                   onDismiss={() => setActiveAlert(null)}
-                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
+                  autoDismissMs={activeAlert.autoDismissMs}
                 />
               </div>
             )}
@@ -530,10 +557,10 @@ export default function LoginPage() {
 
       {/* Website Copyright Footer at Bottom Edge */}
       <footer className="w-full pt-6 pb-4 md:absolute md:bottom-4 md:left-0 md:right-0 text-center select-none z-10" role="contentinfo">
-        <p className="text-xs text-slate-500 font-medium tracking-wide">
+        <p className="text-xs text-slate-400 font-medium tracking-wide">
           &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
         </p>
-        <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
+        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
           Tacurong City Logistics &amp; Fleet Operations
         </p>
       </footer>

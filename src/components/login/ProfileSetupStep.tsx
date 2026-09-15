@@ -21,7 +21,7 @@ interface ProfileSetupStepProps {
 type FieldKey = "firstName" | "middleName" | "lastName" | "email";
 
 const fieldClass = (hasError: boolean) =>
-  `w-full px-4 py-3 rounded-xl outline-none border bg-slate-800 text-white placeholder-slate-500 text-sm transition disabled:opacity-60 ${
+  `w-full px-4 py-3 rounded-xl outline-none border bg-slate-800 text-white placeholder-slate-400 caret-red-500 text-sm transition disabled:opacity-60 ${
     hasError
       ? "border-rose-500 bg-rose-950/30"
       : "border-slate-700 focus:border-red-500"
@@ -74,7 +74,7 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         <ShieldCheck size={16} className="text-blue-400 shrink-0 mt-0.5" />
         <p className="text-blue-300 text-xs font-medium leading-relaxed">
           This administrator account is still using its default setup details. Enter your real name and a
-          working email address to continue — we'll send a verification code there next.
+          working email address to continue. We will send a verification code there next.
         </p>
       </div>
 
@@ -152,8 +152,8 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
         {errors.email ? (
           fieldError("email")
         ) : (
-          <p className="mt-1 text-[11px] text-slate-500 font-medium">
-            Use a real inbox you can open now — the verification code goes here.
+          <p className="mt-1 text-[11px] text-slate-400 font-medium">
+            Use an active inbox you can access immediately: the verification code will be sent here.
           </p>
         )}
       </div>
@@ -163,14 +163,14 @@ export const ProfileSetupStep: React.FC<ProfileSetupStepProps> = ({
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          className="px-4 py-3 rounded-xl border border-slate-700 text-slate-300 font-semibold text-sm hover:bg-slate-800 transition disabled:opacity-60 cursor-pointer"
+          className="px-4 py-3 rounded-xl border border-slate-700 text-slate-300 font-semibold text-sm hover:bg-slate-800 transition disabled:opacity-60 cursor-pointer focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:outline-none"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-70 cursor-pointer"
+          className="flex-1 py-3.5 rounded-xl text-white flex items-center justify-center gap-2 bg-[#DC2626] hover:bg-red-700 font-bold text-sm tracking-wide transition-colors disabled:opacity-70 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
         >
           {isSubmitting ? (
             <>

@@ -56,14 +56,15 @@
   - `C:\Capstone_Project_Web\index.html` (Added high-priority preconnect and dns-prefetch hints to api.sugoonthego.online)
   - `C:\Capstone_Project_Web\src\context\AuthContext.tsx` & `src\types\auth.ts` (Decoupled root DOM render blocking from silent refresh; added sugo_session_active cookie guard to prevent false 401 console errors)
   - `C:\Capstone_Project_Web\src\components\ProtectedRoute.tsx` (Handled isInitializing with loading spinner instead of premature redirect)
-  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Removed enclosing card container, bike badge, and pill tag for pure flat login layout; positioned copyright seal at screen bottom edge)
-  - `C:\Capstone_Project_Web\src\components\login\ProfileSetupStep.tsx` & `src\components\login\OtpStep.tsx` (Cohesive flat dark styling for inputs, labels, and buttons directly on canvas)
+  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Converted to pure flat layout; applied Impeccable craft floor: removed vanishing 1.5s errors for sticky error alerts, added Caps Lock detection, Sugo brandmark, live dispatch engine status pill, WCAG AA contrast, caret-red-500, focus-visible rings, and mobile app gateway link)
+  - `C:\Capstone_Project_Web\src\components\login\ProfileSetupStep.tsx` (Removed em-dashes, upgraded placeholder contrast to slate-400, added caret-red-500 and focus-visible rings)
+  - `C:\Capstone_Project_Web\src\components\login\OtpStep.tsx` (Added font-mono tabular-nums to expiry/resend countdowns, upgraded disabled contrast to slate-500, added focus-visible rings)
   - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings (built in 29.46s).
-  - Git commit `d567083`: `style(web): remove card container, bike badge, and pill tag for pure flat login layout`.
+  - `npm run build` verified with 0 errors / 0 warnings (built in 27.29s).
+  - Impeccable critique snapshot persisted at `.impeccable/critique/2026-09-15T20-46-18Z__src-components-loginpage-tsx.md`.
 * **Notes for Claude**:
   - Web dashboard Core Web Vitals optimized for mobile (critical path JS reduced by >70% on root `/` login route).
-  - Login page converted to pure flat layout (no card container, no badge, no pill tag, only text fields, buttons, labels, and bottom copyright seal).
+  - Login page converted to pure flat layout and hardened with Impeccable UI/UX standards (sticky error states, full WCAG 2.2 AA contrast, Caps Lock detection, tabular numbers).
   - Production build in `dist/` is ready for user manual deployment via SCP.
