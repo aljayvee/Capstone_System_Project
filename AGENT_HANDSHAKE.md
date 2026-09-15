@@ -53,17 +53,14 @@
   - `C:\Capstone_Project_Web\index.html` (Added high-priority preconnect and dns-prefetch hints to api.sugoonthego.online)
   - `C:\Capstone_Project_Web\src\context\AuthContext.tsx` & `src\types\auth.ts` (Decoupled root DOM render blocking from silent refresh; added sugo_session_active cookie guard to prevent false 401 console errors)
   - `C:\Capstone_Project_Web\src\components\ProtectedRoute.tsx` (Handled isInitializing with loading spinner instead of premature redirect)
-  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Added aria-label to password toggle, converted root to semantic <main> landmark, elevated submit button contrast to 4.83:1 WCAG AA #DC2626, optimized input transitions)
+  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Removed enclosing card container, bike badge, and pill tag for pure flat login layout; positioned copyright seal at screen bottom edge)
+  - `C:\Capstone_Project_Web\src\components\login\ProfileSetupStep.tsx` & `src\components\login\OtpStep.tsx` (Cohesive flat dark styling for inputs, labels, and buttons directly on canvas)
   - `C:\Capstone_Project_Web\public\llms.txt` (Created standardized H1 llms.txt directory document for 3/3 Agentic Browsing compliance)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings:
-    - Initial entry JS bundle reduced from **1,805.60 kB** to **137.02 kB** (gzip: **44.53 kB**).
-    - Isolated `vendor-utils` (25.59 kB / gzip 8.23 kB) containing `clsx`, `tailwind-merge`, and `class-variance-authority`.
-    - Completely severed `vendor-charts` (392.74 kB) from critical entry path — 0 chart bytes preloaded on `/`!
-    - Portals dynamically isolated (`OwnerPortal`: 271 kB, `DispatcherPortal`: 232 kB, `PlacesDirectoryScreen`: 22 kB).
+  - `npm run build` verified with 0 errors / 0 warnings (built in 29.46s).
+  - Git commit `d567083`: `style(web): remove card container, bike badge, and pill tag for pure flat login layout`.
 * **Notes for Claude**:
-  - Web dashboard Core Web Vitals optimized for mobile (previously throttled by monolithic 1.8 MB bundle and 1.58s element render delay).
-  - Critical path JS reduced by >70% on root `/` login route.
-  - Accessibility elevated to 100/100 (contrast, accessible names, main landmark).
-  - Agentic Browsing elevated to 3/3 (llms.txt with H1 and links, button labels).
+  - Web dashboard Core Web Vitals optimized for mobile (critical path JS reduced by >70% on root `/` login route).
+  - Login page converted to pure flat layout (no card container, no badge, no pill tag, only text fields, buttons, labels, and bottom copyright seal).
+  - Production build in `dist/` is ready for user manual deployment via SCP.
