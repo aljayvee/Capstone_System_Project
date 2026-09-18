@@ -13,17 +13,15 @@ export const ReportNotes: React.FC<{ notes?: string[] }> = ({ notes }) => {
   if (!notes || notes.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+    <section className="rounded-plate border border-edge bg-board-ground p-4">
       <header className="flex items-center gap-1.5 mb-2">
-        <Info size={13} className="text-slate-400" />
-        <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-          How to read this
-        </h4>
+        <Info size={13} className="text-ink-muted" />
+        <h4 className="text-micro uppercase text-ink-muted">How to read this</h4>
       </header>
       <ul className="space-y-1.5">
         {notes.map((note, i) => (
-          <li key={i} className="text-[11px] leading-relaxed text-slate-600 flex gap-2">
-            <span className="text-slate-300 shrink-0">—</span>
+          <li key={i} className="text-label leading-relaxed text-ink-muted flex gap-2">
+            <span aria-hidden className="mt-1.5 size-1 shrink-0 rounded-full bg-ink-muted" />
             <span>{note}</span>
           </li>
         ))}

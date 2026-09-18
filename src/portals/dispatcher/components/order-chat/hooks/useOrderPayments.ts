@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../../../../../services/apiClient";
-import { useInlineMessage } from "../../ui/DispatcherInlineBanner";
+import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 
 /**

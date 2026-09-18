@@ -2,8 +2,25 @@ import * as React from "react";
 import { Loader2, MessageSquare, MapPin, Send, Lock } from "lucide-react";
 import { ChatBubble } from "../../../../../components/chat/ChatBubble";
 import { TypingIndicator } from "../../../../../components/chat/TypingIndicator";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { copy } from "../copy";
 import type { OrderChatMessage } from "../types";
+
+/**
+ * The customer conversation, beside the stages it is about.
+ *
+ * Route board build. This file held the console-wide palette breach: the
+ * customer monogram was `bg-gradient-to-br from-blue-500 to-indigo-600`, which
+ * is a gradient (banned outright) in indigo (not in the palette at all) on the
+ * one element that identifies the person the whole order is for. The monogram
+ * is now painted on the field, which is what every other identity mark on this
+ * surface sits on.
+ *
+ * Three more things went with it. The empty state put a 26px icon inside a
+ * 56px tinted rounded square, which is the icon chip the craft floor refuses.
+ * Presence was emerald text on white at roughly 3.3:1. And five controls
+ * carried `active:scale-95`, so the surface flinched under the pointer.
+ */
 
 interface ConversationPaneProps {
   messages: OrderChatMessage[];
@@ -46,53 +63,54 @@ export function ConversationPane({
 }: ConversationPaneProps) {
   return (
     <>
-      {/* who you're talking to */}
-      <div className="shrink-0 flex items-center gap-2.5 px-3.5 py-2.5 bg-slate-50 border-b border-slate-200">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-black grid place-items-center text-xs shrink-0">
+      {/* who you are talking to */}
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-hairline bg-board-plate px-3 py-2.5">
+        <div
+          data-on-field
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-board-field text-label text-board-plate"
+        >
           {customerName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-extrabold text-slate-800 truncate m-0">{customerName}</p>
+          <p className="m-0 truncate text-label text-ink">{customerName}</p>
           {customerOnline ? (
-            <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 m-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <p className="m-0 flex items-center gap-1.5 text-body text-status-done-ink">
+              <span aria-hidden className="size-1.5 rounded-full bg-status-done-ink" />
               {copy.activeNow}
             </p>
           ) : (
-            <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1 m-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+            <p className="m-0 flex items-center gap-1.5 text-body text-ink-muted">
+              <span aria-hidden className="size-1.5 rounded-full bg-board-trim" />
               {copy.offline}
             </p>
           )}
         </div>
-        <button
+        <DispatcherButton
           type="button"
+          size="sm"
+          variant="secondary"
+          className="shrink-0"
+          icon={<MapPin size={14} />}
           onClick={onViewLocation}
-          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 transition active:scale-95 cursor-pointer"
         >
-          <MapPin size={12} className="text-emerald-600" />
           {copy.dropOff}
-        </button>
+        </DispatcherButton>
       </div>
 
       {/* the thread */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-3 bg-[#F8FAFC]">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-board-ground p-3">
         {isLoading ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs gap-2">
-            <Loader2 size={22} className="animate-spin text-blue-600" />
-            <span>Loading the conversation…</span>
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-ink-muted">
+            <Loader2 size={20} className="animate-spin" />
+            <span className="text-body">Loading the conversation</span>
           </div>
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-2.5">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 grid place-items-center text-blue-600">
-              <MessageSquare size={26} />
-            </div>
-            <p className="text-sm font-extrabold text-slate-800 m-0">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <MessageSquare size={24} className="text-board-trim" />
+            <p className="m-0 text-panel text-ink">
               {copy.emptyFeedTitle(customerFirstName)}
             </p>
-            <p className="text-xs text-slate-500 max-w-xs leading-relaxed m-0">
-              {copy.emptyFeedBody}
-            </p>
+            <p className="m-0 max-w-xs text-body text-ink-muted">{copy.emptyFeedBody}</p>
           </div>
         ) : (
           messages.map((m) => (
@@ -111,19 +129,19 @@ export function ConversationPane({
       </div>
 
       {readOnly ? (
-        <div className="shrink-0 p-3.5 bg-slate-100 border-t border-slate-200 text-center text-xs text-slate-500 font-semibold flex items-center justify-center gap-1.5">
-          <Lock size={13} />
+        <div className="flex shrink-0 items-center justify-center gap-1.5 border-t border-hairline bg-status-closed-fill p-3 text-label text-status-closed-ink">
+          <Lock size={14} />
           {copy.closedConversation}
         </div>
       ) : (
         <>
-          <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-slate-100/90 border-t border-slate-200 overflow-x-auto">
+          <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-t border-hairline bg-board-ground px-3 py-2">
             {copy.quickReplies(customerFirstName).map((chip) => (
               <button
                 key={chip}
                 type="button"
                 onClick={() => onPrefill(chip)}
-                className="shrink-0 bg-white hover:bg-blue-50 hover:text-blue-900 hover:border-blue-300 text-slate-700 text-[11px] px-3 py-1 rounded-full border border-slate-200 font-medium transition active:scale-95 cursor-pointer"
+                className="min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-edge bg-board-plate px-3 text-body text-ink-muted transition-colors hover:border-board-field hover:text-ink"
               >
                 {chip}
               </button>
@@ -132,7 +150,7 @@ export function ConversationPane({
 
           <form
             onSubmit={onSend}
-            className="shrink-0 p-3 bg-white border-t border-slate-200 flex items-end gap-2"
+            className="flex shrink-0 items-end gap-2 border-t border-hairline bg-board-plate p-3"
           >
             <textarea
               ref={composerRef}
@@ -148,13 +166,15 @@ export function ConversationPane({
               onBlur={onStopTyping}
               placeholder={copy.composerPlaceholder(customerFirstName)}
               aria-label={copy.composerPlaceholder(customerFirstName)}
-              className="flex-1 min-w-0 bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-dispatcher-navy/20 focus:border-dispatcher-navy transition resize-none min-h-[42px] max-h-[120px]"
+              // No per-field focus glow: the console has one themed
+              // :focus-visible outline in surfaces.css and this inherits it.
+              className="min-h-10 max-h-[120px] min-w-0 flex-1 resize-none rounded-plate border border-edge bg-board-ground px-3 py-2 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
             />
             <button
               type="submit"
               disabled={!inputText.trim()}
               aria-label={copy.send}
-              className="shrink-0 h-[42px] bg-dispatcher-navy hover:bg-dispatcher-navy-dark disabled:bg-slate-200 disabled:text-slate-500 text-white px-3.5 rounded-xl transition flex items-center gap-1.5 font-bold text-[13px] active:scale-95 disabled:active:scale-100 cursor-pointer disabled:cursor-not-allowed"
+              className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-plate bg-signal px-3 text-label text-white transition-colors hover:bg-signal-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
             >
               <span className="hidden sm:inline">{copy.send}</span>
               <Send size={15} />

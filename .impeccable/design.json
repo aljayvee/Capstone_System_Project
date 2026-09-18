@@ -1,0 +1,512 @@
+{
+  "version": 1,
+  "name": "The Route Board",
+  "surface": "Dispatcher Management Console and Owner Portal",
+  "document": "DESIGN.md",
+  "contract": [
+    ".impeccable/surfaces/src-portals-dispatcher-dispatcherportal-tsx.md",
+    ".impeccable/surfaces/src-portals-owner-ownerportal-tsx.md"
+  ],
+  "seed": "f2716b25",
+  "buildPath": "code",
+  "visitorMode": "operate",
+  "scope": {
+    "includes": [
+      "src/portals/dispatcher/**",
+      "src/portals/owner/**",
+      "src/components/panel/**",
+      "src/components/chat/**",
+      "src/components/NotificationBell.tsx",
+      "src/components/HeaderClock.tsx",
+      "src/lib/statusPresentation.ts",
+      "src/styles/surfaces.css",
+      "src/styles/owner.css"
+    ],
+    "excludes": [
+      "src/portals/dispatcher/DispatcherPortal.tsx#Sidebar",
+      "src/portals/owner/OwnerPortal.tsx#Sidebar"
+    ],
+    "excludeReason": "The navigation rails are excluded by instruction; the dispatcher rail's alignment contract is recorded at AGENT_HANDSHAKE.md:43-47 and every measurement in it is load-bearing. src/components/ui/dialog.tsx is now in scope: its backdrop-blur-xs scrim was removed this round and verified against a dispatcher modal. src/app/routes.tsx carries three temporary unprotected verification routes (/__owner, /__dispatch, /__places) which are removed before commit and are not part of the system."
+  },
+  "tokenHome": "src/styles/tailwind.css",
+  "scopeAttribute": [
+    "data-surface=\"dispatch\"",
+    "data-surface=\"owner\""
+  ],
+  "type": {
+    "family": "Geist Variable",
+    "mono": "Geist Mono Variable",
+    "monoJob": "data and measurement only: money, quantities, timers, route numbers",
+    "italic": "none imported; italic is banned",
+    "floorPx": 12,
+    "maxHeadingWeight": 700,
+    "roles": [
+      {
+        "token": "--text-micro",
+        "px": 12,
+        "weight": 600,
+        "tracking": "0.06em",
+        "use": "uppercase label tier"
+      },
+      {
+        "token": "--text-label",
+        "px": 13,
+        "weight": 600,
+        "use": "secondary reading tier"
+      },
+      {
+        "token": "--text-body",
+        "px": 14,
+        "weight": 400,
+        "use": "prose; the only 400 role"
+      },
+      {
+        "token": "--text-data",
+        "px": 15,
+        "weight": 600,
+        "use": "money, quantities, timers, route numbers; tabular"
+      },
+      {
+        "token": "--text-panel",
+        "px": 17,
+        "weight": 700,
+        "tracking": "-0.01em",
+        "use": "card and stage titles"
+      },
+      {
+        "token": "--text-title",
+        "px": 22,
+        "weight": 700,
+        "tracking": "-0.02em",
+        "use": "surface and panel titles, route-plate destinations"
+      },
+      {
+        "token": "--text-board",
+        "px": 34,
+        "weight": 700,
+        "tracking": "-0.02em",
+        "use": "counts read across a room"
+      }
+    ],
+    "figureAttribute": "data-figure"
+  },
+  "color": {
+    "field": {
+      "--color-board-field": "#0F2035",
+      "--color-board-field-deep": "#0B132B",
+      "--color-board-trim": "#8494A8"
+    },
+    "ground": {
+      "--color-board-ground": "#F2EEE4",
+      "--color-board-plate": "#FFFFFF"
+    },
+    "ink": {
+      "--color-ink": "#16202E",
+      "--color-ink-muted": "#53606F",
+      "levels": 2,
+      "note": "tinted with the field's hue, never dead grey; deliberately no third level"
+    },
+    "signal": {
+      "meaning": "you must act; the primary action and the states that demand a decision, and nothing else",
+      "--color-signal": {
+        "value": "#DC2626",
+        "contrastWhiteOn": "4.83:1"
+      },
+      "--color-signal-deep": {
+        "value": "#C62828",
+        "use": "hover only"
+      },
+      "--color-signal-on-field": {
+        "value": "#FF8A85",
+        "contrastOnNavy": "7.22:1"
+      },
+      "rejected": {
+        "value": "#E53935",
+        "reason": "4.23:1 under white text fails AA at 17px/700; 3.89:1 on navy"
+      }
+    },
+    "status": {
+      "law": "one fill and one ink per meaning; a status may never be carried by colour alone",
+      "module": "src/lib/statusPresentation.ts",
+      "unknownBehaviour": "resolves to neutral, never guessed",
+      "tones": {
+        "waiting": {
+          "fill": "#FBEBC8",
+          "ink": "#7A4A05",
+          "means": "someone else owes the next move"
+        },
+        "moving": {
+          "fill": "#E2E9F2",
+          "ink": "#1E3A5F",
+          "means": "in motion, nothing owed"
+        },
+        "done": {
+          "fill": "#D9F2E5",
+          "ink": "#0B5B42",
+          "means": "finished well"
+        },
+        "closed": {
+          "fill": "#E6E8EB",
+          "ink": "#414B57",
+          "means": "ended without completing"
+        },
+        "act": {
+          "fill": "#FBE0DE",
+          "ink": "#A81E1A",
+          "means": "you must act"
+        }
+      }
+    },
+    "rules": {
+      "--color-hairline": {
+        "value": "rgb(132 148 168 / 0.26)",
+        "use": "rules inside a plate"
+      },
+      "--color-edge": {
+        "value": "rgb(132 148 168 / 0.45)",
+        "use": "a plate's own boundary"
+      },
+      "--color-field-line": {
+        "value": "rgb(255 255 255 / 0.14)",
+        "use": "rules on the navy field"
+      },
+      "invariant": "a surface's boundary is always heavier than any rule inside it"
+    },
+    "banned": [
+      "gradients",
+      "purple",
+      "violet",
+      "indigo",
+      "raw blue",
+      "dead grey neutrals",
+      "emerald outside the done tone"
+    ]
+  },
+  "geometry": {
+    "--radius-plate": "10px",
+    "--radius-trim": "6px",
+    "--radius-modal": "16px",
+    "pillsReservedFor": [
+      "status chips",
+      "numbered markers"
+    ],
+    "reference": "AGENTS.md 8.2"
+  },
+  "elevation": {
+    "steps": 1,
+    "--shadow-plate": "0 1px 2px 0 rgb(15 32 53 / 0.06)",
+    "--shadow-field": {
+      "value": "inset 0 1px 0 0 rgb(255 255 255 / 0.10)",
+      "use": "navy plates only"
+    },
+    "banned": [
+      "backdrop-blur",
+      "shadow-md",
+      "shadow-lg",
+      "shadow-xl",
+      "shadow-2xl",
+      "shadow-inner",
+      "coloured halos"
+    ]
+  },
+  "motion": {
+    "--ease-board": "cubic-bezier(0.2, 0, 0, 1)",
+    "appliedTo": "anything declaring a transition inside the surface",
+    "keyframes": [
+      "fade-in",
+      "scale-up",
+      "typing-dot"
+    ],
+    "reducedMotion": "all three have prefers-reduced-motion overrides",
+    "banned": [
+      "animate-bounce",
+      "active:scale",
+      "entrance choreography"
+    ]
+  },
+  "browserSurfaces": {
+    "file": "src/styles/surfaces.css",
+    "layering": "deliberately unlayered so it outranks Tailwind utilities; the ground and ink declarations sit in @layer base so components can override them",
+    "layeringRule": "anything a component may need to override goes in @layer base; anything meant to outrank utilities stays unlayered, with a comment",
+    "owns": [
+      "focus-visible ring",
+      "::selection",
+      "caret-color",
+      "scrollbars",
+      "tabular figures",
+      "icon stroke",
+      "one transition curve",
+      "on-field inversion of shared chrome"
+    ],
+    "iconStroke": {
+      "value": 1.5,
+      "mechanism": "CSS outranks lucide's presentation attribute",
+      "optOut": "data-stroke"
+    },
+    "scope": "keyed on bare [data-surface] so one rule set serves both skins; every colour in it is a token, and each skin redefines those tokens on its own root. Formerly dispatch.css, scoped to [data-surface=\"dispatch\"], where six of the seven rule groups reached only the portalled overlays because the console root carried data-portal and never data-surface."
+  },
+  "requiredAttributes": {
+    "data-surface": "one of \"dispatch\" or \"owner\", on the surface root AND on any portalled content (dialogs, modals, overlays), which renders at document.body outside it. The value also selects the skin.",
+    "data-on-field": "any subtree painted on the navy field; inverts the focus ring and selection",
+    "data-portal": "the portal shell; carries the icon stroke only",
+    "data-figure": "every numeric span; gets tabular numerals and the correct letterforms",
+    "data-elevate": "Owner skin only: opts one element back into the single shadow step"
+  },
+  "tailwindMerge": {
+    "file": "src/lib/utils.ts",
+    "declared": {
+      "font-size": [
+        "micro",
+        "label",
+        "body",
+        "data",
+        "panel",
+        "title",
+        "board"
+      ],
+      "shadow": [
+        "plate",
+        "field"
+      ],
+      "rounded": [
+        "plate",
+        "trim",
+        "modal"
+      ]
+    },
+    "rule": "every new named text-*, shadow-* or rounded-* role must be declared here",
+    "failureModes": [
+      "an undeclared text-* role is read as a colour, conflicts with a real colour, and is silently dropped",
+      "an undeclared shadow-* or rounded-* role does not conflict, so both classes reach the DOM and stylesheet order decides"
+    ],
+    "detectability": "invisible to tsc, vite build and the design detector; only visible in the live element's classList and computed value"
+  },
+  "primitives": {
+    "root": "src/components/panel/",
+    "PanelShell": {
+      "contract": "three pinned zones and exactly one scroller; owns all viewport math",
+      "header": "board caps title plus an optional figure on the field",
+      "figureUrgent": "spends the signal red; only where the count means someone must act",
+      "stacksUntil": "md",
+      "reference": "AGENTS.md 8.12"
+    },
+    "PanelState": {
+      "contract": "{ isLoading, error, errorBody, isEmpty, hasFilters, onRetry, onResetFilters }",
+      "invariant": "error is ordered before isEmpty, so no code path renders a failure as reassurance",
+      "loading": "skeleton rows shaped like the content, not a centred spinner",
+      "alignment": "top-aligned under the controls, not centred in the scroller",
+      "errorBody": "optional override for the failure sentence, added so a caller cannot accidentally print the same sentence twice"
+    },
+    "Field": {
+      "contract": "render prop receiving { id, aria-describedby, aria-invalid } from useId",
+      "invariant": "cannot be rendered without wiring the label"
+    },
+    "DispatcherCard": {
+      "parts": [
+        "plate",
+        ".Region",
+        ".Label",
+        ".Header"
+      ],
+      "Region": "replaces nested cards: ground change plus macro gap, no second box",
+      "Label": "micro uppercase label plus a hairline to the column edge",
+      "Header": "title left, status right, hairline beneath; no eyebrow, ever",
+      "alias": "PanelCard"
+    },
+    "DispatcherButton": {
+      "variants": [
+        "primary",
+        "field",
+        "secondary",
+        "subtle",
+        "success",
+        "danger-ghost"
+      ],
+      "minTargetPx": 36,
+      "disabled": {
+        "pairing": "bg-status-closed-fill on text-status-closed-ink",
+        "contrast": "6.4:1"
+      },
+      "iconOnly": "aria-label required at the type level"
+    },
+    "DispatcherBadge": {
+      "export": "StatusChip",
+      "note": "the only correct way to render an errand status, in either skin"
+    },
+    "DispatcherInlineBanner": {
+      "note": "the replacement for alert(); both pairings above 4.5:1"
+    },
+    "DispatcherSearchField": {
+      "note": "aria-label required at the type level"
+    },
+    "barrel": "index.ts re-exports portal-neutral aliases (PanelCard, PanelButton, StatusChip, InlineBanner, SearchField) alongside PanelShell, PanelState, Field and ConfirmDialog. New code in either portal imports from there; five files still carry Dispatcher* declared names, which is historical rather than meaningful."
+  },
+  "layout": {
+    "portalRoot": {
+      "value": "h-screen overflow-hidden",
+      "reason": "min-h-screen is a floor, so content scrolled the page and took the pinned header with it"
+    },
+    "masterDetail": {
+      "value": "lg:grid-cols-[38fr_62fr]",
+      "required": "min-w-0 and min-h-0 on both tracks",
+      "reference": "AGENTS.md 8.30"
+    },
+    "belowLg": "a THE BOARD / THE RUN toggle, one pane at a time; never a vertical stack with fixed minimum heights",
+    "overflowCheck": "per element (scrollWidth vs its own clientWidth); the page-level check is vacuous under overflow-hidden"
+  },
+  "honesty": {
+    "principles": [
+      "a failed fetch is not an empty result",
+      "null from an apiService call means the request failed, never that there is nothing to report",
+      "a figure nobody received shows as --, not 0, and the band and the strip must agree",
+      "never invent a number, a name or a status",
+      "rows must add up to the total above them; label an estimate as an estimate",
+      "optimistic writes must be revertible, awaited, and must not clear a composer or close a screen until they succeed",
+      "claim success only after await"
+    ],
+    "fabricationsRemoved": 6,
+    "structuralGuards": [
+      "PanelState error-before-empty",
+      "useOpenExceptions.isConfirmedClear",
+      "statusPresentation unknown-to-neutral"
+    ],
+    "drafts": {
+      "module": "src/portals/dispatcher/lib/useDraft.ts",
+      "tuple": [
+        "value",
+        "update",
+        "clear",
+        "seed"
+      ],
+      "clear": "blanks the box; only for text that has been sent",
+      "forgetDrafts": "drops drafts and leaves the fields alone; for a saved form",
+      "seed": "fills from a fetch only when nothing is half-typed, and never writes to the store",
+      "passwords": "deliberately not drafted"
+    }
+  },
+  "copy": {
+    "banned": [
+      "em dashes",
+      "emoji",
+      "italic"
+    ],
+    "pronouns": "they/them for customers and riders",
+    "errors": "say what failed and what to do, in the product's own words"
+  },
+  "verification": {
+    "testInfrastructure": "none in this repo",
+    "commands": [
+      "npx tsc --noEmit",
+      "npx tsc -p tsconfig.json --noEmit --noUnusedLocals --noUnusedParameters",
+      "npm run build",
+      ".claude/skills/impeccable/scripts/impeccable detect src/portals/dispatcher src/portals/owner src/components/panel src/components/chat"
+    ],
+    "allClean": true,
+    "contrastPairsMeasured": "22 for the dispatch skin, 20 for the owner skin, 0 failures",
+    "screenshots": ".impeccable/review/",
+    "limits": [
+      "the API is unreachable from the development machine (CORS against api.sugo-express.org; the local server answers 401 with stale seed credentials), so no state in either skin has been verified against production records",
+      "all fourteen screenshots in .impeccable/review/ for the Owner Portal are failure or empty states; populated density, table rules and the period-change beat are unverified by any capture",
+      "the order-chat overlay's five stage cards, payment ledger and conversation pane are verified by typecheck and build only",
+      "Chrome's headless window clamps to a 500px minimum on this machine, so the 390px case is measured numerically rather than photographed"
+    ]
+  },
+  "followUps": [
+    "route each panel's primary list through the errand-plate treatment, which the finish review asked for and neither round has done"
+  ],
+  "skins": {
+    "dispatch": {
+      "surface": "Dispatcher Management Console",
+      "root": "src/portals/dispatcher/",
+      "attribute": "data-surface=\"dispatch\"",
+      "tokenHome": "src/styles/tailwind.css",
+      "character": "warm bone ground, enamel-painted steel"
+    },
+    "owner": {
+      "surface": "Owner Portal",
+      "root": "src/portals/owner/",
+      "attribute": "data-surface=\"owner\"",
+      "tokenHome": "src/styles/owner.css",
+      "character": "cool slate ground, a ledger rather than a dashboard",
+      "overrides": "eight colour values and one elevation rule; nothing else",
+      "mechanism": "every token utility compiles to a var() reference, @theme emits its variables into a plain :root,:host rule, and custom properties resolve per element, so a descendant carrying data-surface=\"owner\" that redefines a property overrides it for its whole subtree. :root,:host can never match a div inside <body>, so specificity never arbitrates and no cascade layer is involved. Zero edits to the 51 already-reviewed Dispatcher files.",
+      "inherited": [
+        "the seven type roles and the 12px floor",
+        "the three radii",
+        "the five status tones and the status law",
+        "the signal red (the portal's own red-600 is already #DC2626)",
+        "--ease-board",
+        "the primitives in src/components/panel/",
+        "the honesty layer and the copy rules"
+      ],
+      "color": {
+        "field": {
+          "--color-board-field": "#1E3A5F",
+          "--color-board-field-deep": "#162D4A",
+          "--color-board-trim": "#98A7BB",
+          "navyOrder": "rail #0F2035, field-deep #162D4A, field #1E3A5F, darkest first",
+          "trimNote": "NOT slate-400. #94A3B8 on #1E3A5F measures 4.49:1 and fails AA for normal text by one hundredth, and PanelShell sets its figure label in text-board-trim at 12px. #98A7BB measures 4.70:1 as text on the field and 2.23:1 as a scrollbar thumb on the ground, where the floor is 3:1 for component identification rather than 4.5:1 for text."
+        },
+        "ground": {
+          "--color-board-ground": "#F1F5F9",
+          "--color-board-plate": "#FFFFFF",
+          "note": "slate-100, not the slate-50 the portal shipped: with no shadows, a white plate on #F8FAFC is a 1.5% luminance step and effectively invisible."
+        },
+        "ink": {
+          "--color-ink": "#0F172A",
+          "--color-ink-muted": "#475569",
+          "levels": 2,
+          "note": "16.3:1 and 6.9:1 on the ground. Deliberately no third level: the portal shipped text-slate-400 on light grounds 142 times at 2.83:1, and a third lighter level is how 2.83:1 returns."
+        },
+        "rules": {
+          "--color-hairline": "rgb(100 116 139 / 0.22)",
+          "--color-edge": "rgb(100 116 139 / 0.40)",
+          "invariant": "a plate's own boundary is always heavier than any rule inside it; a plate's edge is structural and stays, a hairline ring added for looks does not"
+        }
+      },
+      "elevation": {
+        "steps": 0,
+        "basis": "AGENT_HANDSHAKE.md [LOCKED] Flat Design Surface Purity and Zero-Shadow",
+        "structureCarriedBy": [
+          "a ground change",
+          "a macro-gap",
+          "one boundary rule"
+        ],
+        "mechanism": "shadow-plate does NOT compile to var(--shadow-plate); Tailwind emits --tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, #0f20350f), resolving the colour at build time. The skin cannot retire it by redefining a token, so owner.css sets the same variable Tailwind composes from, which is what shadow-none does. Rings and inset rings compose separately, so a focus ring still lands.",
+        "status": "GUARD, not a repair: no Owner file imports PanelCard/DispatcherCard today and no Owner screen passes a figure, so neither shadow currently renders here. The rule exists because adopting the shared card primitive is the obvious next refactor, at which point every white plate would quietly acquire a drop shadow with nothing failing.",
+        "optIn": {
+          "attribute": "data-elevate",
+          "count": 3,
+          "where": "the notification popover, and two map controls plus the name tag floating over map imagery"
+        }
+      },
+      "contrast": {
+        "pairsMeasured": 20,
+        "failures": 0,
+        "tightest": [
+          "board-trim on the field 4.70:1",
+          "white on signal 4.83:1"
+        ],
+        "statusFills": "roughly 1.2:1 against a plate, and correct: the fill is not the indicator. The status law forbids colour-alone encoding, so every tone pairs with a label and a CSS-drawn mark. Do not darken a fill to 'fix' this."
+      },
+      "conventions": [
+        "every rendered count routes through one unknown-judgement per screen (fig(), countsUnknown, or a guarded helper), so a screen cannot hold two answers to one question; a count nobody received is a dash, never a zero",
+        "two glyphs for two absences, each carrying a title saying which: an ellipsis means still arriving, an em dash means never arrived",
+        "StandingFigures is the portal's single device for stating a live figure: one navy plate divided by column rules, adopted by the dashboard (3), Tracking (4) and Riders (3)",
+        "OwnerPanelShell sets the page h1 once, with no header card and no tinted icon chip; the boundary under the pinned zone is a rule, not a box",
+        "OwnerTabs implements the WAI-ARIA tabs pattern with a roving tabindex, no shadow and no rounded-full pill; a two-state toggle uses aria-pressed inside role=group instead",
+        "a period change clears its data in the same beat, so no figure is held over from another period under a new heading"
+      ],
+      "notCanonized": [
+        "10 of roughly 50 form controls are label-wired, all ten in ServiceRatesModule; aria-describedby and aria-invalid are 0 portal-wide. The shared Field primitive is the destination.",
+        "five hand-rolled overlays still lack role=dialog, a focus trap and Escape (MerchantCategoryModule, PlacesTab, AddUserModal, EditUserModal twice) while ConfirmDialog is built and in use",
+        "one header TREATMENT on eight screens but one header COMPONENT on five; Users, Merchants and Tracking keep their own header row, giving four mounts of HeaderClock/NotificationBell rather than one",
+        "two placeholder spellings coexist: the em dash / ellipsis pair on the dashboard and StandingFigures, and the older -- on Users, Tracking and Places. The two-glyph convention is the rule; the -- sites are unconverted, not a second sanctioned form."
+      ]
+    }
+  },
+  "followUpsClosed": [
+    "run /impeccable adapt on the Owner portal (done: it is the owner skin, and it no longer keeps 16px card radii or 2px icons)",
+    "decide whether src/components/ui/dialog.tsx should lose backdrop-blur-xs on its scrim (done: removed, verified against a dispatcher modal)"
+  ]
+}

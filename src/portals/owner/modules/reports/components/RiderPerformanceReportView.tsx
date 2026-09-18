@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ReportState } from "./ReportState";
 import { Star, Bike, Timer, Target, Wallet, ChevronRight } from "lucide-react";
 import { MetricCard } from "../../dashboard/components/MetricCard";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
@@ -21,7 +22,7 @@ import { formatPeso } from "../../../../../utils/format";
  * system never filled in.
  */
 const Absent: React.FC<{ why: string }> = ({ why }) => (
-  <span className="text-slate-300 cursor-help" title={why}>
+  <span className="text-ink-muted cursor-help" title={why}>
     —
   </span>
 );
@@ -49,9 +50,9 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; context?: string }
   context,
 }) => (
   <div className="min-w-0">
-    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-    <p className="text-sm font-bold text-slate-800 tabular-nums">{value}</p>
-    {context && <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{context}</p>}
+    <p className="text-micro uppercase text-ink-muted">{label}</p>
+    <p className="text-label text-ink tabular-nums">{value}</p>
+    {context && <p className="text-label text-ink-muted leading-tight mt-0.5">{context}</p>}
   </div>
 );
 
@@ -59,21 +60,25 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
   const { throughput: t, reliability: r, earnings: e, quality: q } = rider;
 
   return (
-    <div className="bg-slate-50/80 border-t border-slate-100 px-5 py-4 space-y-4">
+    <div className="bg-board-ground border-t border-hairline px-5 py-4 space-y-4">
       <div>
-        <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
-          Throughput
-        </h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Throughput</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat label="Completed" value={t.completedCount} />
           <Stat
             label="Accepted to delivered"
-            value={mins(t.avgDeliveryMinutes, "No errand in this period recorded both an accept and a delivery time.")}
+            value={mins(
+              t.avgDeliveryMinutes,
+              "No errand in this period recorded both an accept and a delivery time.",
+            )}
             context={t.deliveryTimedCount > 0 ? `over ${t.deliveryTimedCount} errands` : undefined}
           />
           <Stat
             label="Assigned to accepted"
-            value={mins(t.avgAcceptMinutes, "No errand in this period recorded both an assign and an accept time.")}
+            value={mins(
+              t.avgAcceptMinutes,
+              "No errand in this period recorded both an assign and an accept time.",
+            )}
             context={t.acceptTimedCount > 0 ? `over ${t.acceptTimedCount} errands` : undefined}
           />
           <Stat
@@ -91,9 +96,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
       </div>
 
       <div>
-        <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
-          Reliability
-        </h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Reliability</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
             label="On time"
@@ -108,7 +111,9 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
           <Stat
             label="Cancelled"
             value={pct(r.cancellationRate, "No errand reached this rider in this period.")}
-            context={r.reachedCount > 0 ? `${r.cancelledCount} of ${r.reachedCount} reached` : undefined}
+            context={
+              r.reachedCount > 0 ? `${r.cancelledCount} of ${r.reachedCount} reached` : undefined
+            }
           />
           <Stat label="Signal drops" value={r.connectivityDrops} />
           <Stat
@@ -120,9 +125,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
       </div>
 
       <div>
-        <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
-          Earnings and cash
-        </h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Earnings and cash</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
             label="Earned"
@@ -132,7 +135,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
           <Stat
             label="Cash variance"
             value={
-              <span className={e.settlementVarianceTotal < 0 ? "text-rose-700" : undefined}>
+              <span className={e.settlementVarianceTotal < 0 ? "text-status-act-ink" : undefined}>
                 {formatPeso(e.settlementVarianceTotal)}
               </span>
             }
@@ -144,9 +147,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
       </div>
 
       <div>
-        <h5 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
-          Service quality
-        </h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Service quality</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
             label="Rating (all time)"
@@ -155,7 +156,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
                 <Absent why="No customer has rated this rider yet." />
               ) : (
                 <span className="inline-flex items-center gap-1">
-                  <Star size={12} className="text-amber-400 fill-amber-400" />
+                  <Star size={12} className="text-status-waiting-ink fill-amber-400" />
                   {q.averageRatingAllTime.toFixed(1)}
                 </span>
               )
@@ -172,7 +173,9 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
                 q.exceptionRate.toFixed(2)
               )
             }
-            context={q.exceptionErrandCount > 0 ? `over ${q.exceptionErrandCount} errands` : undefined}
+            context={
+              q.exceptionErrandCount > 0 ? `over ${q.exceptionErrandCount} errands` : undefined
+            }
           />
           <Stat label="At risk" value={formatPeso(q.exceptionsAtRisk)} />
         </div>
@@ -190,7 +193,10 @@ export const RiderPerformanceReportView: React.FC = () => {
   const [group, setGroup] = useState<MetricGroup>("all");
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  const { data, isLoading, error } = useReport(apiService.getRiderPerformanceReport, apiRange);
+  const { data, isLoading, error, reload } = useReport(
+    apiService.getRiderPerformanceReport,
+    apiRange,
+  );
   const pdf = useReportPdf("rider-performance", apiRange);
 
   const handleExportCSV = () => {
@@ -226,7 +232,7 @@ export const RiderPerformanceReportView: React.FC = () => {
         r.quality.averageRatingAllTime ?? "",
         r.quality.ratingCountAllTime,
         r.quality.exceptionCount,
-      ])
+      ]),
     );
   };
 
@@ -247,13 +253,17 @@ export const RiderPerformanceReportView: React.FC = () => {
         exportDisabled={!data}
         isGeneratingPdf={pdf.isGenerating}
       />
-
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      {isLoading && <p className="text-xs text-slate-400">Loading rider performance report...</p>}
+      <ReportState
+        isLoading={isLoading}
+        error={error}
+        onRetry={reload}
+        title="The rider performance report did not load"
+        loadingRows={6}
+      />
 
       {data && (
         <>
-          <p className="text-xs text-slate-500 font-semibold">{data.rangeLabel}</p>
+          <p className="text-label text-ink-muted">{data.rangeLabel}</p>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
@@ -261,46 +271,50 @@ export const RiderPerformanceReportView: React.FC = () => {
               value={String(data.fleet.completedCount)}
               sub={`${data.fleet.riderCount} riders`}
               icon={Bike}
-              color="#1E3A5F"
             />
             <MetricCard
               title="Avg Delivery Time"
-              value={data.fleet.avgDeliveryMinutes === null ? "—" : `${data.fleet.avgDeliveryMinutes.toFixed(1)} min`}
+              value={
+                data.fleet.avgDeliveryMinutes === null
+                  ? "--"
+                  : `${data.fleet.avgDeliveryMinutes.toFixed(1)} min`
+              }
               sub={
                 data.fleet.deliveryTimedCount > 0
                   ? `over ${data.fleet.deliveryTimedCount} timed errands`
                   : "no timed errands"
               }
               icon={Timer}
-              color="#0EA5E9"
             />
             <MetricCard
               title="On-Time Rate"
-              value={data.fleet.onTimeRate === null ? "—" : `${(data.fleet.onTimeRate * 100).toFixed(1)}%`}
+              value={
+                data.fleet.onTimeRate === null
+                  ? "--"
+                  : `${(data.fleet.onTimeRate * 100).toFixed(1)}%`
+              }
               sub={
                 data.fleet.onTimeDenominator > 0
                   ? `over ${data.fleet.onTimeDenominator} with an ETA`
                   : "no errand carried an ETA"
               }
               icon={Target}
-              color="#10B981"
             />
             <MetricCard
               title="Rider Earnings"
               value={formatPeso(data.fleet.riderShareEarned)}
               sub={`${formatPeso(data.fleet.settlementVarianceTotal)} cash variance`}
               icon={Wallet}
-              color="#8B5CF6"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl w-fit">
+          <div className="flex items-center gap-1.5 flex-wrap bg-board-ground p-1 rounded-plate w-fit">
             {GROUPS.map((g) => (
               <button
                 key={g.id}
                 onClick={() => setGroup(g.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  group === g.id ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+                className={`px-3 py-1.5 rounded-trim text-label transition ${
+                  group === g.id ? "bg-board-plate text-ink" : "text-ink-muted hover:text-ink"
                 }`}
               >
                 {g.label}
@@ -309,42 +323,65 @@ export const RiderPerformanceReportView: React.FC = () => {
           </div>
 
           {data.riders.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center text-sm text-slate-400">
+            <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
               No riders on record.
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 text-slate-500">
+                <table className="w-full text-label">
+                  <thead className="bg-board-ground text-ink-muted">
                     <tr>
-                      <th className="text-left px-5 py-2 font-semibold">Rider</th>
+                      <th scope="col" className="text-left px-5 py-2 font-semibold">
+                        Rider
+                      </th>
                       {showThroughput && (
                         <>
-                          <th className="text-right px-4 py-2 font-semibold">Completed</th>
-                          <th className="text-right px-4 py-2 font-semibold">Avg delivery</th>
-                          <th className="text-right px-4 py-2 font-semibold">Per active hr</th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Completed
+                          </th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Avg delivery
+                          </th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Per active hr
+                          </th>
                         </>
                       )}
                       {showReliability && (
                         <>
-                          <th className="text-right px-4 py-2 font-semibold">On time</th>
-                          <th className="text-right px-4 py-2 font-semibold">Cancelled</th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            On time
+                          </th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Cancelled
+                          </th>
                         </>
                       )}
                       {showEarnings && (
                         <>
-                          <th className="text-right px-4 py-2 font-semibold">Earned</th>
-                          <th className="text-right px-4 py-2 font-semibold">Cash variance</th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Earned
+                          </th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Cash variance
+                          </th>
                         </>
                       )}
                       {showQuality && (
                         <>
-                          <th className="text-right px-4 py-2 font-semibold">Rating</th>
-                          <th className="text-right px-4 py-2 font-semibold">Exceptions</th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Rating
+                          </th>
+                          <th scope="col" className="text-right px-4 py-2 font-semibold">
+                            Exceptions
+                          </th>
                         </>
                       )}
-                      <th className="w-8" />
+                      {/* Was an empty <th> with no content and no label. */}
+                      <th scope="col" className="w-8">
+                        <span className="sr-only">Show breakdown</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -352,11 +389,13 @@ export const RiderPerformanceReportView: React.FC = () => {
                       const isOpen = expanded === r.riderId;
                       return (
                         <React.Fragment key={r.riderId}>
-                          <tr
-                            className="border-t border-slate-100 hover:bg-slate-50/60 cursor-pointer"
-                            onClick={() => setExpanded(isOpen ? null : r.riderId)}
-                          >
-                            <td className="px-5 py-2.5 font-semibold text-slate-800">{r.name}</td>
+                          {/* The <tr> was the control: cursor-pointer and an
+                              onClick, with no tabIndex, role or key handler, so
+                              expanding a rider's detail was mouse-only. The
+                              chevron cell now holds a real button and the row
+                              is just a row. */}
+                          <tr className="border-t border-hairline hover:bg-board-ground">
+                            <td className="px-5 py-2.5 font-semibold text-ink">{r.name}</td>
                             {showThroughput && (
                               <>
                                 <td className="px-4 py-2.5 text-right font-mono tabular-nums">
@@ -365,7 +404,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                   {mins(
                                     r.throughput.avgDeliveryMinutes,
-                                    "No errand in this period recorded both an accept and a delivery time."
+                                    "No errand in this period recorded both an accept and a delivery time.",
                                   )}
                                 </td>
                                 <td className="px-4 py-2.5 text-right font-mono tabular-nums">
@@ -382,10 +421,10 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                   {pct(
                                     r.reliability.onTimeRate,
-                                    "No errand in this period carried an ETA to measure against."
+                                    "No errand in this period carried an ETA to measure against.",
                                   )}
                                   {r.reliability.onTimeDenominator > 0 && (
-                                    <span className="ml-1 text-[10px] text-slate-400">
+                                    <span className="ml-1 text-label text-ink-muted">
                                       ({r.reliability.onTimeDenominator})
                                     </span>
                                   )}
@@ -393,7 +432,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                   {pct(
                                     r.reliability.cancellationRate,
-                                    "No errand reached this rider in this period."
+                                    "No errand reached this rider in this period.",
                                   )}
                                 </td>
                               </>
@@ -405,7 +444,9 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 </td>
                                 <td
                                   className={`px-4 py-2.5 text-right font-mono tabular-nums ${
-                                    r.earnings.settlementVarianceTotal < 0 ? "text-rose-700 font-semibold" : ""
+                                    r.earnings.settlementVarianceTotal < 0
+                                      ? "text-status-act-ink font-semibold"
+                                      : ""
                                   }`}
                                 >
                                   {formatPeso(r.earnings.settlementVarianceTotal)}
@@ -419,9 +460,12 @@ export const RiderPerformanceReportView: React.FC = () => {
                                     <Absent why="No customer has rated this rider yet." />
                                   ) : (
                                     <span className="inline-flex items-center gap-1">
-                                      <Star size={11} className="text-amber-400 fill-amber-400" />
+                                      <Star
+                                        size={11}
+                                        className="text-status-waiting-ink fill-amber-400"
+                                      />
                                       {r.quality.averageRatingAllTime.toFixed(1)}
-                                      <span className="text-[10px] text-slate-400">
+                                      <span className="text-label text-ink-muted">
                                         ({r.quality.ratingCountAllTime})
                                       </span>
                                     </span>
@@ -432,11 +476,19 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 </td>
                               </>
                             )}
-                            <td className="px-2 py-2.5 text-slate-300">
-                              <ChevronRight
-                                size={14}
-                                className={`transition-transform ${isOpen ? "rotate-90" : ""}`}
-                              />
+                            <td className="px-2 py-2.5 text-ink-muted">
+                              <button
+                                type="button"
+                                onClick={() => setExpanded(isOpen ? null : r.riderId)}
+                                aria-expanded={isOpen}
+                                aria-label={`${isOpen ? "Hide" : "Show"} the breakdown for ${r.name}`}
+                                className="grid size-7 place-items-center rounded-trim transition-colors hover:bg-board-ground"
+                              >
+                                <ChevronRight
+                                  size={14}
+                                  className={`transition-transform ${isOpen ? "rotate-90" : ""}`}
+                                />
+                              </button>
                             </td>
                           </tr>
                           {isOpen && (
@@ -469,29 +521,39 @@ export const RiderPerformanceReportView: React.FC = () => {
         generateError={pdf.error}
       >
         {data && (
-          <table className="w-full text-xs">
+          <table className="w-full text-label">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-100">
-                <th className="py-2">Rider</th>
-                <th className="py-2 text-right">Completed</th>
-                <th className="py-2 text-right">Avg delivery</th>
-                <th className="py-2 text-right">On time</th>
-                <th className="py-2 text-right">Earned</th>
+              <tr className="text-left text-ink-muted border-b border-hairline">
+                <th scope="col" className="py-2">
+                  Rider
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Completed
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Avg delivery
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  On time
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Earned
+                </th>
               </tr>
             </thead>
             <tbody>
               {data.riders.map((r) => (
-                <tr key={r.riderId} className="border-b border-slate-50">
-                  <td className="py-2 font-semibold text-slate-700">{r.name}</td>
+                <tr key={r.riderId} className="border-b border-hairline">
+                  <td className="py-2 font-semibold text-ink">{r.name}</td>
                   <td className="py-2 text-right">{r.throughput.completedCount}</td>
                   <td className="py-2 text-right">
                     {r.throughput.avgDeliveryMinutes === null
-                      ? "—"
+                      ? "--"
                       : `${r.throughput.avgDeliveryMinutes.toFixed(1)} min`}
                   </td>
                   <td className="py-2 text-right">
                     {r.reliability.onTimeRate === null
-                      ? "—"
+                      ? "--"
                       : `${(r.reliability.onTimeRate * 100).toFixed(0)}% (${r.reliability.onTimeDenominator})`}
                   </td>
                   <td className="py-2 text-right">{formatPeso(r.earnings.riderShareEarned)}</td>

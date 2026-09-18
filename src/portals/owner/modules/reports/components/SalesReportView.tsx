@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { TrendingUp, ShoppingBag, Store } from "lucide-react";
+import { ReportState } from "./ReportState";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { MetricCard } from "../../dashboard/components/MetricCard";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
@@ -19,7 +18,7 @@ export const SalesReportView: React.FC = () => {
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { data, isLoading, error } = useReport(apiService.getSalesReport, apiRange);
+  const { data, isLoading, error, reload } = useReport(apiService.getSalesReport, apiRange);
   const pdf = useReportPdf("sales", apiRange);
 
   // Retained and still wired, though the button that calls it is hidden — see
@@ -28,8 +27,22 @@ export const SalesReportView: React.FC = () => {
     if (!data) return;
     downloadCSV(
       `Sugo_Sales_Report_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
-      ["Category", "Orders", "Item Cost (PHP)", "Delivery Fees (PHP)", "Tips (PHP)", "Revenue (PHP)"],
-      data.byCategory.map((c) => [c.category, c.orderCount, c.itemCost, c.deliveryFee, c.tip, c.revenue])
+      [
+        "Category",
+        "Orders",
+        "Item Cost (PHP)",
+        "Delivery Fees (PHP)",
+        "Tips (PHP)",
+        "Revenue (PHP)",
+      ],
+      data.byCategory.map((c) => [
+        c.category,
+        c.orderCount,
+        c.itemCost,
+        c.deliveryFee,
+        c.tip,
+        c.revenue,
+      ]),
     );
   };
 
@@ -45,103 +58,117 @@ export const SalesReportView: React.FC = () => {
         exportDisabled={!data}
         isGeneratingPdf={pdf.isGenerating}
       />
-
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      {isLoading && <p className="text-xs text-slate-400">Loading sales report...</p>}
+      <ReportState
+        isLoading={isLoading}
+        error={error}
+        onRetry={reload}
+        title="The sales report did not load"
+        loadingRows={5}
+      />
 
       {data && (
         <>
-          <p className="text-xs text-slate-500 font-semibold">{data.rangeLabel}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <MetricCard
-              title="Total Revenue"
-              value={formatPeso(data.totalRevenue)}
-              sub={data.rangeLabel}
-              icon={TrendingUp}
-              color="#1E3A5F"
-            />
-            <MetricCard
-              title="Total Orders"
-              value={String(data.totalOrders)}
-              sub="Errands placed"
-              icon={ShoppingBag}
-              color="#10B981"
-            />
-            <MetricCard
-              title="Merchant Categories"
-              value={String(data.byCategory.length)}
-              sub="With sales this period"
-              icon={Store}
-              color="#8B5CF6"
-            />
-          </div>
+          {/* The three tiles that opened this report stated Total Revenue,
+              Total Orders and a count of categories - and BOTH tables below
+              already end in a bold Total row carrying the first two, so those
+              figures printed three times on one screen. The third was the
+              length of the list immediately underneath it. A row of figure
+              plates above a table that computes the same totals is the
+              arrangement this redesign refuses; the totals belong to the
+              tables that add them up. */}
+          <p className="text-label text-ink-muted">{data.rangeLabel}</p>
 
           {data.byCategory.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center text-sm text-slate-400">
+            <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
               No sales recorded for this period.
             </div>
           ) : (
             <>
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+              <div className="bg-board-plate border border-edge rounded-plate p-6">
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={data.byCategory}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-hairline)" />
                     <XAxis
                       dataKey="category"
-                      tick={{ fontSize: 10, fill: "#64748B" }}
+                      tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }}
                       interval={0}
                       height={50}
                       angle={-12}
                       textAnchor="end"
                     />
-                    <YAxis tick={{ fontSize: 11, fill: "#64748B" }} />
+                    <YAxis tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }} />
                     <Tooltip formatter={(v: number) => [formatPeso(v), "Revenue"]} />
-                    <Bar dataKey="revenue" name="Revenue" fill="#1E3A5F" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="revenue"
+                      name="Revenue"
+                      fill="var(--color-board-field)"
+                      radius={[4, 4, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-slate-500">
+                  <table className="w-full text-label">
+                    <thead className="bg-board-ground text-ink-muted">
                       <tr>
-                        <th className="text-left px-5 py-2 font-semibold">Merchant category</th>
-                        <th className="text-right px-5 py-2 font-semibold">Orders</th>
-                        <th className="text-right px-5 py-2 font-semibold">Item cost</th>
-                        <th className="text-right px-5 py-2 font-semibold">Delivery fees</th>
-                        <th className="text-right px-5 py-2 font-semibold">Tips</th>
-                        <th className="text-right px-5 py-2 font-semibold">Revenue</th>
+                        <th scope="col" className="text-left px-5 py-2 font-semibold">
+                          Merchant category
+                        </th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">
+                          Orders
+                        </th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">
+                          Item cost
+                        </th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">
+                          Delivery fees
+                        </th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">
+                          Tips
+                        </th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">
+                          Revenue
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.byCategory.map((c) => (
-                        <tr key={c.category} className="border-t border-slate-100">
-                          <td className="px-5 py-2.5 font-semibold text-slate-800">
+                        <tr key={c.category} className="border-t border-hairline">
+                          <td className="px-5 py-2.5 font-semibold text-ink">
                             {c.category}
                             {c.touchedOrderCount > c.orderCount && (
                               <span
-                                className="ml-1.5 text-[10px] font-medium text-slate-400"
+                                className="ml-1.5 text-body text-ink-muted"
                                 title={`${c.touchedOrderCount} errands touched this category; ${c.orderCount} are counted here, each errand counting once in the category holding most of its money.`}
                               >
                                 touched by {c.touchedOrderCount}
                               </span>
                             )}
                           </td>
-                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">{c.orderCount}</td>
-                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(c.itemCost)}</td>
+                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                            {c.orderCount}
+                          </td>
+                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                            {formatPeso(c.itemCost)}
+                          </td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                             {formatPeso(c.deliveryFee)}
                           </td>
-                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(c.tip)}</td>
+                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                            {formatPeso(c.tip)}
+                          </td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold">
                             {formatPeso(c.revenue)}
                           </td>
                         </tr>
                       ))}
-                      <tr className="border-t-2 border-slate-200 font-bold text-slate-900">
+                      <tr className="border-t-2 border-edge font-bold text-ink">
                         <td className="px-5 py-2.5">Total</td>
-                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">{data.totalOrders}</td>
+                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                          {data.totalOrders}
+                        </td>
                         <td colSpan={3} />
                         <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                           {formatPeso(data.totalRevenue)}
@@ -155,13 +182,13 @@ export const SalesReportView: React.FC = () => {
               {/* Surfaced rather than asserted internally: if the allocation ever
                   stops reconciling, it shows up here instead of in an audit. */}
               {data.reconciliation.difference === 0 ? (
-                <p className="text-[11px] text-emerald-700 font-medium">
+                <p className="text-body text-status-done-ink">
                   Category revenue reconciles exactly to the total above.
                 </p>
               ) : (
-                <p className="text-xs text-rose-700 font-semibold" role="alert">
-                  Category revenue is out by {formatPeso(data.reconciliation.difference)} against the total.
-                  Treat this report as provisional.
+                <p className="text-label text-status-act-ink" role="alert">
+                  Category revenue is out by {formatPeso(data.reconciliation.difference)} against
+                  the total. Treat this report as provisional.
                 </p>
               )}
             </>
@@ -181,23 +208,29 @@ export const SalesReportView: React.FC = () => {
         generateError={pdf.error}
       >
         {data && (
-          <table className="w-full text-xs">
+          <table className="w-full text-label">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-100">
-                <th className="py-2">Merchant category</th>
-                <th className="py-2 text-right">Orders</th>
-                <th className="py-2 text-right">Revenue</th>
+              <tr className="text-left text-ink-muted border-b border-hairline">
+                <th scope="col" className="py-2">
+                  Merchant category
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Orders
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Revenue
+                </th>
               </tr>
             </thead>
             <tbody>
               {data.byCategory.map((c) => (
-                <tr key={c.category} className="border-b border-slate-50">
+                <tr key={c.category} className="border-b border-hairline">
                   <td className="py-2">{c.category}</td>
                   <td className="py-2 text-right">{c.orderCount}</td>
                   <td className="py-2 text-right">{formatPeso(c.revenue)}</td>
                 </tr>
               ))}
-              <tr className="font-bold text-slate-800">
+              <tr className="font-bold text-ink">
                 <td className="py-2">Total</td>
                 <td className="py-2 text-right">{data.totalOrders}</td>
                 <td className="py-2 text-right">{formatPeso(data.totalRevenue)}</td>

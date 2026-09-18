@@ -18,12 +18,19 @@ import { DispatcherButton } from "./DispatcherButton";
  *   the wrapping `<form onSubmit>`, matching how it's already used today.
  */
 
+// `aria-label` is required at the type level, the same way DispatcherButton
+// requires one for an icon-only button. Seven inputs in this console shipped
+// with a placeholder and no accessible name at all, including the exception
+// queue's audit-trail justification field; a placeholder disappears the moment
+// a dispatcher types and was never a label.
 interface FilterModeProps extends React.InputHTMLAttributes<HTMLInputElement> {
   mode?: "filter";
+  "aria-label": string;
 }
 
 interface SubmitModeProps extends React.InputHTMLAttributes<HTMLInputElement> {
   mode: "submit";
+  "aria-label": string;
   onClear: () => void;
   submitLabel: string;
   submitIcon?: React.ReactNode;
@@ -40,14 +47,17 @@ export function DispatcherSearchField(props: DispatcherSearchFieldProps) {
     <div className="relative flex-1">
       <Search
         size={15}
-        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
       />
       <input
         type="text"
+        // placeholder:text-slate-400 measured about 2.6:1 on this fill. The
+        // focus ring is the console's single themed :focus-visible outline
+        // from surfaces.css rather than a per-field glow.
         className={cn(
-          "w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 py-2 text-xs text-slate-800 placeholder:text-slate-400 font-medium outline-none focus:ring-2 focus:ring-dispatcher-navy focus:bg-white transition",
-          mode === "submit" ? "pr-8" : "pr-3.5",
-          className
+          "w-full min-h-9 rounded-plate border border-edge bg-board-ground pl-9 text-label text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate",
+          mode === "submit" ? "pr-10" : "pr-3",
+          className,
         )}
         {...inputProps}
       />
@@ -56,7 +66,7 @@ export function DispatcherSearchField(props: DispatcherSearchFieldProps) {
           type="button"
           onClick={(props as SubmitModeProps).onClear}
           aria-label="Clear search"
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded cursor-pointer"
+          className="absolute right-1 top-1/2 grid size-8 -translate-y-1/2 cursor-pointer place-items-center rounded-trim text-ink-muted hover:bg-board-trim/25 hover:text-ink"
         >
           <X size={14} />
         </button>

@@ -42,6 +42,13 @@ interface ArchiveTabProps {
   categories: ApiMerchantCategory[];
   places: ArchivedPlace[];
   isLoadingPlaces?: boolean;
+  /** Set when the retired-stores fetch failed. Distinct from `error`, which is
+   *  a failed restore. A failure may not be reported as an empty archive. */
+  placesError?: string | null;
+  /** Set when the CATEGORY fetch failed upstream. Without it this tab prints
+   *  "Archived categories (0)" underneath the parent's own notice that the
+   *  categories did not load, which is one screen giving two answers. */
+  categoriesError?: string | null;
   onCategoryRestored: (updated: ApiMerchantCategory) => void;
   onPlaceRestored: () => void;
 }
@@ -50,6 +57,8 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
   categories,
   places,
   isLoadingPlaces = false,
+  placesError = null,
+  categoriesError = null,
   onCategoryRestored,
   onPlaceRestored,
 }) => {
@@ -58,6 +67,11 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
 
   const archivedCategories = categories.filter((c) => c.status !== "Active");
   const retiredPlaces = places.filter((p) => !p.isActive);
+
+  // A count is only reportable when the list behind it actually arrived.
+  const categoryCount =
+    categoriesError && categories.length === 0 ? "--" : String(archivedCategories.length);
+  const placeCount = placesError && places.length === 0 ? "--" : String(retiredPlaces.length);
   const categoryName = (id: number) => categories.find((c) => c.id === id)?.name ?? "Uncategorised";
 
   const restoreCategory = async (category: ApiMerchantCategory) => {
@@ -91,17 +105,20 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
 
   const nothingArchived = archivedCategories.length === 0 && retiredPlaces.length === 0;
 
-  if (nothingArchived && !isLoadingPlaces) {
+  // `!placesError` is the load-bearing clause. Without it, a failed fetch
+  // left retiredPlaces empty and this returned the all-clear panel: a green
+  // tick and "Nothing archived" over stores nobody could see.
+  if (nothingArchived && !isLoadingPlaces && !placesError) {
     return (
       <div className="flex-1 min-h-0 flex items-center justify-center">
         <div className="text-center max-w-sm px-6 py-10">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 grid place-items-center mx-auto text-emerald-600">
+          <div className="w-14 h-14 rounded-plate bg-status-done-fill border border-status-done-ink/20 grid place-items-center mx-auto text-status-done-ink">
             <CheckCircle2 size={26} />
           </div>
-          <p className="text-sm font-extrabold text-slate-800 mt-3 mb-0">Nothing archived</p>
-          <p className="text-xs text-slate-500 mt-1 mb-0 leading-relaxed">
-            Categories you set to Inactive and stores you retire will appear here, ready to
-            bring back.
+          <p className="text-label text-ink mt-3 mb-0">Nothing archived</p>
+          <p className="text-label text-ink-muted mt-1 mb-0 leading-relaxed">
+            Categories you set to Inactive and stores you retire will appear here, ready to bring
+            back.
           </p>
         </div>
       </div>
@@ -113,7 +130,7 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
       {error && (
         <p
           role="alert"
-          className="flex items-center gap-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 m-0"
+          className="flex items-center gap-2 text-label text-status-act-ink bg-status-act-fill border border-status-act-ink/20 rounded-plate px-3 py-2 m-0"
         >
           <AlertCircle size={14} className="shrink-0" />
           {error}
@@ -121,24 +138,27 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
       )}
 
       {/* ── archived categories ─────────────────────────────────────── */}
-      <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-          <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 uppercase tracking-wider m-0">
-            <Store size={13} className="text-slate-400" />
-            Archived categories ({archivedCategories.length})
+      <section className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-board-ground border-b border-edge">
+          <p className="flex items-center gap-1.5 text-micro text-ink uppercase m-0">
+            <Store size={13} className="text-ink-muted" />
+            Archived categories ({categoryCount})
           </p>
         </header>
 
         {archivedCategories.length === 0 ? (
-          <p className="text-xs text-slate-400 px-4 py-4 m-0">No archived categories.</p>
+          <p className="text-label text-ink-muted px-4 py-4 m-0">No archived categories.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 m-0 p-0 list-none">
+          <ul className="divide-y divide-hairline m-0 p-0 list-none">
             {archivedCategories.map((category) => (
-              <li key={category.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/70 transition">
-                <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
+              <li
+                key={category.id}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-board-ground transition"
+              >
+                <span className="w-2 h-2 rounded-full bg-status-closed-ink shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-900 truncate m-0">{category.name}</p>
-                  <p className="text-[10px] text-slate-500 truncate m-0">
+                  <p className="text-label text-ink truncate m-0">{category.name}</p>
+                  <p className="text-label text-ink-muted truncate m-0">
                     {category._count?.places ?? 0} store
                     {(category._count?.places ?? 0) === 1 ? "" : "s"} still linked
                     {category.description ? ` · ${category.description}` : ""}
@@ -148,7 +168,7 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
                   type="button"
                   onClick={() => restoreCategory(category)}
                   disabled={busyId === `c${category.id}`}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-[11px] font-bold text-slate-700 hover:border-emerald-500 hover:text-emerald-700 transition active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:border-status-done-ink/40 hover:text-status-done-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {busyId === `c${category.id}` ? (
                     <Loader2 size={12} className="animate-spin" />
@@ -164,29 +184,40 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
       </section>
 
       {/* ── retired stores ──────────────────────────────────────────── */}
-      <section className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-          <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 uppercase tracking-wider m-0">
-            <MapPin size={13} className="text-slate-400" />
-            Retired stores ({retiredPlaces.length})
+      <section className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-board-ground border-b border-edge">
+          <p className="flex items-center gap-1.5 text-micro text-ink uppercase m-0">
+            <MapPin size={13} className="text-ink-muted" />
+            Retired stores ({placeCount})
           </p>
         </header>
 
         {isLoadingPlaces ? (
-          <p className="flex items-center gap-2 text-xs text-slate-400 px-4 py-4 m-0">
+          <p className="flex items-center gap-2 text-label text-ink-muted px-4 py-4 m-0">
             <Loader2 size={13} className="animate-spin" />
             Loading retired stores…
           </p>
+        ) : placesError ? (
+          <p
+            role="alert"
+            className="flex items-center gap-2 px-4 py-4 m-0 text-label text-status-act-ink"
+          >
+            <AlertCircle size={14} className="shrink-0" />
+            {placesError} Any retired store is still retired; this list is just not showing them.
+          </p>
         ) : retiredPlaces.length === 0 ? (
-          <p className="text-xs text-slate-400 px-4 py-4 m-0">No retired stores.</p>
+          <p className="text-label text-ink-muted px-4 py-4 m-0">No retired stores.</p>
         ) : (
-          <ul className="divide-y divide-slate-100 m-0 p-0 list-none">
+          <ul className="divide-y divide-hairline m-0 p-0 list-none">
             {retiredPlaces.map((place) => (
-              <li key={place.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/70 transition">
-                <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
+              <li
+                key={place.id}
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-board-ground transition"
+              >
+                <span className="w-2 h-2 rounded-full bg-status-closed-ink shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-900 truncate m-0">{place.name}</p>
-                  <p className="text-[10px] text-slate-500 truncate m-0">
+                  <p className="text-label text-ink truncate m-0">{place.name}</p>
+                  <p className="text-label text-ink-muted truncate m-0">
                     {categoryName(place.categoryId)}
                     {place.barangay ? ` · ${place.barangay}` : ""} · {place.address}
                   </p>
@@ -195,7 +226,7 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
                   type="button"
                   onClick={() => restorePlace(place)}
                   disabled={busyId === `p${place.id}`}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-300 text-[11px] font-bold text-slate-700 hover:border-emerald-500 hover:text-emerald-700 transition active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:border-status-done-ink/40 hover:text-status-done-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {busyId === `p${place.id}` ? (
                     <Loader2 size={12} className="animate-spin" />
@@ -210,10 +241,10 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
         )}
       </section>
 
-      <p className="flex items-center gap-1.5 text-[10px] text-slate-400 px-1 m-0">
+      <p className="flex items-center gap-1.5 text-label text-ink-muted px-1 m-0">
         <Archive size={11} className="shrink-0" />
-        Archiving never deletes. Stores stay linked to their category, so restoring puts
-        everything back as it was.
+        Archiving never deletes. Stores stay linked to their category, so restoring puts everything
+        back as it was.
       </p>
     </div>
   );

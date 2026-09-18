@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Building2, Compass, Loader2, MapPin, Plus, RefreshCw, AlertCircle, ExternalLink, List, Map as MapIcon } from "lucide-react";
+import {
+  Building2,
+  Compass,
+  Loader2,
+  MapPin,
+  Plus,
+  RefreshCw,
+  AlertCircle,
+  List,
+  Map as MapIcon,
+} from "lucide-react";
 import { PlacesMiniMap } from "../../../../../components/PlacesMiniMap";
 import { apiService, type ApiVerifiedPlace } from "../../../../../services/apiService";
 
@@ -47,24 +57,24 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-4 text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
-        <Loader2 size={15} className="animate-spin text-[#1E3A5F]" />
-        <span className="text-xs font-medium">Loading location stores…</span>
+      <div className="flex items-center justify-center gap-2 py-4 text-ink-muted bg-board-ground rounded-plate border border-edge">
+        <Loader2 size={15} className="animate-spin text-board-field" />
+        <span className="text-body">Loading location stores…</span>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="flex items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-        <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+      <div className="flex items-center justify-between gap-3 p-3 bg-status-waiting-fill border border-status-waiting-ink/20 rounded-plate">
+        <p className="flex items-center gap-1.5 text-label text-status-waiting-ink">
           <AlertCircle size={14} className="shrink-0" />
           <span>Could not load stores for this category.</span>
         </p>
         <button
           type="button"
           onClick={() => void load()}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-xs font-bold text-amber-800 hover:bg-amber-100 transition"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-trim bg-board-plate border border-status-waiting-ink/20 text-label text-status-waiting-ink hover:bg-status-waiting-fill transition"
         >
           <RefreshCw size={12} />
           <span>Retry</span>
@@ -75,19 +85,17 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
 
   if (!places || places.length === 0) {
     return (
-      <div className="p-4 bg-slate-50/80 border border-dashed border-slate-300 rounded-xl text-center space-y-2">
-        <MapPin size={22} className="text-slate-300 mx-auto" />
-        <p className="text-xs font-bold text-slate-700">
-          No stores pinned to {categoryName} yet
-        </p>
-        <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+      <div className="p-4 bg-board-ground border border-dashed border-edge rounded-plate text-center space-y-2">
+        <MapPin size={22} className="text-ink-muted mx-auto" />
+        <p className="text-label text-ink">No stores pinned to {categoryName} yet</p>
+        <p className="text-label text-ink-muted max-w-xs mx-auto">
           Add ground-truth establishment pins so customers can browse and order from this category.
         </p>
         {onSelectCategoryForPlaces ? (
           <button
             type="button"
             onClick={() => onSelectCategoryForPlaces(categoryId)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E3A5F] hover:bg-[#162D4A] text-white text-xs font-bold transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-trim bg-board-field hover:bg-board-field-deep text-white text-label transition"
           >
             <Plus size={13} />
             <span>Pin First Store</span>
@@ -95,7 +103,7 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
         ) : (
           <Link
             to={directoryHref}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E3A5F] hover:bg-[#162D4A] text-white text-xs font-bold transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-trim bg-board-field hover:bg-board-field-deep text-white text-label transition"
           >
             <Plus size={13} />
             <span>Pin First Store</span>
@@ -110,13 +118,13 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
   const inactiveCount = places.filter((p) => !p.isActive).length;
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-      <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-slate-50 border-b border-slate-200">
-        <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-          <Building2 size={13} className="text-slate-400" />
+    <div className="border border-edge rounded-plate overflow-hidden bg-board-plate">
+      <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-board-ground border-b border-edge">
+        <p className="flex items-center gap-1.5 text-micro text-ink uppercase">
+          <Building2 size={13} className="text-ink-muted" />
           <span>Pinned Location Stores ({places.length})</span>
           {inactiveCount > 0 && (
-            <span className="normal-case tracking-normal font-semibold text-slate-400">
+            <span className="normal-case font-semibold text-ink-muted">
               · {inactiveCount} retired
             </span>
           )}
@@ -124,13 +132,17 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
         <div className="flex items-center gap-2 shrink-0">
           {/* View only - the editor lives in the Stores tab. Browsing a category
               should never be able to move a store's ground truth by misclick. */}
-          <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg" role="group" aria-label="View stores as">
+          <div
+            className="flex items-center bg-board-ground p-0.5 rounded-trim"
+            role="group"
+            aria-label="View stores as"
+          >
             <button
               type="button"
               onClick={() => setView("list")}
               aria-pressed={view === "list"}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition ${
-                view === "list" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              className={`flex items-center gap-1 px-2 py-1 rounded-trim text-label transition ${
+                view === "list" ? "bg-board-plate text-ink" : "text-ink-muted hover:text-ink"
               }`}
             >
               <List size={12} />
@@ -140,8 +152,8 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
               type="button"
               onClick={() => setView("map")}
               aria-pressed={view === "map"}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold transition ${
-                view === "map" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+              className={`flex items-center gap-1 px-2 py-1 rounded-trim text-label transition ${
+                view === "map" ? "bg-board-plate text-ink" : "text-ink-muted hover:text-ink"
               }`}
             >
               <MapIcon size={12} />
@@ -153,7 +165,7 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
             <button
               type="button"
               onClick={() => onSelectCategoryForPlaces(categoryId)}
-              className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
+              className="flex items-center gap-1 text-label text-ink hover:text-ink transition"
             >
               <Compass size={13} />
               <span>Open in Stores Tab</span>
@@ -161,7 +173,7 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
           ) : (
             <Link
               to={directoryHref}
-              className="flex items-center gap-1 text-xs font-bold text-blue-700 hover:text-blue-900 transition"
+              className="flex items-center gap-1 text-label text-ink hover:text-ink transition"
             >
               <Compass size={13} />
               <span>Open in Directory</span>
@@ -176,14 +188,14 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
               list truncates to - a map has the room, and a partial map of
               store coverage would be misleading in a way a partial list is not. */}
           <PlacesMiniMap places={places} heightClass="h-64" focusId={hoveredId} />
-          <div className="flex items-center justify-between gap-3 text-[10px] text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-label text-ink-muted">
             <span className="flex items-center gap-3">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Active
+                <span className="w-2 h-2 rounded-full bg-status-done-ink" /> Active
               </span>
               {inactiveCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" /> Retired
+                  <span className="w-2 h-2 rounded-full bg-status-closed-ink" /> Retired
                 </span>
               )}
             </span>
@@ -191,56 +203,51 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
           </div>
         </div>
       ) : (
-      <ul className="divide-y divide-slate-100">
-        {visible.map((place) => (
-          <li
-            key={place.id}
-            className="hover:bg-slate-50/70 transition"
-            onMouseEnter={() => setHoveredId(place.id)}
-            onMouseLeave={() => setHoveredId(null)}
-          >
-            <div className="flex items-center justify-between gap-3 px-3.5 py-2">
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    place.isActive ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
-                  title={place.isActive ? "Active" : "Retired"}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-900 truncate">
-                    {place.name}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {place.barangay ? `${place.barangay} · ` : ""}
-                    {place.address}
-                  </p>
+        <ul className="divide-y divide-hairline">
+          {visible.map((place) => (
+            <li
+              key={place.id}
+              className="hover:bg-board-ground transition"
+              onMouseEnter={() => setHoveredId(place.id)}
+              onMouseLeave={() => setHoveredId(null)}
+            >
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      place.isActive ? "bg-status-done-ink" : "bg-status-closed-ink"
+                    }`}
+                    title={place.isActive ? "Active" : "Retired"}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-label text-ink truncate">{place.name}</p>
+                    <p className="text-label text-ink-muted truncate">
+                      {place.barangay ? `${place.barangay} · ` : ""}
+                      {place.address}
+                    </p>
+                  </div>
                 </div>
+                <span className="font-mono text-label text-ink-muted whitespace-nowrap shrink-0 bg-board-ground px-1.5 py-0.5 rounded border border-edge">
+                  {place.latitude.toFixed(3)}, {place.longitude.toFixed(3)}
+                </span>
               </div>
-              <span className="font-mono text-[10px] text-slate-400 whitespace-nowrap shrink-0 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                {place.latitude.toFixed(3)}, {place.longitude.toFixed(3)}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
       )}
 
       {view === "list" && hiddenCount > 0 && (
-        <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 text-center">
+        <div className="px-3 py-2 bg-board-ground border-t border-edge text-center">
           {onSelectCategoryForPlaces ? (
             <button
               type="button"
               onClick={() => onSelectCategoryForPlaces(categoryId)}
-              className="text-xs font-bold text-blue-700 hover:text-blue-900 transition"
+              className="text-label text-ink hover:text-ink transition"
             >
               View all {places.length} stores in {categoryName} →
             </button>
           ) : (
-            <Link
-              to={directoryHref}
-              className="text-xs font-bold text-blue-700 hover:text-blue-900 transition"
-            >
+            <Link to={directoryHref} className="text-label text-ink hover:text-ink transition">
               View all {places.length} stores in {categoryName} →
             </Link>
           )}

@@ -1,7 +1,6 @@
-import * as React from "react";
 import { CreditCard, CheckCircle2 } from "lucide-react";
-import { DispatcherButton } from "../../ui/DispatcherButton";
-import { DispatcherInlineBanner } from "../../ui/DispatcherInlineBanner";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { WaitingCard } from "../WaitingCard";
 import { PaymentLedgerPanel } from "../PaymentLedgerPanel";
 import { copy, formatAgo } from "../copy";
@@ -59,7 +58,7 @@ export function Stage4Payment({
   if (readOnly) {
     return (
       <div className="space-y-3">
-        <p className="text-[11px] text-slate-600 m-0">
+        <p className="m-0 text-body text-ink-muted">
           {confirmedPaymentMode ? copy.stage4.settled(confirmedPaymentMode) : "No payment recorded."}
         </p>
         {ledgerPanel}
@@ -74,8 +73,8 @@ export function Stage4Payment({
     // is still answering "how is this being paid for?".
     return (
       <div className="space-y-3">
-        <p className="flex items-center gap-2 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 m-0">
-          <CheckCircle2 size={14} className="shrink-0" />
+        <p className="m-0 flex items-center gap-2 rounded-plate bg-status-done-fill px-3 py-2.5 text-label text-status-done-ink">
+          <CheckCircle2 size={15} className="shrink-0" />
           {copy.stage4.settled(confirmedPaymentMode || "Settled")}
         </p>
         {ledgerPanel}
@@ -106,12 +105,12 @@ export function Stage4Payment({
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-slate-500 m-0">{copy.stage4.intro(customerFirstName)}</p>
+      <p className="m-0 text-body text-ink-muted">{copy.stage4.intro(customerFirstName)}</p>
 
       {askedAt && (
         <WaitingCard
           title={`Waiting for ${customerFirstName}`}
-          detail={`You asked how she'll pay ${formatAgo(minsAgo)}.`}
+          detail={`You asked how they will pay ${formatAgo(minsAgo)}.`}
           actions={[{ label: copy.nowActions.nudge(customerFirstName), onClick: onNudge }]}
         />
       )}

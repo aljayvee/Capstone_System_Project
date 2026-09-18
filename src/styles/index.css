@@ -1,7 +1,23 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+/* Browser surfaces for any element carrying data-surface: focus ring,
+   selection, caret, scrollbars, tabular figures, icon stroke, motion curve.
+   Every colour in it is a token, so each portal's skin re-paints it.
 
+   This replaces dispatch.css, which scoped the same rules to
+   [data-surface="dispatch"]. Nothing in them was dispatcher-specific once
+   the colours became tokens, and the dispatcher's root carried only
+   data-portal, so most of them had only ever reached its portalled overlays.
+
+   Order is not what lets these beat the global reset below; specificity is.
+   `[data-surface] *` outranks a bare `*` whatever the source order. */
+@import './surfaces.css';
+/* The Owner portal's eight-token re-skin of that same system. */
+@import './owner.css';
+
+/* Scrollbars are hidden app-wide, and handed back only inside a surface that
+   opts in above. The login page and the marketing shell keep them hidden. */
 * {
   scrollbar-width: none;
 }

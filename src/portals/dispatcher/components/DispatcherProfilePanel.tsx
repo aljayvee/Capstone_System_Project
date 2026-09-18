@@ -1,25 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  UserCog,
   Camera,
   Loader2,
   Mail,
   Phone,
-  User as UserIcon,
   Lock,
   Eye,
   EyeOff,
-  CircleCheck,
+  Check,
   Circle,
-  CheckCircle2,
-  AlertTriangle,
   Trash2,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { apiClient } from "../../../services/apiClient";
 import { fetchStaffPhoto, uploadStaffPhoto, deleteStaffPhoto } from "../../../services/staffPhotoService";
-import { DispatcherCard } from "./ui/DispatcherCard";
-import { DispatcherButton } from "./ui/DispatcherButton";
+import { DispatcherCard } from "@/components/panel/DispatcherCard";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherBadge } from "@/components/panel/DispatcherBadge";
+import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
+import { Field, fieldInputClasses } from "@/components/panel/Field";
+import { PanelShell } from "@/components/panel/PanelShell";
+import { useDraft, forgetDrafts } from "../lib/useDraft";
+import { cn } from "@/lib/utils";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -91,10 +93,21 @@ export function DispatcherProfilePanel() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState("");
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  /**
+   * Drafted, keyed by user id: the portal unmounts this panel on every tab
+   * switch, so without this a dispatcher part way through the form lost it by
+   * clicking Order Queue in the rail they use all shift.
+   *
+   * `seedX` fills from the server only when nothing is half-typed, and never
+   * writes to the draft store, so an unsaved edit survives a refetch and a
+   * refetch never becomes a draft. The password fields below are NOT drafted,
+   * on purpose: see useDraft.ts.
+   */
+  const draftKey = `profile:${user?.id ?? "unknown"}`;
+  const [firstName, setFirstName, , seedFirstName] = useDraft(`${draftKey}:firstName`);
+  const [lastName, setLastName, , seedLastName] = useDraft(`${draftKey}:lastName`);
+  const [email, setEmail, , seedEmail] = useDraft(`${draftKey}:email`);
+  const [phone, setPhone, , seedPhone] = useDraft(`${draftKey}:phone`);
   const [infoErrors, setInfoErrors] = useState<FieldErrors>({});
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
@@ -116,17 +129,17 @@ export function DispatcherProfilePanel() {
       const res = await apiClient.get(`/riders/profile/${user.id}`);
       const data: StaffProfile = res.data?.user ?? res.data?.rider ?? res.data;
       setProfile(data);
-      setFirstName(data.firstName || "");
-      setLastName(data.lastName || "");
-      setEmail(data.email || "");
-      setPhone(data.phone || "");
+      seedFirstName(data.firstName || "");
+      seedLastName(data.lastName || "");
+      seedEmail(data.email || "");
+      seedPhone(data.phone || "");
       setPhotoUri(data.photoUpdatedAt ? await fetchStaffPhoto(user.id) : null);
     } catch (err) {
       console.warn("Failed to load dispatcher profile:", err);
     } finally {
       setLoadingProfile(false);
     }
-  }, [user?.id]);
+  }, [user?.id, seedFirstName, seedLastName, seedEmail, seedPhone]);
 
   useEffect(() => {
     loadProfile();
@@ -208,6 +221,11 @@ export function DispatcherProfilePanel() {
       });
       const updated = res.data?.user;
       setInfoMessage("Your account info was saved.");
+      // Saved edits stop being drafts, but stay on screen: `forgetDrafts`
+      // rather than `clear`, which blanks the box and is only right for text
+      // that has been sent. Without this the next fetch would be outranked by
+      // a draft now identical to the server, permanently.
+      forgetDrafts(draftKey);
       // Refreshes the sidebar's name/email immediately — login() is the only
       // path that both updates AuthContext state and persists to
       // sessionStorage, so it's reused here rather than duplicated. The
@@ -260,306 +278,386 @@ export function DispatcherProfilePanel() {
     }
   };
 
-  const inputClass = (hasError?: string | null) =>
-    `w-full bg-slate-50 border rounded-xl py-2.5 px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-150 focus:bg-white ${
-      hasError
-        ? "border-red-300 focus:ring-2 focus:ring-red-400/30 focus:border-red-500 bg-red-50/30"
-        : "border-slate-200 focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
-    }`;
+  /**
+   * Route board build. Six things were wrong here beyond the palette.
+   *
+   * There were two `<h1>` elements on screen: the board band renders one, and
+   * this panel rendered a second under a tinted blue icon chip. This tab is
+   * now on PanelShell like every other tab, so it gets an `<h2>` and the same
+   * pinned-header-plus-one-scroller shape as its five neighbours.
+   *
+   * Seven visible labels were paired with seven inputs and not one pairing
+   * existed in the markup: no `htmlFor`, no `id`. Clicking a label focused
+   * nothing and a screen reader announced every field unnamed. They all go
+   * through `Field` now, which generates the id and cannot be rendered
+   * without wiring it.
+   *
+   * The password reveal was a bare 14px icon with no accessible name and no
+   * box: a target a third the size of the minimum, controlling all three
+   * password fields from inside the first one. It is a named 36px control on
+   * its own row, where what it governs is legible.
+   *
+   * Error text rendered at `text-[10.5px]`. The smallest type in the console
+   * was the type that tells you what went wrong.
+   *
+   * Five `—` placeholders in the account table said nothing about whether a
+   * field was empty or had failed to load.
+   *
+   * And the three `eyebrow` props here were the last call sites of a prop the
+   * craft floor bans outright, which is why it can now be deleted.
+   */
+  const passwordInput = (hasError: string | null | undefined) =>
+    cn(fieldInputClasses, "font-mono", hasError && "border-status-act-ink");
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-2.5">
-        <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
-          <UserCog size={20} />
-        </span>
-        <h1 className="text-xl font-extrabold text-slate-800">Profile & Account Settings</h1>
-      </div>
-
-      {/* AVATAR */}
-      <DispatcherCard padding="lg">
-        <div className="flex items-center gap-5">
-          <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-blue-600 flex items-center justify-center text-white text-xl font-black shrink-0">
-            {photoBusy ? (
-              <Loader2 className="animate-spin" size={22} />
-            ) : photoUri ? (
-              <img src={photoUri} alt="Your profile" className="w-full h-full object-cover" />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-extrabold text-slate-900 truncate">{user?.name || "Dispatcher"}</p>
-            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-            <div className="flex items-center gap-2 mt-2.5">
-              <DispatcherButton
-                size="sm"
-                variant="secondary"
-                icon={<Camera size={13} />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={photoBusy}
-              >
-                Change Photo
-              </DispatcherButton>
-              {photoUri && (
+    <PanelShell
+      title="Your profile"
+      detail={profile?.username ? `Signed in as ${profile.username}` : "Your account and sign-in"}
+    >
+      {/* Two columns above xl. A single 3xl column left about 45% of a 1440
+          viewport empty, which is a lot of nothing on the one surface in this
+          product that argues for density. The prose measure is still capped;
+          it is the shelf that got used. */}
+      <div className="grid max-w-6xl grid-cols-1 items-start gap-3 pb-2 xl:grid-cols-2">
+        {/* who you are */}
+        <DispatcherCard padding="md">
+          <div className="flex items-center gap-4">
+            <div
+              data-on-field
+              className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-plate bg-board-field text-title text-board-plate"
+            >
+              {photoBusy ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : photoUri ? (
+                <img src={photoUri} alt="Your profile photo" className="size-full object-cover" />
+              ) : (
+                <span data-figure>{initials}</span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-panel text-ink">{user?.name || "Dispatcher"}</p>
+              <p className="truncate text-body text-ink-muted">{user?.email}</p>
+              <div className="mt-2.5 flex items-center gap-2">
                 <DispatcherButton
                   size="sm"
-                  variant="danger-ghost"
-                  icon={<Trash2 size={13} />}
-                  onClick={handleRemovePhoto}
+                  variant="secondary"
+                  icon={<Camera size={14} />}
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={photoBusy}
                 >
-                  Remove
+                  Change the photo
                 </DispatcherButton>
+                {photoUri && (
+                  <DispatcherButton
+                    size="sm"
+                    variant="danger-ghost"
+                    icon={<Trash2 size={14} />}
+                    onClick={handleRemovePhoto}
+                    disabled={photoBusy}
+                  >
+                    Remove
+                  </DispatcherButton>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              {photoError && (
+                <p role="alert" className="mt-1.5 text-label text-status-act-ink">
+                  {photoError}
+                </p>
               )}
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/jpg"
-              className="hidden"
-              onChange={handlePhotoChange}
-            />
-            {photoError && <p className="mt-1.5 text-[11px] font-semibold text-red-600">{photoError}</p>}
           </div>
-        </div>
-      </DispatcherCard>
+        </DispatcherCard>
 
-      {/* ACCOUNT DETAILS TABLE */}
-      <DispatcherCard padding="lg">
-        <DispatcherCard.Header eyebrow="ACCOUNT" title="Account Details" />
-        {loadingProfile ? (
-          <div className="flex items-center justify-center py-6 text-slate-400">
-            <Loader2 className="animate-spin" size={18} />
-          </div>
-        ) : (
-          <table className="w-full text-xs">
-            <tbody>
-              <tr className="border-b border-slate-100">
-                <td className="py-2.5 pr-4 text-slate-500 font-semibold w-1/3">Username</td>
-                <td className="py-2.5 font-mono text-slate-800">{profile?.username ?? "—"}</td>
-              </tr>
-              <tr className="border-b border-slate-100">
-                <td className="py-2.5 pr-4 text-slate-500 font-semibold">Role</td>
-                <td className="py-2.5 font-bold text-slate-800 capitalize">{(profile?.role || "—").toLowerCase()}</td>
-              </tr>
-              <tr className="border-b border-slate-100">
-                <td className="py-2.5 pr-4 text-slate-500 font-semibold">Status</td>
-                <td className="py-2.5">
-                  <span
-                    className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                      profile?.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                    }`}
-                  >
-                    {profile?.status ?? "—"}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td className="py-2.5 pr-4 text-slate-500 font-semibold">Member Since</td>
-                <td className="py-2.5 text-slate-800">
-                  {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "—"}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        )}
-      </DispatcherCard>
+        {/* the account record */}
+        <DispatcherCard padding="md">
+          <DispatcherCard.Header title="Account" />
+          {loadingProfile ? (
+            <div className="flex items-center justify-center gap-2 py-6 text-body text-ink-muted">
+              <Loader2 className="animate-spin" size={18} />
+              Loading your account
+            </div>
+          ) : (
+            <dl className="m-0 divide-y divide-hairline">
+              <div className="flex items-baseline justify-between gap-3 py-2">
+                <dt className="text-body text-ink-muted">Username</dt>
+                <dd data-figure className="m-0 truncate font-mono text-label text-ink">
+                  {profile?.username || "Not recorded"}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 py-2">
+                <dt className="text-body text-ink-muted">Role</dt>
+                <dd className="m-0 truncate text-label capitalize text-ink">
+                  {(profile?.role || "Not recorded").toLowerCase()}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 py-2">
+                <dt className="text-body text-ink-muted">Status</dt>
+                <dd className="m-0">
+                  {profile?.status ? (
+                    <DispatcherBadge
+                      variant={profile.status === "Active" ? "success" : "neutral"}
+                    >
+                      {profile.status}
+                    </DispatcherBadge>
+                  ) : (
+                    <span className="text-label text-ink-muted">Not recorded</span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 py-2">
+                <dt className="text-body text-ink-muted">On the roster since</dt>
+                <dd data-figure className="m-0 text-label tabular-nums text-ink">
+                  {profile?.createdAt
+                    ? new Date(profile.createdAt).toLocaleDateString()
+                    : "Not recorded"}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </DispatcherCard>
 
-      {/* PERSONAL INFO */}
-      <DispatcherCard padding="lg">
-        <DispatcherCard.Header eyebrow="PROFILE" title="Personal Information" />
-        {infoError && (
-          <div className="flex items-start gap-2 p-3 mb-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            <span>{infoError}</span>
-          </div>
-        )}
-        {infoMessage && (
-          <div className="flex items-start gap-2 p-3 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-            <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
-            <span>{infoMessage}</span>
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">First Name</label>
-            <div className="relative">
-              <UserIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => {
-                  setFirstName(e.target.value);
-                  setInfoErrors((p) => ({ ...p, firstName: null }));
-                }}
-                className={`${inputClass(infoErrors.firstName)} pl-9`}
-              />
-            </div>
-            {infoErrors.firstName && <p className="mt-1 text-[10.5px] font-semibold text-red-600">{infoErrors.firstName}</p>}
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Last Name</label>
-            <div className="relative">
-              <UserIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => {
-                  setLastName(e.target.value);
-                  setInfoErrors((p) => ({ ...p, lastName: null }));
-                }}
-                className={`${inputClass(infoErrors.lastName)} pl-9`}
-              />
-            </div>
-            {infoErrors.lastName && <p className="mt-1 text-[10.5px] font-semibold text-red-600">{infoErrors.lastName}</p>}
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className="block text-[11px] font-bold text-slate-600 mb-1">Email Address</label>
-          <div className="relative">
-            <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value.replace(/\s/g, ""));
-                setInfoErrors((p) => ({ ...p, email: null }));
-              }}
-              className={`${inputClass(infoErrors.email)} pl-9`}
-            />
-          </div>
-          {infoErrors.email && <p className="mt-1 text-[10.5px] font-semibold text-red-600">{infoErrors.email}</p>}
-        </div>
-        <div className="mt-3">
-          <label className="block text-[11px] font-bold text-slate-600 mb-1">Phone Number</label>
-          <div className="relative">
-            <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={PH_MOBILE_LENGTH}
-              value={phone}
-              onChange={(e) => {
-                setPhone(sanitizePhoneInput(e.target.value));
-                setInfoErrors((p) => ({ ...p, phone: null }));
-              }}
-              className={`${inputClass(infoErrors.phone)} pl-9 font-mono`}
-            />
-          </div>
-          {infoErrors.phone && <p className="mt-1 text-[10.5px] font-semibold text-red-600">{infoErrors.phone}</p>}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <DispatcherButton onClick={handleSaveInfo} loading={infoSaving} loadingText="Saving...">
-            Save Changes
-          </DispatcherButton>
-        </div>
-      </DispatcherCard>
+        {/* your details */}
+        <DispatcherCard padding="md">
+          <DispatcherCard.Header title="Your details" />
 
-      {/* CHANGE PASSWORD */}
-      <DispatcherCard padding="lg">
-        <DispatcherCard.Header eyebrow="SECURITY" icon={<Lock size={14} />} title="Change Password" />
-        {passwordError && (
-          <div className="flex items-start gap-2 p-3 mb-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            <span>{passwordError}</span>
+          {infoError ? (
+            <p
+              role="alert"
+              className="mb-3 rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink"
+            >
+              {infoError}
+            </p>
+          ) : null}
+          <DispatcherInlineBanner
+            message={infoMessage ? { variant: "success", text: infoMessage } : null}
+            onDismiss={() => setInfoMessage("")}
+          />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="First name" error={infoErrors.firstName}>
+              {(control) => (
+                <input
+                  {...control}
+                  type="text"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(e) => {
+                    setFirstName(e.target.value);
+                    setInfoErrors((p) => ({ ...p, firstName: null }));
+                  }}
+                  className={fieldInputClasses}
+                />
+              )}
+            </Field>
+            <Field label="Last name" error={infoErrors.lastName}>
+              {(control) => (
+                <input
+                  {...control}
+                  type="text"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(e) => {
+                    setLastName(e.target.value);
+                    setInfoErrors((p) => ({ ...p, lastName: null }));
+                  }}
+                  className={fieldInputClasses}
+                />
+              )}
+            </Field>
           </div>
-        )}
-        {passwordMessage && (
-          <div className="flex items-start gap-2 p-3 mb-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-            <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
-            <span>{passwordMessage}</span>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Email address" error={infoErrors.email}>
+              {(control) => (
+                <div className="relative">
+                  <Mail
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                  />
+                  <input
+                    {...control}
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value.replace(/\s/g, ""));
+                      setInfoErrors((p) => ({ ...p, email: null }));
+                    }}
+                    className={cn(fieldInputClasses, "pl-9")}
+                  />
+                </div>
+              )}
+            </Field>
+            <Field
+              label="Phone number"
+              hint={`${PH_MOBILE_LENGTH} digits, starting 09`}
+              error={infoErrors.phone}
+            >
+              {(control) => (
+                <div className="relative">
+                  <Phone
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                  />
+                  <input
+                    {...control}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    maxLength={PH_MOBILE_LENGTH}
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(sanitizePhoneInput(e.target.value));
+                      setInfoErrors((p) => ({ ...p, phone: null }));
+                    }}
+                    className={cn(fieldInputClasses, "pl-9 font-mono tabular-nums")}
+                  />
+                </div>
+              )}
+            </Field>
           </div>
-        )}
-        <div className="space-y-3">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 mb-1">Current Password</label>
-            <div className="relative">
-              <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={(e) => {
-                  setCurrentPassword(e.target.value);
-                  setPasswordErrors((p) => ({ ...p, currentPassword: null }));
-                }}
-                className={`${inputClass(passwordErrors.currentPassword)} pl-9 pr-9 font-mono`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-              >
-                {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
+
+          <div className="mt-4 flex justify-end">
+            <DispatcherButton onClick={handleSaveInfo} loading={infoSaving} loadingText="Saving">
+              Save these details
+            </DispatcherButton>
+          </div>
+        </DispatcherCard>
+
+        {/* your password */}
+        <DispatcherCard padding="md">
+          <DispatcherCard.Header icon={<Lock size={15} />} title="Your password" />
+
+          {passwordError ? (
+            <p
+              role="alert"
+              className="mb-3 rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink"
+            >
+              {passwordError}
+            </p>
+          ) : null}
+          <DispatcherInlineBanner
+            message={passwordMessage ? { variant: "success", text: passwordMessage } : null}
+            onDismiss={() => setPasswordMessage("")}
+          />
+
+          <div className="space-y-3">
+            <Field label="Current password" error={passwordErrors.currentPassword}>
+              {(control) => (
+                <div className="relative">
+                  <Lock
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                  />
+                  <input
+                    {...control}
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPasswordErrors((p) => ({ ...p, currentPassword: null }));
+                    }}
+                    className={cn(passwordInput(passwordErrors.currentPassword), "pl-9")}
+                  />
+                </div>
+              )}
+            </Field>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="New password" error={passwordErrors.newPassword}>
+                {(control) => (
+                  <input
+                    {...control}
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordErrors((p) => ({ ...p, newPassword: null }));
+                    }}
+                    className={passwordInput(passwordErrors.newPassword)}
+                  />
+                )}
+              </Field>
+              <Field label="New password again" error={passwordErrors.confirmPassword}>
+                {(control) => (
+                  <input
+                    {...control}
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      setPasswordErrors((p) => ({ ...p, confirmPassword: null }));
+                    }}
+                    className={passwordInput(passwordErrors.confirmPassword)}
+                  />
+                )}
+              </Field>
             </div>
-            {passwordErrors.currentPassword && (
-              <p className="mt-1 text-[10.5px] font-semibold text-red-600">{passwordErrors.currentPassword}</p>
+
+            {/* Out of the first field and onto its own row. It governs all
+                three password boxes, which was impossible to tell when it was
+                a 14px eye tucked inside one of them, and it had no accessible
+                name at all. */}
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-pressed={showPassword}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-2 text-label text-ink-muted transition-colors hover:text-ink"
+            >
+              {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showPassword ? "Hide the passwords" : "Show the passwords"}
+            </button>
+
+            {(newPassword || confirmPassword) && (
+              <DispatcherCard.Region padding="sm">
+                <DispatcherCard.Label as="h4">What a password needs</DispatcherCard.Label>
+                <ul className="m-0 grid list-none grid-cols-1 gap-x-4 gap-y-1.5 p-0 sm:grid-cols-2">
+                  {PASSWORD_RULES.map((rule) => {
+                    const passed = rule.test(newPassword);
+                    return (
+                      <li
+                        key={rule.label}
+                        className={cn(
+                          "flex items-center gap-1.5 text-body",
+                          passed ? "text-status-done-ink" : "text-ink-muted"
+                        )}
+                      >
+                        {passed ? (
+                          <Check size={14} className="shrink-0" />
+                        ) : (
+                          <Circle size={12} className="shrink-0" />
+                        )}
+                        <span>{rule.label}</span>
+                        <span className="sr-only">{passed ? ", met" : ", not met yet"}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </DispatcherCard.Region>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">New Password</label>
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => {
-                  setNewPassword(e.target.value);
-                  setPasswordErrors((p) => ({ ...p, newPassword: null }));
-                }}
-                className={`${inputClass(passwordErrors.newPassword)} font-mono`}
-              />
-              {passwordErrors.newPassword && (
-                <p className="mt-1 text-[10.5px] font-semibold text-red-600">{passwordErrors.newPassword}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1">Confirm New Password</label>
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => {
-                  setConfirmPassword(e.target.value);
-                  setPasswordErrors((p) => ({ ...p, confirmPassword: null }));
-                }}
-                className={`${inputClass(passwordErrors.confirmPassword)} font-mono`}
-              />
-              {passwordErrors.confirmPassword && (
-                <p className="mt-1 text-[10.5px] font-semibold text-red-600">{passwordErrors.confirmPassword}</p>
-              )}
-            </div>
+
+          <div className="mt-4 flex justify-end">
+            <DispatcherButton
+              onClick={handleChangePassword}
+              loading={passwordSaving}
+              loadingText="Updating"
+            >
+              Update the password
+            </DispatcherButton>
           </div>
-          {(newPassword || confirmPassword) && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">Password Requirements</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-                {PASSWORD_RULES.map((rule) => {
-                  const passed = rule.test(newPassword);
-                  return (
-                    <div
-                      key={rule.label}
-                      className={`flex items-center gap-1.5 text-[11px] font-semibold ${
-                        passed ? "text-emerald-600" : "text-slate-400"
-                      }`}
-                    >
-                      {passed ? <CircleCheck size={13} className="text-emerald-500" /> : <Circle size={13} className="text-slate-300" />}
-                      <span>{rule.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <DispatcherButton onClick={handleChangePassword} loading={passwordSaving} loadingText="Updating...">
-            Update Password
-          </DispatcherButton>
-        </div>
-      </DispatcherCard>
-    </div>
+        </DispatcherCard>
+      </div>
+    </PanelShell>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Camera, ImageOff, Loader2, Trash2, Upload, AlertCircle } from "lucide-react";
+import { Camera, Loader2, Trash2, Upload, AlertCircle } from "lucide-react";
 import { apiService, type ApiStoreCategoryImageMeta } from "../../../../../services/apiService";
+import { ConfirmDialog } from "@/components/panel";
 import {
   prepareCategoryImage,
   formatImageSize,
@@ -47,6 +48,15 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
       .then((image) => {
         if (!cancelled) setPreviewSrc(image?.imageData ?? null);
       })
+      // There was no .catch here at all, and getMerchantCategoryImage has an
+      // EMPTY catch of its own (apiService.ts:789-796) that returns null
+      // without even logging. So a 500 on the photo endpoint was
+      // indistinguishable from a category that simply has no photo.
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn("Could not load the category photo:", err);
+        setError("The photo could not be loaded. It may still be there.");
+      })
       .finally(() => {
         if (!cancelled) setIsLoadingPreview(false);
       });
@@ -80,22 +90,26 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
       } catch (uploadErr: any) {
         setPreviewSrc(previousPreview);
         throw new CategoryImageError(
-          uploadErr?.response?.data?.message || "The photo could not be saved. Please try again."
+          uploadErr?.response?.data?.message || "The photo could not be saved. Please try again.",
         );
       }
     } catch (err: any) {
-      setError(err instanceof CategoryImageError ? err.message : "That image could not be processed.");
+      setError(
+        err instanceof CategoryImageError ? err.message : "That image could not be processed.",
+      );
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleRemove = async () => {
-    const confirmed = window.confirm(
-      `Remove photo for "${categoryName}"?\n\nThe customer app will fall back to a default stock icon for this category.`
-    );
-    if (!confirmed) return;
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
+  const handleRemove = async () => {
+    // The native confirm that used to gate this is gone. It rendered in
+    // browser chrome with no product voice, and its consequence (the customer
+    // app falling back to a stock icon) was jammed into a window.confirm body
+    // using escape characters for layout. ConfirmDialog states it properly.
+    setConfirmRemove(false);
     setError(null);
     setIsRemoving(true);
     try {
@@ -115,13 +129,13 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
     <div className="space-y-1.5 w-full">
       {/* Thumbnail Container */}
       <div
-        className={`relative w-full h-24 sm:h-28 rounded-xl overflow-hidden border transition group ${
-          hasImage ? "border-slate-200 bg-slate-900" : "border-dashed border-slate-300 bg-slate-50"
+        className={`relative w-full h-24 sm:h-28 rounded-plate overflow-hidden border border-edge transition group ${
+          hasImage ? "border-edge bg-slate-900" : "border-dashed border-edge bg-board-ground"
         }`}
       >
         {isLoadingPreview && !previewSrc ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-50">
-            <Loader2 size={18} className="animate-spin text-slate-400" />
+          <div className="absolute inset-0 flex items-center justify-center bg-board-ground">
+            <Loader2 size={18} className="animate-spin text-ink-muted" />
           </div>
         ) : previewSrc ? (
           <>
@@ -130,13 +144,14 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
               alt={`${categoryName} photo`}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-            <div className="absolute bottom-1.5 left-2 right-2 flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-white truncate drop-shadow-sm">
-                {categoryName}
-              </span>
+            {/* The gradient scrim is gone, and with it the 9px and 10px type
+                and the drop-shadow that were propping up white text over an
+                unknown photo. The caption now sits on a solid band below the
+                image, where it is legible whatever the photo contains. */}
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-board-field-deep px-2 py-1">
+              <span className="truncate text-micro uppercase text-board-plate">{categoryName}</span>
               {imageMeta && (
-                <span className="text-[9px] font-mono text-slate-200 font-semibold drop-shadow-sm">
+                <span data-figure className="shrink-0 font-mono text-micro text-board-trim">
                   {formatImageSize(imageMeta.fileSize)}
                 </span>
               )}
@@ -147,15 +162,15 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-[#1E3A5F] hover:bg-slate-100/70 transition p-2 text-center"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-ink-muted hover:text-board-field hover:bg-board-ground transition p-2 text-center"
           >
             <Camera size={18} />
-            <span className="text-[10px] font-bold">Add Photo</span>
+            <span className="text-label">Add Photo</span>
           </button>
         )}
 
         {isBusy && (
-          <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center gap-1.5 text-white text-[10px] font-bold">
+          <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center gap-1.5 text-white text-label">
             <Loader2 size={14} className="animate-spin" />
             <span>{isUploading ? "Uploading..." : "Removing..."}</span>
           </div>
@@ -177,7 +192,7 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isBusy}
-          className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 text-[10px] font-bold transition disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-trim bg-board-ground hover:bg-board-ground text-ink-muted hover:text-ink border border-edge text-label transition disabled:opacity-50"
         >
           {hasImage ? <Upload size={11} /> : <Camera size={11} />}
           <span>{hasImage ? "Change" : "Upload"}</span>
@@ -186,9 +201,9 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
         {hasImage && (
           <button
             type="button"
-            onClick={handleRemove}
+            onClick={() => setConfirmRemove(true)}
             disabled={isBusy}
-            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 transition disabled:opacity-50"
+            className="p-1 rounded-trim text-ink-muted hover:text-status-act-ink hover:bg-status-act-fill border border-edge hover:border-status-act-ink/40 transition-colors disabled:opacity-50"
             title={`Remove photo for ${categoryName}`}
           >
             <Trash2 size={12} />
@@ -197,11 +212,24 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
       </div>
 
       {error && (
-        <p className="flex items-center gap-1 text-[10px] font-semibold text-red-600">
-          <AlertCircle size={11} className="shrink-0" />
-          <span className="truncate">{error}</span>
+        // No truncate. This used to be `truncate`, so any server message
+        // longer than the 100px-odd control clipped to nothing useful.
+        <p className="flex items-start gap-1 text-micro text-status-act-ink">
+          <AlertCircle size={11} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        title="Remove this photo?"
+        body={`The photo for "${categoryName}" will be deleted.`}
+        consequence="The customer app falls back to a default stock icon for this category."
+        confirmLabel="Remove the photo"
+        onConfirm={() => void handleRemove()}
+        busy={isRemoving}
+      />
     </div>
   );
 };

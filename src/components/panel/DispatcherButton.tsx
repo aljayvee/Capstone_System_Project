@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
  * what every dispatcher screen already uses by convention. Rather than
  * override that everywhere it's used, this codifies the recipe that's
  * already consistent across 11 dispatcher files into one place.
+ *
+ * Route board build: `primary` is now the signal red, because on this surface
+ * red has exactly one meaning, "you must act", and the primary action is that
+ * meaning. Navy moved to its own `field` variant, since navy is the board's
+ * structural field rather than an emphasis colour. The `success` variant also
+ * lost `shadow-md shadow-emerald-600/30`, a zero-offset coloured halo that the
+ * flat-surface invariant bans and that every success button inherited.
  */
 
 // Disabled states are deliberately their own, checked pair per variant — not
@@ -17,32 +24,33 @@ import { cn } from "@/lib/utils";
 // text-slate-400, or lighter) measured at 1.5-2.5:1 contrast everywhere, well
 // under WCAG AA's 4.5:1 floor for text this small — a disabled "Pin Store"
 // button that a dispatcher genuinely could not read, not just one that looked
-// muted. Every pairing below is a real, computed ratio, not a guess:
-// primary/success 5.10:1, secondary 6.92:1, subtle 6.15:1, danger-ghost 4.76:1.
+// muted. The disabled pairing is now one token pair for every variant,
+// bg-status-closed-fill on text-status-closed-ink, computed at 6.4:1: slate
+// here means "no claim being made", which is what a disabled control is.
+const DISABLED = "disabled:bg-status-closed-fill disabled:text-status-closed-ink";
+
 const VARIANT_CLASSES = {
-  primary:
-    "bg-dispatcher-navy hover:bg-dispatcher-navy-dark text-white shadow-xs disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none",
-  secondary:
-    "bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-2xs disabled:text-slate-600 disabled:bg-slate-100",
-  subtle:
-    "bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-900 disabled:bg-slate-200 disabled:text-slate-600",
-  success:
-    "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/30 disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none",
-  "danger-ghost":
-    "text-rose-500 hover:text-rose-700 hover:bg-rose-50 disabled:text-slate-500 disabled:hover:bg-transparent",
+  primary: `bg-signal hover:bg-signal-deep text-white ${DISABLED}`,
+  field: `bg-board-field hover:bg-board-field-deep text-white ${DISABLED}`,
+  secondary: `bg-board-plate hover:bg-board-ground text-ink border border-edge ${DISABLED} disabled:border-transparent`,
+  subtle: `bg-board-ground hover:bg-board-trim/25 text-ink ${DISABLED}`,
+  success: `bg-status-done-ink hover:bg-board-field text-white ${DISABLED}`,
+  "danger-ghost": `text-status-act-ink hover:bg-status-act-fill ${DISABLED} disabled:bg-transparent`,
 } as const;
 
+// Every size clears a 36px minimum target, which the tablet usage makes
+// load-bearing rather than nominal. `sm` was previously text-xs px-3 py-1.5,
+// about 28px tall.
 const SIZE_CLASSES = {
-  sm: "text-xs px-3 py-1.5 gap-1.5",
-  md: "text-xs px-4 py-2.5 gap-1.5",
-  lg: "text-sm px-4 py-3.5 gap-2.5",
+  sm: "text-micro px-3 min-h-9 gap-1.5",
+  md: "text-label px-4 min-h-10 gap-2",
+  lg: "text-panel px-5 min-h-12 gap-2.5",
 } as const;
 
 type Variant = keyof typeof VARIANT_CLASSES;
 type Size = keyof typeof SIZE_CLASSES;
 
-interface CommonProps
-  extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+interface CommonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   variant?: Variant;
   size?: Size;
   /** Swaps the icon slot for a spinner (and the label too, if `loadingText` is given). */
@@ -80,12 +88,17 @@ export function DispatcherButton({
     <button
       type="button"
       disabled={disabled || loading}
+      // The focus ring is not declared here. src/styles/surfaces.css gives the
+      // whole console one themed :focus-visible outline at a specificity that
+      // outranks a utility class, so every control agrees and none can opt out
+      // by accident. Before that, all 31 component files had zero focus-visible
+      // styles between them.
       className={cn(
-        "inline-flex items-center justify-center font-bold rounded-xl transition active:scale-95 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer",
+        "inline-flex cursor-pointer items-center justify-center rounded-plate transition-colors duration-150 disabled:cursor-not-allowed",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],
-        iconOnly && "aspect-square p-0",
-        className
+        iconOnly && "aspect-square px-0",
+        className,
       )}
       {...props}
     >

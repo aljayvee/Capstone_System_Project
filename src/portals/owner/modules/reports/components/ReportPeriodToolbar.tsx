@@ -48,7 +48,7 @@ export const ReportPeriodToolbar: React.FC<ReportPeriodToolbarProps> = ({
   isGeneratingPdf,
 }) => {
   return (
-    <div className="flex items-center justify-between flex-wrap gap-3 border-b border-slate-100 pb-4">
+    <div className="flex items-center justify-between flex-wrap gap-3 border-b border-hairline pb-4">
       <RangeSelector
         preset={preset}
         onPresetChange={onPresetChange}
@@ -60,9 +60,13 @@ export const ReportPeriodToolbar: React.FC<ReportPeriodToolbarProps> = ({
         <button
           onClick={onPreview}
           disabled={exportDisabled || isGeneratingPdf}
-          className="flex items-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-4 py-2.5 rounded-plate transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isGeneratingPdf ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+          {isGeneratingPdf ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <FileText size={15} />
+          )}
           {isGeneratingPdf ? "Preparing PDF..." : "Export PDF"}
         </button>
 
@@ -70,7 +74,7 @@ export const ReportPeriodToolbar: React.FC<ReportPeriodToolbarProps> = ({
           <button
             onClick={onExportCSV}
             disabled={exportDisabled}
-            className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-board-plate border border-edge hover:bg-board-ground text-ink text-label px-4 py-2.5 rounded-plate transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={15} /> Export CSV
           </button>

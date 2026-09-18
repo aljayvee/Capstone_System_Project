@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { ref, onValue } from "firebase/database";
 import { database } from "../firebase/config";
@@ -146,10 +146,33 @@ function expectedIntervalMs(presence: RiderPresenceState): number | null {
   return null;
 }
 
-export function useRiderFleetPresence(): { riders: RiderFleetMember[]; isLoading: boolean } {
+/**
+ * ADDITIVE, 2026-09-17: `loadError` and `reload`.
+ *
+ * This hook returned `{ riders, isLoading }` and had no error channel at all,
+ * while `loadRoster` discarded the null that `apiService.getRiders()` resolves
+ * on failure. Both consumers were therefore structurally unable to tell "no
+ * riders are registered" from "the roster endpoint is down", and the Owner
+ * Portal's tracking screen rendered "0 Ready, 0 Delivering" beside a pulsing
+ * green dot and an animated radio icon whenever /riders was unreachable. The
+ * interface asserted liveness it had never checked.
+ *
+ * Nothing else changes. The Socket.io listener, the Firebase subscription and
+ * the 15s roster poll are untouched, existing consumers that destructure
+ * `{ riders, isLoading }` keep working, and a transient failure still leaves
+ * the last roster on screen rather than blanking it: stale data under an
+ * honest warning beats an empty list that looks like an answer.
+ */
+export function useRiderFleetPresence(): {
+  riders: RiderFleetMember[];
+  isLoading: boolean;
+  loadError: string | null;
+  reload: () => void;
+} {
   const [roster, setRoster] = useState<ApiRider[]>([]);
   const [fleetLocations, setFleetLocations] = useState<Record<string, FirebaseRiderEntry>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Bumped to force an out-of-band roster re-fetch when the socket says a
   // rider's presence moved, so a shift starting or ending shows up immediately
@@ -161,8 +184,18 @@ export function useRiderFleetPresence(): { riders: RiderFleetMember[]; isLoading
 
     const loadRoster = async () => {
       const riders = await apiService.getRiders();
-      if (!cancelled && riders) setRoster(riders);
-      if (!cancelled) setIsLoading(false);
+      if (cancelled) return;
+      // apiService.getRiders catches its own error and resolves null
+      // (apiService.ts:705-713). Null is the failure; an empty array is a
+      // genuinely empty roster. Discarding the null, as this did, collapsed
+      // those two into the same screen.
+      if (riders) {
+        setRoster(riders);
+        setLoadError(null);
+      } else {
+        setLoadError("The rider roster did not load.");
+      }
+      setIsLoading(false);
     };
 
     loadRoster();
@@ -255,5 +288,9 @@ export function useRiderFleetPresence(): { riders: RiderFleetMember[]; isLoading
     };
   });
 
-  return { riders, isLoading };
+  // `reload` reuses the refresh token the socket listener already bumps, so a
+  // retry button and a presence event take the same path.
+  const reload = useCallback(() => setRefreshToken((n) => n + 1), []);
+
+  return { riders, isLoading, loadError, reload };
 }

@@ -1,15 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router";
-import {
-  Pencil,
-  Check,
-  Building2,
-  ChevronDown,
-  X,
-  MapPin,
-  Tag,
-  Sparkles,
-} from "lucide-react";
+import { Pencil, Check, Building2, ChevronDown, MapPin, Tag } from "lucide-react";
 import {
   apiService,
   type ApiMerchantCategory,
@@ -29,25 +20,14 @@ interface CategoryRowCardProps {
   category: ApiMerchantCategory;
   onUpdated: (updated: ApiMerchantCategory) => void;
   onSelectCategoryForPlaces?: (categoryId: number) => void;
-  index: number;
   /** Live rates, so the fee-mode labels quote real figures rather than hardcoded ones. */
   rateConfig?: ApiRateConfig | null;
 }
-
-const CATEGORY_COLOR_SCHEMES = [
-  { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
-  { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
-  { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
-  { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
-  { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200" },
-];
 
 export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
   category,
   onUpdated,
   onSelectCategoryForPlaces,
-  index,
   rateConfig,
 }) => {
   const [editing, setEditing] = useState(false);
@@ -55,10 +35,10 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
   const [description, setDescription] = useState(category.description || "");
   const [status, setStatus] = useState<"Active" | "Inactive">(category.status);
   const [handlingFeeMode, setHandlingFeeMode] = useState<HandlingFeeMode>(
-    category.handlingFeeMode ?? "THRESHOLD"
+    category.handlingFeeMode ?? "THRESHOLD",
   );
   const [geofenceRadius, setGeofenceRadius] = useState<string>(
-    String(category.geofenceRadiusMeters ?? 75)
+    String(category.geofenceRadiusMeters ?? 75),
   );
   const [isSaving, setIsSaving] = useState(false);
   // The server refuses bills-payment category names and explains which term it
@@ -69,8 +49,10 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
   const [showPlaces, setShowPlaces] = useState(false);
   const [resolvedPlacesCount, setResolvedPlacesCount] = useState<number | null>(null);
 
-  const scheme = CATEGORY_COLOR_SCHEMES[index % CATEGORY_COLOR_SCHEMES.length];
-  const placesCount = resolvedPlacesCount ?? category._count?.places ?? 0;
+  // `?? 0` used to close this expression, so a category whose _count the API
+  // did not include rendered "0 Stores" - asserting the category is empty when
+  // nobody had said how many it holds. Null means unknown and prints a dash.
+  const placesCount = resolvedPlacesCount ?? category._count?.places ?? null;
   const directoryHref = `/places?categoryId=${category.id}`;
 
   const handleImageChanged = (meta: ApiStoreCategoryImageMeta | null) => {
@@ -109,7 +91,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
       // Shown as written: the server's message names the exact term it objected
       // to, which is the difference between a usable rejection and a dead end.
       setSaveError(
-        err?.response?.data?.message || "Could not save this category. Please try again."
+        err?.response?.data?.message || "Could not save this category. Please try again.",
       );
     } finally {
       setIsSaving(false);
@@ -128,10 +110,8 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
 
   return (
     <div
-      className={`bg-white border rounded-2xl p-5 shadow-xs transition-all duration-200 hover:shadow-md flex flex-col justify-between ${
-        editing
-          ? "border-amber-400 ring-2 ring-amber-100 bg-amber-50/10"
-          : "border-slate-200/90 hover:border-slate-300"
+      className={`bg-board-plate border border-edge rounded-plate p-5 transition-all duration-200 flex flex-col justify-between ${
+        editing ? " ring-2  bg-status-waiting-fill" : "border-edge hover:border-edge"
       }`}
     >
       <div className="space-y-4">
@@ -152,7 +132,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
             {editing ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-micro text-ink-muted uppercase mb-1">
                     Category Name *
                   </label>
                   <input
@@ -160,34 +140,34 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full font-bold text-slate-900 text-xs bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] transition"
+                    className="w-full text-ink text-label bg-board-plate border border-edge rounded-plate px-3 py-2 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field transition"
                     placeholder="Category name"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-micro text-ink-muted uppercase mb-1">
                     Description
                   </label>
                   <textarea
                     rows={2}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full text-xs text-slate-700 bg-white border border-slate-300 rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] transition resize-none"
+                    className="w-full text-label text-ink bg-board-plate border border-edge rounded-plate px-3 py-1.5 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field transition resize-none"
                     placeholder="Brief description of items or partner stores..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-micro text-ink-muted uppercase mb-1">
                     Customer Visibility Status
                   </label>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => setStatus("Active")}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      className={`px-3 py-1 rounded-trim text-label transition ${
                         status === "Active"
-                          ? "bg-emerald-600 text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "bg-status-done-ink text-white"
+                          : "bg-board-ground text-ink-muted hover:bg-board-ground"
                       }`}
                     >
                       Active
@@ -195,10 +175,10 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                     <button
                       type="button"
                       onClick={() => setStatus("Inactive")}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                      className={`px-3 py-1 rounded-trim text-label transition ${
                         status === "Inactive"
-                          ? "bg-slate-700 text-white shadow-2xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "bg-board-field text-white"
+                          : "bg-board-ground text-ink-muted hover:bg-board-ground"
                       }`}
                     >
                       Inactive
@@ -211,13 +191,13 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                     "THRESHOLD" means. The amounts themselves stay in Service
                     Rates — only which rule applies is per-category. */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  <label className="block text-micro text-ink-muted uppercase mb-1">
                     Purchase Handling Fee
                   </label>
                   <select
                     value={handlingFeeMode}
                     onChange={(e) => setHandlingFeeMode(e.target.value as HandlingFeeMode)}
-                    className="w-full text-xs text-slate-700 bg-white border border-slate-300 rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] transition"
+                    className="w-full text-label text-ink bg-board-plate border border-edge rounded-plate px-3 py-1.5 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field transition"
                   >
                     {HANDLING_FEE_MODES.map((mode) => (
                       <option key={mode} value={mode}>
@@ -225,13 +205,13 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-500 mt-1">
+                  <p className="text-label text-ink-muted mt-1">
                     Charged on the value of the goods, on top of the delivery fee.
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+                  <label className="block text-micro uppercase text-ink-muted mb-1">
                     Arrival Radius
                   </label>
                   <div className="flex items-center gap-2">
@@ -243,18 +223,18 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                       value={geofenceRadius}
                       onChange={(e) => setGeofenceRadius(e.target.value)}
                       data-testid="category-geofence-radius"
-                      className="w-24 text-xs text-slate-700 bg-white border border-slate-300 rounded-xl px-3 py-1.5 outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] transition"
+                      className="w-24 text-label text-ink bg-board-plate border border-edge rounded-plate px-3 py-1.5 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field transition"
                     />
-                    <span className="text-xs font-semibold text-slate-500">metres</span>
+                    <span className="text-label text-ink-muted">metres</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    How close the rider must get before this stop counts as reached.
-                    A supermarket needs a wider circle than a roadside carinderia.
+                  <p className="text-label text-ink-muted mt-1">
+                    How close the rider must get before this stop counts as reached. A supermarket
+                    needs a wider circle than a roadside carinderia.
                   </p>
                 </div>
 
                 {saveError && (
-                  <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  <p className="text-label text-status-act-ink bg-status-act-fill border border-status-act-ink/20 rounded-plate px-3 py-2">
                     {saveError}
                   </p>
                 )}
@@ -262,32 +242,33 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-extrabold text-slate-900 text-base truncate">
-                    {category.name}
-                  </h3>
+                  <h3 className=" text-ink text-panel truncate">{category.name}</h3>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border shrink-0 ${
+                    className={`px-2.5 py-0.5 rounded-full text-micro uppercase border border-edge shrink-0 ${
                       category.status === "Active"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        : "bg-slate-100 text-slate-500 border-slate-200"
+                        ? "bg-status-done-fill text-status-done-ink "
+                        : "bg-board-ground text-ink-muted border-edge"
                     }`}
                   >
                     {category.status}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">
+                <p className="text-label text-ink-muted line-clamp-3 leading-relaxed">
                   {category.description || (
-                    <span className="italic text-slate-400">No category description provided.</span>
+                    <span className="text-ink-muted">No category description provided.</span>
                   )}
                 </p>
                 {/* Visible without opening the editor: pricing that can only be
                     seen by clicking into each category is pricing nobody checks. */}
                 <div
-                  className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200"
-                  title={describeHandlingFeeMode(category.handlingFeeMode ?? "THRESHOLD", rateConfig)}
+                  className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-trim bg-board-ground border border-edge"
+                  title={describeHandlingFeeMode(
+                    category.handlingFeeMode ?? "THRESHOLD",
+                    rateConfig,
+                  )}
                 >
-                  <Tag size={11} className="text-slate-400" />
-                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                  <Tag size={11} className="text-ink-muted" />
+                  <span className="text-micro text-ink-muted uppercase">
                     {shortHandlingFeeMode(category.handlingFeeMode ?? "THRESHOLD")}
                   </span>
                 </div>
@@ -297,13 +278,13 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
         </div>
 
         {/* Bottom Action Rail */}
-        <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-hairline">
           {editing ? (
             <div className="flex items-center gap-2 w-full justify-end">
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold transition"
+                className="px-3.5 py-1.5 rounded-plate border border-edge hover:bg-board-ground text-ink-muted text-label transition"
                 title="Cancel Edit"
               >
                 Cancel
@@ -312,7 +293,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                 type="button"
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-4 py-1.5 bg-[#1E3A5F] hover:bg-[#162D4A] text-white text-xs font-bold rounded-xl shadow-2xs transition flex items-center gap-1.5"
+                className="px-4 py-1.5 bg-board-field hover:bg-board-field-deep text-white text-label rounded-plate transition flex items-center gap-1.5"
                 title="Save Changes"
               >
                 <Check size={14} />
@@ -326,16 +307,22 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                 type="button"
                 onClick={() => setShowPlaces((open) => !open)}
                 aria-expanded={showPlaces}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition shadow-2xs ${
+                className={`flex items-center gap-2 rounded-plate border border-edge px-3 py-1.5 text-label transition-colors ${
                   showPlaces
-                    ? `${scheme.bg} ${scheme.text} ${scheme.border}`
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    ? "bg-board-ground text-ink"
+                    : "bg-board-plate text-ink-muted hover:bg-board-ground hover:text-ink"
                 }`}
-                title={`Show ${placesCount} location store${placesCount === 1 ? "" : "s"} in ${category.name}`}
+                title={
+                  placesCount === null
+                    ? `Show the location stores in ${category.name}. The number of stores is not known.`
+                    : `Show ${placesCount} location store${placesCount === 1 ? "" : "s"} in ${category.name}`
+                }
               >
-                <Building2 size={14} className={showPlaces ? "" : "text-slate-400"} />
-                <span className="font-mono font-black text-slate-900">{placesCount}</span>
-                <span className="text-[11px] text-slate-500 font-medium">Stores</span>
+                <Building2 size={14} className={showPlaces ? "" : "text-ink-muted"} />
+                <span className="font-mono font-bold text-ink">
+                  {placesCount === null ? "--" : placesCount}
+                </span>
+                <span className="text-body text-ink-muted">Stores</span>
                 <ChevronDown
                   size={13}
                   className={`transition-transform duration-200 ${showPlaces ? "rotate-180" : ""}`}
@@ -348,7 +335,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectCategoryForPlaces(category.id)}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 transition shadow-2xs flex items-center gap-1 text-xs font-bold"
+                    className="p-2 rounded-plate bg-board-ground hover:bg-board-ground text-ink-muted hover:text-ink border border-edge transition flex items-center gap-1 text-label"
                     title={`View ${category.name} location stores`}
                   >
                     <MapPin size={14} />
@@ -357,7 +344,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                 ) : (
                   <Link
                     to={directoryHref}
-                    className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-blue-700 border border-slate-200 transition shadow-2xs flex items-center gap-1 text-xs font-bold"
+                    className="p-2 rounded-plate bg-board-ground hover:bg-board-ground text-ink-muted hover:text-ink border border-edge transition flex items-center gap-1 text-label"
                     title={`Manage ${category.name} locations in directory`}
                   >
                     <MapPin size={14} />
@@ -368,7 +355,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="p-2 rounded-xl bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-700 border border-slate-200 transition shadow-2xs"
+                  className="p-2 rounded-plate bg-board-ground hover:bg-status-waiting-fill text-ink-muted hover:text-status-waiting-ink border border-edge transition"
                   title="Edit Category Details"
                 >
                   <Pencil size={14} />
@@ -381,7 +368,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
 
       {/* Expanded Pinned Stores Panel */}
       {showPlaces && (
-        <div className="mt-4 pt-4 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-4 pt-4 border-t border-hairline animate-in fade-in slide-in-from-top-1 duration-200">
           <CategoryPlacesPanel
             categoryId={category.id}
             categoryName={category.name}

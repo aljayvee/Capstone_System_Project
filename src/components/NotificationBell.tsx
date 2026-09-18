@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Bell, CheckCheck } from "lucide-react";
 import { apiService, type ApiNotification } from "../services/apiService";
 
@@ -12,13 +12,43 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-// Shared by the Owner and Dispatcher portals (both render it next to
-// ServerStatusBadge in their header) — closes REQ035/036.
+/**
+ * Notifications, shared by the Owner and Dispatcher portals (both render it
+ * next to ServerStatusBadge in their header) — closes REQ035/036.
+ *
+ * Because it renders in both, this pass fixed the things that are wrong
+ * everywhere rather than repainting it in one portal's palette. The console
+ * inverts it on the navy band through the `data-bell` hook in surfaces.css.
+ *
+ * What was wrong:
+ *
+ * It could not be operated from a keyboard. There was a click-outside
+ * listener and nothing else: no Escape, no focus moved into the panel, no
+ * focus returned to the trigger, and no `aria-expanded` — so a screen reader
+ * was never told the panel existed, let alone that it had opened. The button's
+ * only name was a `title`, which is not announced reliably and shows nothing
+ * at all on touch.
+ *
+ * The unread count was a bare number. "3" beside a bell is not a label, so it
+ * now carries the words in an accessible-only span.
+ *
+ * `text-slate-400` on white measures about 2.6:1, well under the 4.5:1 floor,
+ * and it was carrying the timestamps, the empty state and the unread count.
+ * The tinted ink token clears it at both portals' backgrounds.
+ *
+ * The unread marker was `bg-blue-50/50` — a tint at 50% of an already pale
+ * blue, on a surface whose palette contains no blue, doing the weakest
+ * possible job of the most important distinction in the list. It is a mark
+ * against the title now, which reads at a glance and costs no colour.
+ */
 export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -45,58 +75,121 @@ export const NotificationBell: React.FC = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  // Escape closes it and hands focus back, which is the whole of the keyboard
+  // contract a popover owes and none of which existed.
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen) dialogRef.current?.focus();
+  }, [isOpen]);
+
   const handleMarkRead = async (id: number) => {
+    // Optimistic, but reverted when the write fails. Without the revert the
+    // panel kept claiming a notification was read while the server still had
+    // it unread, so it returned on the next poll and the count disagreed with
+    // the list. markNotificationRead returns null rather than throwing.
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-    await apiService.markNotificationRead(id);
+
+    const saved = await apiService.markNotificationRead(id);
+    if (!saved) {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)));
+    }
   };
 
   return (
     <div className="relative" ref={panelRef}>
       <button
+        ref={triggerRef}
+        type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className="relative p-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition shadow-sm"
-        title="Notifications"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? panelId : undefined}
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications, none unread"
+        }
+        data-bell
+        className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
       >
-        <Bell size={17} className="text-slate-600" />
+        <Bell size={17} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center">
+          <span
+            aria-hidden
+            className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-signal px-1 text-[10px] font-bold tabular-nums text-white"
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-lg z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800">Notifications</h3>
-            {unreadCount > 0 && <span className="text-[11px] text-slate-400">{unreadCount} unread</span>}
+        <div
+          id={panelId}
+          ref={dialogRef}
+          role="dialog"
+          aria-label="Notifications"
+          tabIndex={-1}
+          data-elevate
+          className="absolute right-0 z-50 mt-2 max-h-96 w-80 overflow-y-auto rounded-plate border border-edge bg-board-plate shadow-plate outline-none"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+            <h3 className="text-sm font-bold text-ink">Notifications</h3>
+            {unreadCount > 0 && (
+              <span data-figure className="text-xs font-semibold tabular-nums text-ink-muted">
+                {unreadCount} unread
+              </span>
+            )}
           </div>
 
           {isLoading ? (
-            <p className="p-4 text-xs text-slate-400 text-center">Loading...</p>
+            <p className="p-4 text-center text-xs text-ink-muted">Loading</p>
           ) : notifications.length === 0 ? (
-            <p className="p-6 text-xs text-slate-400 text-center">No notifications yet.</p>
+            <p className="p-6 text-center text-xs text-ink-muted">No notifications yet.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {notifications.map((n) => (
-                <li
-                  key={n.id}
-                  className={`px-4 py-3 text-xs space-y-1 ${n.isRead ? "bg-white" : "bg-blue-50/50"}`}
-                >
+                <li key={n.id} className="space-y-1 px-4 py-3 text-xs">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-slate-800">{n.title}</p>
+                    <p className="flex min-w-0 items-baseline gap-2 font-bold text-ink">
+                      {!n.isRead && (
+                        <span
+                          aria-hidden
+                          className="mt-1 size-1.5 shrink-0 rounded-full bg-signal"
+                        />
+                      )}
+                      <span className="min-w-0">
+                        {!n.isRead && <span className="sr-only">Unread. </span>}
+                        {n.title}
+                      </span>
+                    </p>
                     {!n.isRead && (
                       <button
+                        type="button"
                         onClick={() => handleMarkRead(n.id)}
-                        className="text-blue-600 hover:text-blue-800 shrink-0"
-                        title="Mark as read"
+                        aria-label={`Mark "${n.title}" as read`}
+                        className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-ink-muted transition-colors hover:bg-slate-100 hover:text-ink"
                       >
                         <CheckCheck size={14} />
                       </button>
                     )}
                   </div>
-                  <p className="text-slate-500">{n.body}</p>
-                  <p className="text-[10px] text-slate-400">{timeAgo(n.createdAt)}</p>
+                  <p className="text-ink-muted">{n.body}</p>
+                  <p data-figure className="text-[11px] tabular-nums text-ink-muted">
+                    {timeAgo(n.createdAt)}
+                  </p>
                 </li>
               ))}
             </ul>

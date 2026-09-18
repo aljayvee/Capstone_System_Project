@@ -37,6 +37,16 @@ export function useDashboardMetrics(
     async function load() {
       setIsLoading(true);
       setError(null);
+      // Cleared on every read, which is the whole signature interaction.
+      // Without it `data` survives a period change, and because every figure
+      // renders as `data ? value : placeholder`, the placeholder machinery
+      // could never fire again after the first successful mount: switching
+      // Today to Month kept LAST period's numbers on screen beside a heading
+      // that already said Month, and a failed request left them there under a
+      // banner. The direction contract names the opposite - any figure the
+      // request did not return goes to a dash in that same beat rather than
+      // holding a stale number under a lit indicator.
+      setData(null);
       const summary = await apiService.getDashboardSummary(frequency, range);
       if (cancelled) return;
       if (summary) {

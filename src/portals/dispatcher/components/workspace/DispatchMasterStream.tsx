@@ -1,7 +1,9 @@
 import React from "react";
 import { Errand } from "../../../../types/errand";
+import { cn } from "@/lib/utils";
 import { DispatchErrandCard } from "./DispatchErrandCard";
-import { Search, SlidersHorizontal, CheckCircle2, Inbox } from "lucide-react";
+import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { PanelState } from "@/components/panel/PanelState";
 
 interface DispatchMasterStreamProps {
   errands: Errand[];
@@ -16,8 +18,33 @@ interface DispatchMasterStreamProps {
   onSegmentChange: (seg: "INCOMING" | "ACTIVE") => void;
   incomingCount: number;
   activeCount: number;
+  /** Additive. The board's own load state, so the stream stops asserting empty. */
+  isLoading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
 }
 
+/**
+ * The board: every run in the chosen segment, oldest demand first.
+ *
+ * Structure is AGENTS.md 8.12, which this already followed: the segment
+ * switcher, the search and the category capsules stay pinned and only the list
+ * scrolls. The two-segment control is AGENTS.md 8.30 and stays exactly two,
+ * with no "All" tab.
+ *
+ * What changed. The empty state used to be the only state: there was no
+ * loading and no failure, so a dead API rendered "No Errands in this View"
+ * with the same confidence as a genuinely quiet board. That decision now
+ * belongs to PanelState, which orders a failure ahead of emptiness.
+ *
+ * The search input is the shared field rather than the third of four
+ * hand-rolled copies, which also gives it a real accessible name instead of a
+ * placeholder.
+ *
+ * The `⌘K` badge is gone. It advertised a shortcut that nothing implemented,
+ * on a console whose dispatchers are on Windows, so it named the wrong
+ * modifier for a keystroke that did nothing.
+ */
 export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
   errands,
   selectedErrandId,
@@ -31,131 +58,122 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
   onSegmentChange,
   incomingCount,
   activeCount,
+  isLoading = false,
+  loadError = null,
+  onRetry,
 }) => {
+  const hasFilters = searchQuery.trim().length > 0 || selectedCategory !== "ALL";
+
+  const resetFilters = () => {
+    onSearchChange("");
+    onCategoryChange("ALL");
+  };
+
+  const segment = (id: "INCOMING" | "ACTIVE", label: string, count: number) => {
+    const isActive = activeSegment === id;
+    return (
+      <button
+        type="button"
+        onClick={() => onSegmentChange(id)}
+        aria-pressed={isActive}
+        className={cn(
+          "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-trim px-3 text-micro uppercase transition-colors",
+          isActive ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+        )}
+      >
+        <span>{label}</span>
+        <span data-figure className="tabular-nums">
+          {count}
+        </span>
+      </button>
+    );
+  };
+
   return (
-    <div className="flex flex-col h-full bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP TOOLBAR: Segmented Capsule Switcher & Search Bar        */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="p-3.5 sm:p-4 border-b border-slate-100 space-y-3 bg-white/90 backdrop-blur-xs">
-        {/* Apple Segmented Pill Switcher */}
-        <div className="flex items-center p-1 bg-slate-100 rounded-xl">
-          <button
-            type="button"
-            onClick={() => onSegmentChange("INCOMING")}
-            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-              activeSegment === "INCOMING"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <span>Incoming</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                activeSegment === "INCOMING"
-                  ? "bg-blue-100 text-blue-800 font-bold"
-                  : "bg-slate-200 text-slate-700"
-              }`}
-            >
-              {incomingCount}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSegmentChange("ACTIVE")}
-            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-              activeSegment === "ACTIVE"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <span>Active</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                activeSegment === "ACTIVE"
-                  ? "bg-blue-100 text-blue-800 font-bold"
-                  : "bg-slate-200 text-slate-700"
-              }`}
-            >
-              {activeCount}
-            </span>
-          </button>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
+      {/* Pinned controls */}
+      <div className="shrink-0 space-y-2.5 border-b border-hairline p-3">
+        <div className="flex items-center gap-1 rounded-plate bg-board-ground p-1">
+          {segment("INCOMING", "Incoming", incomingCount)}
+          {segment("ACTIVE", "Active", activeCount)}
         </div>
 
-        {/* Search Bar with Cmd+K Badge */}
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search Errand, Customer, Store..."
-            className="w-full pl-9 pr-14 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
-          />
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold text-slate-400 border border-slate-200 px-1.5 py-0.5 rounded-md bg-white">
-            ⌘K
-          </span>
-        </div>
+        <DispatcherSearchField
+          aria-label="Search the board by store, customer, route number or address"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Search store, customer, route number"
+        />
 
-        {/* Category Filter Chips */}
         {categories.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
             <button
               type="button"
               onClick={() => onCategoryChange("ALL")}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+              aria-pressed={selectedCategory === "ALL"}
+              className={cn(
+                "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim px-3 text-micro uppercase transition-colors",
                 selectedCategory === "ALL"
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                  ? "bg-board-field text-board-plate"
+                  : "bg-board-ground text-ink-muted hover:text-ink"
+              )}
             >
-              All Categories
+              All
             </button>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => onCategoryChange(cat)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
-                  selectedCategory.toLowerCase() === cat.toLowerCase()
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const isActive = selectedCategory.toLowerCase() === cat.toLowerCase();
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => onCategoryChange(cat)}
+                  aria-pressed={isActive}
+                  className={cn(
+                    "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim px-3 text-micro uppercase transition-colors",
+                    isActive
+                      ? "bg-board-field text-board-plate"
+                      : "bg-board-ground text-ink-muted hover:text-ink"
+                  )}
+                >
+                  {cat}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. MASTER CARDS STREAM (Scrollable list)                      */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-3.5 space-y-2.5">
-        {errands.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center my-auto">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
-              <Inbox size={22} />
-            </div>
-            <p className="text-xs font-bold text-slate-700">No Errands in this View</p>
-            <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
-              {searchQuery
-                ? `No orders matching "${searchQuery}"`
-                : "New incoming orders will appear here automatically."}
-            </p>
+      {/* The only scroller */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <PanelState
+          isLoading={isLoading}
+          error={loadError}
+          onRetry={onRetry}
+          isEmpty={errands.length === 0}
+          hasFilters={hasFilters}
+          onResetFilters={resetFilters}
+          emptyTitle={
+            activeSegment === "INCOMING" ? "No runs waiting" : "Nothing in motion"
+          }
+          emptyBody={
+            activeSegment === "INCOMING"
+              ? "New orders land here the moment a customer sends one."
+              : "Runs appear here once they are claimed and on the road."
+          }
+          errorTitle="The board did not load"
+          loadingRows={6}
+        >
+          <div className="space-y-2">
+            {errands.map((errand) => (
+              <DispatchErrandCard
+                key={errand.id}
+                errand={errand}
+                isSelected={selectedErrandId === errand.id}
+                onClick={() => onSelectErrand(errand)}
+              />
+            ))}
           </div>
-        ) : (
-          errands.map((errand) => (
-            <DispatchErrandCard
-              key={errand.id}
-              errand={errand}
-              isSelected={selectedErrandId === errand.id}
-              onClick={() => onSelectErrand(errand)}
-            />
-          ))
-        )}
+        </PanelState>
       </div>
     </div>
   );

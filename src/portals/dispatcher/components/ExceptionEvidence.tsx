@@ -23,6 +23,8 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
   const [isLoading, setIsLoading] = useState(false);
   const [openImage, setOpenImage] = useState<{ mimeType: string; imageData: string } | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [viewFailed, setViewFailed] = useState(false);
 
   // A long stop is a timing signal, not a photographed one — there is nothing to
   // show and offering a button that opens an empty strip is worse than no button.
@@ -30,34 +32,64 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
 
   const open = async () => {
     setIsLoading(true);
-    setImages((await apiService.listProofImages(errandId)) ?? []);
+    setLoadFailed(false);
+
+    // listProofImages swallows its own failure and returns null, so the old
+    // `?? []` turned "the request failed" into an empty array, and the empty
+    // branch below then told the dispatcher "No photo was ever captured on
+    // this errand." That is evidence of absence invented out of a network
+    // error, on the screen where a shortfall gets adjudicated.
+    const result = await apiService.listProofImages(errandId);
+    if (result === null) {
+      setLoadFailed(true);
+    } else {
+      setImages(result);
+    }
+
     setIsLoading(false);
   };
 
   const view = async (image: ApiProofImage) => {
     setLoadingId(image.id);
+    setViewFailed(false);
+
     const full = await apiService.getProofImage(errandId, image.id);
-    if (full) setOpenImage({ mimeType: full.mimeType, imageData: full.imageData });
+    if (full) {
+      setOpenImage({ mimeType: full.mimeType, imageData: full.imageData });
+    } else {
+      // Previously the click simply did nothing when the bytes failed to
+      // arrive, which reads as a broken thumbnail rather than a failed request.
+      setViewFailed(true);
+    }
+
     setLoadingId(null);
   };
 
   if (images === null) {
     return (
-      <button
-        onClick={() => void open()}
-        disabled={isLoading}
-        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-[#1E3A5F] transition"
-        data-testid={`evidence-open-${errandId}`}
-      >
-        {isLoading ? <Loader2 size={12} className="animate-spin" /> : <Camera size={12} />}
-        {isLoading ? "Loading evidence…" : "Show the evidence"}
-      </button>
+      <div className="flex flex-col gap-1.5">
+        <button
+          onClick={() => void open()}
+          disabled={isLoading}
+          className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-label text-ink-muted transition-colors hover:text-ink"
+          data-testid={`evidence-open-${errandId}`}
+        >
+          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+          {isLoading ? "Loading evidence" : loadFailed ? "Try the evidence again" : "Show the evidence"}
+        </button>
+        {loadFailed ? (
+          <p role="alert" className="text-label text-status-act-ink">
+            The evidence did not load. This does not mean there is none, so do not clear the
+            shortfall on the strength of it.
+          </p>
+        ) : null}
+      </div>
     );
   }
 
   if (images.length === 0) {
     return (
-      <p className="text-[11px] text-rose-600 font-medium">
+      <p className="text-label text-status-act-ink">
         No photo was ever captured on this errand.
       </p>
     );
@@ -65,6 +97,11 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
 
   return (
     <>
+      {viewFailed ? (
+        <p role="alert" className="mb-1.5 text-label text-status-act-ink">
+          That photo could not be opened. The others may still load.
+        </p>
+      ) : null}
       <div className="flex gap-2 overflow-x-auto pb-1" data-testid={`evidence-strip-${errandId}`}>
         {images.map((img) => {
           // What the machine read, what the rider stood behind, or what they
@@ -76,10 +113,10 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
             <button
               key={img.id}
               onClick={() => void view(img)}
-              className="shrink-0 w-[104px] rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-left hover:border-[#1E3A5F] transition"
+              className="w-[112px] shrink-0 cursor-pointer rounded-trim border border-edge bg-board-ground px-2 py-1.5 text-left transition-colors hover:border-board-field"
               data-testid={`evidence-${img.id}`}
             >
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-700">
+              <div className="flex items-center gap-1 text-micro uppercase text-ink-muted">
                 {loadingId === img.id ? (
                   <Loader2 size={10} className="animate-spin shrink-0" />
                 ) : (
@@ -94,14 +131,14 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
                 </span>
               </div>
               {figure !== null && figure !== undefined && (
-                <p className="font-mono text-[11px] font-bold text-slate-800 tabular-nums">
+                <p data-figure className="font-mono text-data text-ink">
                   {formatPeso(figure)}
                 </p>
               )}
               {/* Says whose figure this is. An unverified total is the rider's
                   word, and a reader deciding on money should never have to guess
                   which of the two they are looking at. */}
-              <p className="text-[9px] text-slate-400 leading-tight">
+              <p className="text-label leading-tight text-ink-muted">
                 {img.verified ? "Read from the receipt" : "Stated by the rider"}
               </p>
             </button>
@@ -127,7 +164,7 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
           <img
             src={`data:${openImage.mimeType};base64,${openImage.imageData}`}
             alt="Proof captured by the rider"
-            className="max-h-full max-w-full rounded-xl object-contain"
+            className="max-h-full max-w-full rounded-modal object-contain"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

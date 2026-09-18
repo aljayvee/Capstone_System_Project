@@ -1,67 +1,115 @@
 import React, { useState } from "react";
-import { Errand, ErrandStatus } from "../../../../types/errand";
+import { Errand } from "../../../../types/errand";
 import { formatErrandId } from "../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../utils/format";
+import { cn } from "@/lib/utils";
 import {
-  CheckCircle2,
-  Copy,
-  Check,
-  Phone,
-  Store,
-  MapPin,
-  ShoppingBag,
-  Clock,
-  ArrowRight,
-  MessageSquare,
-  Sparkles,
   AlertTriangle,
-  ChevronRight,
+  ArrowLeft,
+  Check,
+  Copy,
   ExternalLink,
+  MessageSquare,
+  Phone,
   ShieldCheck,
-  X,
 } from "lucide-react";
+import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherCard } from "@/components/panel/DispatcherCard";
+import { Field, fieldInputClasses } from "@/components/panel/Field";
+import { PanelState } from "@/components/panel/PanelState";
+import { useDraft } from "../../lib/useDraft";
+import { RUN_PROGRESSION, progressIndexOf } from "@/lib/statusPresentation";
 
 interface DispatchDetailInspectorProps {
   errand: Errand | null;
-  currentUser: any;
   onClaimAndReview: (errand: Errand) => void;
   onDecline?: (orderId: string, reason?: string) => void;
   onOpenChat: (orderId: string) => void;
-  onUpdateStatus: (errandId: string, newStatus: ErrandStatus) => void;
   isClaiming: boolean;
   claimError: string | null;
   onDismissClaimError: () => void;
+  /** Additive, all optional. */
+  isLoading?: boolean;
+  loadError?: string | null;
+  /** Narrow screens only: hands the screen back to the board. */
+  onBackToBoard?: () => void;
 }
 
+/**
+ * One run's waybill.
+ *
+ * The empty state was the console's most misleading screen. With nothing
+ * selected it rendered "All Caught Up" under a large green check, which is a
+ * claim about the whole shift, and it rendered identically whether nothing was
+ * selected, a search had matched nothing, or the API was dead. Loading and
+ * failure now belong to PanelState, and the no-selection state says only what
+ * it knows: pick a run.
+ *
+ * Structure changed rather than being restyled. This file nested bordered,
+ * rounded cards three deep: a card at the root, four `bg-slate-50/70` cards
+ * inside it, and a bordered square inside those. Those inner boxes are now
+ * regions, which is how this world groups things, by a change of ground and a
+ * gap instead of another frame.
+ *
+ * The action footer is a real flex sibling. It used to be
+ * `absolute bottom-0` with `shadow-lg` and `backdrop-blur-md`, which is three
+ * separate breaches of the flat-surface invariant, and the scroller carried
+ * `pb-24` to dodge it.
+ */
 export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = ({
   errand,
-  currentUser,
   onClaimAndReview,
   onDecline,
   onOpenChat,
-  onUpdateStatus,
   isClaiming,
   claimError,
   onDismissClaimError,
+  isLoading = false,
+  loadError = null,
+  onBackToBoard,
 }) => {
   const [activeTab, setActiveTab] = useState<"OVERVIEW" | "CHAT">("OVERVIEW");
   const [copiedId, setCopiedId] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
-  const [declineReason, setDeclineReason] = useState("Out of service range / unavailable rider");
+  const [isDeclining, setIsDeclining] = useState(false);
+
+  // Keyed by errand, which is the fix for a real defect: `declineReason` was a
+  // single piece of state that was never reset when the selection changed, so
+  // a reason typed against one run stayed in the box, and was submittable,
+  // against the next one.
+  const [declineReason, setDeclineReason, clearDeclineReason] = useDraft(
+    `decline:${errand?.id ?? "none"}`
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate p-4">
+        <PanelState isLoading loadingRows={4}>
+          {null}
+        </PanelState>
+      </div>
+    );
+  }
 
   if (!errand) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[480px] bg-white border border-slate-200/90 rounded-2xl p-8 text-center shadow-xs">
-        <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mb-4 shadow-2xs">
-          <CheckCircle2 size={32} />
-        </div>
-        <h3 className="text-base font-extrabold text-slate-800 tracking-tight">
-          All Caught Up
-        </h3>
-        <p className="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">
-          No errand currently selected. Choose an errand from the list on the left to inspect itemized requests, store pickup, customer destination, and dispatch actions.
+      <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-plate border border-edge bg-board-plate p-8 text-center">
+        <p className="text-panel text-ink">No run selected</p>
+        <p className="mt-1.5 max-w-sm text-body text-ink-muted">
+          Pick a run from the board to see its items, its route and what it comes
+          to. This says nothing about whether the queue is clear.
         </p>
+        {/* A quiet note rather than a second error frame. This pane has no
+            fetch of its own, so repeating the board's failure here just gave
+            the same problem two headings and two retry buttons. */}
+        {loadError ? (
+          <p className="mt-3 max-w-sm text-label text-ink-muted">
+            The board is reporting a problem loading, so there may be runs that
+            are not showing here yet.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -69,19 +117,37 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   const isAvailable = String(errand.status).toUpperCase() === "AVAILABLE";
   const items = errand.pabiliDetails || errand.pabiliItemRequests || [];
   const primaryStore =
-    errand.pinpoints?.[0]?.storeName ||
-    items[0]?.storeCategory ||
-    errand.category ||
-    "Store";
+    errand.pinpoints?.[0]?.storeName || items[0]?.storeCategory || errand.category || "Store";
 
-  const totalDisplay =
-    errand.totalCost ||
-    Number(errand.estimatedCost || 0) + Number(errand.deliveryFee || 0);
+  const subtotal = Number(errand.estimatedCost || 0);
+
+  /**
+   * What one line actually costs, or null when nobody knows yet.
+   *
+   * Null is the normal case on an unstarted run: a pabili item has no price
+   * until the rider stands at the till. Returning 0 for that, which is what
+   * this used to do, put a figure on screen that no one had established.
+   */
+  const lineAmount = (item: any): number | null => {
+    if (item?.estimatedSubtotal) return Number(item.estimatedSubtotal);
+    if (item?.unitPrice) return Number(item.unitPrice) * Number(item.quantity || 1);
+    return null;
+  };
+  const fee = Number(errand.deliveryFee || 0);
+  const lineSum = subtotal + fee;
+  const totalDisplay = errand.totalCost || lineSum;
+  // `Errand` has no base-fee column, so a breakdown has to be derived and can
+  // silently fail to add up. Rather than hide that, the difference is stated:
+  // the same discipline the sales report uses, where a figure that stops
+  // reconciling shows up on the screen instead of in an audit.
+  const unreconciled = errand.totalCost ? Number(errand.totalCost) - lineSum : 0;
 
   // The mode the customer actually confirmed, where they have. Null before the
   // choice is made, which the fee note says plainly rather than assuming COD.
   const paymentModeName: string | null =
     (errand as any).paymentSelection?.paymentMode?.name ?? null;
+
+  const progressIndex = progressIndexOf(errand.status);
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(formatErrandId(errand.id));
@@ -96,384 +162,405 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
     setTimeout(() => setCopiedPhone(false), 2000);
   };
 
+  const submitDecline = async () => {
+    if (!onDecline || isDeclining) return;
+    setIsDeclining(true);
+    try {
+      // Awaited, and the dialog holds until it resolves. The old handler fired
+      // an unawaited call with no busy flag, so a double click declined twice.
+      await onDecline(errand.id, declineReason.trim() || undefined);
+      clearDeclineReason();
+      setShowDeclineConfirm(false);
+    } finally {
+      setIsDeclining(false);
+    }
+  };
+
+  const tab = (id: "OVERVIEW" | "CHAT", label: string, icon?: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setActiveTab(id)}
+      aria-pressed={activeTab === id}
+      className={cn(
+        "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim px-3 text-micro uppercase transition-colors sm:flex-initial",
+        activeTab === id ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+
   return (
-    <div className="flex flex-col h-full bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden text-left relative">
-      {/* Inline Conflict / Claim Error Alert */}
-      {claimError && (
-        <div
-          role="alert"
-          className="m-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start justify-between gap-2 shadow-xs shrink-0"
-        >
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={15} className="text-amber-600 mt-0.5 shrink-0" />
-            <span className="font-medium">{claimError}</span>
-          </div>
+    // `relative` anchors the decline dialog's absolute overlay to this plate.
+    <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
+      {/* Header: the run's identity, painted on the field */}
+      <div data-on-field className="shrink-0 bg-board-field px-4 py-3 shadow-field">
+        {onBackToBoard ? (
           <button
             type="button"
-            onClick={onDismissClaimError}
-            className="text-amber-700 hover:text-amber-900 font-bold text-xs shrink-0"
+            onClick={onBackToBoard}
+            className="mb-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-micro uppercase text-board-trim transition-colors hover:text-board-plate lg:hidden"
           >
-            Dismiss
+            <ArrowLeft size={14} />
+            Back to the board
           </button>
-        </div>
-      )}
+        ) : null}
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP INSPECTOR HEADER: Order ID, Status & Customer Contact   */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="p-4 sm:p-5 border-b border-slate-100 bg-white/90 backdrop-blur-xs shrink-0 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Left: Errand ID + Copy Badge */}
-          <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight font-mono">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 data-figure className="truncate font-mono text-title text-board-plate">
               {formatErrandId(errand.id)}
-            </h3>
+            </h2>
             <button
               type="button"
               onClick={handleCopyId}
-              title="Copy Errand ID"
-              className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
+              aria-label="Copy this run's number"
+              className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
             >
-              {copiedId ? (
-                <Check size={14} className="text-emerald-600" />
-              ) : (
-                <Copy size={14} />
-              )}
+              {copiedId ? <Check size={15} /> : <Copy size={15} />}
             </button>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-              {errand.category || "Pabili"}
-            </span>
           </div>
 
-          {/* Right: Status Capsule */}
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
-                isAvailable
-                  ? "bg-amber-100 text-amber-800 border border-amber-200"
-                  : String(errand.status).toUpperCase() === "IN_TRANSIT"
-                  ? "bg-blue-100 text-blue-800 border border-blue-200"
-                  : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-              }`}
+          <StatusChip status={errand.status} className="shrink-0" />
+        </div>
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="truncate text-label text-board-plate/90">
+            {errand.customerName || "Customer"}
+          </span>
+          {errand.customerPhone ? (
+            <button
+              type="button"
+              onClick={handleCopyPhone}
+              aria-label={`Copy ${errand.customerName || "the customer"}'s phone number`}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label text-board-trim transition-colors hover:text-board-plate"
             >
-              {isAvailable ? "Awaiting Claim" : String(errand.status)}
-            </span>
-          </div>
-        </div>
-
-        {/* Customer & Store Summary Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center font-black text-[10px] text-slate-700 shrink-0">
-              {(errand.customerName || "C").charAt(0).toUpperCase()}
-            </div>
-            <span className="font-bold text-slate-800 truncate">
-              {errand.customerName || "Customer"}
-            </span>
-            {errand.customerPhone && (
-              <button
-                type="button"
-                onClick={handleCopyPhone}
-                className="text-[11px] font-mono text-blue-600 hover:underline flex items-center gap-1"
-                title="Copy phone"
-              >
-                <Phone size={10} />
-                <span>{errand.customerPhone}</span>
-                {copiedPhone && <Check size={10} className="text-emerald-600" />}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center sm:justify-end gap-1.5 text-slate-500">
-            <Store size={13} className="text-slate-400" />
-            <span className="font-semibold text-slate-700 truncate">{primaryStore}</span>
-          </div>
-        </div>
-
-        {/* Apple Segmented Inspector Tabs */}
-        <div className="flex items-center p-1 bg-slate-100 rounded-xl w-full sm:w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveTab("OVERVIEW")}
-            className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
-              activeTab === "OVERVIEW"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Order Overview & Items
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("CHAT")}
-            className={`flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === "CHAT"
-                ? "bg-white text-blue-700 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <MessageSquare size={13} />
-            <span>Live Customer Chat</span>
-          </button>
+              <Phone size={12} />
+              <span data-figure>{errand.customerPhone}</span>
+              {copiedPhone ? <Check size={12} /> : null}
+            </button>
+          ) : (
+            <span className="text-label text-board-trim">No number on file</span>
+          )}
+          <span className="truncate text-label text-board-trim">{primaryStore}</span>
         </div>
       </div>
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. SCROLLABLE TAB CONTENT BODY                                */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 pb-24">
+      {/* The rail, always.
+          It used to be gated on `progressIndex >= 0`, which meant the DEFAULT
+          first viewport showed none: an incoming run has started no stage, so
+          the one element that says what the five steps even are was absent
+          exactly when a dispatcher meets the run for the first time. An
+          unstarted run now shows the rail with every detent hollow, which is
+          the honest reading of "nothing has happened yet" and is also what
+          makes the rail a rail rather than a progress indicator. */}
+      {(
+        <ol className="flex shrink-0 items-stretch border-b border-hairline bg-board-ground">
+          {RUN_PROGRESSION.map((stage, idx) => {
+            const isDone = idx <= progressIndex;
+            const isCurrent = idx === progressIndex;
+            return (
+              <li
+                key={stage.label}
+                aria-current={isCurrent ? "step" : undefined}
+                className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-2"
+              >
+                {/* A stamped detent: filled once passed, hollow while ahead.
+                    Never colour alone, so the label carries the state too. */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "size-2.5",
+                    isCurrent ? "rounded-full bg-signal" : "rounded-full",
+                    isDone && !isCurrent ? "bg-board-field" : "",
+                    !isDone ? "border-[1.5px] border-board-trim" : ""
+                  )}
+                />
+                <span
+                  className={cn(
+                    "w-full truncate text-center text-micro uppercase",
+                    isCurrent ? "text-ink" : isDone ? "text-ink-muted" : "text-board-trim"
+                  )}
+                >
+                  {stage.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      {/* Tabs, mandated by AGENTS.md 8.30 */}
+      <div className="flex shrink-0 items-center gap-1 border-b border-hairline p-2">
+        {tab("OVERVIEW", "Order and items")}
+        {tab("CHAT", "Customer chat", <MessageSquare size={13} />)}
+      </div>
+
+      {claimError ? (
+        <div
+          role="alert"
+          className="m-3 flex shrink-0 items-start justify-between gap-2 rounded-plate bg-status-waiting-fill p-3 text-label text-status-waiting-ink"
+        >
+          <span className="flex items-start gap-2">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            <span>{claimError}</span>
+          </span>
+          <DispatcherButton variant="subtle" size="sm" onClick={onDismissClaimError}>
+            Dismiss
+          </DispatcherButton>
+        </div>
+      ) : null}
+
+      {/* The only scroller */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {activeTab === "OVERVIEW" ? (
           <>
-            {/* 1. Itemized Shopping Checklist */}
-            <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                <div className="flex items-center gap-2">
-                  <ShoppingBag size={15} className="text-blue-600" />
-                  <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">
-                    Requested Items ({items.length})
-                  </h4>
-                </div>
-                <span className="text-[11px] font-mono text-slate-500 font-semibold">
-                  Est. Subtotal: {formatPeso(errand.estimatedCost || 0)}
+            <DispatcherCard.Region padding="sm">
+              <div className="flex items-baseline justify-between gap-3 border-b border-hairline pb-2">
+                <h3 className="text-micro uppercase text-ink">
+                  Requested items ({items.length})
+                </h3>
+                {/* Named as an estimate. It comes from errand.estimatedCost,
+                    not from summing the lines below, and presenting it bare
+                    beside a column of line amounts read as a subtotal the
+                    rows were supposed to reconcile to. */}
+                <span className="shrink-0 text-label text-ink-muted">
+                  est.{" "}
+                  <span data-figure className="font-mono">
+                    {formatPeso(subtotal)}
+                  </span>
                 </span>
               </div>
 
               {items.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-2">
-                  No individual items listed. General errand requested:{" "}
-                  <span className="text-slate-600 font-medium">
-                    "{errand.description || "General errand"}"
-                  </span>
+                <p className="pt-2 text-body text-ink-muted">
+                  No individual items were listed. The customer asked for:{" "}
+                  <span className="text-ink">{errand.description || "a general errand"}</span>
                 </p>
               ) : (
-                <div className="space-y-2 divide-y divide-slate-100">
+                <ul className="divide-y divide-hairline">
                   {items.map((item, idx) => (
-                    <div
+                    <li
                       key={item.id || idx}
-                      className="pt-2 first:pt-0 flex items-start justify-between gap-3 text-xs"
+                      className="flex items-start justify-between gap-3 py-2 first:pt-2"
                     >
-                      <div className="flex items-start gap-2 min-w-0">
-                        <span className="w-4 h-4 rounded bg-white border border-slate-300 flex items-center justify-center text-[10px] text-slate-400 font-bold shrink-0 mt-0.5">
+                      <div className="flex min-w-0 items-baseline gap-2">
+                        <span
+                          data-figure
+                          className="shrink-0 font-mono text-label text-ink-muted"
+                        >
                           {idx + 1}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-bold text-slate-900 truncate">
-                            {item.itemName}
-                          </p>
-                          {item.notes && (
-                            <p className="text-[11px] text-slate-500 italic mt-0.5">
-                              Note: {item.notes}
-                            </p>
-                          )}
+                          <p className="truncate text-body text-ink">{item.itemName}</p>
+                          {item.notes ? (
+                            <p className="mt-0.5 text-label text-ink-muted">Note: {item.notes}</p>
+                          ) : null}
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
-                        <span className="font-mono font-bold text-slate-800">
-                          {formatPeso(item.estimatedSubtotal || (Number(item.unitPrice || 0) * Number(item.quantity || 1)))}
-                        </span>
-                        <p className="text-[10px] text-slate-400">
-                          Qty: {item.quantity || 1} {item.unitPrice ? `@ ${formatPeso(item.unitPrice)}` : ""}
+                      <div className="shrink-0 text-right">
+                        {lineAmount(item) !== null ? (
+                          <span data-figure className="font-mono text-data text-ink">
+                            {formatPeso(lineAmount(item) as number)}
+                          </span>
+                        ) : null}
+                        <p data-figure className="text-label text-ink-muted">
+                          {item.quantity || 1}
+                          {item.unitPrice ? ` at ${formatPeso(item.unitPrice)}` : ""}
                         </p>
                       </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
-            </div>
 
-            {/* 2. Route & Location Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Pickup Location */}
-              <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700">
-                  <Store size={14} className="text-amber-600" />
-                  <span>Pickup Location</span>
-                </div>
-                <p className="text-xs font-bold text-slate-900 truncate">
-                  {primaryStore}
+              {items.length > 0 && items.every((i: any) => lineAmount(i) === null) ? (
+                <p className="mt-2 border-t border-hairline pt-2 text-label text-ink-muted">
+                  No prices yet. They are settled against the receipt the rider files, not
+                  against this list.
                 </p>
-                <p className="text-[11px] text-slate-500 line-clamp-2">
-                  {errand.pickupAddress || "Verified Tacurong Store"}
-                </p>
-              </div>
+              ) : null}
+            </DispatcherCard.Region>
 
-              {/* Delivery Destination */}
-              <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700">
-                  <MapPin size={14} className="text-blue-600" />
-                  <span>Delivery Destination</span>
+            {/* Route. Two figures on one region rather than two matching cards. */}
+            <DispatcherCard.Region padding="sm">
+              <DispatcherCard.Label as="h3">The route</DispatcherCard.Label>
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <dt className="text-label text-ink-muted">Collect from</dt>
+                  <dd className="mt-0.5 truncate text-body text-ink">{primaryStore}</dd>
+                  <dd className="line-clamp-2 text-label text-ink-muted">
+                    {errand.pickupAddress || "Address not recorded"}
+                  </dd>
                 </div>
-                <p className="text-xs font-bold text-slate-900 truncate">
-                  {errand.customerName}
-                </p>
-                <p className="text-[11px] text-slate-500 line-clamp-2">
-                  {errand.deliveryAddress || "Tacurong City"}
-                </p>
-              </div>
-            </div>
+                <div className="min-w-0">
+                  <dt className="text-label text-ink-muted">Deliver to</dt>
+                  <dd className="mt-0.5 truncate text-body text-ink">
+                    {errand.customerName || "Customer"}
+                  </dd>
+                  <dd className="line-clamp-2 text-label text-ink-muted">
+                    {errand.deliveryAddress || "Address not recorded"}
+                  </dd>
+                </div>
+              </dl>
+            </DispatcherCard.Region>
 
-            {/* 3. Transparent Fee Breakdown */}
-            <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 space-y-2">
-              <h4 className="text-xs font-black uppercase text-slate-600 tracking-wider">
-                Cost & Fee Computation
-              </h4>
-              <div className="space-y-1.5 text-xs text-slate-600 pt-1">
-                <div className="flex justify-between">
-                  <span>Item Subtotal:</span>
-                  <span className="font-mono font-semibold text-slate-800">
-                    {formatPeso(errand.estimatedCost || 0)}
-                  </span>
+            <DispatcherCard.Region padding="sm">
+              <DispatcherCard.Label as="h3">What it comes to</DispatcherCard.Label>
+              <dl className="space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
+                  <dt>Items</dt>
+                  <dd data-figure className="font-mono text-ink">
+                    {formatPeso(subtotal)}
+                  </dd>
                 </div>
-                <div className="flex justify-between">
-                  <span>Base Delivery Fee:</span>
-                  <span className="font-mono font-semibold text-slate-800">
-                    {formatPeso(errand.deliveryFee || 0)}
-                  </span>
+                <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
+                  <dt>Delivery</dt>
+                  <dd data-figure className="font-mono text-ink">
+                    {formatPeso(fee)}
+                  </dd>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-slate-200 font-bold text-slate-900">
-                  <span>Estimated Total Amount:</span>
-                  <span className="font-mono font-black text-sm text-blue-700">
+                <div className="flex items-baseline justify-between gap-3 border-t border-hairline pt-2 text-body text-ink">
+                  <dt>Total</dt>
+                  <dd data-figure className="font-mono text-data text-ink">
                     {formatPeso(totalDisplay)}
-                  </span>
+                  </dd>
                 </div>
-                {/* The payment mode, not an assumption about it. This line
-                    read "Customer pays via Cash on Delivery (COD)" on every
-                    errand — including one the customer had explicitly put on the
-                    50% downpayment plan, where half the money has already
-                    arrived and the rider collects only the balance. */}
-                <p className="text-[10px] text-slate-400 pt-1">
-                  *Delivery fee realized upon completion.{" "}
-                  {paymentModeName
-                    ? `Customer pays via ${paymentModeName}.`
-                    : "Payment mode not chosen yet."}
+              </dl>
+
+              {Math.abs(unreconciled) > 0.01 ? (
+                <p role="status" className="mt-2 text-label text-status-act-ink">
+                  These lines do not add up to the recorded total. The difference is{" "}
+                  {formatPeso(Math.abs(unreconciled))}, so check the figure with the customer
+                  before taking payment.
                 </p>
-              </div>
-            </div>
+              ) : null}
+
+              <p className="mt-2 text-label text-ink-muted">
+                The delivery fee is realised on completion.{" "}
+                {paymentModeName
+                  ? `The customer pays by ${paymentModeName}.`
+                  : "No payment mode has been chosen yet."}
+              </p>
+            </DispatcherCard.Region>
           </>
         ) : (
-          /* Live Customer Chat Tab */
-          <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto">
-              <MessageSquare size={22} />
-            </div>
-            <div>
-              <h4 className="text-sm font-extrabold text-slate-800">
-                Customer Live Conversation
-              </h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                Communicate directly with {errand.customerName || "the customer"} to confirm item availability, adjust substitute brands, and guide the 5 dispatch stages.
-              </p>
-            </div>
-
-            <button
-              type="button"
+          <DispatcherCard.Region padding="md">
+            <h3 className="text-panel text-ink">Talk to {errand.customerName || "the customer"}</h3>
+            <p className="mt-1.5 text-body text-ink-muted">
+              The conversation and the five dispatch stages open in the full console, where you
+              confirm what was in stock, agree substitutions, and take payment.
+            </p>
+            <DispatcherButton
+              variant="field"
+              size="md"
+              className="mt-3"
+              icon={<ExternalLink size={14} />}
               onClick={() => onOpenChat(errand.id)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-sm transition cursor-pointer"
             >
-              <span>Launch Multi-Stage Dispatch Console</span>
-              <ExternalLink size={14} />
-            </button>
-          </div>
+              Open the dispatch console
+            </DispatcherButton>
+          </DispatcherCard.Region>
         )}
       </div>
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. FLOATING ACTION FOOTER (Sticky Bottom)                     */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-0 left-0 right-0 p-3.5 sm:p-4 bg-white/95 backdrop-blur-md border-t border-slate-200/80 flex items-center justify-between gap-3 shadow-lg">
+      {/* Action footer: a flex sibling, not an absolutely positioned overlay */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-hairline bg-board-plate p-3">
         {isAvailable ? (
           <>
-            <button
-              type="button"
+            <DispatcherButton
+              variant="primary"
+              size="lg"
+              className="flex-1"
               disabled={isClaiming}
+              loading={isClaiming}
+              loadingText="Claiming this run"
+              icon={<ShieldCheck size={18} />}
               onClick={() => onClaimAndReview(errand)}
-              className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-sm hover:shadow-md transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isClaiming ? (
-                <>
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Claiming Request...</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck size={16} />
-                  <span>Check the Order & Start Review ➔</span>
-                </>
-              )}
-            </button>
+              Check the order and start review
+            </DispatcherButton>
 
-            {onDecline && (
-              <button
-                type="button"
+            {/* Decline is secondary, not act-red. A red-ink Decline sat
+                beside the red primary, putting the signal on a second meaning
+                in the same row; the confirmation dialog already carries the
+                commit weight that raise asks for. */}
+            {onDecline ? (
+              <DispatcherButton
+                variant="secondary"
+                size="lg"
                 onClick={() => setShowDeclineConfirm(true)}
-                className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 text-xs font-bold transition cursor-pointer"
               >
                 Decline
-              </button>
-            )}
+              </DispatcherButton>
+            ) : null}
           </>
         ) : (
-          <button
-            type="button"
+          <DispatcherButton
+            variant="field"
+            size="lg"
+            className="w-full"
             onClick={() => onOpenChat(errand.id)}
-            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 bg-[#1E3A5F] hover:bg-[#162D4A] text-white text-xs font-black rounded-xl shadow-sm transition cursor-pointer"
           >
-            <span>Open Multi-Stage Dispatch Console</span>
-            <ChevronRight size={15} />
-          </button>
+            Open the dispatch console
+          </DispatcherButton>
         )}
       </div>
 
-      {/* Quick Decline Confirmation Dialog */}
-      {showDeclineConfirm && (
-        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-red-600" />
-                Decline Request
-              </h4>
-              <button
-                type="button"
-                onClick={() => setShowDeclineConfirm(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <p className="text-xs text-slate-500">
-              Are you sure you want to decline this request from {errand.customerName}?
+      {showDeclineConfirm ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-board-field-deep/50 p-4">
+          <div className="w-full max-w-sm space-y-3 rounded-modal border border-edge bg-board-plate p-5">
+            <h3 className="flex items-center gap-2 text-panel text-ink">
+              <AlertTriangle size={16} className="text-status-act-ink" />
+              Decline this run
+            </h3>
+            <p className="text-body text-ink-muted">
+              {errand.customerName || "The customer"} is told this was declined, and the reason is
+              kept on the record.
             </p>
-            <input
-              type="text"
-              value={declineReason}
-              onChange={(e) => setDeclineReason(e.target.value)}
-              placeholder="Reason for declining..."
-              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
-            />
+
+            <Field
+              label="Why is this being declined?"
+              hint="The customer reads this, so name the real reason."
+            >
+              {(control) => (
+                <input
+                  {...control}
+                  type="text"
+                  value={declineReason}
+                  onChange={(e) => setDeclineReason(e.target.value)}
+                  placeholder="Out of service range, no rider available"
+                  className={fieldInputClasses}
+                />
+              )}
+            </Field>
+
             <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
+              <DispatcherButton
+                variant="secondary"
+                size="md"
+                className="flex-1"
+                disabled={isDeclining}
                 onClick={() => setShowDeclineConfirm(false)}
-                className="flex-1 py-2 rounded-lg border border-slate-200 text-xs font-bold text-slate-600"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDeclineConfirm(false);
-                  if (onDecline) onDecline(errand.id, declineReason);
-                }}
-                className="flex-1 py-2 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition"
+                Keep it
+              </DispatcherButton>
+              <DispatcherButton
+                variant="primary"
+                size="md"
+                className="flex-1"
+                loading={isDeclining}
+                loadingText="Declining"
+                onClick={() => void submitDecline()}
               >
-                Confirm Decline
-              </button>
+                Decline it
+              </DispatcherButton>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

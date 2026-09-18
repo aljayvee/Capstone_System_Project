@@ -1,16 +1,33 @@
-import * as React from "react";
 import { Plus, Minus, Trash2, Send, Package } from "lucide-react";
-import { DispatcherButton } from "../../ui/DispatcherButton";
-import { DispatcherInlineBanner } from "../../ui/DispatcherInlineBanner";
+import { cn } from "@/lib/utils";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { WaitingCard } from "../WaitingCard";
 import { copy, formatAgo } from "../copy";
 import type { MerchantCategory, StorePinpoint } from "../types";
 
 /**
- * Stage 3 — confirm the items.
+ * Stage 3 - confirm the items.
  *
  * Completes only when the customer approves the card in their own app, which
  * is why this stage owns a real waiting state rather than a grey pill.
+ *
+ * Route board build, and the one stage that needed restructuring rather than
+ * retoning. The edit row put five controls on a single line: two selects at
+ * 10px text with 4px of vertical padding (about 22px tall), a quantity
+ * stepper whose buttons were 19px, and a delete at 20px. You named tablet as
+ * a scene the console is actually used in, and a 19px target under a thumb is
+ * not a target. Every control here now clears 36px, and the row breaks into
+ * two lines - what the item is, then where it is bought - instead of
+ * compressing five things into one.
+ *
+ * The item name input was `border-0 bg-transparent focus:outline-none`: a
+ * field with no edge that also suppressed the focus ring, so a keyboard user
+ * editing an order had no idea which line they were on.
+ *
+ * The saved list was one bordered, rounded box per item, which is the nested
+ * card the craft floor refuses, repeated per row. Items are separated by
+ * hairlines now, which is also how the inspector lists them.
  */
 
 interface Stage3Props {
@@ -23,6 +40,9 @@ interface Stage3Props {
   onNeedStores: (reason: string) => void;
   readOnly?: boolean;
 }
+
+const SELECT_CLASSES =
+  "min-h-9 shrink-0 cursor-pointer rounded-trim border px-2 text-label transition-colors";
 
 export function Stage3ConfirmItems({
   items,
@@ -77,21 +97,23 @@ export function Stage3ConfirmItems({
 
   if (readOnly) {
     return (
-      <div className="space-y-1.5">
+      <div>
         {savedItems.length === 0 ? (
-          <p className="text-[11px] text-slate-400 m-0">No items on this order.</p>
+          <p className="m-0 text-body text-ink-muted">No items on this order.</p>
         ) : (
-          savedItems.map((it: any, i: number) => (
-            <div key={i} className="flex items-center gap-2.5 text-[11px] text-slate-700">
-              <span className="font-mono font-bold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                {it.quantity}&times;
-              </span>
-              <span className="flex-1 min-w-0 truncate font-semibold">{it.itemName}</span>
-              <span className="shrink-0 text-[10px] text-slate-400 truncate max-w-[120px]">
-                {parseStoreAndCat(it.storeCategory).store}
-              </span>
-            </div>
-          ))
+          <ul className="m-0 list-none divide-y divide-hairline p-0">
+            {savedItems.map((it: any, i: number) => (
+              <li key={i} className="flex items-center gap-2.5 py-2">
+                <span data-figure className="shrink-0 font-mono text-label text-ink-muted">
+                  {it.quantity}&times;
+                </span>
+                <span className="min-w-0 flex-1 truncate text-body text-ink">{it.itemName}</span>
+                <span className="max-w-[128px] shrink-0 truncate text-label text-ink-muted">
+                  {parseStoreAndCat(it.storeCategory).store}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     );
@@ -101,108 +123,126 @@ export function Stage3ConfirmItems({
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-slate-500 m-0">{copy.stage3.intro(customerFirstName)}</p>
+      <p className="m-0 text-body text-ink-muted">{copy.stage3.intro(customerFirstName)}</p>
 
       {noStores && (
-        <p className="text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 m-0">
+        <p className="m-0 rounded-plate bg-status-waiting-fill px-3 py-2 text-label text-status-waiting-ink">
           {copy.stage3.needsStores}
         </p>
       )}
 
       {/* the list */}
       {isEditing ? (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {editableItems.map((item, index) => {
             const { store, category, assigned } = parseStoreAndCat(item.storeCategory);
             return (
               <div
                 key={index}
-                className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 ${
-                  assigned ? "bg-white border-slate-200" : "bg-amber-50 border-amber-300"
-                }`}
+                className={cn(
+                  "rounded-trim border p-2",
+                  assigned
+                    ? "border-edge bg-board-plate"
+                    : "border-status-waiting-ink/40 bg-status-waiting-fill"
+                )}
               >
-                {/* Which shop the rider buys this line at. Without this the
-                    store half of `storeCategory` could never be set, so every
-                    item silently landed on the first pin. */}
-                <select
-                  value={assigned ? store : ""}
-                  onChange={(e) =>
-                    updateItem(index, { storeCategory: `${e.target.value} | ${category}` })
-                  }
-                  aria-label={copy.stage3.storeLabel}
-                  className={`shrink-0 text-[10px] font-bold rounded-lg px-1.5 py-1 max-w-[104px] cursor-pointer border ${
-                    assigned
-                      ? "bg-slate-50 border-slate-200 text-slate-600"
-                      : "bg-white border-amber-400 text-amber-900"
-                  }`}
-                >
-                  {!assigned && <option value="">{copy.stage3.pickStore}</option>}
-                  {storeOptions.length === 0 ? (
-                    <option value={store}>{store}</option>
-                  ) : (
-                    storeOptions.map((s: string) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))
-                  )}
-                </select>
+                {/* what it is, how many, and gone */}
+                <div className="flex items-center gap-2">
+                  <input
+                    value={item.itemName}
+                    onChange={(e) => updateItem(index, { itemName: e.target.value })}
+                    placeholder={copy.stage3.itemPlaceholder}
+                    aria-label={copy.stage3.itemPlaceholder}
+                    className="min-h-9 min-w-0 flex-1 rounded-trim border border-edge bg-board-ground px-2 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
+                  />
 
-                <select
-                  value={category}
-                  onChange={(e) =>
-                    updateItem(index, {
-                      storeCategory: `${assigned ? store : ""} | ${e.target.value}`,
-                    })
-                  }
-                  aria-label="Store type"
-                  className="shrink-0 text-[10px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 max-w-[92px] text-slate-600 cursor-pointer"
-                >
-                  {merchantCategories.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  <div className="flex shrink-0 items-center rounded-trim border border-edge bg-board-plate">
+                    <button
+                      type="button"
+                      aria-label="One fewer"
+                      onClick={() =>
+                        updateItem(index, { quantity: Math.max(1, item.quantity - 1) })
+                      }
+                      className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:text-ink"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span
+                      data-figure
+                      className="w-6 text-center font-mono text-label tabular-nums text-ink"
+                    >
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="One more"
+                      onClick={() => updateItem(index, { quantity: item.quantity + 1 })}
+                      className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:text-ink"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
 
-                <input
-                  value={item.itemName}
-                  onChange={(e) => updateItem(index, { itemName: e.target.value })}
-                  placeholder={copy.stage3.itemPlaceholder}
-                  aria-label={copy.stage3.itemPlaceholder}
-                  className="flex-1 min-w-0 text-[11px] font-semibold bg-transparent border-0 focus:outline-none text-slate-800"
-                />
-
-                <div className="shrink-0 flex items-center gap-0.5 bg-slate-50 border border-slate-200 rounded-lg">
                   <button
                     type="button"
-                    aria-label="One fewer"
-                    onClick={() => updateItem(index, { quantity: Math.max(1, item.quantity - 1) })}
-                    className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
+                    aria-label={`${copy.stage3.removeItem} ${item.itemName || "item"}`}
+                    onClick={() => removeItem(index)}
+                    className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-status-act-fill hover:text-status-act-ink"
                   >
-                    <Minus size={11} />
-                  </button>
-                  <span className="text-[11px] font-mono font-bold w-5 text-center tabular-nums">
-                    {item.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="One more"
-                    onClick={() => updateItem(index, { quantity: item.quantity + 1 })}
-                    className="p-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                  >
-                    <Plus size={11} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  aria-label={`${copy.stage3.removeItem} ${item.itemName || "item"}`}
-                  onClick={() => removeItem(index)}
-                  className="shrink-0 p-1 text-slate-300 hover:text-rose-600 cursor-pointer"
-                >
-                  <Trash2 size={12} />
-                </button>
+                {/* where it is bought. Without the store half of
+                    `storeCategory` set, every item silently landed on the
+                    first pin. */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <select
+                    value={assigned ? store : ""}
+                    onChange={(e) =>
+                      updateItem(index, { storeCategory: `${e.target.value} | ${category}` })
+                    }
+                    aria-label={copy.stage3.storeLabel}
+                    className={cn(
+                      SELECT_CLASSES,
+                      "max-w-[168px]",
+                      assigned
+                        ? "border-edge bg-board-ground text-ink"
+                        : "border-status-act-ink/50 bg-board-plate text-status-act-ink"
+                    )}
+                  >
+                    {!assigned && <option value="">{copy.stage3.pickStore}</option>}
+                    {storeOptions.length === 0 ? (
+                      <option value={store}>{store}</option>
+                    ) : (
+                      storeOptions.map((s: string) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))
+                    )}
+                  </select>
+
+                  <select
+                    value={category}
+                    onChange={(e) =>
+                      updateItem(index, {
+                        storeCategory: `${assigned ? store : ""} | ${e.target.value}`,
+                      })
+                    }
+                    aria-label="Store type"
+                    className={cn(
+                      SELECT_CLASSES,
+                      "max-w-[136px] border-edge bg-board-ground text-ink"
+                    )}
+                  >
+                    {merchantCategories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             );
           })}
@@ -210,64 +250,60 @@ export function Stage3ConfirmItems({
           <button
             type="button"
             onClick={() => addItem()}
-            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-slate-300 text-[11px] font-bold text-slate-500 hover:border-dispatcher-navy hover:text-dispatcher-navy transition cursor-pointer"
+            className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-trim border border-edge bg-board-plate text-micro uppercase text-ink-muted transition-colors hover:text-ink"
           >
-            <Plus size={13} /> {copy.stage3.addItem}
+            <Plus size={14} /> {copy.stage3.addItem}
           </button>
         </div>
       ) : savedItems.length === 0 ? (
-        <div className="text-center py-4 px-3 border border-dashed border-slate-200 rounded-xl">
-          <Package size={20} className="text-slate-300 mx-auto" />
-          <p className="text-[11px] font-bold text-slate-600 mt-1.5 mb-0">Nothing on the list yet</p>
+        <div className="rounded-trim bg-board-ground px-3 py-4 text-center">
+          <Package size={20} className="mx-auto text-board-trim" />
+          <p className="mb-0 mt-1.5 text-label text-ink">Nothing on the list yet</p>
         </div>
       ) : (
-        <div className="space-y-1.5">
+        <ul className="m-0 list-none divide-y divide-hairline p-0">
           {savedItems.map((it: any, i: number) => {
             const { store, assigned } = parseStoreAndCat(it.storeCategory);
             return (
-              <div
-                key={i}
-                className={`flex items-center gap-2.5 rounded-xl border px-2.5 py-2 ${
-                  assigned ? "bg-white border-slate-200" : "bg-amber-50 border-amber-300"
-                }`}
-              >
-                <span className="shrink-0 font-mono font-bold bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+              <li key={i} className="flex items-center gap-2.5 py-2">
+                <span data-figure className="shrink-0 font-mono text-label text-ink-muted">
                   {it.quantity}&times;
                 </span>
-                <span className="flex-1 min-w-0 truncate text-[11px] font-semibold text-slate-800">
-                  {it.itemName}
-                </span>
-                {/* Which shop this is bought at — the thing the rider needs and
+                <span className="min-w-0 flex-1 truncate text-body text-ink">{it.itemName}</span>
+                {/* Which shop this is bought at. The thing the rider needs and
                     the list could not previously show. */}
                 <span
-                  className={`shrink-0 text-[10px] font-bold truncate max-w-[112px] ${
-                    assigned ? "text-slate-400" : "text-amber-800"
-                  }`}
+                  className={cn(
+                    "max-w-[128px] shrink-0 truncate text-label",
+                    assigned ? "text-ink-muted" : "text-status-act-ink"
+                  )}
                 >
                   {assigned ? store : copy.stage3.pickStore}
                 </span>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {unassignedCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-          <p className="text-[11px] font-extrabold text-amber-900 m-0">
+        <div className="rounded-plate bg-status-waiting-fill px-3 py-2.5">
+          <p className="m-0 text-label text-status-waiting-ink">
             {copy.stage3.unassignedTitle(unassignedCount)}
           </p>
-          <p className="text-[11px] text-amber-900/85 mt-1 mb-0 leading-relaxed">
+          <p className="mb-0 mt-1 text-body text-status-waiting-ink/85">
             {copy.stage3.unassignedBody}
           </p>
           {!isEditing && (
-            <button
+            <DispatcherButton
               type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-2"
               onClick={startEditing}
-              className="mt-2 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition active:scale-95 cursor-pointer"
             >
               {copy.stage3.edit}
-            </button>
+            </DispatcherButton>
           )}
         </div>
       )}
@@ -285,7 +321,7 @@ export function Stage3ConfirmItems({
 
       <DispatcherInlineBanner message={feedback.message} onDismiss={feedback.dismiss} />
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex flex-wrap gap-2">
         {isEditing ? (
           <>
             <DispatcherButton
@@ -293,7 +329,7 @@ export function Stage3ConfirmItems({
               size="md"
               loading={isSaving}
               loadingText={copy.stage3.sending}
-              icon={<Send size={14} />}
+              icon={<Send size={15} />}
               onClick={handleSend}
               className="flex-1 justify-center"
             >
@@ -310,7 +346,7 @@ export function Stage3ConfirmItems({
               size="md"
               loading={isSaving}
               loadingText={copy.stage3.sending}
-              icon={<Send size={14} />}
+              icon={<Send size={15} />}
               onClick={handleSend}
               disabled={savedItems.length === 0}
               className="flex-1 justify-center"

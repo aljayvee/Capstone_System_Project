@@ -1,24 +1,38 @@
 import * as React from "react";
-import { HandCoins, AlertTriangle, CheckCircle2, Undo2, Receipt } from "lucide-react";
-import { DispatcherButton } from "../ui/DispatcherButton";
-import { DispatcherBadge } from "../ui/DispatcherBadge";
-import { DispatcherInlineBanner } from "../ui/DispatcherInlineBanner";
+import { AlertTriangle, CheckCircle2, Undo2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherBadge } from "@/components/panel/DispatcherBadge";
+import { DispatcherCard } from "@/components/panel/DispatcherCard";
+import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "./copy";
 import type { useOrderPayments } from "./hooks/useOrderPayments";
 
 /**
  * The money on a 50% downpayment errand.
  *
- * Payment lands on the company's Facebook Page, outside this system. There is
- * no callback to trust — a dispatcher looks at that page and says whether it
- * arrived — so this panel is a place to make an ATTESTATION, and it is built to
- * feel like one. The amount is typed rather than one-tapped: a button reading
- * "confirm what we expected" would record agreement with a figure nobody read,
- * and the server refuses a mismatch precisely so that typing is meaningful.
+ * Payment lands on the company Facebook Page, outside this system. There is no
+ * callback to trust - a dispatcher looks at that page and says whether it
+ * arrived - so this panel is a place to make an ATTESTATION, and it is built
+ * to feel like one. The amount is typed rather than one-tapped: a button
+ * reading "confirm what we expected" would record agreement with a figure
+ * nobody read, and the server refuses a mismatch precisely so that typing is
+ * meaningful.
  *
  * One state, one action. The panel never shows the dispatcher a choice between
- * confirming a downpayment and clearing an overage, because only one of those is
- * ever the next thing.
+ * confirming a downpayment and clearing an overage, because only one of those
+ * is ever the next thing.
+ *
+ * Route board build. This panel renders inside a stage body, which is already
+ * inside the stage card, and it opened with `bg-white border rounded-xl` and
+ * then put two more bordered boxes inside that: four levels of surface for one
+ * ledger. It is regions on the stage plate now, and the two figures sit either
+ * side of one rule instead of in two matching boxes.
+ *
+ * Three em dash placeholders are gone. A dash where a reference number should
+ * be tells a dispatcher nothing about whether the OCR failed, the field was
+ * blank, or nobody has uploaded anything - and this is the screen where money
+ * gets vouched for.
  */
 
 const peso = (n: number) =>
@@ -45,28 +59,27 @@ export function PaymentLedgerPanel({
 
   const [showRefund, setShowRefund] = React.useState(false);
 
-  // Not a downpayment errand — nothing here applies.
+  // Not a downpayment errand - nothing here applies.
   if (!ledger?.hasLedger) return null;
 
   const c = copy.payments;
 
   return (
-    <section className="bg-white border border-slate-200 rounded-xl p-3 space-y-3">
-      <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <HandCoins size={14} className="shrink-0 text-slate-500" />
-          <h4 className="text-[11px] font-extrabold text-slate-900 m-0 truncate">{c.title}</h4>
-        </div>
+    <DispatcherCard.Region padding="sm" className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <DispatcherCard.Label as="h4" className="mb-0 min-w-0 flex-1">
+          {c.title}
+        </DispatcherCard.Label>
         <PlanBadge state={ledger.state} />
-      </header>
+      </div>
 
-      {/* The two figures, always both — a dispatcher asked "how much is left?"
-          should never have to subtract. */}
-      <dl className="grid grid-cols-2 gap-2 m-0">
-        {/* Label names the thing, value IS the number, caption gives it
-            context. They used to carry the amount in the label AND a different
-            amount as the value — "Due before dispatch: ₱500.00" over "₱0.00" —
-            which put two figures with two meanings in one card. */}
+      {/* The two figures, always both - a dispatcher asking "how much is left?"
+          should never have to subtract. Label names the thing, value IS the
+          number, caption gives it context. They used to carry the amount in the
+          label AND a different amount as the value ("Due before dispatch:
+          500.00" over "0.00"), which put two figures with two meanings in one
+          box. */}
+      <dl className="m-0 grid grid-cols-2 divide-x divide-hairline">
         <Figure
           label={c.paidUpFront}
           value={peso(ledger.amountPaid)}
@@ -76,6 +89,7 @@ export function PaymentLedgerPanel({
           label={c.balance}
           value={peso(ledger.balanceDue)}
           caption="collected at the door"
+          className="pl-3"
         />
       </dl>
 
@@ -83,26 +97,27 @@ export function PaymentLedgerPanel({
 
       {/* ── the one thing to do next ─────────────────────────────────────── */}
       {/* What the customer says they sent, read off their own screenshot by
-          Cloud Vision. It does NOT confirm anything — OCR can be fooled by an
-          edited image and the money is real — but it puts a reference on screen
+          Cloud Vision. It does NOT confirm anything - OCR can be fooled by an
+          edited image and the money is real - but it puts a reference on screen
           that the dispatcher can search the Facebook Page for, instead of
           confirming from memory. */}
       {ledger.state === "AWAITING_UPFRONT" && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Receipt size={13} className="shrink-0 text-slate-500" />
-            <span className="text-[11px] font-extrabold text-slate-800">{c.proofTitle}</span>
-          </div>
+        <div>
+          <DispatcherCard.Label as="h5">{c.proofTitle}</DispatcherCard.Label>
 
           {proof?.extraction ? (
             <>
-              <ProofRow label={c.proofRef} value={proof.extraction.referenceNo ?? "—"} mono />
+              <ProofRow label={c.proofRef} value={proof.extraction.referenceNo} mono />
               {proof.extraction.transactionId && (
                 <ProofRow label={c.proofTxn} value={proof.extraction.transactionId} mono />
               )}
               <ProofRow
                 label={c.proofAmount}
-                value={proof.extraction.extractedTotal != null ? peso(proof.extraction.extractedTotal) : "—"}
+                value={
+                  proof.extraction.extractedTotal != null
+                    ? peso(proof.extraction.extractedTotal)
+                    : null
+                }
                 mono
               />
               <ProofRow
@@ -110,15 +125,15 @@ export function PaymentLedgerPanel({
                 value={
                   proof.extraction.extractedDate
                     ? new Date(proof.extraction.extractedDate).toLocaleDateString()
-                    : "—"
+                    : null
                 }
               />
-              <p className="text-[10px] text-slate-400 m-0 pt-0.5">
+              <p className="m-0 pt-1 text-label text-ink-muted">
                 {c.proofRead(proof.extraction.engine)}
               </p>
             </>
           ) : (
-            <p className="text-[11px] text-slate-500 m-0">{c.proofNone}</p>
+            <p className="m-0 text-body text-ink-muted">{c.proofNone}</p>
           )}
         </div>
       )}
@@ -135,12 +150,12 @@ export function PaymentLedgerPanel({
       )}
 
       {!readOnly && ledger.state === "OVERAGE_PENDING" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
-          <p className="flex items-center gap-1.5 text-[11px] font-extrabold text-amber-900 m-0">
-            <AlertTriangle size={13} className="shrink-0" />
+        <div className="space-y-2 rounded-trim bg-status-waiting-fill p-3">
+          <p className="m-0 flex items-center gap-1.5 text-label text-status-waiting-ink">
+            <AlertTriangle size={14} className="shrink-0" />
             {c.overageTitle}
           </p>
-          <p className="text-[11px] text-amber-900 m-0">
+          <p className="m-0 text-body text-status-waiting-ink">
             {c.overageHint(
               peso(agreedBasket ?? 0),
               peso(actualBasket ?? 0),
@@ -158,36 +173,36 @@ export function PaymentLedgerPanel({
       )}
 
       {!readOnly && ledger.state === "AWAITING_BALANCE" && (
-        <p className="text-[11px] text-slate-500 m-0">
-          {c.balanceHint}
-        </p>
+        <p className="m-0 text-body text-ink-muted">{c.balanceHint}</p>
       )}
 
       {ledger.state === "SETTLED" && (
-        <p className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 m-0">
-          <CheckCircle2 size={13} className="shrink-0" />
+        <p className="m-0 flex items-center gap-1.5 text-label text-status-done-ink">
+          <CheckCircle2 size={14} className="shrink-0" />
           {c.settled}
         </p>
       )}
 
       {/* ── what has already been recorded, and who vouched for it ───────── */}
       {ledger.entries.length > 0 && (
-        <ul className="m-0 p-0 list-none space-y-1 border-t border-slate-100 pt-2">
+        <ul className="m-0 list-none divide-y divide-hairline border-t border-hairline p-0 pt-1">
           {ledger.entries.map((e) => (
-            <li key={e.id} className="flex items-baseline justify-between gap-2 text-[11px]">
-              <span className="text-slate-600 truncate">
-                <span className="font-bold text-slate-800">{KIND_LABEL[e.kind]}</span>
+            <li key={e.id} className="flex items-baseline justify-between gap-2 py-1.5">
+              <span className="min-w-0 truncate text-body text-ink-muted">
+                <span className="text-ink">{KIND_LABEL[e.kind]}</span>
                 {e.confirmedBy && (
-                  <span className="text-slate-400">
+                  <span>
                     {" · "}
                     {c.attestedBy(e.confirmedBy.name, new Date(e.confirmedAt).toLocaleString())}
                   </span>
                 )}
               </span>
               <span
-                className={`font-mono tabular-nums font-bold shrink-0 ${
-                  e.kind === "REFUND" ? "text-rose-600" : "text-slate-800"
-                }`}
+                data-figure
+                className={cn(
+                  "shrink-0 font-mono text-label tabular-nums",
+                  e.kind === "REFUND" ? "text-status-act-ink" : "text-ink"
+                )}
               >
                 {e.kind === "REFUND" ? "−" : ""}
                 {peso(e.amount)}
@@ -200,7 +215,7 @@ export function PaymentLedgerPanel({
       {/* Refund is deliberately last, small, and behind a disclosure. It is the
           rarest action here and the most consequential to press by accident. */}
       {!readOnly && ledger.amountPaid > 0 && (
-        <div className="border-t border-slate-100 pt-2">
+        <div className="border-t border-hairline pt-2">
           {showRefund ? (
             <AttestationForm
               defaultAmount={ledger.amountPaid}
@@ -219,7 +234,7 @@ export function PaymentLedgerPanel({
             <DispatcherButton
               variant="danger-ghost"
               size="sm"
-              icon={<Undo2 size={12} />}
+              icon={<Undo2 size={14} />}
               onClick={() => setShowRefund(true)}
             >
               {c.refund}
@@ -227,7 +242,7 @@ export function PaymentLedgerPanel({
           )}
         </div>
       )}
-    </section>
+    </DispatcherCard.Region>
   );
 }
 
@@ -255,21 +270,57 @@ function PlanBadge({ state }: { state: string }) {
   }
 }
 
-function ProofRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+/**
+ * A field read off the customer's screenshot.
+ *
+ * A null value says the OCR did not return this field, in words. It used to
+ * render an em dash, which reads as a value rather than as its absence.
+ */
+function ProofRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value?: string | null;
+  mono?: boolean;
+}) {
+  const missing = value == null || value === "";
   return (
-    <div className="flex items-baseline justify-between gap-2 text-[11px]">
-      <span className="text-slate-500">{label}</span>
-      <span className={`text-slate-800 font-bold ${mono ? "font-mono tabular-nums" : ""}`}>{value}</span>
+    <div className="flex items-baseline justify-between gap-2 py-0.5">
+      <span className="text-body text-ink-muted">{label}</span>
+      <span
+        data-figure={mono && !missing ? "" : undefined}
+        className={cn(
+          "text-label",
+          missing ? "text-ink-muted" : "text-ink",
+          mono && !missing && "font-mono tabular-nums"
+        )}
+      >
+        {missing ? "Not read" : value}
+      </span>
     </div>
   );
 }
 
-function Figure({ label, value, caption }: { label: string; value: string; caption: string }) {
+function Figure({
+  label,
+  value,
+  caption,
+  className,
+}: {
+  label: string;
+  value: string;
+  caption: string;
+  className?: string;
+}) {
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2">
-      <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-500 m-0">{label}</dt>
-      <dd className="text-sm font-black text-slate-900 font-mono tabular-nums m-0">{value}</dd>
-      <p className="text-[10px] text-slate-400 m-0">{caption}</p>
+    <div className={cn("min-w-0 pr-3", className)}>
+      <dt className="m-0 text-micro uppercase text-ink-muted">{label}</dt>
+      <dd data-figure className="m-0 font-mono text-data tabular-nums text-ink">
+        {value}
+      </dd>
+      <p className="m-0 text-label text-ink-muted">{caption}</p>
     </div>
   );
 }
@@ -278,10 +329,10 @@ function Figure({ label, value, caption }: { label: string; value: string; capti
  * Type the figure you are looking at.
  *
  * Pre-filled with what is due, because that is almost always the right number
- * and retyping it from scratch is friction with no safety value. Still editable,
- * and still checked by the server — a dispatcher who sees a different amount on
- * the Facebook Page must be able to say so, and the refusal that follows is the
- * control working, not an obstacle.
+ * and retyping it from scratch is friction with no safety value. Still
+ * editable, and still checked by the server - a dispatcher who sees a different
+ * amount on the Facebook Page must be able to say so, and the refusal that
+ * follows is the control working, not an obstacle.
  */
 function AttestationForm({
   hint,
@@ -310,31 +361,33 @@ function AttestationForm({
   const amountValid = Number.isFinite(parsed) && parsed > 0;
   const noteValid = !noteRequired || note.trim().length > 0;
 
+  const field =
+    "min-h-10 w-full rounded-trim border border-edge bg-board-plate px-2 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field";
+
   return (
     <div className="space-y-2">
-      {hint && <p className="text-[11px] text-slate-500 m-0">{hint}</p>}
+      {hint && <p className="m-0 text-body text-ink-muted">{hint}</p>}
 
-      <div className="flex items-end gap-2">
-        <label className="flex-1 min-w-0">
-          <span className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
-            {c.amountLabel}
+      <label className="block min-w-0">
+        <span className="mb-1 block text-micro uppercase text-ink-muted">{c.amountLabel}</span>
+        <div className="flex items-center gap-1.5">
+          <span data-figure className="font-mono text-data text-ink-muted">
+            {"₱"}
           </span>
-          <div className="flex items-center gap-1">
-            <span className="text-slate-400 font-black">₱</span>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-slate-900 font-bold text-sm outline-none focus:ring-2 focus:ring-dispatcher-navy"
-            />
-          </div>
-        </label>
-      </div>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            // The one themed focus outline, not a per-field navy glow.
+            className={cn(field, "font-mono tabular-nums")}
+          />
+        </div>
+      </label>
 
       <label className="block">
-        <span className="block text-[10px] font-bold uppercase text-slate-600 mb-1">
+        <span className="mb-1 block text-micro uppercase text-ink-muted">
           {noteRequired ? c.noteRequired : c.noteLabel}
         </span>
         <input
@@ -343,13 +396,13 @@ function AttestationForm({
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={noteRequired ? c.refundReasonRequired : ""}
-          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-slate-800 text-xs outline-none focus:ring-2 focus:ring-dispatcher-navy"
+          className={field}
         />
       </label>
 
       <div className="flex items-center gap-2">
         <DispatcherButton
-          variant="success"
+          variant="primary"
           size="md"
           loading={loading}
           loadingText={loadingLabel}

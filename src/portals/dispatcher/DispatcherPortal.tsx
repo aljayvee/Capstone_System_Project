@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/AuthContext";
 import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
-import { ErrandQueueTable } from "./components/ErrandQueueTable";
+// Straight to the workspace. `ErrandQueueTable` was a 21-line file whose entire
+// body was `return <DispatchManagementWorkspace {...props} />`, so it added a
+// second props interface to keep in sync and a name that promised a table this
+// console does not have.
+import { DispatchManagementWorkspace } from "./components/workspace/DispatchManagementWorkspace";
 import { RiderFleetRoster } from "./components/RiderFleetRoster";
 import { OrderChatScreen } from "./components/order-chat/OrderChatScreen";
 import { RecentChatsPanel } from "./components/RecentChatsPanel";
@@ -11,7 +16,7 @@ import { ExceptionQueuePanel } from "./components/ExceptionQueuePanel";
 import { DispatcherProfilePanel } from "./components/DispatcherProfilePanel";
 import { useOpenExceptions } from "./hooks/useOpenExceptions";
 import {
-  ClipboardList, Bike, LogOut, Clock, Zap, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle
+  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle
 } from "lucide-react";
 import { NotificationBell } from "../../components/NotificationBell";
 import { HeaderClock } from "../../components/HeaderClock";
@@ -34,6 +39,8 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { formatErrandId } from "../../utils/formatErrandId";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +58,13 @@ export default function DispatcherPortal() {
     activeTab,
     setActiveTab,
     errands,
+    // Destructured at last. isLoading was returned by this hook from the start
+    // and never read here, which is why every panel rendered its empty state
+    // during the first fetch as though the board were confirmed empty.
+    isLoading,
+    loadError,
+    actionError,
+    dismissActionError,
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,
@@ -59,7 +73,6 @@ export default function DispatcherPortal() {
     handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,
-    handleUpdateStatus,
   } = useDispatcherPortal(user?.id, user?.name);
   const { riders } = useRiderFleetPresence();
   const exceptionQueue = useOpenExceptions();
@@ -84,15 +97,61 @@ export default function DispatcherPortal() {
     const s = String(e.status).toUpperCase();
     return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "COMPLETED" && s !== "DELIVERED" && s !== "PASSING BY";
   }).length;
+  /**
+   * The run the board is currently signed to.
+   *
+   * Reported up by the queue workspace, which stays the owner of its own
+   * selection. Holding it here is what lets the destination band repaint to
+   * the selected run, which the direction contract names as this surface's
+   * signature interaction and which was previously only claimed in a comment.
+   */
+  const [signedRun, setSignedRun] = useState<any | null>(null);
+
   const exceptionCount = exceptionQueue.openCount;
   const onlineRidersCount = riders.filter((r) => r.online).length;
 
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
-        <div className="min-h-screen bg-[#F9FAFB] text-slate-900 flex relative overflow-x-hidden w-full">
+        {/* data-portal marks the whole dispatcher shell, rail included. It
+            carries nothing but the icon stroke: the navigation rail sits an
+            inch from the console and a 2px nav icon beside a 1.5px console icon
+            reads as two unfinished halves of one screen. No geometry rides on
+            this attribute, so the sidebar alignment contract recorded in
+            AGENT_HANDSHAKE.md is untouched. */}
+        {/* h-screen, not min-h-screen. A minimum is a floor, so content
+            pushed this wrapper past the viewport and the PAGE scrolled: the
+            board band, the panel title and the filter row all scrolled away
+            with it, which is exactly the pinned-header contract (AGENTS.md
+            8.12) that PanelShell exists to keep. Nothing below here had a
+            definite height either, so the `h-screen overflow-hidden` on the
+            inner main was inert. With a ceiling at this level the flex chain
+            resolves and the one region that should scroll is the only one
+            that does. The rail scrolls internally through SidebarContent, so
+            capping it is safe. */}
+        {/* data-surface was missing here, and that was a real defect rather
+            than an omission. src/styles/surfaces.css (formerly dispatch.css)
+            keys seven rule groups on it: the focus ring, themed scrollbars,
+            ::selection, the caret, tabular figures, the motion curve and the
+            icon stroke. Only the last also matches [data-portal], so the
+            other six had never applied to the console body at all. They fired
+            inside the portalled overlays, which carry data-surface themselves
+            because they render at document.body, and nowhere else. The one
+            focus ring meant to replace per-component focus styles across
+            dozens of files was only ever firing in modals. */}
+        <div
+          data-surface="dispatch"
+          data-portal="dispatch"
+          className="relative flex h-screen w-full overflow-hidden bg-board-ground text-ink"
+        >
           {/* Sidebar Navigation - Sugo Midnight Navy */}
+          {/* data-on-field is required now that the root carries data-surface.
+              The focus ring is drawn in var(--color-board-field), which IS
+              #0F2035, so on a #0F2035 rail it would be an invisible outline.
+              This flips it to the ground. Styling only: no geometry rides on
+              it, so the alignment contract is untouched. */}
           <Sidebar
+            data-on-field
             collapsible="icon"
             className="border-r border-white/10 select-none"
             variant="sidebar"
@@ -435,81 +494,205 @@ export default function DispatcherPortal() {
           </Sidebar>
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
-            <DialogContent>
+            {/* data-surface because DialogContent portals to document.body,
+                outside the console element that carries it. */}
+            <DialogContent
+              data-surface="dispatch"
+              className="rounded-modal border-edge shadow-plate"
+            >
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <LogOut className="text-red-500" size={20} /> Sign Out
+                <DialogTitle className="flex items-center gap-2 text-panel text-ink">
+                  <LogOut size={18} className="text-ink-muted" /> Sign out
                 </DialogTitle>
-                <DialogClose className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+                <DialogClose
+                  aria-label="Close this dialog"
+                  className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-board-ground hover:text-ink"
+                >
                   <X size={18} />
                 </DialogClose>
               </DialogHeader>
-              <DialogDescription>
-                Thank you for your work today, {(user?.name || "Duty Dispatcher").split(" ")[0]}. Are you sure you want to sign out of the Dispatcher console? You'll need to log back in to continue dispatching errands.
+              <DialogDescription className="text-body text-ink-muted">
+                Thanks for your work today,{" "}
+                {(user?.name || "Duty Dispatcher").split(" ")[0]}. Signing out ends your shift on
+                this console, and anything you have claimed stays claimed until someone releases
+                it.
               </DialogDescription>
               <DialogFooter className="flex-row gap-3">
-                <button
+                <DispatcherButton
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  className="flex-1 justify-center"
                   onClick={() => setShowSignOutConfirm(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition"
                 >
-                  Cancel
-                </button>
-                <button
+                  Stay on shift
+                </DispatcherButton>
+                <DispatcherButton
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  className="flex-1 justify-center"
+                  icon={<LogOut size={16} />}
                   onClick={() => {
                     setShowSignOutConfirm(false);
                     logout();
                   }}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition flex items-center justify-center gap-2"
                 >
-                  <LogOut size={16} /> Log Out
-                </button>
+                  Sign out
+                </DispatcherButton>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
           {/* Main Operations Console */}
           <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full relative">
-            <main className="flex-1 p-6 sm:p-8 overflow-y-auto space-y-6 h-screen w-full">
+            {/* The console's own surface. Every token and browser-surface rule
+                in src/styles/surfaces.css is scoped to this attribute, which is
+                what keeps the route board out of the Owner portal. */}
+            <main
+              data-surface="dispatch"
+              className="flex h-screen w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4"
+            >
               {/* ───────────────────────────────────────────────────────────── */}
-              {/* 1. TOP HERO HEADER (Scrolls away with page)                   */}
+              {/* 1. THE DESTINATION BAND (pinned)                              */}
+              {/*                                                               */}
+              {/* The shift itself, read across the room: who is on duty, the    */}
+              {/* time, and what is owed a decision right now. It replaces a     */}
+              {/* white card carrying a tinted icon chip and a 20px title, which */}
+              {/* scrolled away with the page and was the most interchangeable   */}
+              {/* element on the surface.                                        */}
               {/* ───────────────────────────────────────────────────────────── */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <SidebarTrigger className="text-slate-600 hover:text-slate-900 hover:bg-slate-100 -ml-1 mr-1 size-9 rounded-xl focus-visible:ring-2 focus-visible:ring-slate-400" />
-                    <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
-                      <ClipboardList size={20} />
-                    </span>
-                    <h1 className="text-xl font-extrabold text-slate-800">Dispatch Management</h1>
+              <div
+                data-on-field
+                className="shrink-0 rounded-plate bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {/* No SidebarTrigger here. The rail carries its own in
+                      both states, as part of the alignment contract recorded
+                      in AGENT_HANDSHAKE.md, and this was a third identical
+                      panel-left control sitting 35px from one of them. */}
+                  <div className="min-w-0">
+                    {/* The board re-signs to the selected run. With nothing
+                        picked it names itself; with a run picked it carries
+                        that run's destination and route number. This is the
+                        contract's signature interaction, and the reason the
+                        band is a board rather than a page title. */}
+                    <h1 className="truncate text-title uppercase text-board-plate">
+                      {signedRun
+                        ? signedRun.pinpoints?.[0]?.storeName ||
+                          signedRun.category ||
+                          "Dispatch board"
+                        : "Dispatch board"}
+                    </h1>
+                    {signedRun ? (
+                      <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-label text-board-trim">
+                        <span data-figure className="font-mono text-data text-board-plate">
+                          {formatErrandId(signedRun.id)}
+                        </span>
+                        <span className="truncate">{signedRun.customerName || "Customer"}</span>
+                        <span className="truncate">
+                          {signedRun.deliveryAddress || "Tacurong City"}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="truncate text-label text-board-trim">
+                        {user?.name || "Duty dispatcher"} on duty, Tacurong City
+                      </p>
+                    )}
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2.5">
-                  <HeaderClock />
-                  <NotificationBell />
-                </div>
-              </div>
-
-              {/* ───────────────────────────────────────────────────────────── */}
-              {/* 2. MODULAR CONTENT VIEWS                                      */}
-              {/* ───────────────────────────────────────────────────────────── */}
-              <div>
-                {activeTab === "queue" && (
-                  <div className="flex flex-col space-y-4">
-                    <div className="w-full">
-                      <ErrandQueueTable
-                        errands={errands}
-                        currentUser={user}
-                        onClaimOrder={handleClaimOrder}
-                        onDeclineOrder={handleDeclineOrder}
-                        onOpenChat={handleOpenChat}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
+                  <div className="flex items-center gap-3">
+                    {/* What is owed a decision, at board scale. Red only when
+                        something is actually owed: on this surface red means
+                        "you must act" and nothing else. */}
+                    <div className="text-right">
+                      <p className="text-micro uppercase text-board-trim">Needs a decision</p>
+                      <p
+                        data-figure
+                        className={cn(
+                          "text-board tabular-nums",
+                          exceptionQueue.openCount > 0 ? "text-signal-on-field" : "text-board-plate"
+                        )}
+                      >
+                        {exceptionQueue.isLoading || exceptionQueue.loadError
+                          ? "--"
+                          : exceptionQueue.openCount}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <HeaderClock />
+                      <NotificationBell />
                     </div>
                   </div>
+                </div>
+
+                {/* Everywhere EXCEPT the exceptions tab.
+                    This rendered on all seven tabs, so a profile form
+                    announced a queue failure, and on the exceptions tab the
+                    identical sentence appeared twice 400px apart. The count
+                    above shows "--" wherever the dispatcher is, and this line
+                    is what explains that dash — but on the exceptions tab the
+                    panel itself says it in full, so the band stays quiet and
+                    lets the failing region do the talking. */}
+                {exceptionQueue.loadError && activeTab !== "exceptions" ? (
+                  <p role="status" className="mt-2 text-label text-board-trim">
+                    {exceptionQueue.loadError}
+                  </p>
+                ) : null}
+              </div>
+
+              {/* A failed claim, status change or decline. This is where the
+                  two alert() dialogs used to interrupt the shift. */}
+              {actionError ? (
+                <div
+                  role="alert"
+                  className="flex shrink-0 items-start justify-between gap-3 rounded-plate bg-status-act-fill px-3 py-2.5 text-label text-status-act-ink"
+                >
+                  <span>{actionError}</span>
+                  <button
+                    type="button"
+                    onClick={dismissActionError}
+                    className="shrink-0 cursor-pointer text-micro uppercase underline underline-offset-2"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              ) : null}
+
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* 2. THE ACTIVE SURFACE                                         */}
+              {/*                                                               */}
+              {/* One flex child that owns the remaining height, so panels size  */}
+              {/* from the chain instead of each guessing at 100vh minus a       */}
+              {/* constant. min-h-0 is what allows it to shrink.                 */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* Every tab now owns its own single scroller, through the
+                  queue workspace or through PanelShell, so this wrapper only
+                  hands out the remaining height. The profile tab was the last
+                  one needing an overflow of its own here; nesting that inside
+                  a PanelShell scroller would have made two. */}
+              <div className="min-h-0 min-w-0 flex-1">
+                {activeTab === "queue" && (
+                  <DispatchManagementWorkspace
+                    errands={errands}
+                    currentUser={user}
+                    onClaimOrder={handleClaimOrder}
+                    onDeclineOrder={handleDeclineOrder}
+                    onOpenChat={handleOpenChat}
+                    isLoading={isLoading}
+                    loadError={loadError}
+                    onRetry={fetchOrders}
+                    onSignedRunChange={setSignedRun}
+                  />
                 )}
                 {activeTab === "active_errands" && (
-                  <ActiveErrandsPanel errands={errands} onOpenChat={handleOpenChat} />
+                  <ActiveErrandsPanel
+                    errands={errands}
+                    onOpenChat={handleOpenChat}
+                    isLoading={isLoading}
+                    loadError={loadError}
+                    onRetry={fetchOrders}
+                  />
                 )}
                 {activeTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
                 {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
@@ -521,7 +704,13 @@ export default function DispatcherPortal() {
                   />
                 )}
                 {activeTab === "recent_chats" && (
-                  <RecentChatsPanel errands={errands} onOpenChat={handleOpenChat} />
+                  <RecentChatsPanel
+                    errands={errands}
+                    onOpenChat={handleOpenChat}
+                    isLoading={isLoading}
+                    loadError={loadError}
+                    onRetry={fetchOrders}
+                  />
                 )}
                 {activeTab === "profile" && <DispatcherProfilePanel />}
               </div>

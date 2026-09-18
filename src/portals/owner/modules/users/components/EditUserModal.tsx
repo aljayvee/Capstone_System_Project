@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  UserCheck,
   X,
   AlertTriangle,
   Check,
@@ -26,7 +25,12 @@ import {
 import { UserRole } from "../../../../../types/auth";
 import { UserRecord } from "../UserManagementModule";
 import { useAuth } from "../../../../../context/AuthContext";
-import { ASSIGNABLE_ROLES, AssignableRole, requiresRoleChangeApproval, roleLabel } from "../../../../../constants/userRoles";
+import {
+  ASSIGNABLE_ROLES,
+  AssignableRole,
+  requiresRoleChangeApproval,
+  roleLabel,
+} from "../../../../../constants/userRoles";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -73,41 +77,45 @@ type FieldKey =
 
 const ROLE_METADATA: Record<
   AssignableRole,
-  { label: string; description: string; icon: React.ElementType; color: string; border: string; bg: string; activeBg: string }
+  {
+    label: string;
+    description: string;
+    icon: React.ElementType;
+    color: string;
+    bg: string;
+    activeBg: string;
+  }
 > = {
   owner: {
     label: "Admin",
     description: "Full system & business governance",
     icon: ShieldCheck,
-    color: "text-purple-700",
-    border: "border-purple-200",
-    bg: "bg-purple-50/70",
-    activeBg: "bg-purple-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
   dispatcher: {
     label: "Dispatcher",
     description: "Order routing, fleet & chat hub",
     icon: Headphones,
-    color: "text-blue-700",
-    border: "border-blue-200",
-    bg: "bg-blue-50/70",
-    activeBg: "bg-blue-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
   rider: {
     label: "Delivery Rider",
     description: "Field order execution & mobile app",
     icon: Bike,
-    color: "text-amber-700",
-    border: "border-amber-200",
-    bg: "bg-amber-50/70",
-    activeBg: "bg-amber-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
 };
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onSave }) => {
   const { user: currentUser } = useAuth();
   const isSelf = Boolean(
-    currentUser && (currentUser.id === user.id || currentUser.username === user.username)
+    currentUser && (currentUser.id === user.id || currentUser.username === user.username),
   );
 
   const [firstName, setFirstName] = useState(user.firstName);
@@ -156,7 +164,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
     if (showPasswordSection && (password || confirmPassword)) {
       set("password", validatePassword(password));
-      if (!errors.password) set("confirmPassword", validateConfirmPassword(password, confirmPassword));
+      if (!errors.password)
+        set("confirmPassword", validateConfirmPassword(password, confirmPassword));
     }
 
     return errors;
@@ -245,46 +254,55 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
   };
 
   const inputBaseClass = (hasError: boolean) =>
-    `w-full bg-slate-50 border rounded-xl py-2.5 px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-150 focus:bg-white ${
+    `w-full bg-board-ground border border-edge rounded-plate py-2.5 px-3.5 text-body text-ink placeholder-ink-muted outline-none transition duration-150 focus:bg-board-plate ${
       hasError
-        ? "border-red-300 focus:ring-2 focus:ring-red-400/30 focus:border-red-500 bg-red-50/30"
-        : "border-slate-200 focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
+        ? "border-status-act-ink/50 focus:ring-2 focus:ring-status-act-ink/25 focus:border-status-act-ink bg-status-act-fill"
+        : "border-edge focus:ring-2 focus:ring-board-field/20 focus:border-board-field"
     }`;
 
   // ── Re-authentication confirmation step ──────────────────────────────────
   if (showReauth) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-fade-in">
-        <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl space-y-5 p-6 sm:p-7 my-auto">
-          <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold shadow-md shadow-red-900/10 shrink-0">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 overflow-y-auto animate-fade-in">
+        <div className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-md w-full overflow-hidden space-y-5 p-6 sm:p-7 my-auto">
+          <div className="flex items-center gap-3 border-b border-hairline pb-4">
+            <div className="w-10 h-10 rounded-plate bg-signal text-white flex items-center justify-center font-bold shrink-0">
               <ShieldAlert size={20} />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-slate-900">Security Verification</h3>
-              <p className="text-[11px] font-medium text-slate-500">Confirm privileged role change</p>
+              <h3 className="text-panel text-ink">Security Verification</h3>
+              <p className="text-body text-ink-muted">Confirm privileged role change</p>
             </div>
           </div>
 
-          <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 space-y-2">
-            <p className="text-xs font-extrabold text-amber-900 flex items-center gap-1.5">
-              <AlertTriangle size={15} className="shrink-0 text-amber-600" />
+          <div className="bg-status-waiting-fill border border-status-waiting-ink/20 rounded-plate p-4 space-y-2">
+            <p className="text-label text-status-waiting-ink flex items-center gap-1.5">
+              <AlertTriangle size={15} className="shrink-0 text-status-waiting-ink" />
               <span>Operational Role Re-assignment</span>
             </p>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              <span className="font-extrabold text-slate-900">{user.name}</span> will be switched from{" "}
-              <span className="font-extrabold text-purple-800 bg-purple-100/60 px-1.5 py-0.5 rounded">{roleLabel(user.role)}</span> to{" "}
-              <span className="font-extrabold text-blue-800 bg-blue-100/60 px-1.5 py-0.5 rounded">{roleLabel(role)}</span>. This
-              immediately updates permissions and active dispatch duties.
+            <p className="text-label text-status-waiting-ink leading-relaxed">
+              <span className="font-bold text-ink">{user.name}</span> will be switched from{" "}
+              <span className="font-bold text-ink-muted bg-board-ground px-1.5 py-0.5 rounded">
+                {roleLabel(user.role)}
+              </span>{" "}
+              to{" "}
+              <span className="font-bold text-ink bg-board-ground px-1.5 py-0.5 rounded">
+                {roleLabel(role)}
+              </span>
+              . This immediately updates permissions and active dispatch duties.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-extrabold uppercase tracking-wider text-slate-700">
-              Admin Password {currentUser?.username ? `(@${currentUser.username})` : ""} <span className="text-red-500">*</span>
+            <label className="block text-micro uppercase text-ink">
+              Admin Password {currentUser?.username ? `(@${currentUser.username})` : ""}{" "}
+              <span className="text-signal">*</span>
             </label>
             <div className="relative">
-              <KeyRound size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <KeyRound
+                size={15}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+              />
               <input
                 type={showAdminPassword ? "text" : "password"}
                 autoFocus
@@ -306,15 +324,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               <button
                 type="button"
                 onClick={() => setShowAdminPassword(!showAdminPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
               >
                 {showAdminPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
-            {reauthError && <p className="text-[11px] font-bold text-red-600 mt-1">{reauthError}</p>}
+            {reauthError && <p className="text-label text-status-act-ink mt-1">{reauthError}</p>}
           </div>
 
-          <div className="flex gap-2.5 pt-3 border-t border-slate-100">
+          <div className="flex gap-2.5 pt-3 border-t border-hairline">
             <button
               type="button"
               onClick={() => {
@@ -323,7 +341,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                 setReauthError("");
               }}
               disabled={isSubmitting}
-              className="flex-1 bg-white hover:bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl border border-slate-200 text-xs transition disabled:opacity-50"
+              className="flex-1 bg-board-plate hover:bg-board-ground text-ink py-2.5 rounded-plate border border-edge text-label transition disabled:opacity-50"
             >
               Back
             </button>
@@ -331,9 +349,13 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               type="button"
               onClick={handleReauthConfirm}
               disabled={isSubmitting}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl shadow-sm text-xs flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+              className="flex-1 bg-signal hover:bg-signal text-white py-2.5 rounded-plate text-label flex items-center justify-center gap-1.5 transition disabled:opacity-50"
             >
-              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <ShieldAlert size={14} />}
+              {isSubmitting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <ShieldAlert size={14} />
+              )}
               <span>Verify & Apply</span>
             </button>
           </div>
@@ -344,26 +366,23 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
   // ── Main Edit Form ───────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-fade-in">
-      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 overflow-y-auto animate-fade-in">
+      <div className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-xl w-full max-h-[94vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 text-white flex items-center justify-center font-bold shadow-md shadow-amber-900/10 shrink-0">
-              <UserCheck size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 leading-tight">Edit Personnel Account</h3>
-              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                Update account credentials, profile details & operational role
-              </p>
-            </div>
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-hairline bg-board-ground shrink-0">
+          {/* Same removal as the add modal: a gradient chip with a coloured
+              shadow, replaced by the title doing its own work. */}
+          <div className="min-w-0">
+            <h3 className="truncate text-panel text-ink">Edit Personnel Account</h3>
+            <p className="mt-0.5 text-label text-ink-muted">
+              Update account credentials, profile details & operational role
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
+            className="w-8 h-8 rounded-trim flex items-center justify-center text-ink-muted hover:text-ink hover:bg-board-ground transition"
           >
             <X size={18} />
           </button>
@@ -372,7 +391,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto px-5 sm:px-6 py-5 space-y-6 flex-1">
           {error && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+            <div className="flex items-start gap-2.5 p-3 rounded-plate bg-status-act-fill border border-status-act-ink/20 text-status-act-ink text-label">
               <AlertTriangle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -382,27 +401,27 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
             {/* 1. ROLE & STATUS */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700">
+                <label className="text-micro uppercase text-ink">
                   1. Operational Role & Status
                 </label>
                 {/* Status Segmented Capsule */}
                 {isSelf ? (
                   <div
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-bold select-none"
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-plate bg-status-done-fill border border-status-done-ink/20 text-status-done-ink text-label select-none"
                     title="You cannot deactivate your own account while logged in"
                   >
-                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    <CheckCircle2 size={13} className="text-status-done-ink shrink-0" />
                     <span>Active (Current Admin)</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <div className="flex items-center gap-1 bg-board-ground p-1 rounded-plate">
                     <button
                       type="button"
                       onClick={() => setStatus("Active")}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-trim text-label transition ${
                         status === "Active"
-                          ? "bg-emerald-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-status-done-ink text-white"
+                          : "text-ink-muted hover:text-ink"
                       }`}
                     >
                       <CheckCircle2 size={12} />
@@ -411,10 +430,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     <button
                       type="button"
                       onClick={() => setStatus("Inactive")}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-trim text-label transition ${
                         status === "Inactive"
-                          ? "bg-slate-600 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? "bg-board-field text-white"
+                          : "text-ink-muted hover:text-ink"
                       }`}
                     >
                       <XCircle size={12} />
@@ -426,25 +445,25 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
               {/* Role Display / Selection */}
               {isSelf ? (
-                <div className="p-3.5 rounded-xl border border-purple-200 bg-purple-50/60 flex items-center justify-between">
+                <div className="p-3.5 rounded-plate border border-edge bg-board-ground flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                    <div className="w-8 h-8 rounded-trim bg-board-field text-white flex items-center justify-center font-bold shrink-0">
                       <ShieldCheck size={16} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-xs font-black text-slate-800">{roleLabel(user.role)}</p>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700 border border-purple-200">
+                        <p className="text-label text-ink">{roleLabel(user.role)}</p>
+                        <span className="px-2 py-0.5 rounded-full text-label bg-board-ground text-ink-muted border border-edge ">
                           Current Admin
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      <p className="text-body text-ink-muted mt-0.5">
                         Your administrative role is locked while logged into this account.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-purple-700 bg-white/80 px-2.5 py-1 rounded-lg border border-purple-200/80 shadow-2xs shrink-0">
-                    <Lock size={12} className="text-purple-600" />
+                  <div className="flex items-center gap-1 text-label text-ink-muted bg-board-plate px-2.5 py-1 rounded-trim border border-edge shrink-0">
+                    <Lock size={12} className="text-ink-muted" />
                     <span>Locked</span>
                   </div>
                 </div>
@@ -463,29 +482,29 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                           setRole(option.value);
                           clearFieldError("role");
                         }}
-                        className={`p-3 rounded-xl border text-left transition-all duration-150 relative flex flex-col justify-between ${
+                        className={`p-3 rounded-plate border border-edge text-left transition-all duration-150 relative flex flex-col justify-between ${
                           isSelected
-                            ? `border-[#1E3A5F] ring-2 ring-[#1E3A5F]/20 bg-slate-50 shadow-xs`
-                            : `border-slate-200 hover:border-slate-300 hover:bg-slate-50/50`
+                            ? `border-board-field ring-2 ring-board-field/20 bg-board-ground`
+                            : `border-edge hover:border-edge hover:bg-board-ground`
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1.5">
                           <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            className={`w-7 h-7 rounded-trim flex items-center justify-center ${
                               isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
                             }`}
                           >
                             <Icon size={14} />
                           </div>
                           {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center text-[10px]">
+                            <span className="w-4 h-4 rounded-full bg-board-field text-white flex items-center justify-center text-label">
                               <Check size={10} strokeWidth={3} />
                             </span>
                           )}
                         </div>
                         <div>
-                          <p className="text-xs font-black text-slate-800">{meta.label}</p>
-                          <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                          <p className="text-label text-ink">{meta.label}</p>
+                          <p className="text-body text-ink-muted leading-tight mt-0.5">
                             {meta.description}
                           </p>
                         </div>
@@ -496,11 +515,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               )}
 
               {roleChangeNeedsApproval && !isSelf && (
-                <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold leading-relaxed">
-                  <ShieldAlert size={15} className="shrink-0 mt-0.5 text-amber-600" />
+                <div className="flex items-start gap-2 p-3 rounded-plate bg-status-waiting-fill border border-status-waiting-ink/20 text-status-waiting-ink text-label leading-relaxed">
+                  <ShieldAlert size={15} className="shrink-0 mt-0.5 text-status-waiting-ink" />
                   <span>
-                    Changing role from <strong className="text-slate-900">{roleLabel(user.role)}</strong> to{" "}
-                    <strong className="text-slate-900">{roleLabel(role)}</strong> requires admin password authorization upon saving.
+                    Changing role from <strong className="text-ink">{roleLabel(user.role)}</strong>{" "}
+                    to <strong className="text-ink">{roleLabel(role)}</strong> requires admin
+                    password authorization upon saving.
                   </span>
                 </div>
               )}
@@ -508,17 +528,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
             {/* 2. PERSONAL INFORMATION */}
             <div className="space-y-3">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 block">
-                2. Personal Information
-              </label>
+              <label className="text-micro uppercase text-ink block">2. Personal Information</label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    First Name <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    First Name <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={firstName}
@@ -531,16 +552,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     />
                   </div>
                   {fieldErrors.firstName && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.firstName}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.firstName}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Last Name <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Last Name <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={lastName}
@@ -553,14 +577,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     />
                   </div>
                   {fieldErrors.lastName && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.lastName}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.lastName}</p>
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Middle Name <span className="text-slate-400 font-normal">(Optional)</span>
+                <label className="block text-label text-ink-muted mb-1">
+                  Middle Name <span className="text-ink-muted font-normal">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -573,24 +597,27 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                   className={inputBaseClass(!!fieldErrors.middleName)}
                 />
                 {fieldErrors.middleName && (
-                  <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.middleName}</p>
+                  <p className="mt-1 text-label text-status-act-ink">{fieldErrors.middleName}</p>
                 )}
               </div>
             </div>
 
             {/* 3. CONTACT & ACCOUNT CREDENTIALS */}
             <div className="space-y-3">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 block">
+              <label className="text-micro uppercase text-ink block">
                 3. Contact & Login Credentials
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Username <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Username <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <AtSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <AtSign
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={username}
@@ -603,16 +630,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     />
                   </div>
                   {fieldErrors.username && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.username}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.username}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Phone Number <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Phone Number <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Phone
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       inputMode="numeric"
@@ -628,9 +658,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     />
                   </div>
                   {fieldErrors.phone ? (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.phone}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.phone}</p>
                   ) : (
-                    <p className="mt-1 text-[10px] text-slate-400 font-medium">
+                    <p className="mt-1 text-body text-ink-muted">
                       PH mobile: 11 digits starting with 09
                     </p>
                   )}
@@ -638,11 +668,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Email Address <span className="text-red-500">*</span>
+                <label className="block text-label text-ink-muted mb-1">
+                  Email Address <span className="text-signal">*</span>
                 </label>
                 <div className="relative">
-                  <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Mail
+                    size={14}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                  />
                   <input
                     type="email"
                     value={email}
@@ -655,15 +688,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                   />
                 </div>
                 {fieldErrors.email && (
-                  <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.email}</p>
+                  <p className="mt-1 text-label text-status-act-ink">{fieldErrors.email}</p>
                 )}
               </div>
             </div>
 
             {/* 4. PASSWORD RESET ACCORDION */}
-            <div className="space-y-3 pt-3 border-t border-slate-100">
+            <div className="space-y-3 pt-3 border-t border-hairline">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <label className="text-micro uppercase text-ink flex items-center gap-1.5">
                   <RotateCcw size={13} />
                   <span>Password Reset</span>
                 </label>
@@ -676,19 +709,22 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                       setConfirmPassword("");
                     }
                   }}
-                  className="text-xs font-extrabold text-[#1E3A5F] hover:underline"
+                  className="text-label text-board-field hover:underline"
                 >
                   {showPasswordSection ? "Cancel Password Reset" : "+ Reset User Password"}
                 </button>
               </div>
 
               {showPasswordSection && (
-                <div className="space-y-3 bg-slate-50/70 border border-slate-200 rounded-2xl p-4 animate-fade-in">
+                <div className="space-y-3 bg-board-ground border border-edge rounded-plate p-4 animate-fade-in">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">New Password</label>
+                      <label className="block text-label text-ink-muted mb-1">New Password</label>
                       <div className="relative">
-                        <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Lock
+                          size={14}
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                        />
                         <input
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
@@ -703,20 +739,27 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
                         >
                           {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
                       </div>
                       {fieldErrors.password && (
-                        <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.password}</p>
+                        <p className="mt-1 text-label text-status-act-ink">
+                          {fieldErrors.password}
+                        </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Confirm New Password</label>
+                      <label className="block text-label text-ink-muted mb-1">
+                        Confirm New Password
+                      </label>
                       <div className="relative">
-                        <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Lock
+                          size={14}
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                        />
                         <input
                           type={showPassword ? "text" : "password"}
                           autoComplete="new-password"
@@ -730,15 +773,17 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                         />
                       </div>
                       {fieldErrors.confirmPassword && (
-                        <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.confirmPassword}</p>
+                        <p className="mt-1 text-label text-status-act-ink">
+                          {fieldErrors.confirmPassword}
+                        </p>
                       )}
                     </div>
                   </div>
 
                   {/* Password Rules Live Feedback */}
                   {(password || confirmPassword) && (
-                    <div className="bg-white border border-slate-200 rounded-xl p-3">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
+                    <div className="bg-board-plate border border-edge rounded-plate p-3">
+                      <p className="text-micro uppercase text-ink-muted mb-2">
                         Password Requirements
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
@@ -747,14 +792,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                           return (
                             <div
                               key={rule.label}
-                              className={`flex items-center gap-1.5 text-[11px] font-semibold transition-colors ${
-                                passed ? "text-emerald-600" : "text-slate-400"
+                              className={`flex items-center gap-1.5 text-label transition-colors ${
+                                passed ? "text-status-done-ink" : "text-ink-muted"
                               }`}
                             >
                               {passed ? (
-                                <CircleCheck size={13} className="shrink-0 text-emerald-500" />
+                                <CircleCheck size={13} className="shrink-0 text-status-done-ink" />
                               ) : (
-                                <Circle size={13} className="shrink-0 text-slate-300" />
+                                <Circle size={13} className="shrink-0 text-ink-muted" />
                               )}
                               <span>{rule.label}</span>
                             </div>
@@ -770,12 +815,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-end gap-2.5 shrink-0">
+        <div className="px-5 sm:px-6 py-4 bg-board-ground border-t border-hairline flex flex-col sm:flex-row items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition disabled:opacity-50"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-plate border border-edge bg-board-plate hover:bg-board-ground text-ink text-label transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -783,7 +828,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
             type="submit"
             form="edit-user-form"
             disabled={isSubmitting}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-plate bg-status-waiting-ink hover:bg-status-waiting-ink text-white text-label flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             {isSubmitting ? (
               <>

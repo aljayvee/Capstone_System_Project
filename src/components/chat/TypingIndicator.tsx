@@ -1,6 +1,14 @@
 import React from "react";
 import { User, Headphones } from "lucide-react";
 
+/**
+ * Someone is composing a reply.
+ *
+ * Matched to the customer bubble in ChatBubble so the placeholder occupies the
+ * same shape the message will: same avatar, same radius, same ground. It used
+ * a different radius, a different avatar shape and a fourth shadow level, so
+ * the thread visibly shifted when the real message arrived.
+ */
 interface TypingIndicatorProps {
   name?: string;
   role?: "customer" | "dispatcher";
@@ -12,40 +20,27 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 }) => {
   return (
     <div
-      className="flex items-end gap-2.5 my-2 max-w-[88%] mr-auto flex-row animate-in fade-in duration-200"
+      className="my-2 mr-auto flex max-w-[88%] flex-row items-end gap-2.5 animate-in fade-in duration-200"
       data-testid="dispatcher-chat-typing-indicator"
     >
-      {/* Avatar */}
       <div
-        className="w-7 h-7 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 bg-slate-200 text-slate-700 border border-slate-300/80 shadow-xs"
+        className="grid size-7 shrink-0 place-items-center rounded-full bg-board-ground text-ink-muted"
         title={name}
       >
-        {role === "customer" ? (
-          <User size={14} className="text-slate-600" />
-        ) : (
-          <Headphones size={14} className="text-slate-600" />
-        )}
+        {role === "customer" ? <User size={14} /> : <Headphones size={14} />}
       </div>
 
       <div className="flex flex-col items-start">
-        <span className="text-[10px] font-medium text-slate-400 mb-1 px-1">
-          {name} is typing...
-        </span>
+        <span className="mb-1 px-1 text-micro uppercase text-ink-muted">{name} is typing</span>
 
-        {/* 3-Dot Animated Bubble */}
-        <div className="bg-slate-100 border border-slate-200/90 rounded-2xl rounded-bl-xs px-3.5 py-2.5 flex items-center gap-1.5 shadow-2xs">
-          <span
-            className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-            style={{ animationDuration: "1s", animationDelay: "0ms" }}
-          />
-          <span
-            className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-            style={{ animationDuration: "1s", animationDelay: "200ms" }}
-          />
-          <span
-            className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
-            style={{ animationDuration: "1s", animationDelay: "400ms" }}
-          />
+        <div className="flex items-center gap-1.5 rounded-plate rounded-bl-xs border border-edge bg-board-plate px-3 py-2.5">
+          {[0, 180, 360].map((delay) => (
+            <span
+              key={delay}
+              className="size-1.5 rounded-full bg-board-trim animate-typing-dot"
+              style={{ animationDelay: `${delay}ms` }}
+            />
+          ))}
         </div>
       </div>
     </div>
