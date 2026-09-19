@@ -74,7 +74,7 @@ export default function DispatcherPortal() {
     handleOpenChat,
     handleCloseChat,
   } = useDispatcherPortal(user?.id, user?.name);
-  const { riders } = useRiderFleetPresence();
+  const { riders, telemetryError: fleetTelemetryError } = useRiderFleetPresence();
   const exceptionQueue = useOpenExceptions();
 
   const [sidebarPhotoUri, setSidebarPhotoUri] = useState<string | null>(null);
@@ -695,7 +695,9 @@ export default function DispatcherPortal() {
                   />
                 )}
                 {activeTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
-                {activeTab === "riders" && <RiderFleetRoster riders={riders} />}
+                {activeTab === "riders" && (
+                  <RiderFleetRoster riders={riders} telemetryError={fleetTelemetryError} />
+                )}
                 {activeTab === "messages" && (
                   <DispatcherRiderMessagesPanel
                     errands={errands}

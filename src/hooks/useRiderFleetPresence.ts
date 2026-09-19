@@ -3,6 +3,12 @@ import { io, Socket } from "socket.io-client";
 import { ref, onValue } from "firebase/database";
 import { database } from "../firebase/config";
 import {
+  ensureRealtimeSession,
+  onRealtimeAuthChange,
+  realtimeAuthState,
+  type RealtimeAuthState,
+} from "../firebase/realtimeSession";
+import {
   apiService,
   type ApiRider,
   type RiderAvailabilityState,
@@ -167,12 +173,18 @@ export function useRiderFleetPresence(): {
   riders: RiderFleetMember[];
   isLoading: boolean;
   loadError: string | null;
+  /** Set when the Firebase position feed itself is refusing or failing. */
+  telemetryError: string | null;
   reload: () => void;
 } {
   const [roster, setRoster] = useState<ApiRider[]>([]);
   const [fleetLocations, setFleetLocations] = useState<Record<string, FirebaseRiderEntry>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Separate from `loadError` on purpose: the roster and the telemetry feed are
+  // two different services, and they fail independently. Collapsing them would
+  // make a working roster look broken, or a broken feed look fine.
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
 
   // Bumped to force an out-of-band roster re-fetch when the socket says a
   // rider's presence moved, so a shift starting or ending shows up immediately
@@ -206,13 +218,74 @@ export function useRiderFleetPresence(): {
     };
   }, [refreshToken]);
 
+  // The feed follows the Firebase session rather than mounting once and hoping.
+  //
+  // `riders` is readable only by an authenticated client now, so a subscription
+  // opened before sign-in completes is rejected, and — since a rejected RTDB
+  // listener never retries on its own — it would stay rejected for the life of
+  // the page. Tracking down that failure mode is the whole reason this hook now
+  // has an error channel; re-subscribing when the session arrives is what stops
+  // it happening in the first place.
+  const [realtimeAuth, setRealtimeAuth] = useState<RealtimeAuthState>(realtimeAuthState());
+
+  useEffect(() => onRealtimeAuthChange(setRealtimeAuth), []);
+
+  // Covers the tab that loads straight onto a tracking screen with a session
+  // already restored: nothing else would ask for a Firebase identity.
   useEffect(() => {
-    const ridersRef = ref(database, "riders");
-    const unsubscribe = onValue(ridersRef, (snapshot) => {
-      setFleetLocations(snapshot.exists() ? snapshot.val() : {});
-    });
-    return () => unsubscribe();
+    void ensureRealtimeSession();
   }, []);
+
+  useEffect(() => {
+    if (realtimeAuth === "unavailable") {
+      setTelemetryError(
+        "Live rider positions are unavailable: this session could not authenticate to the telemetry database."
+      );
+      setFleetLocations({});
+      return;
+    }
+
+    // Still opening the session. Deliberately silent rather than reporting a
+    // failure that has not happened yet — an error shown during normal startup
+    // is how a screen teaches people to ignore its errors.
+    if (realtimeAuth !== "signed-in") return;
+
+    const ridersRef = ref(database, "riders");
+    const unsubscribe = onValue(
+      ridersRef,
+      (snapshot) => {
+        setFleetLocations(snapshot.exists() ? snapshot.val() : {});
+        setTelemetryError(null);
+      },
+      // ADDITIVE, 2026-09-18: the error callback this subscription never had.
+      //
+      // `onValue` was called with a value handler and nothing else, so a
+      // REJECTED subscription resolved to silence: `fleetLocations` stayed
+      // `{}`, every rider mapped to `location: null`, and the map plotted an
+      // empty fleet underneath a roster that listed those same riders as
+      // AVAILABLE. Two answers from one screen again, and the failing half
+      // was the half with no voice.
+      //
+      // This is not hypothetical. The RTDB now answers an unauthenticated
+      // read of `riders` with PERMISSION_DENIED, and neither portal said so —
+      // the pins simply stopped appearing, which looks exactly like a fleet
+      // that is not sharing GPS.
+      (error) => {
+        const code = String((error as { code?: string }).code || "").toUpperCase();
+        const denied = code.includes("PERMISSION_DENIED") || /permission[_ ]denied/i.test(error.message);
+        setTelemetryError(
+          denied
+            ? "Live rider positions are being refused by the telemetry database's security rules."
+            : "Live rider positions are unavailable."
+        );
+        // Drop the cache rather than leaving the last pins frozen on screen.
+        // A position from before the feed broke is not evidence of where
+        // anyone is now, and the map has no way to caveat an individual pin.
+        setFleetLocations({});
+      }
+    );
+    return () => unsubscribe();
+  }, [realtimeAuth]);
 
   useEffect(() => {
     // Authenticated so this connection joins the staff role room and receives
@@ -292,5 +365,5 @@ export function useRiderFleetPresence(): {
   // retry button and a presence event take the same path.
   const reload = useCallback(() => setRefreshToken((n) => n + 1), []);
 
-  return { riders, isLoading, loadError, reload };
+  return { riders, isLoading, loadError, telemetryError, reload };
 }

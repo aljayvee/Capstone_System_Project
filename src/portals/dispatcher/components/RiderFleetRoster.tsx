@@ -11,6 +11,12 @@ import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField"
 
 interface RiderFleetRosterProps {
   riders: RiderFleetMember[];
+  /**
+   * ADDITIVE: the live position feed's own failure, forwarded to the map.
+   *
+   * Optional so nothing that already renders this roster has to change.
+   */
+  telemetryError?: string | null;
 }
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
@@ -37,7 +43,7 @@ function batteryPercent(level: number | null | undefined): number | null {
   return level <= 1 ? Math.round(level * 100) : Math.round(level);
 }
 
-export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders }) => {
+export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, telemetryError = null }) => {
   const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<RiderPresenceState | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -147,6 +153,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders }) =>
         <div className="relative min-h-[320px] overflow-hidden rounded-plate border border-edge bg-board-plate lg:col-span-2 lg:min-h-0">
           <LiveFleetMap
             riders={riders}
+            telemetryError={telemetryError}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRider?.id}
             onSelectRider={(riderId) => setSelectedRiderId(riderId)}

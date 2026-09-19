@@ -24,7 +24,7 @@ import { HeaderClock } from "../../../../components/HeaderClock";
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
 export const RiderTrackingModule: React.FC = () => {
-  const { riders, isLoading, loadError, reload } = useRiderFleetPresence();
+  const { riders, isLoading, loadError, telemetryError, reload } = useRiderFleetPresence();
   const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [selectedPresence, setSelectedPresence] = useState<"ALL" | RiderPresenceState>("ALL");
@@ -230,6 +230,7 @@ export const RiderTrackingModule: React.FC = () => {
         >
           <LiveFleetMap
             presenceUnknown={unknown}
+            telemetryError={telemetryError}
             riders={riders}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRiderId}

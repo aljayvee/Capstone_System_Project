@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { User, AuthContextType } from "../types/auth";
 import { setMemoryAccessToken, getMemoryAccessToken, setOnLogoutCallback, apiClient } from "../services/apiClient";
+import { endRealtimeSession, ensureRealtimeSession } from "../firebase/realtimeSession";
 
 const USER_SESSION_KEY = "errand_system_session_user";
 
@@ -28,6 +29,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await apiClient.post("/auth/logout").catch(() => {});
     } finally {
+      // Before the local session is cleared, so the Firebase credential does
+      // not outlive the account that owns it. A browser left holding one would
+      // keep reading rider positions after the portal believes nobody is
+      // signed in.
+      await endRealtimeSession();
       setUser(null);
       updateToken(null);
       sessionStorage.removeItem(USER_SESSION_KEY);
@@ -46,6 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       const authToken = newToken || newUser.token || null;
       updateToken(authToken);
+
+      // Fire and forget. The real-time identity is what the live map and the
+      // chat panes need; every other surface runs over REST and must not wait
+      // on it, nor fail with it.
+      void ensureRealtimeSession();
     },
     [updateToken]
   );
@@ -89,6 +100,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (res.data.user) {
             setUser(res.data.user);
           }
+          // A reload restores the JWT session silently, and the Firebase one
+          // has to come back with it. Without this, the map worked only on the
+          // tab where the user actually typed their password.
+          void ensureRealtimeSession();
         }
       } catch (err) {
         if (isMounted) {

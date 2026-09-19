@@ -40,6 +40,18 @@ interface LiveFleetMapProps {
    */
   presenceUnknown?: boolean;
   /**
+   * ADDITIVE: set when the live position feed itself is down or refusing.
+   *
+   * Distinct from `presenceUnknown`, which means the ROSTER could not be read.
+   * These two fail independently and look identical on an unlabelled map: an
+   * empty board either way. When the roster is healthy and the feed is not,
+   * the map is showing a real fleet with every pin missing, and saying so is
+   * the difference between "nobody is on shift" and "we cannot see anybody".
+   *
+   * Defaults to null, so existing calls are unchanged.
+   */
+  telemetryError?: string | null;
+  /**
    * Encoded polyline of the selected errand's road-network route
    * (Errand.routeGeometry). Drawing the real route rather than straight lines
    * between pins means the dispatcher sees the same path the fare was billed on
@@ -172,6 +184,7 @@ export default function LiveFleetMap({
   onToggleHideOffline,
   filterStatus = "ALL",
   presenceUnknown = false,
+  telemetryError = null,
   routeGeometry = null,
   routeStops = [],
   routeDestination = null,
@@ -434,6 +447,26 @@ export default function LiveFleetMap({
   return (
     <div className="w-full h-full relative rounded-plate overflow-hidden border border-edge bg-slate-50">
       <div ref={mapRef} className="w-full h-full bg-slate-100" />
+
+      {/* The feed is down but the map itself is fine, so this is a banner and
+          not a scrim: the base map, the controls and any route still drawn on
+          it remain usable and worth looking at. Only the rider pins are gone,
+          and that is exactly what this says. */}
+      {telemetryError && !mapError ? (
+        <div
+          role="alert"
+          className="absolute inset-x-0 top-0 z-30 flex items-start gap-2 border-b border-edge bg-status-act-fill px-3 py-2"
+        >
+          <MapPinOff size={14} className="mt-0.5 shrink-0 text-status-act-ink" />
+          <div className="min-w-0">
+            <p className="text-label text-status-act-ink">{telemetryError}</p>
+            <p className="text-micro text-status-act-ink/80">
+              No rider pins can be drawn until it is restored. The roster still shows who is on
+              duty, and their last known stop is on the errand record.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Error first, then loading. A spinner that never resolves is a worse
           answer than a sentence saying the map failed and what still works. */}
