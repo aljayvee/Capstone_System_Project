@@ -15,53 +15,53 @@ import { formatPeso } from "../../../../../utils/format";
 type Transaction = ApiTransactionSummaryReport["transactions"][number];
 
 const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transactions }) => (
-  <table className="w-full text-label">
+  <table className="w-full text-label min-w-[1100px] border-collapse">
     <thead>
       <tr className="text-left text-ink-muted border-b border-hairline">
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Errand
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Category
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Rider
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Customer
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Location
         </th>
-        <th scope="col" className="py-2 text-right">
+        <th scope="col" className="px-3 py-2.5 font-medium text-right whitespace-nowrap">
           Amount
         </th>
-        <th scope="col" className="py-2 text-right">
+        <th scope="col" className="px-3 py-2.5 font-medium text-right whitespace-nowrap">
           Delivery Fee
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Payment
         </th>
         {/* The GCash/Maya reference read off whichever photo backed the
             payment, and whose photo it was — the customer's own upload, or a
             rider's door-side photo. Null on COD, where there's no receipt to
             reference at all. */}
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Payment Ref #
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Evidence
         </th>
-        <th scope="col" className="py-2">
+        <th scope="col" className="px-3 py-2.5 font-medium text-center whitespace-nowrap">
           Status
         </th>
       </tr>
     </thead>
     <tbody>
       {transactions.map((t) => (
-        <tr key={t.transactionId} className="border-b border-hairline">
-          <td className="py-2 font-mono text-ink-muted">{formatErrandId(t.errandId)}</td>
-          <td className="py-2">
+        <tr key={t.transactionId} className="border-b border-hairline hover:bg-board-ground/40 transition-colors">
+          <td className="px-3 py-2.5 font-mono text-ink-muted whitespace-nowrap">{formatErrandId(t.errandId)}</td>
+          <td className="px-3 py-2.5 whitespace-nowrap">
             {t.category}
             {/* A multi-stop errand is one transaction but several shops. The
                 badge keeps the column readable while the title carries the rest. */}
@@ -74,21 +74,27 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
               </span>
             )}
           </td>
-          <td className="py-2">{t.riderName ?? "Unassigned"}</td>
-          <td className="py-2">{t.customerName ?? "--"}</td>
-          <td className="py-2 text-ink-muted max-w-[160px] truncate">{t.deliveryAddress}</td>
-          <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.amount)}</td>
-          <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.deliveryFee)}</td>
-          <td className="py-2">{t.paymentMethod}</td>
-          <td className="py-2 font-mono text-ink-muted">{t.paymentReferenceNo ?? "—"}</td>
-          <td className="py-2 text-ink-muted">
+          <td className="px-3 py-2.5 whitespace-nowrap">{t.riderName ?? "Unassigned"}</td>
+          <td className="px-3 py-2.5 whitespace-nowrap">{t.customerName ?? "--"}</td>
+          <td className="px-3 py-2.5 text-ink-muted max-w-[180px] truncate" title={t.deliveryAddress}>
+            {t.deliveryAddress}
+          </td>
+          <td className="px-3 py-2.5 text-right font-mono tabular-nums whitespace-nowrap font-medium text-ink">
+            {formatPeso(t.amount)}
+          </td>
+          <td className="px-3 py-2.5 text-right font-mono tabular-nums whitespace-nowrap font-medium text-ink">
+            {formatPeso(t.deliveryFee)}
+          </td>
+          <td className="px-3 py-2.5 whitespace-nowrap">{t.paymentMethod}</td>
+          <td className="px-3 py-2.5 font-mono text-ink-muted whitespace-nowrap">{t.paymentReferenceNo ?? "—"}</td>
+          <td className="px-3 py-2.5 text-ink-muted whitespace-nowrap">
             {t.paymentEvidenceSource === "customer"
               ? "Customer upload"
               : t.paymentEvidenceSource === "rider"
                 ? "Rider photo"
                 : "—"}
           </td>
-          <td className="py-2">
+          <td className="px-3 py-2.5 text-center whitespace-nowrap">
             <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
               {t.errandStatus}
             </span>
