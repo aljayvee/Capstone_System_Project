@@ -342,7 +342,13 @@ export default function LoginPage() {
 
         {/* STAGE 1: CREDENTIALS (Sign In) */}
         {stage === "CREDENTIALS" && (
-          <div className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+            className="space-y-4"
+          >
             
             {/* Alert Banner System */}
             {activeAlert && (
@@ -452,8 +458,7 @@ export default function LoginPage() {
             {/* Submit CTA Button */}
             <div className="pt-2">
               <button
-                type="button"
-                onClick={handleLogin}
+                type="submit"
                 disabled={isLoading || isCooldownActive}
                 className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
                 style={{
@@ -473,7 +478,7 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
-          </div>
+          </form>
         )}
 
         {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}

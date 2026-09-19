@@ -95,21 +95,18 @@
   - `C:\Capstone_Project_Web\src\portals\dispatcher\DispatcherPortal.tsx` (Sidebar alignment pass: gutter px-3 across sections; row boxes 12->243; icon/chrome axis at 24px; label axis at 50px; count pills right-aligned to 231; collapsed 36px tile column at 10->46 with p-2.5 padding; group-data-[collapsible=icon]:gap-0; trigger/logo size-9; LogOut size-16; copyright px-3 text-left)
   - `C:\Users\Capstone\.gemini\GEMINI.md` (Codified global Impeccable UI/UX Design Standards, 15 Strict Anti-AI-Slop bans, Canonical Domain mapping, Landing Page SCP deployment command, and Gemini Non-Autonomous Execution & Claude Cognitive Alignment Protocol)
   - `C:\Capstone_Project_Web\AGENT_HANDSHAKE.md` (Reinforced locked Impeccable UI/UX invariant, Canonical Domain Architecture, VPS Deployment Pipelines, and Gemini Non-Autonomous Execution)
-  - `C:\Capstone_Landing_Page\` (Full Impeccable Persuade revamp: PhoneMockup with 3 interactive screens, HowItWorks operational timeline, FareCalculator with Tacurong landmark presets, CoverageNetwork 20-barangay explorer, ApkInstallGuide, and SystemStatus live telemetry)
+  - `C:\Capstone_Landing_Page\` (Mobile Application Browser & Smartphone Experience Upgrade: added viewport-fit=cover and web app tags in index.html, zero-horizontal-overflow & safe-area classes in index.css, mobile hamburger drawer in Header.tsx, in-app WebView download tip in Hero.tsx, touch-steppers in FareCalculator.tsx, full-width touch buttons in ApkInstallGuide & SystemStatus, safe-area clearance in Footer.tsx, and persistent MobileBottomDock.tsx)
   - `C:\Capstone_Project_Web\.agents\rules\gemini-claude-thinking-alignment.md` (Created dedicated behavioral rule codifying Gemini non-autonomous execution and 6-stage Claude cognitive thinking process)
   - `C:\Capstone_Project_Web\.agents\rules\dual-agent-handshake-protocol.md` (Synchronized dual-agent roles to enforce non-autonomous Gemini pair programming)
   - `C:\Capstone_Project_Web\AGENTS.md`, `CustomerApp\AGENTS.md`, `RiderMobileApp\AGENTS.md`, `server\AGENTS.md` (Propagated invariant across all workspace AGENTS configurations)
+  - `C:\Capstone_Server\server\src\services\reportService.ts` (Hardened getTransactionSummary with safe null-coerced canonicalPaymentMethod, optional chaining on customer information and errand fields)
+  - `C:\Capstone_Server\server\src\services\patterns\categoryRevenueAllocation.ts` (Safeguarded toCategoryEvidence with default fallback arrays for pinpoints, proofImages, and item requests)
+  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Enclosed credential inputs in an explicit HTML form element with type="submit" to eliminate Chrome password autofill DOM warnings)
 * **Verification Ledger**:
+  - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` verified with 0 errors / 0 warnings on Capstone_Project_Web (built in 27.91s).
-  - `npm run build` verified with 0 errors / 0 warnings on Capstone_Landing_Page (built in 2.27s).
-  - `npm run lint` (oxlint) verified with 0 warnings and 0 errors across 13 files on Capstone_Landing_Page.
-  - `impeccable context` verified operational across web project surfaces.
-  - `impeccable detect` verified with 0 anti-patterns across all target files.
-  - Rule definitions and frontmatter verified across all target rule files.
-* **Notes for Claude**:
-  - Impeccable UI/UX Design System and Anti-AI-Slop Invariant permanently learned and locked across all workspaces.
-  - Landing Page (`C:\Capstone_Landing_Page\dist\`) completely revamped and ready for user SCP deployment to `/var/www/landing/dist/`.
-  - Canonical domain mapping confirmed: `https://sugoonthego.online` (Landing Page) and `https://sugo-express.org` (Web / Staff Portal).
-  - Gemini models (Gemini 3.x Pro, Gemini 3.8 Flash High) are now strictly bound to non-autonomous execution and fully adapted to the 6-stage Claude cognitive thinking process.
+  - `npm test` verified 52 passed test suites (743 tests passing) on Capstone_Server/server.
+* **Notes for Claude & Next Session**:
+  - Defensive hardening applied to prevent runtime null pointer exceptions on Transaction Summary report.
+  - Pending action: Execute database migration on Contabo VPS (`109.123.239.182`) to add `proofImageId` to `errand_payments` and `settlement_records`.
 
