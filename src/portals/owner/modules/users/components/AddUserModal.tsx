@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  UserPlus,
   X,
   AlertTriangle,
   Check,
@@ -60,34 +59,38 @@ type FieldKey =
 
 const ROLE_METADATA: Record<
   AssignableRole,
-  { label: string; description: string; icon: React.ElementType; color: string; border: string; bg: string; activeBg: string }
+  {
+    label: string;
+    description: string;
+    icon: React.ElementType;
+    color: string;
+    bg: string;
+    activeBg: string;
+  }
 > = {
   owner: {
     label: "Admin",
     description: "Full system & business governance",
     icon: ShieldCheck,
-    color: "text-purple-700",
-    border: "border-purple-200",
-    bg: "bg-purple-50/70",
-    activeBg: "bg-purple-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
   dispatcher: {
     label: "Dispatcher",
     description: "Order routing, fleet & chat hub",
     icon: Headphones,
-    color: "text-blue-700",
-    border: "border-blue-200",
-    bg: "bg-blue-50/70",
-    activeBg: "bg-blue-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
   rider: {
     label: "Delivery Rider",
     description: "Field order execution & mobile app",
     icon: Bike,
-    color: "text-amber-700",
-    border: "border-amber-200",
-    bg: "bg-amber-50/70",
-    activeBg: "bg-amber-600 text-white",
+    color: "text-ink",
+    bg: "bg-board-ground",
+    activeBg: "bg-board-field text-white",
   },
 };
 
@@ -123,7 +126,8 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
     set("phone", validatePhone(phone));
     set("email", validateEmail(email));
     set("password", validatePassword(password));
-    if (!errors.password) set("confirmPassword", validateConfirmPassword(password, confirmPassword));
+    if (!errors.password)
+      set("confirmPassword", validateConfirmPassword(password, confirmPassword));
 
     return errors;
   };
@@ -163,33 +167,32 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
   };
 
   const inputBaseClass = (hasError: boolean) =>
-    `w-full bg-slate-50 border rounded-xl py-2.5 px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition duration-150 focus:bg-white ${
+    `w-full bg-board-ground border border-edge rounded-plate py-2.5 px-3.5 text-body text-ink placeholder-ink-muted outline-none transition duration-150 focus:bg-board-plate ${
       hasError
-        ? "border-red-300 focus:ring-2 focus:ring-red-400/30 focus:border-red-500 bg-red-50/30"
-        : "border-slate-200 focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
+        ? "border-status-act-ink/50 focus:ring-2 focus:ring-status-act-ink/25 focus:border-status-act-ink bg-status-act-fill"
+        : "border-edge focus:ring-2 focus:ring-board-field/20 focus:border-board-field"
     }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-fade-in">
-      <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl max-w-xl w-full max-h-[94vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 overflow-y-auto animate-fade-in">
+      <div className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-xl w-full max-h-[94vh] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#162D4A] text-white flex items-center justify-center font-bold shadow-md shadow-slate-900/10 shrink-0">
-              <UserPlus size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900 leading-tight">Add System Personnel</h3>
-              <p className="text-[11px] font-medium text-slate-500 mt-0.5">
-                Register operational staff (Admin, Dispatcher, Delivery Rider)
-              </p>
-            </div>
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-hairline bg-board-ground shrink-0">
+          {/* The gradient icon chip is gone: it was a banned tinted chip AND
+              the portal's only remaining decorative gradient, carrying a
+              coloured shadow on top. The title carries the header, which is
+              what AGENTS.md 8.13 asks for. */}
+          <div className="min-w-0">
+            <h3 className="truncate text-panel text-ink">Add System Personnel</h3>
+            <p className="mt-0.5 text-label text-ink-muted">
+              Register operational staff (Admin, Dispatcher, Delivery Rider)
+            </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
+            className="w-8 h-8 rounded-trim flex items-center justify-center text-ink-muted hover:text-ink hover:bg-board-ground transition"
           >
             <X size={18} />
           </button>
@@ -198,7 +201,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto px-5 sm:px-6 py-5 space-y-6 flex-1">
           {error && (
-            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+            <div className="flex items-start gap-2.5 p-3 rounded-plate bg-status-act-fill border border-status-act-ink/20 text-status-act-ink text-label">
               <AlertTriangle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -208,11 +211,11 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
             {/* 1. ROLE SELECTION */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700">
-                  1. Operational Role <span className="text-red-500">*</span>
+                <label className="text-micro uppercase text-ink">
+                  1. Operational Role <span className="text-signal">*</span>
                 </label>
                 {fieldErrors.role && (
-                  <span className="text-[11px] font-bold text-red-600">{fieldErrors.role}</span>
+                  <span className="text-label text-status-act-ink">{fieldErrors.role}</span>
                 )}
               </div>
 
@@ -230,29 +233,29 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                         setRole(option.value);
                         clearFieldError("role");
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all duration-150 relative flex flex-col justify-between ${
+                      className={`p-3 rounded-plate border border-edge text-left transition-all duration-150 relative flex flex-col justify-between ${
                         isSelected
-                          ? `border-[#1E3A5F] ring-2 ring-[#1E3A5F]/20 bg-slate-50 shadow-xs`
-                          : `border-slate-200 hover:border-slate-300 hover:bg-slate-50/50`
+                          ? `border-board-field ring-2 ring-board-field/20 bg-board-ground`
+                          : `border-edge hover:border-edge hover:bg-board-ground`
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                          className={`w-7 h-7 rounded-trim flex items-center justify-center ${
                             isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
                           }`}
                         >
                           <Icon size={14} />
                         </div>
                         {isSelected && (
-                          <span className="w-4 h-4 rounded-full bg-[#1E3A5F] text-white flex items-center justify-center text-[10px]">
+                          <span className="w-4 h-4 rounded-full bg-board-field text-white flex items-center justify-center text-label">
                             <Check size={10} strokeWidth={3} />
                           </span>
                         )}
                       </div>
                       <div>
-                        <p className="text-xs font-black text-slate-800">{meta.label}</p>
-                        <p className="text-[10px] text-slate-500 font-medium leading-tight mt-0.5">
+                        <p className="text-label text-ink">{meta.label}</p>
+                        <p className="text-body text-ink-muted leading-tight mt-0.5">
                           {meta.description}
                         </p>
                       </div>
@@ -264,17 +267,18 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
 
             {/* 2. PERSONAL INFORMATION */}
             <div className="space-y-3">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 block">
-                2. Personal Information
-              </label>
+              <label className="text-micro uppercase text-ink block">2. Personal Information</label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    First Name <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    First Name <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={firstName}
@@ -287,16 +291,19 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                   </div>
                   {fieldErrors.firstName && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.firstName}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.firstName}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Last Name <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Last Name <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <User size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <User
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={lastName}
@@ -309,14 +316,14 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                   </div>
                   {fieldErrors.lastName && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.lastName}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.lastName}</p>
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Middle Name <span className="text-slate-400 font-normal">(Optional)</span>
+                <label className="block text-label text-ink-muted mb-1">
+                  Middle Name <span className="text-ink-muted font-normal">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -329,24 +336,27 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                   className={inputBaseClass(!!fieldErrors.middleName)}
                 />
                 {fieldErrors.middleName && (
-                  <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.middleName}</p>
+                  <p className="mt-1 text-label text-status-act-ink">{fieldErrors.middleName}</p>
                 )}
               </div>
             </div>
 
             {/* 3. CONTACT & ACCOUNT CREDENTIALS */}
             <div className="space-y-3">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 block">
+              <label className="text-micro uppercase text-ink block">
                 3. Contact & Login Credentials
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Username <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Username <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <AtSign size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <AtSign
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       value={username}
@@ -359,16 +369,19 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                   </div>
                   {fieldErrors.username && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.username}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.username}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                    Phone Number <span className="text-red-500">*</span>
+                  <label className="block text-label text-ink-muted mb-1">
+                    Phone Number <span className="text-signal">*</span>
                   </label>
                   <div className="relative">
-                    <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Phone
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type="text"
                       inputMode="numeric"
@@ -384,9 +397,9 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                   </div>
                   {fieldErrors.phone ? (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.phone}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.phone}</p>
                   ) : (
-                    <p className="mt-1 text-[10px] text-slate-400 font-medium">
+                    <p className="mt-1 text-body text-ink-muted">
                       PH mobile: 11 digits starting with 09
                     </p>
                   )}
@@ -394,11 +407,14 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                  Email Address <span className="text-red-500">*</span>
+                <label className="block text-label text-ink-muted mb-1">
+                  Email Address <span className="text-signal">*</span>
                 </label>
                 <div className="relative">
-                  <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Mail
+                    size={14}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                  />
                   <input
                     type="email"
                     value={email}
@@ -411,22 +427,25 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                   />
                 </div>
                 {fieldErrors.email && (
-                  <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.email}</p>
+                  <p className="mt-1 text-label text-status-act-ink">{fieldErrors.email}</p>
                 )}
               </div>
             </div>
 
             {/* 4. SECURITY & PASSWORD */}
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 block">
-                4. Account Password <span className="text-red-500">*</span>
+            <div className="space-y-3 pt-3 border-t border-hairline">
+              <label className="text-micro uppercase text-ink block">
+                4. Account Password <span className="text-signal">*</span>
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Password</label>
+                  <label className="block text-label text-ink-muted mb-1">Password</label>
                   <div className="relative">
-                    <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Lock
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
@@ -441,20 +460,23 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
                     >
                       {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
                   </div>
                   {fieldErrors.password && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.password}</p>
+                    <p className="mt-1 text-label text-status-act-ink">{fieldErrors.password}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Confirm Password</label>
+                  <label className="block text-label text-ink-muted mb-1">Confirm Password</label>
                   <div className="relative">
-                    <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Lock
+                      size={14}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                    />
                     <input
                       type={showPassword ? "text" : "password"}
                       autoComplete="new-password"
@@ -468,14 +490,16 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                   </div>
                   {fieldErrors.confirmPassword && (
-                    <p className="mt-1 text-[10.5px] font-semibold text-red-600">{fieldErrors.confirmPassword}</p>
+                    <p className="mt-1 text-label text-status-act-ink">
+                      {fieldErrors.confirmPassword}
+                    </p>
                   )}
                 </div>
               </div>
 
               {/* Password Rules Live Feedback */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
+              <div className="bg-board-ground border border-edge rounded-plate p-3">
+                <p className="text-micro uppercase text-ink-muted mb-2">
                   Password Strength Requirements
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
@@ -484,14 +508,14 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     return (
                       <div
                         key={rule.label}
-                        className={`flex items-center gap-1.5 text-[11px] font-semibold transition-colors ${
-                          passed ? "text-emerald-600" : "text-slate-400"
+                        className={`flex items-center gap-1.5 text-label transition-colors ${
+                          passed ? "text-status-done-ink" : "text-ink-muted"
                         }`}
                       >
                         {passed ? (
-                          <CircleCheck size={13} className="shrink-0 text-emerald-500" />
+                          <CircleCheck size={13} className="shrink-0 text-status-done-ink" />
                         ) : (
-                          <Circle size={13} className="shrink-0 text-slate-300" />
+                          <Circle size={13} className="shrink-0 text-ink-muted" />
                         )}
                         <span>{rule.label}</span>
                       </div>
@@ -504,12 +528,12 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-5 sm:px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-end gap-2.5 shrink-0">
+        <div className="px-5 sm:px-6 py-4 bg-board-ground border-t border-hairline flex flex-col sm:flex-row items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition disabled:opacity-50"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-plate border border-edge bg-board-plate hover:bg-board-ground text-ink text-label transition disabled:opacity-50"
           >
             Cancel
           </button>
@@ -517,7 +541,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
             type="submit"
             form="add-user-form"
             disabled={isSubmitting}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-[#1E3A5F] hover:bg-[#162D4A] text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition disabled:opacity-50"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-plate bg-board-field hover:bg-board-field-deep text-white text-label flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             {isSubmitting ? (
               <>

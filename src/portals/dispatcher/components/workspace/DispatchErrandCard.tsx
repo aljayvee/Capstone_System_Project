@@ -2,17 +2,8 @@ import React from "react";
 import { Errand } from "../../../../types/errand";
 import { formatErrandId } from "../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../utils/format";
-import {
-  Clock,
-  Store,
-  MapPin,
-  ShoppingBag,
-  Bike,
-  CheckCircle2,
-  ChevronRight,
-  AlertCircle,
-  Sparkles,
-} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { StatusChip } from "@/components/panel/DispatcherBadge";
 
 interface DispatchErrandCardProps {
   errand: Errand;
@@ -43,6 +34,28 @@ function getRelativeTime(createdAtString: string): { label: string; isUrgent: bo
   return { label: "1d+ ago", isUrgent: true };
 }
 
+/**
+ * One run on the board.
+ *
+ * Reads destination first, the way a route board does: the store is what the
+ * dispatcher is looking for, so it leads at a size that survives a glance,
+ * with the route number under it and the departure clock opposite.
+ *
+ * It is a real `<button>` now. It was a `<div role="button" tabIndex={0}>`
+ * with a hand-rolled Enter and Space handler, which is a reimplementation of
+ * what the element already does, and it received no focus styling from
+ * anywhere in the console.
+ *
+ * The selected run inverts onto the navy field instead of being tinted blue.
+ * A board marks its active row by lighting it, and inversion gives the stream
+ * a hierarchy that a 4% background tint never had.
+ *
+ * Status comes from the one status table. This card used to decide its own
+ * colours with a chain that painted AVAILABLE amber, IN_TRANSIT and IN ROUTE
+ * blue, DELIVERED emerald and everything else slate, then printed the raw
+ * value: `String(errand.status)`, which is how `DOING ERRAND` and `PASSING BY`
+ * reached a dispatcher's eyes.
+ */
 export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
   errand,
   isSelected,
@@ -58,104 +71,103 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
     errand.category ||
     "Custom Store";
 
-  const itemCount =
-    errand.pabiliDetails?.length ||
-    errand.pabiliItemRequests?.length ||
-    0;
+  const itemCount = errand.pabiliDetails?.length || errand.pabiliItemRequests?.length || 0;
 
-  const totalDisplay = errand.totalCost || (Number(errand.estimatedCost || 0) + Number(errand.deliveryFee || 0));
+  const totalDisplay =
+    errand.totalCost || Number(errand.estimatedCost || 0) + Number(errand.deliveryFee || 0);
+
+  // Only an unclaimed run that has been sitting is urgent. A run already in
+  // motion has someone on it, so its age is information, not a demand.
+  const isWaitingTooLong = isAvailable && isUrgent;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className={`group relative p-4 rounded-2xl border transition-all duration-200 cursor-pointer select-none text-left ${
+      aria-current={isSelected ? "true" : undefined}
+      className={cn(
+        "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-colors duration-150",
         isSelected
-          ? "bg-blue-50/80 border-blue-500/50 shadow-xs ring-2 ring-blue-500/20"
-          : "bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-2xs hover:shadow-xs"
-      }`}
+          ? "bg-board-field"
+          : "border border-edge bg-board-plate hover:border-board-trim"
+      )}
     >
-      {/* 1. Header Row: Store Name & Urgency Timer */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
-              isSelected
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors"
-            }`}
-          >
-            <Store size={14} />
-          </div>
-          <div className="min-w-0">
-            <h4 className="text-xs font-black text-slate-900 truncate tracking-tight">
-              {primaryStoreName}
-            </h4>
-            <span className="text-[10px] font-mono font-semibold text-slate-500">
-              {formatErrandId(errand.id)}
-            </span>
-          </div>
-        </div>
-
-        {/* Time Elapsed Pill */}
-        <span
-          className={`shrink-0 flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-            isAvailable && isUrgent
-              ? "bg-amber-50 text-amber-700 border-amber-300 animate-pulse"
-              : isSelected
-              ? "bg-blue-100/70 text-blue-800 border-blue-200"
-              : "bg-slate-100 text-slate-600 border-slate-200"
-          }`}
+      {/* Destination and departure clock */}
+      <div className="flex items-baseline justify-between gap-3">
+        <h3
+          className={cn(
+            "min-w-0 flex-1 truncate text-title uppercase",
+            isSelected ? "text-board-plate" : "text-ink"
+          )}
         >
-          <Clock size={10} />
-          <span>{timeLabel}</span>
+          {primaryStoreName}
+        </h3>
+        <span
+          data-figure
+          className={cn(
+            "shrink-0 text-label tabular-nums",
+            isWaitingTooLong
+              ? isSelected
+                ? "text-signal-on-field"
+                : "text-status-act-ink"
+              : isSelected
+                ? "text-board-trim"
+                : "text-ink-muted"
+          )}
+        >
+          {timeLabel}
         </span>
       </div>
 
-      {/* 2. Middle Row: Customer Name & Items Preview */}
-      <div className="flex items-center justify-between text-xs text-slate-600 my-1.5">
-        <span className="font-semibold text-slate-700 truncate mr-2">
+      {/* Route number, customer, and what it comes to */}
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <span
+          data-figure
+          className={cn(
+            "shrink-0 font-mono text-data",
+            isSelected ? "text-board-plate" : "text-ink"
+          )}
+        >
+          {formatErrandId(errand.id)}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-right text-label",
+            isSelected ? "text-board-plate/90" : "text-ink-muted"
+          )}
+        >
           {errand.customerName || "Customer"}
         </span>
-        <span className="shrink-0 text-slate-500 font-medium text-[11px]">
-          {itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "General Errand"} •{" "}
-          <strong className="text-slate-900 font-extrabold font-mono">
-            {formatPeso(totalDisplay)}
-          </strong>
-        </span>
       </div>
 
-      {/* 3. Bottom Row: Route Snapshot & Status Capsule */}
-      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-[11px]">
-        <div className="flex items-center gap-1 text-slate-500 truncate">
-          <MapPin size={11} className="shrink-0 text-slate-400" />
-          <span className="truncate max-w-[170px]">
+      {/* Drop-off and state. Separated by a rule rather than a second box. */}
+      <div
+        className={cn(
+          "mt-2.5 flex items-center justify-between gap-3 border-t pt-2.5",
+          isSelected ? "border-field-line" : "border-hairline"
+        )}
+      >
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span
+            className={cn(
+              "truncate text-label",
+              isSelected ? "text-board-plate/90" : "text-ink"
+            )}
+          >
             {errand.deliveryAddress || "Tacurong City"}
+          </span>
+          <span
+            data-figure
+            className={cn("text-label", isSelected ? "text-board-trim" : "text-ink-muted")}
+          >
+            {itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "General errand"}
+            {" · "}
+            {formatPeso(totalDisplay)}
           </span>
         </div>
 
-        {/* Status Indicator */}
-        <span
-          className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-            isAvailable
-              ? "bg-amber-100 text-amber-800"
-              : String(errand.status).toUpperCase() === "IN_TRANSIT" || String(errand.status).toUpperCase() === "IN ROUTE"
-              ? "bg-blue-100 text-blue-800"
-              : String(errand.status).toUpperCase() === "DELIVERED"
-              ? "bg-emerald-100 text-emerald-800"
-              : "bg-slate-100 text-slate-700"
-          }`}
-        >
-          {isAvailable ? "Ready to Claim" : String(errand.status)}
-        </span>
+        <StatusChip status={errand.status} className="shrink-0" />
       </div>
-    </div>
+    </button>
   );
 };

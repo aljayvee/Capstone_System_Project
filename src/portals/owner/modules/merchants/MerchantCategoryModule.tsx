@@ -4,26 +4,30 @@ import {
   Store,
   AlertCircle,
   Search,
-  Sparkles,
   FolderPlus,
   Check,
   X,
   Loader2,
   MapPin,
   ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   Archive,
+  RotateCcw,
 } from "lucide-react";
-import { apiService, type ApiMerchantCategory, type ApiRateConfig } from "../../../../services/apiService";
+import {
+  apiService,
+  type ApiMerchantCategory,
+  type ApiRateConfig,
+} from "../../../../services/apiService";
 import { apiClient } from "../../../../services/apiClient";
+import { OwnerTabs } from "../../components/OwnerTabs";
 import { CategoryRowCard } from "./components/CategoryCard";
 import PlacesTab from "./components/PlacesTab";
 import { ArchiveTab, type ArchivedPlace } from "./components/ArchiveTab";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
 
-type CategorySortOption = "name-asc" | "name-desc" | "stores-desc" | "stores-asc" | "newest" | "oldest";
+type CategorySortOption =
+  "name-asc" | "name-desc" | "stores-desc" | "stores-asc" | "newest" | "oldest";
 
 export const MerchantCategoryModule: React.FC = () => {
   const [categories, setCategories] = useState<ApiMerchantCategory[]>([]);
@@ -40,6 +44,13 @@ export const MerchantCategoryModule: React.FC = () => {
    * anything in it is the same as no archive.
    */
   const [archivedPlaces, setArchivedPlaces] = useState<ArchivedPlace[]>([]);
+  /**
+   * The retired-stores fetch used to fail into a console.warn and nothing
+   * else, which had three visible consequences: `archivedCount` undercounted,
+   * the Archive tab's badge disappeared because it is gated on `> 0`, and the
+   * tab itself rendered "Nothing archived" over stores that were still there.
+   */
+  const [archivedPlacesError, setArchivedPlacesError] = useState<string | null>(null);
   const [isLoadingArchivedPlaces, setIsLoadingArchivedPlaces] = useState(true);
 
   const archivedCount =
@@ -50,8 +61,10 @@ export const MerchantCategoryModule: React.FC = () => {
     try {
       const res = await apiClient.get<ArchivedPlace[]>("/places?includeInactive=true");
       setArchivedPlaces((res.data || []).filter((p) => !p.isActive));
+      setArchivedPlacesError(null);
     } catch (err) {
       console.warn("Could not load retired stores:", err);
+      setArchivedPlacesError("The retired stores did not load.");
     } finally {
       setIsLoadingArchivedPlaces(false);
     }
@@ -80,10 +93,10 @@ export const MerchantCategoryModule: React.FC = () => {
       if (backendCategories) {
         setCategories(backendCategories);
       } else {
-        setLoadError("Could not load merchant categories from the server.");
+        setLoadError("The merchant categories did not load.");
       }
     } catch (err: any) {
-      setLoadError("Failed to fetch merchant categories. Please verify server connection.");
+      setLoadError("The merchant categories did not load.");
     } finally {
       setIsLoading(false);
     }
@@ -91,9 +104,19 @@ export const MerchantCategoryModule: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    apiService.getRateConfig().then((config) => {
-      if (!cancelled) setRateConfig(config);
-    });
+    apiService
+      .getRateConfig()
+      .then((config) => {
+        if (!cancelled) setRateConfig(config);
+      })
+      // No .catch at all before this. The service resolves null rather than
+      // rejecting, so nothing was thrown in practice, but an unhandled
+      // rejection was one network-layer change away. A null config is safe
+      // here: describeHandlingFeeMode falls back to "the flat fee" and "a
+      // percentage" rather than quoting a figure it does not have.
+      .catch((err) => {
+        console.warn("Could not load the rate config for fee labels:", err);
+      });
     return () => {
       cancelled = true;
     };
@@ -144,19 +167,20 @@ export const MerchantCategoryModule: React.FC = () => {
   };
 
   // Metrics computation for summary overview cards
-  const totalCategories = categories.length;
   const activeCategories = useMemo(
     () => categories.filter((c) => c.status === "Active").length,
-    [categories]
+    [categories],
   );
   const totalLinkedPlaces = useMemo(
     () => categories.reduce((sum, c) => sum + (c._count?.places ?? 0), 0),
-    [categories]
+    [categories],
   );
   /**
    * What each tab actually shows. Archived things moved out, so a badge counting
    * everything would sit above a shorter list and quietly contradict it.
    */
+  /** Nothing arrived AND the request failed: the counts are unknown, not zero. */
+  const categoriesUnknown = loadError !== null && categories.length === 0;
   const liveCategories = activeCategories;
   const livePlaces = Math.max(0, totalLinkedPlaces - archivedPlaces.length);
 
@@ -171,10 +195,7 @@ export const MerchantCategoryModule: React.FC = () => {
       const q = search.trim().toLowerCase();
       if (!q) return true;
 
-      return (
-        c.name.toLowerCase().includes(q) ||
-        (c.description ?? "").toLowerCase().includes(q)
-      );
+      return c.name.toLowerCase().includes(q) || (c.description ?? "").toLowerCase().includes(q);
     });
 
     return [...filtered].sort((a, b) => {
@@ -200,17 +221,12 @@ export const MerchantCategoryModule: React.FC = () => {
   return (
     <div className="flex flex-col h-full space-y-3 max-w-7xl mx-auto w-full overflow-hidden">
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING)         */}
+      {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-hairline pb-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-              <Store size={18} />
-            </span>
-            <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-              Merchants Category
-            </h2>
+            <h1 className="truncate text-title uppercase text-ink">Merchants Category</h1>
           </div>
         </div>
 
@@ -220,7 +236,7 @@ export const MerchantCategoryModule: React.FC = () => {
           {activeTab === "categories" && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-xs transition ml-1"
+              className="flex items-center gap-1.5 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 py-2 rounded-plate transition ml-1"
             >
               <Plus size={15} />
               <span>Add Category</span>
@@ -230,92 +246,89 @@ export const MerchantCategoryModule: React.FC = () => {
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. NAVIGATION TABS (STATIC NON-SCROLLING)                      */}
+      {/* 2. NAVIGATION TABS (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-1.5 p-1 bg-slate-200/80 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab("categories")}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-extrabold transition ${
-            activeTab === "categories"
-              ? "bg-white text-[#1E3A5F] shadow-xs"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-          }`}
-        >
-          <Store size={13} />
-          <span>Merchant Categories</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
-            activeTab === "categories" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
-          }`}>
-            {liveCategories}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab("places")}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-extrabold transition ${
-            activeTab === "places"
-              ? "bg-white text-[#1E3A5F] shadow-xs"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-          }`}
-        >
-          <MapPin size={13} />
-          <span>Location Stores</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
-            activeTab === "places" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
-          }`}>
-            {livePlaces}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab("archive")}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-extrabold transition ${
-            activeTab === "archive"
-              ? "bg-white text-[#1E3A5F] shadow-xs"
-              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
-          }`}
-        >
-          <Archive size={13} />
-          <span>Archive</span>
-          {archivedCount > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono ${
-              activeTab === "archive" ? "bg-blue-50 text-blue-700" : "bg-slate-300 text-slate-700"
-            }`}>
-              {archivedCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* One real tab set, replacing three <button>s in a plain div.
+          role="tab", aria-selected and role="tablist" appeared ZERO times in
+          this portal, so the strip announced three unrelated buttons and gave
+          no relationship to the panel it controls. OwnerTabs also supplies
+          arrow-key movement and a single tab stop.
+
+          Counts pass `null` rather than 0 when the archive fetch failed, so a
+          badge cannot claim an empty archive over a request that never
+          answered. */}
+      <OwnerTabs
+        label="Merchant category view"
+        idPrefix="merchants"
+        active={activeTab}
+        onChange={(id) => setActiveTab(id)}
+        tabs={[
+          {
+            id: "categories",
+            label: "Merchant Categories",
+            icon: Store,
+            // A badge may not report 0 over a request that never answered.
+            // Both of these derive from `categories`, so when the fetch failed
+            // and nothing arrived they are unknown, not empty.
+            count: categoriesUnknown ? null : liveCategories,
+          },
+          {
+            id: "places",
+            label: "Location Stores",
+            icon: MapPin,
+            count: categoriesUnknown ? null : livePlaces,
+          },
+          {
+            id: "archive",
+            label: "Archive",
+            icon: Archive,
+            count: archivedPlacesError ? null : archivedCount,
+          },
+        ]}
+      />
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. ACTIVE TAB CONTENT (CONTAINER FILLS REMAINING HEIGHT)       */}
+      {/* 3. ACTIVE TAB CONTENT (CONTAINER FILLS REMAINING HEIGHT) */}
       {/* ───────────────────────────────────────────────────────────── */}
+      {/* One panel per tab, each labelled by the tab that selects it, so
+          OwnerTabs' aria-controls resolves to a real element. */}
       {activeTab === "categories" ? (
-        <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
+        <div
+          role="tabpanel"
+          id="merchants-panel-categories"
+          aria-labelledby="merchants-tab-categories"
+          className="flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden"
+        >
           {/* Search, Filter & Sort Rail (STATIC) */}
-          <div className="shrink-0 bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+          <div className="shrink-0 bg-board-plate p-2.5 sm:p-3 rounded-plate border border-edge flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                size={15}
+              />
               <input
                 type="text"
+                aria-label="Search merchant categories"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search category name or description..."
-                className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:bg-white transition"
+                className="w-full pl-9 pr-4 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
               />
             </div>
 
             {/* Right Group: Sorting. Archived categories are not filtered here -
                 they live in the Archive tab. */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-
               {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                <ArrowUpDown size={14} className="text-slate-400" />
-                <span className="text-[11px] font-bold text-slate-500">Sort:</span>
+              <div className="flex items-center gap-1.5 bg-board-ground border border-edge px-3 py-1.5 rounded-plate">
+                <ArrowUpDown size={14} className="text-ink-muted" />
+                <span className="text-label text-ink-muted">Sort:</span>
                 <select
+                  aria-label="Sort the categories"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as CategorySortOption)}
-                  className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                  className="bg-transparent text-label text-ink cursor-pointer"
                 >
                   <option value="name-asc">Name (A → Z)</option>
                   <option value="name-desc">Name (Z → A)</option>
@@ -328,8 +341,8 @@ export const MerchantCategoryModule: React.FC = () => {
             </div>
           </div>
 
-          {loadError && (
-            <div className="shrink-0 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-4 py-2.5 rounded-2xl flex items-center gap-2">
+          {loadError && categories.length > 0 && (
+            <div className="shrink-0 bg-status-waiting-fill border border-status-waiting-ink/20 text-status-waiting-ink text-label px-4 py-2.5 rounded-plate flex items-center gap-2">
               <AlertCircle size={15} className="shrink-0" />
               <span>{loadError}</span>
             </div>
@@ -337,30 +350,49 @@ export const MerchantCategoryModule: React.FC = () => {
 
           {/* Cards Grid - ONLY THIS SECTION SCROLLS! */}
           {isLoading ? (
-            <div className="flex-1 min-h-0 p-12 text-center text-slate-400 space-y-3 bg-white rounded-2xl border border-slate-200 flex flex-col items-center justify-center">
-              <Loader2 size={28} className="animate-spin text-[#1E3A5F]" />
-              <p className="text-xs font-medium">Loading merchant categories...</p>
+            <div className="flex-1 min-h-0 p-12 text-center text-ink-muted space-y-3 bg-board-plate rounded-plate border border-edge flex flex-col items-center justify-center">
+              <Loader2 size={28} className="animate-spin text-board-field" />
+              <p className="text-body">Loading merchant categories...</p>
+            </div>
+          ) : /* Ordered before the empty branch, for the same reason as the
+             user directory: the banner above rendered on a failure and
+             this panel rendered under it anyway, so a dead endpoint read
+             "No merchant categories have been registered yet." The empty
+             branch now only runs when the fetch actually succeeded. */
+          categories.length === 0 && loadError ? (
+            <div className="flex-1 min-h-0 bg-board-plate rounded-plate p-12 border border-edge text-center space-y-3 flex flex-col items-center justify-center">
+              <AlertCircle size={22} className="text-status-act-ink" />
+              <p className="text-panel text-ink">The categories did not load</p>
+              <p className="max-w-sm text-body text-ink-muted">
+                {loadError} Nothing is listed because nothing arrived, not because nothing is there.
+              </p>
+              <button
+                onClick={loadCategories}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+              >
+                <RotateCcw size={14} />
+                <span>Try again</span>
+              </button>
             </div>
           ) : sortedCategories.length === 0 ? (
-            <div className="flex-1 min-h-0 bg-white rounded-2xl p-12 shadow-xs border border-slate-200 text-center space-y-3 flex flex-col items-center justify-center">
-              <Store size={40} className="text-slate-300" />
-              <h4 className="font-bold text-slate-700 text-sm">No categories found</h4>
-              <p className="text-xs text-slate-400 max-w-sm">
+            <div className="flex-1 min-h-0 bg-board-plate rounded-plate p-12 border border-edge text-center space-y-3 flex flex-col items-center justify-center">
+              <Store size={40} className="text-ink-muted" />
+              <h4 className=" text-ink text-label">No categories found</h4>
+              <p className="text-label text-ink-muted max-w-sm">
                 {categories.length === 0
                   ? "No merchant categories have been registered yet. Click 'Add Category' above to create one."
                   : "No categories match your search or status filter."}
               </p>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4 scrollbar-thin">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {sortedCategories.map((cat, idx) => (
+                {sortedCategories.map((cat) => (
                   <CategoryRowCard
                     key={cat.id}
                     category={cat}
                     onUpdated={handleCategoryUpdated}
                     onSelectCategoryForPlaces={handleSelectCategoryForPlaces}
-                    index={idx}
                     rateConfig={rateConfig}
                   />
                 ))}
@@ -369,51 +401,64 @@ export const MerchantCategoryModule: React.FC = () => {
           )}
         </div>
       ) : activeTab === "places" ? (
-        <PlacesTab
-          categories={categories}
-          preSelectedCategory={selectedCategoryForPlaces}
-        />
+        <div
+          role="tabpanel"
+          id="merchants-panel-places"
+          aria-labelledby="merchants-tab-places"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <PlacesTab categories={categories} preSelectedCategory={selectedCategoryForPlaces} />
+        </div>
       ) : (
-        <ArchiveTab
-          categories={categories}
-          places={archivedPlaces}
-          isLoadingPlaces={isLoadingArchivedPlaces}
-          onCategoryRestored={(updated) => {
-            setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-          }}
-          onPlaceRestored={() => {
-            void loadArchivedPlaces();
-          }}
-        />
+        <div
+          role="tabpanel"
+          id="merchants-panel-archive"
+          aria-labelledby="merchants-tab-archive"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <ArchiveTab
+            categories={categories}
+            places={archivedPlaces}
+            isLoadingPlaces={isLoadingArchivedPlaces}
+            placesError={archivedPlacesError}
+            categoriesError={loadError}
+            onCategoryRestored={(updated) => {
+              setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            }}
+            onPlaceRestored={() => {
+              void loadArchivedPlaces();
+            }}
+          />
+        </div>
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 5. MODAL FORM: CREATE NEW CATEGORY                             */}
+      {/* 5. MODAL FORM: CREATE NEW CATEGORY */}
       {/* ───────────────────────────────────────────────────────────── */}
       {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-fade-in">
+          <div className="bg-board-plate border border-edge rounded-plate p-6 sm:p-8 max-w-lg w-full space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-hairline">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#1E3A5F] text-white flex items-center justify-center font-bold shadow-xs">
+                <div className="w-9 h-9 rounded-plate bg-board-field text-white flex items-center justify-center font-bold">
                   <FolderPlus size={18} />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-800 text-base">Add Merchant Category</h3>
-                  <p className="text-[11px] text-slate-500">Create a new store classification</p>
+                  <h3 className="text-panel text-ink">Add Merchant Category</h3>
+                  <p className="text-label text-ink-muted">Create a new store classification</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+                className="p-1.5 rounded-trim hover:bg-board-ground text-ink-muted hover:text-ink transition"
               >
                 <X size={18} />
               </button>
             </div>
 
             {formError && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+              <div className="p-3 bg-status-act-fill border border-status-act-ink/20 text-status-act-ink rounded-plate text-label flex items-center gap-2">
                 <AlertCircle size={14} className="shrink-0" />
                 <span>{formError}</span>
               </div>
@@ -421,46 +466,46 @@ export const MerchantCategoryModule: React.FC = () => {
 
             <form onSubmit={handleAddCategory} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Category Name *
-                </label>
+                <label className="block text-micro text-ink uppercase mb-1">Category Name *</label>
                 <input
                   type="text"
                   required
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="e.g. Bakeries & Pastries, Hardware & Construction"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-xs font-medium outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:bg-white transition"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-4 py-2.5 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Description
-                </label>
+                <label className="block text-micro text-ink uppercase mb-1">Description</label>
                 <textarea
                   rows={3}
                   value={newCatDesc}
                   onChange={(e) => setNewCatDesc(e.target.value)}
                   placeholder="Describe the types of items, partner shops, and services included in this category..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-xs font-medium outline-none focus:ring-2 focus:ring-[#1E3A5F] focus:bg-white transition resize-none"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-4 py-2.5 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-3 border-t border-hairline">
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                  className="px-4 py-2.5 rounded-plate text-label text-ink-muted hover:bg-board-ground transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#1E3A5F] hover:bg-[#162D4A] text-white shadow-xs transition flex items-center gap-1.5"
+                  className="px-5 py-2.5 rounded-plate text-label bg-board-field hover:bg-board-field-deep text-white transition flex items-center gap-1.5"
                 >
-                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  {isSubmitting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Check size={14} />
+                  )}
                   <span>Save Category</span>
                 </button>
               </div>

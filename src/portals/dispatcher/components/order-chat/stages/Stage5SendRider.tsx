@@ -1,6 +1,5 @@
-import * as React from "react";
 import { Bike, Check, Circle } from "lucide-react";
-import { DispatcherButton } from "../../ui/DispatcherButton";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { copy } from "../copy";
 
 /**
@@ -39,12 +38,12 @@ interface Stage5Props {
 function Requirement({ met, label }: { met: boolean; label: string }) {
   return (
     <li
-      className={`flex items-center gap-2 text-[11px] py-0.5 ${
-        met ? "text-emerald-800 font-bold" : "text-amber-900"
+      className={`flex items-center gap-2 py-0.5 text-body ${
+        met ? "text-status-done-ink" : "text-status-waiting-ink"
       }`}
     >
       {met ? (
-        <Check size={12} className="shrink-0" strokeWidth={3} />
+        <Check size={12} className="shrink-0" />
       ) : (
         <Circle size={10} className="shrink-0" />
       )}
@@ -68,7 +67,7 @@ export function Stage5SendRider({
 }: Stage5Props) {
   if (readOnly || riderName) {
     return (
-      <p className="text-[11px] text-slate-600 m-0">
+      <p className="m-0 text-body text-ink-muted">
         {riderName ? copy.status.riderAssigned(riderName) : "No rider was sent."}
       </p>
     );
@@ -76,10 +75,10 @@ export function Stage5SendRider({
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-slate-500 m-0">{copy.stage5.intro}</p>
+      <p className="m-0 text-body text-ink-muted">{copy.stage5.intro}</p>
 
       <DispatcherButton
-        variant="success"
+        variant="primary"
         size="lg"
         loading={isAssigning}
         loadingText={copy.stage5.sending}
@@ -91,8 +90,8 @@ export function Stage5SendRider({
       </DispatcherButton>
 
       {!canSend && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-          <p className="text-[11px] font-extrabold text-amber-900 m-0 mb-1">
+        <div className="rounded-plate bg-status-waiting-fill px-3 py-2.5">
+          <p className="m-0 mb-1 text-label text-status-waiting-ink">
             {copy.stage5.missingTitle}
           </p>
           <ul className="m-0 p-0 list-none">

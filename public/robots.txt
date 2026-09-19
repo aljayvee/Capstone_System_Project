@@ -8,4 +8,4 @@ Disallow: /dispatcher/
 Disallow: /owner/
 Disallow: /api/
 
-Sitemap: https://sugoonthego.online/sitemap.xml
+Sitemap: https://sugo-express.org/sitemap.xml

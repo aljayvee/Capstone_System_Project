@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Eye, EyeOff, ChevronRight,
-  Bike, Loader2
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
@@ -69,6 +69,7 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [mobileAppRoleAlert, setMobileAppRoleAlert] = useState<string | null>(null);
+  const [isCapsLockOn, setIsCapsLockOn] = useState(false);
 
   const [stage, setStage] = useState<Stage>("CREDENTIALS");
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -214,7 +215,6 @@ export default function LoginPage() {
           variant: "error",
           title: "Invalid Credentials",
           message: response.error || "Unable to connect to authentication server. Please check your credentials.",
-          autoDismissMs: 1500,
         });
         return;
       }
@@ -234,7 +234,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Connection Error",
         message: err.message || "An unexpected error occurred during login.",
-        autoDismissMs: 1500,
       });
     }
   };
@@ -255,7 +254,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Profile Error",
         message: result.error,
-        autoDismissMs: 1500,
       });
       setIsLoading(false);
       return;
@@ -275,7 +273,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Verification Failed",
         message: result.error,
-        autoDismissMs: 1500,
       });
       setIsLoading(false);
       return;
@@ -296,7 +293,6 @@ export default function LoginPage() {
         variant: "error",
         title: "Resend Failed",
         message: result.error,
-        autoDismissMs: 1500,
       });
       if (result.retryAfterSeconds) {
         setResendAvailableAt(Date.now() + result.retryAfterSeconds * 1000);
@@ -320,7 +316,7 @@ export default function LoginPage() {
   };
 
   const headings: Record<Stage, { title: string; description: string }> = {
-    CREDENTIALS: { title: "System Portal", description: "Tacurong City Logistics & Fleet Operations" },
+    CREDENTIALS: { title: "Sugo On the Go Portal", description: "Tacurong City Logistics & Fleet Management" },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
     OTP: { title: "Verify Your Email", description: "Enter the 6-digit verification code sent to your email" },
   };
@@ -330,238 +326,218 @@ export default function LoginPage() {
   return (
     <main
       role="main"
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
-      style={{
-        background: "radial-gradient(ellipse at 50% 20%, #162D4A 0%, #0B132B 60%, #070D1B 100%)",
-      }}
+      className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
     >
-      {/* Subtle Vector Topography Grid Pattern */}
-      <div className="absolute inset-0 pointer-events-none opacity-10">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255, 255, 255, 0.4)" strokeWidth="0.75" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid-pattern)" />
-        </svg>
-      </div>
+      {/* Flat Minimalist Form */}
+      <div className="relative w-full max-w-md z-10 my-auto selection:bg-red-950 selection:text-white">
+        {/* Header Section */}
+        <div className="pb-6 text-center pt-2">
+          <h1 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+            {headings[stage].title}
+          </h1>
+          <p className="text-slate-400 text-xs sm:text-sm font-medium tracking-wide mt-1.5">
+            {headings[stage].description}
+          </p>
+        </div>
 
-      {/* Floating Command Glass Console (Layout 2) */}
-      <div className="relative w-full max-w-md z-10">
-        <div className="backdrop-blur-xl bg-slate-900/80 border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
-          
-          {/* Header Section */}
-          <div className="px-6 pt-8 pb-4 text-center">
-            {/* Red Brand Badge */}
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md mx-auto mb-3"
-              style={{ background: "#E53935" }}
-            >
-              <Bike className="text-white" size={24} strokeWidth={2.4} />
+        {/* STAGE 1: CREDENTIALS (Sign In) */}
+        {stage === "CREDENTIALS" && (
+          <div className="space-y-4">
+            
+            {/* Alert Banner System */}
+            {activeAlert && (
+              <LoginAlertBanner
+                variant={activeAlert.variant}
+                title={activeAlert.title}
+                message={activeAlert.message}
+                cooldownSeconds={activeAlert.cooldownSeconds}
+                actionText={activeAlert.actionText}
+                onAction={activeAlert.onAction}
+                onDismiss={() => setActiveAlert(null)}
+                onCooldownExpire={activeAlert.onCooldownExpire}
+                autoDismissMs={activeAlert.autoDismissMs}
+              />
+            )}
+
+            {/* Email / Username Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                  Email
+                </label>
+                {fieldErrors.email && (
+                  <span className="text-rose-400 text-[11px] font-medium">
+                    {fieldErrors.email}
+                  </span>
+                )}
+              </div>
+              <input
+                ref={usernameInputRef}
+                type="text"
+                value={identifier}
+                onChange={(e) => {
+                  setIdentifier(e.target.value);
+                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  if (activeAlert?.variant === "error") setActiveAlert(null);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Enter Email or Username"
+                autoComplete="username"
+                autoFocus
+                disabled={isLoading || isCooldownActive}
+                className={`w-full px-4 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-400 caret-red-500 disabled:opacity-60 ${
+                  fieldErrors.email
+                    ? "border border-rose-500 bg-rose-950/30"
+                    : "border border-slate-700 bg-slate-800 focus:border-red-500"
+                }`}
+              />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/5 border border-white/10 text-[11px] font-bold text-slate-300 tracking-wider uppercase mb-2">
-              SUGO Express
+            {/* Password Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                    Password
+                  </label>
+                  {isCapsLockOn && (
+                    <span className="text-amber-400 text-[10px] font-semibold flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
+                      Caps Lock ON
+                    </span>
+                  )}
+                </div>
+                {fieldErrors.password && (
+                  <span className="text-rose-400 text-[11px] font-medium">
+                    {fieldErrors.password}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    if (activeAlert?.variant === "error") setActiveAlert(null);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={(e) => {
+                    if (e.getModifierState) {
+                      setIsCapsLockOn(e.getModifierState("CapsLock"));
+                    }
+                  }}
+                  placeholder="Enter password"
+                  autoComplete="current-password"
+                  disabled={isLoading || isCooldownActive}
+                  className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none text-sm transition-colors duration-150 text-white placeholder-slate-400 caret-red-500 disabled:opacity-60 ${
+                    fieldErrors.password
+                      ? "border border-rose-500 bg-rose-950/30"
+                      : "border border-slate-700 bg-slate-800 focus:border-red-500"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer p-1 rounded focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
-            <h1 className="text-white text-2xl font-bold tracking-tight">
-              {headings[stage].title}
-            </h1>
-            <p className="text-slate-400 text-xs font-medium tracking-wide mt-1">
-              {headings[stage].description}
-            </p>
+            {/* Submit CTA Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleLogin}
+                disabled={isLoading || isCooldownActive}
+                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
+                style={{
+                  background: isCooldownActive ? "#475569" : "#DC2626",
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ChevronRight size={16} />
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* STAGE 1: CREDENTIALS (Sign In) */}
-          {stage === "CREDENTIALS" && (
-            <div className="px-6 pb-8 space-y-4">
-              
-              {/* Alert Banner System */}
-              {activeAlert && (
+        {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}
+        {stage === "PROFILE_SETUP" && (
+          <div className="space-y-4">
+            {activeAlert && (
+              <div className="mb-4">
                 <LoginAlertBanner
                   variant={activeAlert.variant}
                   title={activeAlert.title}
                   message={activeAlert.message}
-                  cooldownSeconds={activeAlert.cooldownSeconds}
-                  actionText={activeAlert.actionText}
-                  onAction={activeAlert.onAction}
                   onDismiss={() => setActiveAlert(null)}
-                  onCooldownExpire={activeAlert.onCooldownExpire}
-                  autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                />
-              )}
-
-              {/* Email / Username Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                    Email
-                  </label>
-                  {fieldErrors.email && (
-                    <span className="text-rose-400 text-[11px] font-medium">
-                      {fieldErrors.email}
-                    </span>
-                  )}
-                </div>
-                <input
-                  ref={usernameInputRef}
-                  type="text"
-                  value={identifier}
-                  onChange={(e) => {
-                    setIdentifier(e.target.value);
-                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                    if (activeAlert?.variant === "error") setActiveAlert(null);
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Enter Email or Username"
-                  autoComplete="username"
-                  autoFocus
-                  disabled={isLoading || isCooldownActive}
-                  className={`w-full px-4 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
-                    fieldErrors.email
-                      ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
-                      : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
-                  }`}
+                  autoDismissMs={activeAlert.autoDismissMs}
                 />
               </div>
+            )}
+            <ProfileSetupStep
+              onSubmit={handleProfileSubmit}
+              onCancel={() => resetToCredentials()}
+              serverError={activeAlert?.message || ""}
+              isSubmitting={isLoading}
+            />
+          </div>
+        )}
 
-              {/* Password Input */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                    Password
-                  </label>
-                  {fieldErrors.password && (
-                    <span className="text-rose-400 text-[11px] font-medium">
-                      {fieldErrors.password}
-                    </span>
-                  )}
-                </div>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                      if (activeAlert?.variant === "error") setActiveAlert(null);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Enter password"
-                    autoComplete="current-password"
-                    disabled={isLoading || isCooldownActive}
-                    className={`w-full pl-4 pr-10 py-3 rounded-xl outline-none border text-sm transition-colors duration-150 text-white placeholder-slate-500 disabled:opacity-60 ${
-                      fieldErrors.password
-                        ? "border-rose-500 bg-rose-950/20 focus:ring-2 focus:ring-rose-500/20"
-                        : "border-slate-700 bg-slate-800/80 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:bg-slate-800"
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    title={showPassword ? "Hide password" : "Show password"}
-                    tabIndex={-1}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit CTA Button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleLogin}
-                  disabled={isLoading || isCooldownActive}
-                  className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-all shadow-lg disabled:opacity-50 cursor-pointer"
-                  style={{
-                    background: isCooldownActive ? "#475569" : "#DC2626",
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Authenticating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Sign In</span>
-                      <ChevronRight size={16} />
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Operational Security Footnote */}
-              <div className="pt-2 text-center">
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Authorized dispatch and administrative personnel only
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}
-          {stage === "PROFILE_SETUP" && (
-            <div className="px-6 pb-8">
-              {activeAlert && (
-                <div className="mb-4">
-                  <LoginAlertBanner
-                    variant={activeAlert.variant}
-                    title={activeAlert.title}
-                    message={activeAlert.message}
-                    onDismiss={() => setActiveAlert(null)}
-                    autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                  />
-                </div>
-              )}
-              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700">
-                <ProfileSetupStep
-                  onSubmit={handleProfileSubmit}
-                  onCancel={() => resetToCredentials()}
-                  serverError={activeAlert?.message || ""}
-                  isSubmitting={isLoading}
+        {/* STAGE 3: OTP VERIFICATION */}
+        {stage === "OTP" && (
+          <div className="space-y-4">
+            {activeAlert && (
+              <div className="mb-4">
+                <LoginAlertBanner
+                  variant={activeAlert.variant}
+                  title={activeAlert.title}
+                  message={activeAlert.message}
+                  onDismiss={() => setActiveAlert(null)}
+                  autoDismissMs={activeAlert.autoDismissMs}
                 />
               </div>
-            </div>
-          )}
-
-          {/* STAGE 3: OTP VERIFICATION */}
-          {stage === "OTP" && (
-            <div className="px-6 pb-8">
-              {activeAlert && (
-                <div className="mb-4">
-                  <LoginAlertBanner
-                    variant={activeAlert.variant}
-                    title={activeAlert.title}
-                    message={activeAlert.message}
-                    onDismiss={() => setActiveAlert(null)}
-                    autoDismissMs={activeAlert.autoDismissMs ?? (activeAlert.variant === "error" ? 1500 : undefined)}
-                  />
-                </div>
-              )}
-              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700">
-                <OtpStep
-                  maskedEmail={maskedEmail}
-                  expiresAt={challengeExpiresAt}
-                  resendAvailableAt={resendAvailableAt}
-                  serverError={activeAlert?.message || ""}
-                  isSubmitting={isLoading}
-                  isResending={isResending}
-                  onSubmit={handleOtpSubmit}
-                  onResend={handleResend}
-                  onExpire={handleChallengeExpired}
-                  onCancel={() => resetToCredentials()}
-                />
-              </div>
-            </div>
-          )}
-
-        </div>
+            )}
+            <OtpStep
+              maskedEmail={maskedEmail}
+              expiresAt={challengeExpiresAt}
+              resendAvailableAt={resendAvailableAt}
+              serverError={activeAlert?.message || ""}
+              isSubmitting={isLoading}
+              isResending={isResending}
+              onSubmit={handleOtpSubmit}
+              onResend={handleResend}
+              onExpire={handleChallengeExpired}
+              onCancel={() => resetToCredentials()}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Website Copyright Footer at Bottom Edge */}
+      <footer className="w-full pt-6 pb-4 md:absolute md:bottom-4 md:left-0 md:right-0 text-center select-none z-10" role="contentinfo">
+        <p className="text-xs text-slate-400 font-medium tracking-wide">
+          &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
+        </p>
+        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
+          Tacurong City Logistics &amp; Fleet Operations
+        </p>
+      </footer>
 
       {/* Rider / Customer Mobile Redirection Modal */}
       {mobileAppRoleAlert && (

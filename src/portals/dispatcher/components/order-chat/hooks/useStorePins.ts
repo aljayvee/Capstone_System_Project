@@ -8,7 +8,7 @@ import {
   type GoogleMapsStatus,
 } from "../../../../../utils/loadGoogleMaps";
 import { SERVICE_AREA_BOUNDS } from "../../../../../constants/serviceArea";
-import { useInlineMessage } from "../../ui/DispatcherInlineBanner";
+import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { metresBetween } from "../../../../../utils/geo";
 import { GOOGLE_MAP_ID, canUseAdvancedMarkers } from "../../../../../utils/googleMapId";
 import { copy } from "../copy";
@@ -688,7 +688,7 @@ export function useStorePins({
         const g = (window as any).google;
         if (!g?.maps?.places || !mapInstance.current) {
           setIsSearching(false);
-          toast.info("Maps is still loading — try again in a moment.");
+          toast.info("Maps is still loading. Try again in a moment.");
           return;
         }
 

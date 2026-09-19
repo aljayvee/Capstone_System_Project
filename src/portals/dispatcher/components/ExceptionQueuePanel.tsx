@@ -1,9 +1,14 @@
 import React, { useState } from "react";
-import { AlertTriangle, ShieldCheck, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { type ApiErrandException, type ExceptionKind } from "../../../services/apiService";
 import { type OpenExceptions } from "../hooks/useOpenExceptions";
 import { ExceptionEvidence } from "./ExceptionEvidence";
 import { formatPeso } from "../../../utils/format";
+import { PanelShell } from "@/components/panel/PanelShell";
+import { PanelState } from "@/components/panel/PanelState";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { Field, fieldInputClasses } from "@/components/panel/Field";
+import { useDraft } from "../lib/useDraft";
 
 /** Plain names, so a reader never needs the enum to read the queue. */
 const KIND_LABEL: Record<ExceptionKind, string> = {
@@ -16,7 +21,7 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
   // The dispatcher's version is an instruction, not a category: this queue is
   // today's work, and a rider is standing at a door waiting for someone here to
   // ring the customer.
-  OVERAGE_PENDING: "Goods held — call the customer",
+  OVERAGE_PENDING: "Goods held, call the customer",
   UNPAID_BALANCE: "Balance never collected",
 };
 
@@ -26,163 +31,223 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
  * Clearing one demands a reason. That is the difference between a control and a
  * list: an exception cleared with nothing said is weak evidence later, which is
  * exactly when it gets read.
+ *
+ * Three defects fixed here, all of which mattered because this screen is about
+ * money.
+ *
+ * The all-clear was a lie waiting to happen. "Everything reconciles. Nothing is
+ * waiting on you." rendered whenever the array was empty, and the array was
+ * empty when the request failed. It is now gated on `isConfirmedClear`, which
+ * means loaded, no failure, and genuinely nothing open.
+ *
+ * The reason box was shared state. One `reason` string served every row and was
+ * reset on opening another, so a half-typed justification on one exception was
+ * destroyed by clicking "Clear this" on a different one. Both the draft and the
+ * error are now keyed per row.
+ *
+ * "Clear this" was an 11px underlined text link with no padding, about 16px
+ * tall, and it is this panel's primary action.
  */
 export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue }) => {
-  const { exceptions, totalAtRisk, isLoading, reload, resolve } = queue;
+  const { exceptions, totalAtRisk, isLoading, loadError, isConfirmedClear, reload, resolve } = queue;
   const [resolving, setResolving] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   const keyOf = (e: ApiErrandException) => `${e.errandId}:${e.kind}`;
 
-  const handleResolve = async (e: ApiErrandException) => {
-    if (reason.trim().length < 3) {
-      setError("Say why this is being cleared.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await resolve(e.errandId, e.kind, reason.trim(), e.amountAtRisk);
-      setResolving(null);
-      setReason("");
-    } catch (err: any) {
-      setError(err?.response?.data?.error ?? "Could not record that. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      <header className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <AlertTriangle size={16} className="text-amber-600 shrink-0" />
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-800">Needs a decision</h3>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {totalAtRisk > 0 && (
-            <span className="font-mono text-xs font-bold text-amber-700 tabular-nums">
-              {formatPeso(totalAtRisk)} at risk
-            </span>
-          )}
-          <button
-            onClick={() => void reload()}
-            className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition"
-            aria-label="Refresh the queue"
-          >
-            <RefreshCw size={14} />
-          </button>
-        </div>
-      </header>
-
-      {isLoading && <p className="px-5 py-6 text-xs text-slate-400">Checking recent errands…</p>}
-
-      {!isLoading && exceptions.length === 0 && (
-        <div className="px-5 py-8 flex items-center gap-2.5 text-sm" data-testid="queue-all-clear">
-          <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
-          <span className="font-medium text-emerald-900">
-            Everything reconciles. Nothing is waiting on you.
-          </span>
-        </div>
-      )}
-
-      {!isLoading && exceptions.length > 0 && (
-        <ul className="divide-y divide-slate-100" data-testid="exception-queue">
+    <PanelShell
+      title="Needs a decision"
+      figure={{
+        label: "Open",
+        // A dash when the queue never loaded, so this cannot report a
+        // confident zero over money nobody has reconciled.
+        value: queue.isLoading || queue.loadError ? "--" : String(queue.openCount),
+        urgent: queue.openCount > 0,
+      }}
+      detail={
+        totalAtRisk > 0
+          ? `${formatPeso(totalAtRisk)} is held against these runs`
+          : "Runs that did not reconcile and nobody has decided on yet"
+      }
+      aside={
+        <DispatcherButton
+          variant="secondary"
+          size="sm"
+          iconOnly
+          aria-label="Refresh the queue"
+          icon={<RefreshCw size={15} />}
+          onClick={() => void reload()}
+        />
+      }
+    >
+      <PanelState
+        isLoading={isLoading}
+        error={loadError}
+        onRetry={() => void reload()}
+        isEmpty={isConfirmedClear}
+        emptyTitle="Everything reconciles"
+        emptyBody="Nothing is waiting on you. Every run that came through has been accounted for."
+        errorTitle="The exception queue did not load"
+        loadingRows={3}
+      >
+        <ul className="space-y-2" data-testid="exception-queue">
           {exceptions.map((e) => {
             const key = keyOf(e);
             const isResolving = resolving === key;
 
             return (
-              <li key={key} className="px-5 py-3.5 space-y-2.5" data-testid={`exception-${key}`}>
+              <li
+                key={key}
+                className="rounded-plate border border-edge bg-board-plate p-4"
+                data-testid={`exception-${key}`}
+              >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-extrabold text-slate-800">
-                        {KIND_LABEL[e.kind]}
-                      </span>
-                      <span className="font-mono text-[10px] text-slate-400">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-panel text-ink">{KIND_LABEL[e.kind]}</h3>
+                      <span data-figure className="font-mono text-label text-ink-muted">
                         {e.errandId.slice(0, 8)}
                       </span>
-                      {e.riderName && (
-                        <span className="text-[11px] text-slate-500">· {e.riderName}</span>
-                      )}
+                      {e.riderName ? (
+                        <span className="text-label text-ink-muted">{e.riderName}</span>
+                      ) : null}
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-snug">{e.detail}</p>
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-body text-ink">{e.detail}</p>
+                    <p data-figure className="text-label text-ink-muted">
                       {new Date(e.occurredAt).toLocaleString()}
                     </p>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    {e.amountAtRisk > 0 && (
-                      <span className="font-mono text-sm font-bold text-amber-700 tabular-nums">
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    {e.amountAtRisk > 0 ? (
+                      <span data-figure className="font-mono text-data text-status-act-ink">
                         {formatPeso(e.amountAtRisk)}
                       </span>
-                    )}
-                    {!isResolving && (
-                      <button
+                    ) : null}
+                    {!isResolving ? (
+                      <DispatcherButton
+                        variant="secondary"
+                        size="sm"
                         onClick={() => {
                           setResolving(key);
-                          setReason("");
-                          setError(null);
+                          setErrors((prev) => ({ ...prev, [key]: null }));
                         }}
-                        className="text-[11px] font-bold text-[#1E3A5F] hover:underline"
                         data-testid={`resolve-${key}`}
                       >
                         Clear this
-                      </button>
-                    )}
+                      </DispatcherButton>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* The evidence, beside the claim about it — a variance nobody can
+                {/* The evidence, beside the claim about it. A variance nobody can
                     see the receipt for is a number, not a finding. */}
-                <ExceptionEvidence errandId={e.errandId} kind={e.kind} />
+                <div className="mt-2.5">
+                  <ExceptionEvidence errandId={e.errandId} kind={e.kind} />
+                </div>
 
-                {isResolving && (
-                  <div className="space-y-1.5 pt-0.5">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        autoFocus
-                        value={reason}
-                        onChange={(ev) => setReason(ev.target.value)}
-                        placeholder="Why is this being cleared?"
-                        maxLength={500}
-                        className="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F]"
-                        data-testid="resolve-reason"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          disabled={busy}
-                          onClick={() => void handleResolve(e)}
-                          className="text-xs font-bold text-white bg-[#1E3A5F] rounded-lg px-3.5 py-2 hover:bg-[#16304f] disabled:opacity-50 transition"
-                          data-testid="resolve-confirm"
-                        >
-                          {busy ? "Recording…" : "Record"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setResolving(null);
-                            setError(null);
-                          }}
-                          className="text-xs font-semibold text-slate-500 rounded-lg px-3 py-2 hover:bg-slate-50 transition"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                    {error && <p className="text-[11px] text-rose-600">{error}</p>}
-                  </div>
-                )}
+                {isResolving ? (
+                  <ResolveForm
+                    rowKey={key}
+                    busy={busy}
+                    error={errors[key] ?? null}
+                    onCancel={() => {
+                      setResolving(null);
+                      setErrors((prev) => ({ ...prev, [key]: null }));
+                    }}
+                    onSubmit={async (reason) => {
+                      if (reason.trim().length < 3) {
+                        setErrors((prev) => ({ ...prev, [key]: "Say why this is being cleared." }));
+                        return false;
+                      }
+                      setBusy(true);
+                      setErrors((prev) => ({ ...prev, [key]: null }));
+                      try {
+                        await resolve(e.errandId, e.kind, reason.trim(), e.amountAtRisk);
+                        setResolving(null);
+                        return true;
+                      } catch (err: any) {
+                        setErrors((prev) => ({
+                          ...prev,
+                          [key]: err?.response?.data?.error ?? "Could not record that. Try again.",
+                        }));
+                        return false;
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  />
+                ) : null}
               </li>
             );
           })}
         </ul>
-      )}
-    </div>
+      </PanelState>
+    </PanelShell>
   );
 };
+
+/**
+ * Split out so the draft is keyed by row: this text becomes the audit trail for
+ * money held against a customer, and it survives switching tabs mid-sentence.
+ */
+function ResolveForm({
+  rowKey,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
+}: {
+  rowKey: string;
+  busy: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSubmit: (reason: string) => Promise<boolean>;
+}) {
+  const [reason, setReason, clearReason] = useDraft(`exception-reason:${rowKey}`);
+
+  return (
+    <div className="mt-3 border-t border-hairline pt-3">
+      <Field
+        label="Why is this being cleared?"
+        error={error}
+        hint="This is the record anyone reviewing the money will read."
+        required
+      >
+        {(control) => (
+          <input
+            {...control}
+            autoFocus
+            value={reason}
+            onChange={(ev) => setReason(ev.target.value)}
+            placeholder="The customer paid the balance in cash on the doorstep"
+            maxLength={500}
+            className={fieldInputClasses}
+            data-testid="resolve-reason"
+          />
+        )}
+      </Field>
+
+      <div className="mt-2 flex gap-2">
+        <DispatcherButton
+          variant="primary"
+          size="md"
+          loading={busy}
+          loadingText="Recording"
+          onClick={async () => {
+            const ok = await onSubmit(reason);
+            if (ok) clearReason();
+          }}
+          data-testid="resolve-confirm"
+        >
+          Record it
+        </DispatcherButton>
+        <DispatcherButton variant="secondary" size="md" disabled={busy} onClick={onCancel}>
+          Cancel
+        </DispatcherButton>
+      </div>
+    </div>
+  );
+}

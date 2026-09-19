@@ -25,6 +25,21 @@
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* The typing indicator's three dots.
+ *
+ * They ran on `animate-bounce`, which the detector flags for the right reason:
+ * bounce easing reads dated, and nothing in this console moves that way. It
+ * also sat outside the prefers-reduced-motion guard below, so it was the one
+ * animation on the surface that ignored the setting entirely.
+ *
+ * Opacity only. Nothing translates, so there is no motion to suppress beyond
+ * a fade, and a fade is what remains under reduced motion.
+ */
+@keyframes typing-dot {
+  0%, 65%, 100% { opacity: 0.3; }
+  32%           { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   @keyframes fade-in {
     from { opacity: 1; }
@@ -34,11 +49,17 @@
     from { opacity: 1; transform: none; }
     to   { opacity: 1; transform: none; }
   }
+  @keyframes typing-dot {
+    0%, 100% { opacity: 0.55; }
+  }
 }
 
 @theme {
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-scale-up: scale-up 0.18s ease-out;
+  /* ease-in-out, not the board curve: --ease-board is shaped for a state
+     change that settles, and this is a loop that breathes. */
+  --animate-typing-dot: typing-dot 1.3s ease-in-out infinite;
 
   --color-sidebar: #1E3A5F;
   --color-sidebar-foreground: #ffffff;
@@ -48,6 +69,160 @@
   --color-sidebar-accent-foreground: #ffffff;
   --color-sidebar-border: rgba(96, 165, 250, 0.2);
   --color-sidebar-ring: #ffffff;
+
+  /* ─────────────────────────────────────────────────────────────────────
+     THE ROUTE BOARD: the dispatcher console's design system.
+
+     Everything below is additive. The Owner portal and the shared sidebar
+     primitive read the tokens above and are untouched by these.
+
+     Type is seven roles, not 438 declarations. Before this, the console set
+     size inline 438 times across ten sizes, 55% of them arbitrary pixels
+     (text-[9px] through text-[13px]), and the same status chip shipped at
+     four sizes in three weights. A role carries its own line-height, weight
+     and tracking so it cannot drift apart again.
+
+     The floor is 12px. A dense operational console earns sizes below the
+     16px web body floor; it does not earn 9px. There is deliberately no
+     token below --text-micro, and no third ink level: a contrast failure
+     needs a token to express it, and none exists here.
+     ───────────────────────────────────────────────────────────────────── */
+
+  /* Uppercase label tier: column heads, field labels, chip text. */
+  --text-micro: 0.75rem;
+  --text-micro--line-height: 1.25;
+  --text-micro--font-weight: 600;
+  --text-micro--letter-spacing: 0.06em;
+
+  /* Secondary reading tier: list metadata, helper copy. */
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.35;
+  --text-label--font-weight: 600;
+
+  /* The only role set at 400. The console had no normal weight at all. */
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.55;
+  --text-body--font-weight: 400;
+
+  /* Money, quantities, timers, route numbers. Tabular by contract. */
+  --text-data: 0.9375rem;
+  --text-data--line-height: 1.35;
+  --text-data--font-weight: 600;
+
+  /* Panel titles. One size for every peer panel; there were three. */
+  --text-panel: 1.0625rem;
+  --text-panel--line-height: 1.25;
+  --text-panel--font-weight: 700;
+  --text-panel--letter-spacing: -0.01em;
+
+  /* The surface title. One per screen. */
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.15;
+  --text-title--font-weight: 700;
+  --text-title--letter-spacing: -0.02em;
+
+  /* Destination and count scale: read across a room, not at a desk. */
+  --text-board: 2.125rem;
+  --text-board--line-height: 1;
+  --text-board--font-weight: 700;
+  --text-board--letter-spacing: -0.02em;
+
+  /* Enamel-painted steel. The navy field was hardcoded 8 times as #0F2035
+     and was never a token, while #1E3A5F was hand-written 143 times. */
+  --color-board-field: #0F2035;
+  --color-board-field-deep: #0B132B;
+  --color-board-trim: #8494A8;
+  --color-board-ground: #F2EEE4;
+  --color-board-plate: #FFFFFF;
+
+  /* SUGO red has exactly one legal meaning on this surface: you must act.
+     It carries the primary action and the states that demand a decision,
+     and nothing else. It is never decoration.
+
+     Three values because one red cannot clear AA everywhere, and the ratios
+     are measured rather than assumed:
+       --color-signal          solid fills under white text. White on #E53935
+                               is 4.23:1, which fails AA at the 17px/700 of a
+                               button label, so fills use #DC2626 at 4.83:1.
+                               That is also the red LoginPage already uses for
+                               its primary CTA.
+       --color-signal-on-field red text and figures ON the navy field, where
+                               #E53935 is only 3.89:1. #FF8A85 is 7.22:1.
+       --color-status-act-ink  red text on bone or white, at 6.33:1 (below). */
+  --color-signal: #DC2626;
+  --color-signal-deep: #C62828;
+  --color-signal-on-field: #FF8A85;
+
+  /* Two ink levels, both clearing 4.5:1 on bone and on white. Tinted with
+     the field's own hue; never dead gray. */
+  --color-ink: #16202E;
+  --color-ink-muted: #53606F;
+
+  /* Status law: one fill and one ink per meaning, and a status may never be
+     carried by colour alone (see statusPresentation in the console's lib,
+     which pairs every tone with a label and a mark).
+       waiting = someone else owes the next move
+       moving  = in motion, nothing owed
+       done    = finished well
+       closed  = ended without completing
+       act     = you must act (shares the signal red, same meaning) */
+  --color-status-waiting-fill: #FBEBC8;
+  --color-status-waiting-ink: #7A4A05;
+  --color-status-moving-fill: #E2E9F2;
+  --color-status-moving-ink: #1E3A5F;
+  --color-status-done-fill: #D9F2E5;
+  --color-status-done-ink: #0B5B42;
+  --color-status-closed-fill: #E6E8EB;
+  --color-status-closed-ink: #414B57;
+  --color-status-act-fill: #FBE0DE;
+  --color-status-act-ink: #A81E1A;
+
+  /* Geometry per AGENTS.md 8.2: cards and controls 8 to 12px, inner marks 4
+     to 6px, modals 16 to 20px. Pills are for status chips only. */
+  --radius-plate: 0.625rem;
+  --radius-trim: 0.375rem;
+  --radius-modal: 1rem;
+
+  /* One elevation step, with a real offset and a soft blur, tinted from the
+     field rather than black. The console had ten levels. */
+  --shadow-plate: 0 1px 2px 0 rgb(15 32 53 / 0.06);
+
+  /* ─────────────────────────────────────────────────────────────────────
+     THE DETAIL LAYER.
+
+     Flat is not the same as undetailed. A flat surface has forfeited
+     gradients, blurs and stacked shadows, so every bit of its hierarchy
+     has to be carried by line weight, rhythm and stroke instead. This
+     console shipped the forfeit and skipped the compensation.
+
+     Rules were written at five arbitrary strengths (/25 /30 /40 /50 /60)
+     chosen per call site, so a plate's own outer edge could be lighter
+     than a divider drawn inside it, and the errand card actually did
+     invert the two. There are two line weights here and their
+     relationship is fixed: a surface's boundary is always heavier than
+     any rule inside it, and nothing is allowed to invert that.
+     ───────────────────────────────────────────────────────────────────── */
+  --color-hairline: rgb(132 148 168 / 0.26);
+  --color-edge: rgb(132 148 168 / 0.45);
+
+  /* The same rule on the navy field, where a slate hairline goes muddy and
+     the light has to come from above rather than below. */
+  --color-field-line: rgb(255 255 255 / 0.14);
+
+  /* Painted steel has a lit top edge. One inset hairline, no gradient and
+     no blur: it is the whole difference between a plate bolted to a wall
+     and a navy rectangle. Deliberately has no counterpart on white, where
+     a top light would be invisible and a second shadow would break the
+     one-elevation rule. */
+  --shadow-field: inset 0 1px 0 0 rgb(255 255 255 / 0.10);
+
+  /* One curve for every state change on this surface. All 60-odd
+     `transition-*` utilities in the console set the property list and left
+     the timing at the default, so a hover, a selection and a disclosure
+     each moved on a different curve. Fast out of the gate and a long
+     settle, which is what makes a colour-only transition read as
+     deliberate rather than as a lag. */
+  --ease-board: cubic-bezier(0.2, 0, 0, 1);
 }
 
 :root {

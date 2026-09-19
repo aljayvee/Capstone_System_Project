@@ -122,8 +122,8 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
   return (
     <div
       role="alert"
-      className={`relative w-full p-4 rounded-xl border backdrop-blur-md transition-all duration-200 ${
-        isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+      className={`relative w-full p-4 rounded-xl border transition-opacity duration-150 ${
+        isVisible ? "opacity-100" : "opacity-0 pointer-events-none"
       } ${config.container} ${className}`}
     >
       <div className="flex items-start gap-3">
@@ -154,7 +154,7 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
               <button
                 type="button"
                 onClick={onAction}
-                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm cursor-pointer ${config.buttonBg}`}
+                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${config.buttonBg}`}
               >
                 {actionText}
               </button>

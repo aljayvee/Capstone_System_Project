@@ -1,6 +1,28 @@
 import React from "react";
-import { ShieldAlert, ArrowLeft, Layers, Lock, Check, Copy, SearchX, Info } from "lucide-react";
+import { ShieldAlert, ArrowLeft, Check, Copy, SearchX, Info } from "lucide-react";
 import { formatErrandId } from "../../../utils/formatErrandId";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherCard } from "@/components/panel/DispatcherCard";
+
+/**
+ * The claim rule, explained at the moment it stops you.
+ *
+ * Route board build. This screen was carrying most of the craft floor's
+ * refusals at once: a 32px icon inside a 64px tinted rounded square wearing
+ * an 8px coloured halo (`ring-8 ring-rose-50/60`) AND an inset shadow AND a
+ * second badge pinned to its corner, `rounded-3xl` at 24px against a modal
+ * range of 16 to 20, `shadow-2xl`, `backdrop-blur-sm`, `font-black`, and a
+ * blue claimant chip on a surface with no blue in its palette.
+ *
+ * It is a modal now: `role="dialog"`, `aria-modal`, a labelled title, focus
+ * moved in on mount and Escape wired to the same handler as the button. None
+ * of that existed, so the screen could trap a keyboard user completely.
+ *
+ * The copy also claimed something it could not know. `navigator.clipboard`
+ * rejects on an insecure origin or a denied permission, and the old handler
+ * flipped to "copied" before the promise settled, so the tick appeared
+ * whether or not anything reached the clipboard.
+ */
 
 interface UnauthorizedErrandScreenProps {
   errandId: string;
@@ -8,136 +30,159 @@ interface UnauthorizedErrandScreenProps {
   claimantName?: string;
   reason?: string;
   onReturnToQueue: () => void;
+  /**
+   * Somewhere other than the queue to go next. Only render the second button
+   * when this genuinely does something different: it and `onReturnToQueue`
+   * were both wired to the same `onClose` at the call site, so the screen
+   * offered two distinct-looking choices that did the identical thing.
+   */
   onViewMyErrands?: () => void;
 }
 
 export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> = ({
   errandId,
   variant = "unauthorized",
-  claimantName = "Another Dispatcher",
+  claimantName = "Another dispatcher",
   reason,
   onReturnToQueue,
   onViewMyErrands,
 }) => {
   const [copied, setCopied] = React.useState(false);
+  const [copyFailed, setCopyFailed] = React.useState(false);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
   const formattedId = formatErrandId(errandId);
   const isNotFound = variant === "not_found";
 
   const defaultReason = isNotFound
-    ? "We couldn't find this order. It may have been removed, or the link may be incorrect."
-    : "Another dispatcher is currently handling this order.";
+    ? "This order could not be found. It may have been removed, or the link may be wrong."
+    : "Another dispatcher is handling this order right now.";
 
   const displayReason = reason || defaultReason;
 
-  const handleCopyId = () => {
-    navigator.clipboard.writeText(errandId);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  React.useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
+
+  React.useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onReturnToQueue();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onReturnToQueue]);
+
+  const handleCopyId = async () => {
+    setCopyFailed(false);
+    try {
+      await navigator.clipboard.writeText(errandId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // An insecure origin or a denied permission. Saying nothing would leave
+      // the reader believing they had the number.
+      setCopyFailed(true);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-6 text-center animate-scale-up">
-        {/* TOP SECURITY / STATUS BADGE */}
-        <div className="flex justify-center">
-          <div className="relative">
-            {isNotFound ? (
-              <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-inner ring-8 ring-amber-50/60">
-                <SearchX size={32} strokeWidth={2.2} />
-              </div>
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-inner ring-8 ring-rose-50/60">
-                <ShieldAlert size={32} strokeWidth={2.2} />
-              </div>
-            )}
-            {!isNotFound && (
-              <span className="absolute -bottom-1 -right-1 p-1 bg-amber-500 text-white rounded-full shadow-xs">
-                <Lock size={12} strokeWidth={3} />
-              </span>
-            )}
-          </div>
-        </div>
+    <div
+      data-surface="dispatch"
+      className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-board-field-deep/70 p-4"
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unauthorized-title"
+        tabIndex={-1}
+        className="w-full max-w-lg animate-scale-up space-y-5 rounded-modal border border-edge bg-board-plate p-6 text-center shadow-plate outline-none sm:p-8"
+      >
+        {/* A bare mark. It was a tinted square in a coloured halo with a second
+            badge clipped to its corner: three pieces of chrome to say one
+            thing the heading says better. */}
+        {isNotFound ? (
+          <SearchX size={28} className="mx-auto text-status-waiting-ink" />
+        ) : (
+          <ShieldAlert size={28} className="mx-auto text-status-act-ink" />
+        )}
 
-        {/* HEADER TEXT */}
         <div className="space-y-1.5">
-          <h3 className="text-xl font-black text-slate-900 tracking-tight">
+          <h3 id="unauthorized-title" className="text-title text-ink">
             {isNotFound ? "Order not found" : "Already being handled"}
           </h3>
           <p
-            className={`text-xs font-semibold ${
-              isNotFound ? "text-amber-600" : "text-rose-600"
-            }`}
+            className={
+              isNotFound
+                ? "text-label text-status-waiting-ink"
+                : "text-label text-status-act-ink"
+            }
           >
             {isNotFound
-              ? "This link doesn't match any order"
+              ? "This link does not match any order"
               : "Only the assigned dispatcher can open this"}
           </p>
-          <p className="text-xs text-slate-500 max-w-md mx-auto pt-1 leading-relaxed">
-            {displayReason}
-          </p>
+          <p className="mx-auto max-w-md text-body text-ink-muted">{displayReason}</p>
         </div>
 
-        {/* TRANSACTION METADATA CARD */}
-        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left space-y-3 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Order:
-            </span>
+        <DispatcherCard.Region padding="sm" className="space-y-2 text-left">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-micro uppercase text-ink-muted">Order</span>
             <button
-              onClick={handleCopyId}
-              className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-dispatcher-navy bg-white px-2.5 py-1 rounded-lg border border-slate-200 hover:border-blue-400 transition"
-              title="Copy order ID"
-              aria-label={copied ? "Order ID copied" : `Copy order ID ${formattedId}`}
+              type="button"
+              onClick={() => void handleCopyId()}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim border border-edge bg-board-plate px-2.5 font-mono text-label text-ink transition-colors hover:border-board-field"
+              aria-label={copied ? "Order number copied" : `Copy order number ${formattedId}`}
             >
-              #{formattedId}
-              {copied ? (
-                <Check size={12} className="text-emerald-600" />
-              ) : (
-                <Copy size={12} className="text-slate-400" />
-              )}
+              <span data-figure>{formattedId}</span>
+              {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
           </div>
 
+          {copyFailed ? (
+            <p role="alert" className="text-label text-status-act-ink">
+              The clipboard is not available here. The number is {formattedId}.
+            </p>
+          ) : null}
+
           {!isNotFound && (
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Assigned Dispatcher:
-              </span>
-              <div className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 text-xs font-extrabold px-2.5 py-1 rounded-lg">
-                <ShieldAlert size={12} />
-                <span>{claimantName}</span>
-              </div>
+            <div className="flex items-center justify-between gap-2 border-t border-hairline pt-2">
+              <span className="text-micro uppercase text-ink-muted">Assigned to</span>
+              <span className="truncate text-label text-ink">{claimantName}</span>
             </div>
           )}
 
-          <div className="pt-2 border-t border-slate-200/60">
-            <p className="text-[11px] text-slate-500 leading-normal flex items-start gap-1.5">
-              <Info size={13} className="text-amber-500 shrink-0 mt-0.5" />
-              <span>
-                {isNotFound
-                  ? "Check the link from the customer chat, or return to the queue to pick an active order."
-                  : "This keeps two dispatchers from editing the same order at once."}
-              </span>
-            </p>
-          </div>
-        </div>
+          <p className="flex items-start gap-1.5 border-t border-hairline pt-2 text-body text-ink-muted">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <span>
+              {isNotFound
+                ? "Check the link from the customer chat, or go back to the queue and pick an active order."
+                : "This keeps two dispatchers from editing the same order at once."}
+            </span>
+          </p>
+        </DispatcherCard.Region>
 
-        {/* ACTION BUTTONS */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-          <button
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <DispatcherButton
+            type="button"
+            variant="primary"
+            size="md"
+            className="w-full justify-center sm:flex-1"
+            icon={<ArrowLeft size={15} />}
             onClick={onReturnToQueue}
-            className="w-full sm:flex-1 bg-dispatcher-navy hover:bg-dispatcher-navy-dark text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-xs transition"
           >
-            <ArrowLeft size={15} /> Return to Queue
-          </button>
+            Back to the queue
+          </DispatcherButton>
 
           {onViewMyErrands && (
-            <button
+            <DispatcherButton
+              type="button"
+              variant="secondary"
+              size="md"
+              className="w-full justify-center sm:flex-1"
               onClick={onViewMyErrands}
-              className="w-full sm:flex-1 bg-white hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs border border-slate-300 flex items-center justify-center gap-2 shadow-2xs transition"
             >
-              <Layers size={15} /> My Active Errands
-            </button>
+              My active errands
+            </DispatcherButton>
           )}
         </div>
       </div>

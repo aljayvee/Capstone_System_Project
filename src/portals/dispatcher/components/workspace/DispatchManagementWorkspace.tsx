@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Errand, ErrandStatus } from "../../../../types/errand";
+import { cn } from "@/lib/utils";
+import { Errand } from "../../../../types/errand";
 import { apiClient } from "../../../../services/apiClient";
 import { postUnderReview } from "../../../../services/chatSystemMessages";
 import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
@@ -12,8 +13,17 @@ interface DispatchManagementWorkspaceProps {
   currentUser: any;
   onClaimOrder: (orderId: string, user: any) => Promise<void> | void;
   onOpenChat: (orderId: string) => void;
-  onUpdateStatus: (errandId: string, newStatus: ErrandStatus) => Promise<void> | void;
   onDeclineOrder?: (orderId: string, reason?: string) => Promise<void> | void;
+  /** Additive, all optional, so the existing call site keeps working. */
+  isLoading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
+  /**
+   * Reports which run is selected so the destination band can re-sign to it.
+   * The contract's signature interaction: picking a run repaints the board's
+   * own header, which is what makes the band a board rather than a title.
+   */
+  onSignedRunChange?: (errand: Errand | null) => void;
 }
 
 interface MerchantCategoryItem {
@@ -28,10 +38,18 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   currentUser,
   onClaimOrder,
   onOpenChat,
-  onUpdateStatus,
   onDeclineOrder,
+  isLoading = false,
+  loadError = null,
+  onRetry,
+  onSignedRunChange,
 }) => {
   const { riders } = useRiderFleetPresence();
+  // Below the side-by-side breakpoint the board and the run share the screen
+  // one at a time. Stacking them was the old behaviour and it did not work:
+  // the columns carried `min-h-[580px]` and `min-h-[400px]`, so a tablet got
+  // a page taller than itself with the run pushed below the fold.
+  const [narrowPane, setNarrowPane] = useState<"board" | "run">("board");
   const [selectedErrandId, setSelectedErrandId] = useState<string | null>(null);
   const [activeSegment, setActiveSegment] = useState<"INCOMING" | "ACTIVE">("INCOMING");
   const [searchQuery, setSearchQuery] = useState("");
@@ -144,6 +162,12 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
     [errands, selectedErrandId]
   );
 
+  // Reported up rather than lifted: the workspace stays the owner of its own
+  // selection, and the band becomes a reader of it.
+  useEffect(() => {
+    onSignedRunChange?.(selectedErrand);
+  }, [selectedErrand, onSignedRunChange]);
+
   // Claim & review flow
   const handleClaimAndReview = async (errand: Errand) => {
     const id = String(errand.id);
@@ -170,52 +194,106 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
     }
   };
 
+  const board = (
+    <DispatchMasterStream
+      errands={currentDisplayedList}
+      selectedErrandId={selectedErrandId}
+      onSelectErrand={(e) => {
+        setSelectedErrandId(e.id);
+        // Picking a run re-signs the board. On a narrow screen that means
+        // handing the screen to the run itself.
+        setNarrowPane("run");
+      }}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      selectedCategory={selectedCategory}
+      onCategoryChange={setSelectedCategory}
+      categories={activeCategoryNames}
+      activeSegment={activeSegment}
+      onSegmentChange={setActiveSegment}
+      incomingCount={availableErrands.length}
+      activeCount={activeErrands.length}
+      isLoading={isLoading}
+      loadError={loadError}
+      onRetry={onRetry}
+    />
+  );
+
+  const run = (
+    <DispatchDetailInspector
+      errand={selectedErrand}
+      onClaimAndReview={handleClaimAndReview}
+      onDecline={onDeclineOrder}
+      onOpenChat={onOpenChat}
+      isClaiming={openingId !== null}
+      claimError={claimError}
+      onDismissClaimError={() => setClaimError(null)}
+      isLoading={isLoading}
+      loadError={loadError}
+      onBackToBoard={() => setNarrowPane("board")}
+    />
+  );
+
   return (
-    <div className="space-y-4 sm:space-y-5">
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP KPI TELEMETRY CARDS (Frosted Glass Apple Design)       */}
-      {/* ───────────────────────────────────────────────────────────── */}
+    // Height comes from the flex chain rather than from viewport arithmetic.
+    // This was `h-[calc(100vh-250px)] min-h-[580px]`, a guess about the height
+    // of a header this component cannot see, with a floor that guaranteed
+    // overflow on a 1280x720 laptop and on every tablet.
+    <div className="flex h-full min-h-0 w-full flex-col gap-3">
       <DispatchKpiCards
-        errands={errands}
+        awaitingCount={availableErrands.length}
+        activeCount={activeErrands.length}
         totalRiders={riders.length}
         onlineRiders={riders.filter((r) => r.online).length}
+        isLoading={isLoading}
+        isStale={Boolean(loadError)}
       />
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. MAIN MASTER-DETAIL WORKSPACE (38% / 62% Split)             */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 h-[calc(100vh-250px)] min-h-[580px]">
-        {/* Master Stream (Left Column - 38% / 5 cols) */}
-        <div className="lg:col-span-5 h-full min-h-[300px]">
-          <DispatchMasterStream
-            errands={currentDisplayedList}
-            selectedErrandId={selectedErrandId}
-            onSelectErrand={(e) => setSelectedErrandId(e.id)}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            selectedCategory={selectedCategory}
-            onCategoryChange={setSelectedCategory}
-            categories={activeCategoryNames}
-            activeSegment={activeSegment}
-            onSegmentChange={setActiveSegment}
-            incomingCount={availableErrands.length}
-            activeCount={activeErrands.length}
-          />
-        </div>
+      {/* Narrow: one pane at a time, switched here. */}
+      <div className="flex shrink-0 items-center gap-1 rounded-plate bg-board-plate p-1 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setNarrowPane("board")}
+          aria-pressed={narrowPane === "board"}
+          className={cn(
+            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
+            narrowPane === "board"
+              ? "bg-board-field text-board-plate"
+              : "text-ink-muted hover:text-ink"
+          )}
+        >
+          The board
+        </button>
+        <button
+          type="button"
+          onClick={() => setNarrowPane("run")}
+          aria-pressed={narrowPane === "run"}
+          disabled={!selectedErrand}
+          className={cn(
+            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors disabled:cursor-not-allowed disabled:text-board-trim",
+            narrowPane === "run"
+              ? "bg-board-field text-board-plate"
+              : "text-ink-muted hover:text-ink"
+          )}
+        >
+          The run
+        </button>
+      </div>
 
-        {/* Detail Inspector (Right Column - 62% / 7 cols) */}
-        <div className="lg:col-span-7 h-full min-h-[400px]">
-          <DispatchDetailInspector
-            errand={selectedErrand}
-            currentUser={currentUser}
-            onClaimAndReview={handleClaimAndReview}
-            onDecline={onDeclineOrder}
-            onOpenChat={onOpenChat}
-            onUpdateStatus={onUpdateStatus}
-            isClaiming={openingId !== null}
-            claimError={claimError}
-            onDismissClaimError={() => setClaimError(null)}
-          />
+      {/* The documented ratio, expressed as the documented ratio. This was
+          `lg:grid-cols-12` with a 5/7 split, which is 41.7/58.3, not the
+          38/62 AGENTS.md 8.30 specifies. */}
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[38fr_62fr]">
+        {/* min-w-0 on both, not just min-h-0. A grid item defaults to
+            min-width:auto, so a pane whose content is wider than its track
+            refuses to shrink and pushes the whole page into horizontal
+            scroll. That is what happened at tablet width: the run pane's
+            contact row held the grid open and clipped the board strip. */}
+        <div className={cn("min-h-0 min-w-0", narrowPane === "board" ? "block" : "hidden lg:block")}>
+          {board}
+        </div>
+        <div className={cn("min-h-0 min-w-0", narrowPane === "run" ? "block" : "hidden lg:block")}>
+          {run}
         </div>
       </div>
     </div>

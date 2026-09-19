@@ -1,5 +1,5 @@
-import * as React from "react";
 import { Hourglass } from "lucide-react";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
 
 /**
  * What we're waiting for, how long it's been, and what to do meanwhile.
@@ -7,6 +7,11 @@ import { Hourglass } from "lucide-react";
  * Replaces the grey "Pending" pill, which told a dispatcher nothing: not what
  * had been sent, not how long ago, and not what they could usefully do instead
  * of watching it.
+ *
+ * On the route board it wears the console's one waiting pair rather than its
+ * own amber, and its actions are real 36px buttons: they were 11px text on a
+ * 24px box, offered to someone who is reading this precisely because they are
+ * looking for something else to do.
  */
 interface WaitingCardProps {
   title: string;
@@ -16,22 +21,17 @@ interface WaitingCardProps {
 
 export function WaitingCard({ title, detail, actions = [] }: WaitingCardProps) {
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex gap-3 items-start">
-      <Hourglass size={16} className="text-amber-700 shrink-0 mt-0.5" />
+    <div className="flex items-start gap-3 rounded-plate bg-status-waiting-fill p-3">
+      <Hourglass size={16} className="mt-0.5 shrink-0 text-status-waiting-ink" />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-extrabold text-amber-900 m-0">{title}</p>
-        <p className="text-[11px] text-amber-900/80 mt-1 mb-0 leading-relaxed">{detail}</p>
+        <p className="m-0 text-label text-status-waiting-ink">{title}</p>
+        <p className="mb-0 mt-1 text-body text-status-waiting-ink/85">{detail}</p>
         {actions.length > 0 && (
-          <div className="flex gap-2 flex-wrap mt-2.5">
+          <div className="mt-2.5 flex flex-wrap gap-2">
             {actions.map((a) => (
-              <button
-                key={a.label}
-                type="button"
-                onClick={a.onClick}
-                className="text-[11px] font-bold px-3 py-1.5 rounded-xl bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 transition active:scale-95 cursor-pointer"
-              >
+              <DispatcherButton key={a.label} type="button" size="sm" variant="secondary" onClick={a.onClick}>
                 {a.label}
-              </button>
+              </DispatcherButton>
             ))}
           </div>
         )}

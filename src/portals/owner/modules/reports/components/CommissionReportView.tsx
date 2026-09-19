@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { TrendingUp, Truck } from "lucide-react";
+import { ReportState } from "./ReportState";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
-import { MetricCard } from "../../dashboard/components/MetricCard";
 import { useReport } from "../../../hooks/useReport";
 import { useReportPdf } from "../../../hooks/useReportPdf";
 import { apiService } from "../../../../../services/apiService";
@@ -18,14 +17,21 @@ export const CommissionReportView: React.FC = () => {
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { data, isLoading, error } = useReport(apiService.getCommissionReport, apiRange);
+  const { data, isLoading, error, reload } = useReport(apiService.getCommissionReport, apiRange);
   const pdf = useReportPdf("commission", apiRange);
 
   const handleExportCSV = () => {
     if (!data) return;
     downloadCSV(
       `Sugo_Commission_Report_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
-      ["Category", "Orders", "Revenue (PHP)", "Delivery Fees (PHP)", "Business Share (PHP)", "Rider Share (PHP)"],
+      [
+        "Category",
+        "Orders",
+        "Revenue (PHP)",
+        "Delivery Fees (PHP)",
+        "Business Share (PHP)",
+        "Rider Share (PHP)",
+      ],
       data.byCategory.map((c) => [
         c.category,
         c.orderCount,
@@ -33,7 +39,7 @@ export const CommissionReportView: React.FC = () => {
         c.deliveryFee,
         c.businessShare,
         c.riderShare,
-      ])
+      ]),
     );
   };
 
@@ -52,68 +58,82 @@ export const CommissionReportView: React.FC = () => {
         exportDisabled={!data}
         isGeneratingPdf={pdf.isGenerating}
       />
-
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      {isLoading && <p className="text-xs text-slate-400">Loading commission report...</p>}
+      <ReportState
+        isLoading={isLoading}
+        error={error}
+        onRetry={reload}
+        title="The commission report did not load"
+        loadingRows={4}
+      />
 
       {data && (
         <>
-          <p className="text-xs text-slate-500 font-semibold">{data.rangeLabel}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <MetricCard
-              title="Estimated Commission"
-              value={formatPeso(data.estimatedCommission)}
-              sub={`${businessPct}% of delivery fees · ${data.orderCount} orders`}
-              icon={TrendingUp}
-              color="#1E3A5F"
-            />
-            <MetricCard
-              title="Total Delivery Fees"
-              value={formatPeso(data.totalDeliveryFees)}
-              sub="Charged to customers"
-              icon={Truck}
-              color="#10B981"
-            />
-          </div>
+          {/* Both figures these two tiles carried are in the table's own bold
+              Total row below, so each printed twice on one screen. The
+              percentage and the order count the tiles explained have moved to
+              the line under the heading, where they read as the denominator
+              of the whole report rather than as a caption on a plate. */}
+          <p className="text-label text-ink-muted">
+            {data.rangeLabel} · commission is {businessPct}% of delivery fees, over{" "}
+            {data.orderCount} {data.orderCount === 1 ? "order" : "orders"}
+          </p>
 
           {data.byCategory.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center text-sm text-slate-400">
+            <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
               No commission activity for this period.
             </div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50 text-slate-500">
+                <table className="w-full text-label">
+                  <thead className="bg-board-ground text-ink-muted">
                     <tr>
-                      <th className="text-left px-5 py-2 font-semibold">Merchant category</th>
-                      <th className="text-right px-5 py-2 font-semibold">Orders</th>
-                      <th className="text-right px-5 py-2 font-semibold">Revenue</th>
-                      <th className="text-right px-5 py-2 font-semibold">Delivery fees</th>
-                      <th className="text-right px-5 py-2 font-semibold">Business share</th>
-                      <th className="text-right px-5 py-2 font-semibold">Rider share</th>
+                      <th scope="col" className="text-left px-5 py-2 font-semibold">
+                        Merchant category
+                      </th>
+                      <th scope="col" className="text-right px-5 py-2 font-semibold">
+                        Orders
+                      </th>
+                      <th scope="col" className="text-right px-5 py-2 font-semibold">
+                        Revenue
+                      </th>
+                      <th scope="col" className="text-right px-5 py-2 font-semibold">
+                        Delivery fees
+                      </th>
+                      <th scope="col" className="text-right px-5 py-2 font-semibold">
+                        Business share
+                      </th>
+                      <th scope="col" className="text-right px-5 py-2 font-semibold">
+                        Rider share
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.byCategory.map((c) => (
-                      <tr key={c.category} className="border-t border-slate-100">
-                        <td className="px-5 py-2.5 font-semibold text-slate-800">{c.category}</td>
-                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">{c.orderCount}</td>
-                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(c.revenue)}</td>
+                      <tr key={c.category} className="border-t border-hairline">
+                        <td className="px-5 py-2.5 font-semibold text-ink">{c.category}</td>
+                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                          {c.orderCount}
+                        </td>
+                        <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                          {formatPeso(c.revenue)}
+                        </td>
                         <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                           {formatPeso(c.deliveryFee)}
                         </td>
-                        <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold text-[#1E3A5F]">
+                        <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold text-board-field">
                           {formatPeso(c.businessShare)}
                         </td>
-                        <td className="px-5 py-2.5 text-right font-mono tabular-nums text-emerald-700">
+                        <td className="px-5 py-2.5 text-right font-mono tabular-nums text-status-done-ink">
                           {formatPeso(c.riderShare)}
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-slate-200 font-bold text-slate-900">
+                    <tr className="border-t-2 border-edge font-bold text-ink">
                       <td className="px-5 py-2.5">Total</td>
-                      <td className="px-5 py-2.5 text-right font-mono tabular-nums">{data.orderCount}</td>
+                      <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                        {data.orderCount}
+                      </td>
                       <td />
                       <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                         {formatPeso(data.totalDeliveryFees)}
@@ -143,23 +163,29 @@ export const CommissionReportView: React.FC = () => {
         generateError={pdf.error}
       >
         {data && (
-          <table className="w-full text-xs">
+          <table className="w-full text-label">
             <thead>
-              <tr className="text-left text-slate-500 border-b border-slate-100">
-                <th className="py-2">Merchant category</th>
-                <th className="py-2 text-right">Orders</th>
-                <th className="py-2 text-right">Business share</th>
+              <tr className="text-left text-ink-muted border-b border-hairline">
+                <th scope="col" className="py-2">
+                  Merchant category
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Orders
+                </th>
+                <th scope="col" className="py-2 text-right">
+                  Business share
+                </th>
               </tr>
             </thead>
             <tbody>
               {data.byCategory.map((c) => (
-                <tr key={c.category} className="border-b border-slate-50">
+                <tr key={c.category} className="border-b border-hairline">
                   <td className="py-2">{c.category}</td>
                   <td className="py-2 text-right">{c.orderCount}</td>
                   <td className="py-2 text-right">{formatPeso(c.businessShare)}</td>
                 </tr>
               ))}
-              <tr className="font-bold text-slate-800">
+              <tr className="font-bold text-ink">
                 <td className="py-2">Total</td>
                 <td className="py-2 text-right">{data.orderCount}</td>
                 <td className="py-2 text-right">{formatPeso(data.estimatedCommission)}</td>

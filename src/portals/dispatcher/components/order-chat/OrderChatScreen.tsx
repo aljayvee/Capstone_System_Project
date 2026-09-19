@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ArrowLeft, MoreHorizontal, MessageSquare, ListChecks, Slash, X } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, MessageSquare, ListChecks, Wallet, Slash, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "../../../../services/apiClient";
 import { formatErrandId } from "../../../../utils/formatErrandId";
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { UnauthorizedErrandScreen } from "../UnauthorizedErrandScreen";
 import { CustomerLocationModal } from "../CustomerLocationModal";
-import { DispatcherBadge } from "../ui/DispatcherBadge";
+import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
 
 import { NowBar } from "./NowBar";
 import { StageList, readStoredShowAll, storeShowAll } from "./StageList";
@@ -25,6 +26,7 @@ import { Stage2PinStores } from "./stages/Stage2PinStores";
 import { Stage3ConfirmItems } from "./stages/Stage3ConfirmItems";
 import { Stage4Payment } from "./stages/Stage4Payment";
 import { Stage5SendRider } from "./stages/Stage5SendRider";
+import { PaymentProofPanel } from "./PaymentProofPanel";
 
 import { useOrderDetails } from "./hooks/useOrderDetails";
 import { useOrderChat } from "./hooks/useOrderChat";
@@ -73,7 +75,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     refresh,
   } = useOrderDetails(orderId, dispatcher);
 
-  const [mobilePane, setMobilePane] = useState<"chat" | "steps">("steps");
+  const [mobilePane, setMobilePane] = useState<"chat" | "steps" | "payment">("steps");
   const [openStageId, setOpenStageId] = useState<StageId | null>(null);
   const [showAll, setShowAll] = useState(readStoredShowAll);
   const [flashId, setFlashId] = useState<StageId | null>(null);
@@ -263,14 +265,23 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     [jumpToStage, focusComposer, items, model, dispatchRider]
   );
 
+  const [closeError, setCloseError] = useState<string | null>(null);
+
   const handleCloseWithoutOrder = useCallback(async () => {
+    setCloseError(null);
     try {
       await apiClient.patch(`/errands/${orderId}/status`, { status: "PASSING BY" });
       onRefreshOrders?.();
+      onClose();
     } catch (e) {
+      // onClose() used to run whether or not the PATCH succeeded, so a failed
+      // write returned the dispatcher to the queue believing this errand had
+      // been closed as a passing-by visit when the server still had it open.
       console.error("Failed to close errand as passing by:", e);
+      setCloseError(
+        "This run could not be closed as a passing-by visit. It is still open, so nothing has been lost, and it is safe to try again."
+      );
     }
-    onClose();
   }, [orderId, onRefreshOrders, onClose]);
 
   const riderName = useMemo(() => {
@@ -290,7 +301,12 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
         claimantName={panelError.claimantName}
         reason={panelError.reason}
         onReturnToQueue={onClose}
-        onViewMyErrands={onClose}
+        // Deliberately not passing onViewMyErrands. It was wired to `onClose`,
+        // the same handler as onReturnToQueue, so the screen showed two
+        // differently-styled buttons labelled "Return to Queue" and "My Active
+        // Errands" that did the identical thing. One button that tells the
+        // truth beats two that do not; wire this to a real tab change if the
+        // second destination is wanted.
       />
     );
   }
@@ -383,33 +399,37 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 w-screen h-screen flex flex-col bg-slate-100 overflow-hidden">
+    <div
+      data-surface="dispatch"
+      className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-board-ground"
+    >
       {/* ── header ───────────────────────────────────────────────────────── */}
-      <header className="shrink-0 bg-dispatcher-navy-dark text-white px-3 sm:px-4 py-2.5 flex items-center gap-2.5">
+      <header
+        data-on-field
+        className="flex shrink-0 items-center gap-2.5 bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
+      >
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition active:scale-95 cursor-pointer"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-trim px-2.5 text-micro uppercase text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
         >
           <ArrowLeft size={14} />
           <span className="hidden sm:inline">{copy.backToQueue}</span>
         </button>
 
         <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-          <span className="font-extrabold text-[13px] tracking-tight truncate">{customerName}</span>
-          <span className="hidden sm:inline font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-blue-200">
-            #{formatErrandId(orderId)}
+          <span className="truncate text-label text-board-plate">{customerName}</span>
+          {/* The route number was blue-200, the only blue on the surface and a
+              direct breach of the locked palette. It is a figure, so it now
+              reads as one. */}
+          <span data-figure className="hidden font-mono text-micro text-board-trim sm:inline">
+            {formatErrandId(orderId)}
           </span>
-          <span
-            className={cn(
-              "text-[10px] font-extrabold px-2 py-0.5 rounded-full border",
-              isReadOnly
-                ? "bg-slate-500/20 border-slate-400/30 text-slate-200"
-                : "bg-emerald-500/20 border-emerald-400/30 text-emerald-300"
-            )}
-          >
-            {orderDetails?.status || "Loading"}
-          </span>
+          {orderDetails?.status ? (
+            <StatusChip status={orderDetails.status} className="shrink-0" />
+          ) : (
+            <span className="text-micro uppercase text-board-trim">Loading</span>
+          )}
         </div>
 
         {!isReadOnly && (
@@ -419,14 +439,14 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               onClick={() => setShowMenu((v) => !v)}
               aria-label={copy.moreActions}
               aria-expanded={showMenu}
-              className="w-8 h-8 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 transition cursor-pointer"
+              className="grid size-9 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
             >
               <MoreHorizontal size={16} />
             </button>
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-10 z-20 w-56 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+                <div className="absolute right-0 top-11 z-20 w-56 overflow-hidden rounded-plate border border-edge bg-board-plate shadow-plate">
                   {/* Destructive and rare — deliberately not beside "Back to
                       queue", which it was previously confusable with. */}
                   <button
@@ -435,9 +455,9 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
                       setShowMenu(false);
                       setShowPassByConfirm(true);
                     }}
-                    className="w-full text-left px-3.5 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 transition flex items-center gap-2 cursor-pointer"
+                    className="flex min-h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-label text-status-act-ink transition-colors hover:bg-status-act-fill"
                   >
-                    <Slash size={13} />
+                    <Slash size={14} />
                     {copy.closeWithoutOrder}
                   </button>
                 </div>
@@ -455,25 +475,27 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
       />
 
       {/* ── surface switcher, below 1024px only ───────────────────────────── */}
-      <div className="shrink-0 lg:hidden flex gap-1.5 px-3 py-2 bg-white border-b border-slate-200">
+      <div className="flex shrink-0 gap-1.5 border-b border-hairline bg-board-plate px-3 py-2 lg:hidden">
         <button
           type="button"
           onClick={() => setMobilePane("chat")}
           aria-pressed={mobilePane === "chat"}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition cursor-pointer",
+            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
             mobilePane === "chat"
-              ? "bg-dispatcher-navy text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              ? "bg-board-field text-board-plate"
+              : "bg-board-ground text-ink-muted hover:text-ink"
           )}
         >
-          <MessageSquare size={13} />
+          <MessageSquare size={14} />
           {copy.chatTab}
           {unreadCount > 0 && (
             <span
               className={cn(
-                "text-[9px] font-extrabold px-1.5 py-0.5 rounded-full",
-                mobilePane === "chat" ? "bg-white/25" : "bg-rose-600 text-white"
+                "rounded-full px-1.5 text-micro tabular-nums",
+                mobilePane === "chat"
+                  ? "bg-board-plate/20 text-board-plate"
+                  : "bg-signal text-white"
               )}
             >
               {unreadCount}
@@ -485,25 +507,41 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
           onClick={() => setMobilePane("steps")}
           aria-pressed={mobilePane === "steps"}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition cursor-pointer",
+            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
             mobilePane === "steps"
-              ? "bg-dispatcher-navy text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              ? "bg-board-field text-board-plate"
+              : "bg-board-ground text-ink-muted hover:text-ink"
           )}
         >
-          <ListChecks size={13} />
+          <ListChecks size={14} />
           {copy.stepsTab}
-          <span className="text-[10px] font-bold opacity-70 tabular-nums">
+          <span data-figure className="tabular-nums opacity-75">
             {model.doneCount}/5
           </span>
         </button>
+        {payments.ledger?.hasLedger && (
+          <button
+            type="button"
+            onClick={() => setMobilePane("payment")}
+            aria-pressed={mobilePane === "payment"}
+            className={cn(
+              "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
+              mobilePane === "payment"
+                ? "bg-board-field text-board-plate"
+                : "bg-board-ground text-ink-muted hover:text-ink"
+            )}
+          >
+            <Wallet size={14} />
+            {copy.paymentTab}
+          </button>
+        )}
       </div>
 
       {/* ── workspace ─────────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 flex">
         <section
           className={cn(
-            "min-h-0 flex-col bg-white lg:w-[38%] lg:border-r lg:border-slate-200 lg:flex",
+            "min-h-0 flex-col bg-board-plate lg:flex lg:w-[30%] lg:border-r lg:border-edge",
             mobilePane === "chat" ? "flex w-full" : "hidden"
           )}
         >
@@ -530,7 +568,8 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
 
         <section
           className={cn(
-            "min-h-0 overflow-y-auto bg-slate-50 lg:w-[62%] lg:block",
+            "min-h-0 overflow-y-auto bg-board-ground lg:block",
+            payments.ledger?.hasLedger ? "lg:w-[45%]" : "lg:w-[70%]",
             mobilePane === "steps" ? "block w-full" : "hidden"
           )}
         >
@@ -551,35 +590,68 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             />
           </div>
         </section>
+
+        {/* ── half-payment, standalone and persistent — not one of the five
+            sequential stages, so a dispatcher can check the receipt or
+            confirm the balance no matter which stage is open. Only takes up
+            room on a ledger errand; COD gets its 70/30 split back. ────────── */}
+        {payments.ledger?.hasLedger && (
+          <section
+            className={cn(
+              "min-h-0 overflow-y-auto bg-board-plate lg:flex lg:w-[25%] lg:border-l lg:border-edge",
+              mobilePane === "payment" ? "flex w-full" : "hidden"
+            )}
+          >
+            <div className="w-full p-3 sm:p-4">
+              <PaymentProofPanel errandId={orderId} payments={payments} readOnly={isReadOnly} />
+            </div>
+          </section>
+        )}
       </div>
 
       {/* ── close without an order ────────────────────────────────────────── */}
       <Dialog open={showPassByConfirm} onOpenChange={setShowPassByConfirm}>
-        <DialogContent>
+        <DialogContent data-surface="dispatch" className="rounded-modal border-edge shadow-plate">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Slash className="text-amber-600" size={20} /> {copy.passBy.title}
+              <Slash className="text-status-waiting-ink" size={18} /> {copy.passBy.title}
             </DialogTitle>
-            <DialogClose className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
+            <DialogClose
+              aria-label="Close this dialog"
+              className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-board-ground hover:text-ink"
+            >
               <X size={18} />
             </DialogClose>
           </DialogHeader>
           <DialogDescription>{copy.passBy.body}</DialogDescription>
+          {closeError ? (
+            <p role="alert" className="rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink">
+              {closeError}
+            </p>
+          ) : null}
           <DialogFooter className="flex-row gap-3">
-            <button
+            <DispatcherButton
               type="button"
-              onClick={() => setShowPassByConfirm(false)}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition cursor-pointer"
+              variant="secondary"
+              size="md"
+              className="flex-1"
+              onClick={() => {
+                setCloseError(null);
+                setShowPassByConfirm(false);
+              }}
             >
               {copy.passBy.cancel}
-            </button>
+            </DispatcherButton>
             <button
               type="button"
+              // The dialog stays open until the write succeeds. It used to
+              // dismiss itself first and fire the request afterwards, so there
+              // was nowhere left to report a failure and the screen closed
+              // regardless.
               onClick={() => {
-                setShowPassByConfirm(false);
-                handleCloseWithoutOrder();
+                void handleCloseWithoutOrder();
               }}
-              className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
+              className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-plate bg-signal px-4 text-label text-white transition-colors hover:bg-signal-deep"
             >
               <Slash size={16} /> {copy.passBy.confirm}
             </button>

@@ -1,0 +1,200 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   BROWSER SURFACES, shared by every portal that opts in.
+
+   These are the parts nobody draws: the caret, the selection, the scrollbar,
+   the focus ring, the numerals, the icon stroke, the motion curve. They ship
+   with browser defaults belonging to no design system.
+
+   Everything here is keyed on [data-surface] with no value, so one rule set
+   serves both consoles. Every colour below is a token, and each portal
+   redefines those tokens on its own root: the dispatcher's live in the
+   @theme block in tailwind.css, the owner's in owner.css. Token utilities
+   compile to var() references, so a scoped redefinition re-skins these rules
+   without touching a single component.
+
+   This file was dispatch.css, scoped to [data-surface="dispatch"]. Two things
+   were wrong with that. Nothing in it was actually dispatcher-specific once
+   the colours became tokens. And the dispatcher's own root carried only
+   data-portal, never data-surface, so six of these seven rule groups reached
+   the portalled overlays and never the console body: the focus ring that was
+   supposed to replace per-component focus styles in dozens of files was only
+   ever firing inside modals. Broadening the selector and adding the missing
+   attribute fixes both at once.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* The ground and the ink go in @layer base ON PURPOSE, and the caret stays
+   out of it.
+
+   Everything else in this file is deliberately unlayered so it outranks
+   Tailwind's utilities. That is what makes one focus ring beat per-component
+   focus styles scattered across dozens of files. But unlayered CSS beats
+   LAYERED CSS at equal specificity regardless of source order, and Tailwind
+   utilities all live in @layer utilities. So background-color here would
+   silently outrank every bg-* class on any element carrying data-surface.
+
+   That is not theoretical: the order-chat dialogs and the location modal each
+   set bg-board-plate and each rendered on the bone ground instead, because
+   they carry data-surface themselves (they portal to document.body, outside
+   the console element, so they have to). The class was present in the DOM and
+   simply lost the cascade.
+
+   In base, utilities win. A surface with no background of its own still gets
+   the ground, and one that states a background gets the one it asked for. */
+@layer base {
+  [data-surface] {
+    background-color: var(--color-board-ground);
+    color: var(--color-ink);
+  }
+}
+
+[data-surface] {
+  caret-color: var(--color-signal);
+}
+
+/* Selection carries the signal at low strength, so selected text stays
+   readable rather than inverting into it. Deliberately identical on both
+   grounds: a selection that changed hue between portals would read as two
+   different applications. */
+[data-surface] ::selection {
+  background-color: #F7D3D1;
+  color: var(--color-ink);
+}
+
+/* On a navy field the same relationship runs the other way. */
+[data-surface] [data-on-field] ::selection {
+  background-color: rgb(255 255 255 / 0.22);
+  color: #FFFFFF;
+}
+
+/* One focus ring per surface, offset so it reads on the ground, on white
+   plates, and on painted status fills alike. Keyboard only: :focus-visible
+   never fires for a mouse press, so this costs pointer users nothing.
+
+   The outline colour is the portal's own field, so each skin gets a ring in
+   its own navy without needing a second rule. */
+[data-surface] :focus-visible {
+  /* Longhands, not the `outline` shorthand.
+     Measured in Chrome: `outline: 2px solid var(--color-board-field)` applied
+     its width, its style and the border-radius beside it, while the colour
+     came out as currentColor, so the ring took each control's own text colour
+     instead of the field. That made the ring's contrast depend on whatever the
+     element happened to be painted in. Declaring outline-color on its own is
+     substituted correctly, and the literal fallback means a missing token
+     degrades to the navy rather than to currentColor. */
+  outline-width: 2px;
+  outline-style: solid;
+  outline-color: var(--color-board-field, #1E3A5F);
+  outline-offset: 2px;
+  border-radius: var(--radius-trim);
+}
+
+/* Inside a navy field the ring inverts to the ground, since navy on navy is
+   not a focus ring. */
+[data-surface] [data-on-field] :focus-visible {
+  outline-color: var(--color-board-ground, #F2EEE4);
+}
+
+/* src/styles/index.css hides every scrollbar app-wide (scrollbar-width: none,
+   and a 1px transparent track). On a queue console or a report table the
+   scrollbar is the only answer to "how much more is there", so it comes back
+   here, themed as chrome trim. The [data-surface] prefix outranks the global
+   * selector. */
+[data-surface] *,
+[data-surface] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-board-trim) transparent;
+}
+
+[data-surface] *::-webkit-scrollbar,
+[data-surface]::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+[data-surface] *::-webkit-scrollbar-thumb,
+[data-surface]::-webkit-scrollbar-thumb {
+  background-color: var(--color-board-trim);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+[data-surface] *::-webkit-scrollbar-thumb:hover,
+[data-surface]::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-muted);
+}
+
+/* Figures: money, quantities, timers, route numbers, counts.
+
+   src/styles/fonts.css enforces tabular numerals by setting
+   font-feature-settings: 'tnum' 1, which REPLACES the body's
+   'cv02','cv03','cv04','cv11' character variants rather than adding to them,
+   so Geist's letterforms silently differ inside tables and .font-mono. Here
+   both are declared together, so a figure keeps the same alphabet as the
+   sentence beside it. */
+[data-surface] [data-figure] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" 1;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   ICON STROKE.
+
+   lucide-react writes stroke-width as a presentation ATTRIBUTE (its default
+   is 2), and any CSS declaration outranks a presentation attribute. So every
+   icon on the surface is set from this one rule without editing a single call
+   site.
+
+   2px at size 14 is a seventh of the glyph's height. It fills the counters,
+   closes the apertures, and is the main reason small icons read as clip art
+   sitting beside Geist at 600. 1.5 holds the aperture open across every size
+   these consoles actually use, from the 10px evidence marks to the 28px
+   empty-state figures.
+
+   :not([data-stroke]) is the escape hatch, and the only sanctioned one: an
+   icon that genuinely needs a different weight declares data-stroke and
+   carries its own strokeWidth. A 10px check glyph is the real case.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-surface] svg.lucide:not([data-stroke]),
+[data-portal] svg.lucide:not([data-stroke]) {
+  stroke-width: 1.5;
+}
+
+/* One curve for every transition on the surface. The utilities name the
+   properties; none of them named a timing function, so each state change
+   inherited the default and moved slightly differently from its neighbour.
+   This only applies where a transition already exists, so it adds no motion
+   anywhere and costs nothing under prefers-reduced-motion. */
+[data-surface] * {
+  transition-timing-function: var(--ease-board);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SHARED CHROME ON A FIELD.
+
+   HeaderClock and NotificationBell render in BOTH portals, so they are styled
+   for a light header and cannot be repainted at source without changing the
+   other one. Where they sit on a navy field, a slate-50 pill and a white
+   bordered dome read as two foreign objects dropped onto painted steel.
+
+   These rules invert them in place, scoped to a surface and further to the
+   field itself, so a clock in a light header is untouched. Neither component
+   needed a new prop to make it work.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-surface] [data-on-field] [data-clock] {
+  background-color: transparent;
+  border-color: var(--color-field-line);
+  color: var(--color-board-plate);
+}
+
+[data-surface] [data-on-field] [data-bell] {
+  background-color: transparent;
+  border-color: var(--color-field-line);
+  color: var(--color-board-trim);
+}
+
+[data-surface] [data-on-field] [data-bell]:hover {
+  background-color: rgb(255 255 255 / 0.08);
+  color: var(--color-board-plate);
+}

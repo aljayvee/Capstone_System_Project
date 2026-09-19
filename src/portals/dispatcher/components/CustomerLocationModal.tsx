@@ -10,18 +10,44 @@ import {
 import {
   MapPin,
   Phone,
-  User,
   ExternalLink,
   Copy,
   Check,
   Loader2,
   Navigation,
   X,
-  Compass,
-  Layers,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { importGoogleMapsLibrary } from "../../../utils/loadGoogleMaps";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { toast } from "sonner";
+
+/**
+ * Where the order is going, and how to reach the person receiving it.
+ *
+ * Route board build. Four things here were breaches rather than preferences.
+ *
+ * The Google map marker carried `glyphText: "\u{1F3E0}"` — a house emoji as
+ * the pin glyph — over `#059669` on `#065F46`, two greens that appear nowhere
+ * in this product's palette, with a Google-hosted `green-dot.png` as the
+ * fallback icon. The pin is navy now, the glyph is gone, and the fallback
+ * uses Google's own default rather than fetching an image off their CDN.
+ *
+ * `handleCopy` called `navigator.clipboard.writeText(text)` without awaiting
+ * it and fired `toast.success("Copied ...")` on the next line. The clipboard
+ * API rejects on an insecure origin or a denied permission, so the toast
+ * claimed a copy that had not happened — on the panel holding the phone
+ * number a dispatcher is about to dial.
+ *
+ * The body was three levels of surface (a tinted page ground, white cards on
+ * it, rows inside those) with three tinted icon chips and two near-identical
+ * metadata cards in a two-column grid. It is one plate with regions and
+ * label rules now.
+ *
+ * The floating map pill wore `backdrop-blur-xs`, `shadow-md` and
+ * `animate-pulse` on a dot that indicates nothing live.
+ */
 
 interface CustomerLocationModalProps {
   isOpen: boolean;
@@ -60,12 +86,18 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
   const activeLat = hasValidCoords ? parsedLat : 6.68136;
   const activeLng = hasValidCoords ? parsedLng : 124.66345;
 
-  const handleCopy = (text: string, fieldName: string) => {
+  const handleCopy = async (text: string, fieldName: string) => {
     if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldName);
-    toast.success(`Copied ${fieldName} to clipboard`);
-    setTimeout(() => setCopiedField(null), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      toast.success(`Copied the ${fieldName}`);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch {
+      // Said out loud rather than swallowed: the reader is about to act on
+      // something they believe is on their clipboard.
+      toast.error(`Could not copy the ${fieldName}. Select it and copy by hand.`);
+    }
   };
 
   const initGoogleMap = useCallback(async () => {
@@ -100,14 +132,16 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
       mapInstanceRef.current = map;
 
       let marker: any;
-      const titleStr = `Customer Drop-off: ${deliveryAddress}`;
+      const titleStr = `Customer drop-off: ${deliveryAddress}`;
 
       if (markerLib?.AdvancedMarkerElement && g.maps.marker?.PinElement) {
+        // Navy on deep navy, no glyph. The emoji it used to carry was the one
+        // pictograph left anywhere in this console, and it sat on two greens
+        // that are not in the palette.
         const pinElement = new g.maps.marker.PinElement({
-          glyphText: "🏠",
           glyphColor: "#FFFFFF",
-          background: "#059669",
-          borderColor: "#065F46",
+          background: "#0F2035",
+          borderColor: "#0B132B",
         });
 
         marker = new markerLib.AdvancedMarkerElement({
@@ -117,13 +151,12 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
           content: pinElement,
         });
       } else {
+        // No `icon`: the classic marker falls back to Google's own, rather
+        // than pulling a green-dot PNG off maps.google.com on every open.
         marker = new g.maps.Marker({
           position: pos,
           map,
           title: titleStr,
-          icon: {
-            url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-          },
         });
       }
 
@@ -162,220 +195,181 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${activeLat}%2C${activeLng}`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${activeLat},${activeLng}`;
 
+  const providerTab = (id: "osm" | "google", label: string) => (
+    <button
+      type="button"
+      onClick={() => setMapProvider(id)}
+      aria-pressed={mapProvider === id}
+      className={cn(
+        "min-h-9 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
+        mapProvider === id
+          ? "bg-board-field text-board-plate"
+          : "text-ink-muted hover:text-ink"
+      )}
+    >
+      {label}
+    </button>
+  );
+
+  const copyButton = (text: string, field: string, label: string) => (
+    <button
+      type="button"
+      onClick={() => void handleCopy(text, field)}
+      aria-label={copiedField === field ? `${label} copied` : `Copy the ${field}`}
+      className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-board-plate hover:text-ink"
+    >
+      {copiedField === field ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl w-full p-0 overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-xl">
-        <DialogHeader className="px-5 pt-4 pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
-              <MapPin size={18} />
-            </span>
-            <div>
-              <DialogTitle className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <span>Customer Delivery Location</span>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  Drop-off Pin
-                </span>
-              </DialogTitle>
-              <DialogDescription className="text-xs text-slate-500 mt-0.5">
-                Exact destination coordinates and address provided by {customerName}.
-              </DialogDescription>
-            </div>
+      <DialogContent
+        data-surface="dispatch"
+        className="flex max-h-[85dvh] w-full max-w-xl flex-col overflow-hidden rounded-modal border-edge bg-board-plate p-0 shadow-plate"
+      >
+        <DialogHeader
+          data-on-field
+          className="flex shrink-0 flex-row items-start justify-between gap-3 bg-board-field px-4 py-3 shadow-field"
+        >
+          <div className="min-w-0">
+            <DialogTitle className="truncate text-panel text-board-plate">
+              Where this is going
+            </DialogTitle>
+            <DialogDescription className="text-label text-board-trim">
+              The drop-off {customerName} gave for this order.
+            </DialogDescription>
           </div>
-          <DialogClose className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer">
+          <DialogClose
+            aria-label="Close this dialog"
+            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
+          >
             <X size={16} />
           </DialogClose>
         </DialogHeader>
 
-        {/* Map Header Controls / Provider Switcher */}
-        <div className="bg-slate-100/90 px-4 py-1.5 border-b border-slate-200 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 font-bold text-slate-600">
-            <Layers size={13} className="text-slate-500" />
-            <span>Interactive Map View</span>
-          </div>
-
-          <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs text-[11px]">
-            <button
-              type="button"
-              onClick={() => setMapProvider("osm")}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
-                mapProvider === "osm"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              OpenStreetMap
-            </button>
-            <button
-              type="button"
-              onClick={() => setMapProvider("google")}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
-                mapProvider === "google"
-                  ? "bg-emerald-600 text-white shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Google Maps
-            </button>
+        {/* Which map is drawing it */}
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline bg-board-ground px-3 py-1.5">
+          <span className="text-micro uppercase text-ink-muted">Map</span>
+          <div className="flex items-center gap-1">
+            {providerTab("osm", "OpenStreetMap")}
+            {providerTab("google", "Google")}
           </div>
         </div>
 
-        {/* Embedded Interactive Map Container */}
-        <div className="relative w-full h-64 sm:h-72 bg-slate-100 border-b border-slate-200">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="relative h-56 w-full border-b border-hairline bg-board-ground sm:h-64">
           {mapProvider === "osm" ? (
             <iframe
-              title="Customer Delivery Pinpoint Map"
+              title="Customer delivery pinpoint map"
               src={osmEmbedUrl}
-              className="w-full h-full border-0"
+              className="h-full w-full border-0"
               loading="lazy"
             />
           ) : (
-            <div ref={mapContainerRef} className="w-full h-full" />
+            <div ref={mapContainerRef} className="h-full w-full" />
           )}
 
           {!isMapReady && mapProvider === "google" && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-100 text-slate-400 text-xs font-medium">
-              <Loader2 size={18} className="animate-spin mr-2 text-emerald-600" />
-              <span>Loading Google Maps pinpoint...</span>
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-board-ground text-body text-ink-muted">
+              <Loader2 size={18} className="animate-spin" />
+              <span>Loading the map</span>
             </div>
           )}
-
-          {/* Floating Pin Indicator Pill */}
-          <div className="absolute bottom-2.5 left-3 bg-white/95 backdrop-blur-xs border border-slate-200/90 shadow-md px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-[11px] font-bold text-slate-800">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Drop-off Destination Pinned</span>
-          </div>
         </div>
 
-        {/* Location & Recipient Details Box */}
-        <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/50">
-          {/* Address Card */}
-          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+        <div className="space-y-3 p-4">
+          <DispatcherCard.Region padding="sm">
+            <DispatcherCard.Label as="h4">Drop-off address</DispatcherCard.Label>
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-2.5 min-w-0">
-                <MapPin size={15} className="text-emerald-600 shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
-                    Drop-off Address
-                  </p>
-                  <p className="text-xs font-bold text-slate-900 mt-0.5 break-words">
-                    {deliveryAddress}
-                  </p>
-                </div>
+              <div className="flex min-w-0 items-start gap-2">
+                <MapPin size={15} className="mt-0.5 shrink-0 text-ink-muted" />
+                <p className="m-0 min-w-0 break-words text-body text-ink">{deliveryAddress}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleCopy(deliveryAddress, "address")}
-                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition cursor-pointer shrink-0"
-                title="Copy address"
-              >
-                {copiedField === "address" ? (
-                  <Check size={14} className="text-emerald-600" />
-                ) : (
-                  <Copy size={14} />
-                )}
-              </button>
+              {copyButton(deliveryAddress, "address", "Address")}
             </div>
 
-            {/* Coordinates Row */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-1.5 border-t border-slate-100">
-              <span>
-                Coordinates: {activeLat.toFixed(5)}, {activeLng.toFixed(5)}
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-hairline pt-2">
+              <span data-figure className="font-mono text-label tabular-nums text-ink-muted">
+                {activeLat.toFixed(5)}, {activeLng.toFixed(5)}
               </span>
-              <button
-                type="button"
-                onClick={() => handleCopy(`${activeLat}, ${activeLng}`, "coordinates")}
-                className="text-blue-600 hover:text-blue-800 font-sans font-bold flex items-center gap-1 transition cursor-pointer"
-              >
-                {copiedField === "coordinates" ? "Copied!" : "Copy GPS"}
-              </button>
+              {/* Says what it is rather than "Copy GPS" in a blue link. */}
+              {copyButton(`${activeLat}, ${activeLng}`, "coordinates", "Coordinates")}
             </div>
-          </div>
 
-          {/* Customer Metadata Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-2.5">
-              <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                <User size={14} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-extrabold text-slate-400 uppercase">Recipient</p>
-                <p className="font-bold text-slate-800 truncate">{customerName}</p>
+            {!hasValidCoords ? (
+              <p className="mt-2 text-label text-status-waiting-ink">
+                No coordinates were recorded for this order. The map is showing the centre of
+                Tacurong, not the drop-off.
+              </p>
+            ) : null}
+          </DispatcherCard.Region>
+
+          {/* One list, not two matching cards in a two-column grid. */}
+          <DispatcherCard.Region padding="sm">
+            <DispatcherCard.Label as="h4">Recipient</DispatcherCard.Label>
+            <dl className="m-0">
+              <div className="flex items-baseline justify-between gap-2 py-0.5">
+                <dt className="text-body text-ink-muted">Name</dt>
+                <dd className="m-0 min-w-0 truncate text-body text-ink">{customerName}</dd>
               </div>
-            </div>
-
-            {customerPhone ? (
-              <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-                    <Phone size={14} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-extrabold text-slate-400 uppercase">Contact</p>
-                    <p className="font-bold font-mono text-slate-800 truncate">{customerPhone}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(customerPhone, "phone")}
-                  className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition cursor-pointer shrink-0"
-                  title="Copy phone number"
-                >
-                  {copiedField === "phone" ? (
-                    <Check size={14} className="text-emerald-600" />
+              <div className="flex items-center justify-between gap-2 border-t border-hairline pt-1.5">
+                <dt className="flex items-center gap-1.5 text-body text-ink-muted">
+                  <Phone size={14} />
+                  Contact
+                </dt>
+                <dd className="m-0 flex min-w-0 items-center gap-1">
+                  {customerPhone ? (
+                    <>
+                      <span
+                        data-figure
+                        className="truncate font-mono text-label tabular-nums text-ink"
+                      >
+                        {customerPhone}
+                      </span>
+                      {copyButton(customerPhone, "phone number", "Phone number")}
+                    </>
                   ) : (
-                    <Copy size={14} />
+                    <span className="text-body text-ink-muted">No number on file</span>
                   )}
-                </button>
+                </dd>
               </div>
-            ) : (
-              <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
-                  <Compass size={14} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-extrabold text-slate-400 uppercase">Area</p>
-                  <p className="font-bold text-slate-800 truncate">Tacurong Service Zone</p>
-                </div>
-              </div>
-            )}
-          </div>
+            </dl>
+          </DispatcherCard.Region>
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-5 py-3.5 bg-white border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-hairline bg-board-ground px-4 py-3">
           <a
             href={googleMapsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-dispatcher-navy bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition cursor-pointer"
+            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-2 text-label text-ink-muted transition-colors hover:text-ink"
           >
-            <ExternalLink size={13} />
+            <ExternalLink size={14} />
             <span>Open in Google Maps</span>
           </a>
 
           <div className="flex items-center gap-2">
             {onFocusInTools && (
-              <button
+              <DispatcherButton
                 type="button"
+                size="sm"
+                variant="secondary"
+                icon={<Navigation size={14} />}
                 onClick={() => {
                   onClose();
                   onFocusInTools();
                 }}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 rounded-xl transition cursor-pointer shadow-2xs active:scale-95"
               >
-                <Navigation size={13} className="text-emerald-600" />
-                <span>Focus in Tools</span>
-              </button>
+                Focus on the map
+              </DispatcherButton>
             )}
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center justify-center text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 px-4 py-2 rounded-xl transition cursor-pointer shadow-xs active:scale-95"
-            >
+            <DispatcherButton type="button" size="sm" variant="field" onClick={onClose}>
               Done
-            </button>
+            </DispatcherButton>
           </div>
         </div>
       </DialogContent>

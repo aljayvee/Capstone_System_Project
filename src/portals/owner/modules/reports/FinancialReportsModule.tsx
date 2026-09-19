@@ -1,17 +1,18 @@
 import React, { useState } from "react";
-import { BarChart2, Bike, Percent, Wallet, Receipt, FileText, AlertTriangle } from "lucide-react";
+import { BarChart2, Bike, Percent, Wallet, Receipt, AlertTriangle } from "lucide-react";
 import { SalesReportView } from "./components/SalesReportView";
 import { RiderPerformanceReportView } from "./components/RiderPerformanceReportView";
 import { CommissionReportView } from "./components/CommissionReportView";
 import { SettlementReportView } from "./components/SettlementReportView";
 import { TransactionSummaryReportView } from "./components/TransactionSummaryReportView";
 import { ExceptionReportView } from "./components/ExceptionReportView";
-import { NotificationBell } from "../../../../components/NotificationBell";
-import { HeaderClock } from "../../../../components/HeaderClock";
+import { OwnerPanelShell } from "../../components/OwnerPanelShell";
+import { OwnerTabs, type OwnerTab } from "../../components/OwnerTabs";
 
-type ReportTab = "sales" | "rider-performance" | "commission" | "settlement" | "transactions" | "exceptions";
+type ReportTab =
+  "sales" | "rider-performance" | "commission" | "settlement" | "transactions" | "exceptions";
 
-const REPORT_TABS: Array<{ id: ReportTab; label: string; icon: typeof BarChart2 }> = [
+const REPORT_TABS: ReadonlyArray<OwnerTab<ReportTab>> = [
   { id: "sales", label: "Sales Report", icon: BarChart2 },
   { id: "rider-performance", label: "Rider Performance", icon: Bike },
   { id: "commission", label: "Commission", icon: Percent },
@@ -25,54 +26,32 @@ export const FinancialReportsModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ReportTab>("sales");
 
   return (
-    <div className="flex flex-col h-full space-y-3 max-w-7xl mx-auto w-full overflow-hidden">
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP HERO HEADER & TABS (PINNED)                             */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs">
-              <BarChart2 size={18} />
-            </span>
-            <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Reports & Analytics</h2>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <HeaderClock />
-          <NotificationBell />
-        </div>
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. REPORT TYPE TAB SELECTOR (PINNED)                          */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex items-center gap-1.5 flex-wrap bg-slate-100 p-1 rounded-xl">
-        {REPORT_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                isActive
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Icon size={13} className={isActive ? "text-[#1E3A5F]" : "text-slate-400"} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. ACTIVE REPORT VIEW (SCROLLABLE CONTAINER)                  */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4 scrollbar-thin">
+    <OwnerPanelShell
+      title="Reports & Analytics"
+      controls={
+        <OwnerTabs
+          label="Report type"
+          idPrefix="reports"
+          tabs={REPORT_TABS}
+          active={activeTab}
+          // Wrapped rather than passed as the setter directly: a
+          // Dispatch<SetStateAction<T>> accepts an updater function too, and
+          // offering that as an inference site widens OwnerTabs' generic to
+          // plain `string`, which loses the union the tab ids are checked
+          // against.
+          onChange={(id) => setActiveTab(id)}
+        />
+      }
+    >
+      {/* One panel per tab, each labelled by the tab that selects it. The
+          strip above was a plain div of six buttons with no tab semantics at
+          all, so this is the first time the relationship is expressed. */}
+      <div
+        role="tabpanel"
+        id={`reports-panel-${activeTab}`}
+        aria-labelledby={`reports-tab-${activeTab}`}
+        tabIndex={0}
+      >
         {activeTab === "sales" && <SalesReportView />}
         {activeTab === "rider-performance" && <RiderPerformanceReportView />}
         {activeTab === "commission" && <CommissionReportView />}
@@ -80,6 +59,6 @@ export const FinancialReportsModule: React.FC = () => {
         {activeTab === "transactions" && <TransactionSummaryReportView />}
         {activeTab === "exceptions" && <ExceptionReportView />}
       </div>
-    </div>
+    </OwnerPanelShell>
   );
 };

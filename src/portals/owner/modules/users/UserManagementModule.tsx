@@ -21,6 +21,7 @@ import {
   X,
   Copy,
   Check,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddUserModal } from "./components/AddUserModal";
@@ -85,13 +86,13 @@ export const UserManagementModule: React.FC = () => {
             role: u.role.toLowerCase() as UserRole,
             status: u.status || "Active",
             version: u.version,
-          }))
+          })),
         );
       } else {
-        setLoadError("Could not load users from the server.");
+        setLoadError("The user accounts did not load.");
       }
     } catch (err: any) {
-      setLoadError("Failed to fetch users. Please check backend connection.");
+      setLoadError("The user accounts did not load.");
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +145,7 @@ export const UserManagementModule: React.FC = () => {
       password: string;
       adminUsername: string;
       adminPassword: string;
-    }> & { id: number; version: number }
+    }> & { id: number; version: number },
   ) => {
     try {
       const updated = await apiService.updateUser(updatedData.id, updatedData);
@@ -156,7 +157,7 @@ export const UserManagementModule: React.FC = () => {
       return false;
     } catch (err: any) {
       if (err?.isConflict) {
-        toast.error("Someone else just updated this user — refreshing the list.");
+        toast.error("Someone else just updated this user. Refreshing the list.");
         await loadBackendUsers();
       }
       throw err;
@@ -165,8 +166,14 @@ export const UserManagementModule: React.FC = () => {
 
   // Metrics computation for at-a-glance cognitive summary
   const totalUsers = users.length;
+  // One judgement for every count this screen prints. A count is reportable
+  // only when the list behind it actually arrived.
+  const countsUnknown = loadError !== null && users.length === 0;
   const totalAdmins = useMemo(() => users.filter((u) => u.role === "owner").length, [users]);
-  const totalDispatchers = useMemo(() => users.filter((u) => u.role === "dispatcher").length, [users]);
+  const totalDispatchers = useMemo(
+    () => users.filter((u) => u.role === "dispatcher").length,
+    [users],
+  );
   const totalRiders = useMemo(() => users.filter((u) => u.role === "rider").length, [users]);
   const activeUsers = useMemo(() => users.filter((u) => u.status === "Active").length, [users]);
 
@@ -227,38 +234,40 @@ export const UserManagementModule: React.FC = () => {
       case "owner":
         return {
           label: ROLE_BADGE_LABELS.owner,
-          bg: "bg-purple-50",
-          text: "text-purple-700",
-          border: "border-purple-200",
+          bg: "bg-board-ground",
+          text: "text-ink",
           icon: ShieldCheck,
         };
       case "dispatcher":
         return {
           label: ROLE_BADGE_LABELS.dispatcher,
-          bg: "bg-blue-50",
-          text: "text-blue-700",
-          border: "border-blue-200",
+          bg: "bg-board-ground",
+          text: "text-ink",
           icon: Headphones,
         };
       case "rider":
         return {
           label: ROLE_BADGE_LABELS.rider,
-          bg: "bg-amber-50",
-          text: "text-amber-700",
-          border: "border-amber-200",
+          bg: "bg-board-ground",
+          text: "text-ink",
           icon: Bike,
         };
       default:
         return {
           label: role,
-          bg: "bg-slate-50",
-          text: "text-slate-700",
-          border: "border-slate-200",
+          bg: "bg-board-ground",
+          text: "text-ink",
           icon: Users,
         };
     }
   };
 
+  /**
+   * The sort control. `aria-sort` is NOT set here: the attribute belongs on
+   * the `<th>` that owns the columnheader role, and setting it on a nested
+   * button is a spec violation a screen reader simply ignores. SortTh below
+   * carries it.
+   */
   const SortButton: React.FC<{ label: string; sortBy: SortKey; className?: string }> = ({
     label,
     sortBy,
@@ -270,17 +279,38 @@ export const UserManagementModule: React.FC = () => {
       <button
         type="button"
         onClick={() => handleSort(sortBy)}
-        aria-sort={isActive ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
         title={`Sort by ${label}`}
-        className={`group inline-flex items-center gap-1 rounded-lg px-2 py-1 -ml-2 uppercase tracking-wider font-extrabold text-[10px] transition ${
-          isActive ? "text-[#1E3A5F] bg-slate-200/70" : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
+        className={`group inline-flex items-center gap-1 rounded-trim px-2 py-1 -ml-2 uppercase text-micro transition ${
+          isActive
+            ? "text-board-field bg-board-ground"
+            : "text-ink-muted hover:text-ink hover:bg-board-ground"
         } ${className}`}
       >
         <span>{label}</span>
-        <Icon size={12} className={isActive ? "opacity-100" : "opacity-40 group-hover:opacity-80"} />
+        <Icon
+          size={12}
+          className={isActive ? "opacity-100" : "opacity-40 group-hover:opacity-80"}
+        />
       </button>
     );
   };
+
+  /** A column head whose aria-sort reflects the live sort state. */
+  const SortTh: React.FC<{ label: string; sortBy: SortKey; className?: string }> = ({
+    label,
+    sortBy,
+    className = "",
+  }) => (
+    <th
+      scope="col"
+      aria-sort={
+        sortKey === sortBy ? (sortDirection === "asc" ? "ascending" : "descending") : "none"
+      }
+      className={className}
+    >
+      <SortButton label={label} sortBy={sortBy} />
+    </th>
+  );
 
   const resetFilters = () => {
     setSearch("");
@@ -293,16 +323,13 @@ export const UserManagementModule: React.FC = () => {
   return (
     <div className="flex flex-col h-full space-y-2.5 max-w-7xl mx-auto w-full overflow-hidden">
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING)         */}
+      {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 border-b border-hairline pb-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
-              <Users size={18} />
-            </span>
             <div>
-              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">User Management</h2>
+              <h1 className="truncate text-title uppercase text-ink">User Management</h1>
             </div>
           </div>
         </div>
@@ -315,7 +342,7 @@ export const UserManagementModule: React.FC = () => {
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 bg-[#1E3A5F] hover:bg-[#162D4A] text-white font-bold text-xs px-3.5 sm:px-4 py-2 rounded-xl shadow-xs transition active:scale-98"
+            className="flex items-center justify-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 sm:px-4 py-2 rounded-plate transition-colors"
           >
             <Plus size={15} />
             <span>Add User</span>
@@ -324,25 +351,32 @@ export const UserManagementModule: React.FC = () => {
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. SEARCH, FILTERS & VIEW TOGGLE (STATIC NON-SCROLLING)       */}
+      {/* 2. SEARCH, FILTERS & VIEW TOGGLE (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 bg-white p-2.5 rounded-2xl border border-slate-200 shadow-2xs">
+      <div className="shrink-0 bg-board-plate p-2.5 rounded-plate border border-edge">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
           {/* Search Bar with Clear Button */}
           <div className="relative flex-1 w-full">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <Search
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
+              size={15}
+            />
+            {/* aria-label, not a placeholder. A placeholder is the field's
+                hint, not its name: it disappears the moment anyone types, and
+                a screen reader announces an unnamed text box. */}
             <input
               type="text"
+              aria-label="Search user accounts"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, username, email, or phone number..."
-              className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] focus:bg-white transition"
+              className="w-full pl-9 pr-8 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
               >
                 <X size={14} />
               </button>
@@ -352,45 +386,56 @@ export const UserManagementModule: React.FC = () => {
           {/* Right Controls: Role, Status, Sort & View Switcher */}
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto shrink-0">
             {/* Role Filter Dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
-              <Users size={14} className="text-slate-400 shrink-0" />
+            <div className="flex items-center gap-1.5 bg-board-ground border border-edge px-2.5 py-1.5 rounded-plate">
+              <Users size={14} className="text-ink-muted shrink-0" />
               <select
+                aria-label="Filter by role"
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value as any)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-label text-ink cursor-pointer"
               >
-                <option value="ALL">All Roles ({totalUsers})</option>
-                <option value="dispatcher">Dispatchers ({totalDispatchers})</option>
-                <option value="rider">Riders ({totalRiders})</option>
-                <option value="owner">Admins ({totalAdmins})</option>
+                {/* Guarded like every other count on this screen. These read
+                    "All Roles (0)" over a failed request, which is a claim
+                    about the business sitting next to a panel saying nothing
+                    arrived. */}
+                <option value="ALL">All Roles ({countsUnknown ? "--" : totalUsers})</option>
+                <option value="dispatcher">
+                  Dispatchers ({countsUnknown ? "--" : totalDispatchers})
+                </option>
+                <option value="rider">Riders ({countsUnknown ? "--" : totalRiders})</option>
+                <option value="owner">Admins ({countsUnknown ? "--" : totalAdmins})</option>
               </select>
             </div>
 
             {/* Status Filter Dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
-              <CheckCircle2 size={14} className="text-slate-400 shrink-0" />
+            <div className="flex items-center gap-1.5 bg-board-ground border border-edge px-2.5 py-1.5 rounded-plate">
+              <CheckCircle2 size={14} className="text-ink-muted shrink-0" />
               <select
+                aria-label="Filter by account status"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-label text-ink cursor-pointer"
               >
                 <option value="ALL">All Status</option>
-                <option value="Active">Active ({activeUsers})</option>
-                <option value="Inactive">Inactive ({totalUsers - activeUsers})</option>
+                <option value="Active">Active ({countsUnknown ? "--" : activeUsers})</option>
+                <option value="Inactive">
+                  Inactive ({countsUnknown ? "--" : totalUsers - activeUsers})
+                </option>
               </select>
             </div>
 
             {/* Sort Dropdown */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
-              <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
+            <div className="flex items-center gap-1.5 bg-board-ground border border-edge px-2.5 py-1.5 rounded-plate">
+              <ArrowUpDown size={14} className="text-ink-muted shrink-0" />
               <select
+                aria-label="Sort the directory"
                 value={`${sortKey}-${sortDirection}`}
                 onChange={(e) => {
                   const [key, dir] = e.target.value.split("-") as [SortKey, SortDirection];
                   setSortKey(key);
                   setSortDirection(dir);
                 }}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-label text-ink cursor-pointer"
               >
                 <option value="name-asc">Sort: Name (A → Z)</option>
                 <option value="name-desc">Sort: Name (Z → A)</option>
@@ -406,14 +451,27 @@ export const UserManagementModule: React.FC = () => {
             </div>
 
             {/* View Switcher */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60">
+            <div
+              role="group"
+              aria-label="Directory layout"
+              className="flex items-center rounded-plate border border-edge bg-board-ground p-0.5"
+            >
+              {/* aria-label, not title alone. A title is announced
+                  inconsistently and is invisible on a touchscreen, which this
+                  portal is used on. aria-pressed reports which view is live:
+                  it was carried by background colour only.
+
+                  role="group" rather than a tablist, because these two do not
+                  select a panel, they change how one panel is drawn. */}
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg transition ${
+                aria-label="Table view"
+                aria-pressed={viewMode === "table" || viewMode === "auto"}
+                className={`rounded-trim p-1.5 transition-colors ${
                   viewMode === "table" || viewMode === "auto"
-                    ? "bg-white text-[#1E3A5F] shadow-2xs font-bold"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-board-plate text-ink"
+                    : "text-ink-muted hover:text-ink"
                 }`}
                 title="Table View"
               >
@@ -422,10 +480,10 @@ export const UserManagementModule: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setViewMode("cards")}
-                className={`p-1.5 rounded-lg transition ${
-                  viewMode === "cards"
-                    ? "bg-white text-[#1E3A5F] shadow-2xs font-bold"
-                    : "text-slate-500 hover:text-slate-800"
+                aria-label="Card grid view"
+                aria-pressed={viewMode === "cards"}
+                className={`rounded-trim p-1.5 transition-colors ${
+                  viewMode === "cards" ? "bg-board-plate text-ink" : "text-ink-muted hover:text-ink"
                 }`}
                 title="Cards Grid View"
               >
@@ -434,36 +492,66 @@ export const UserManagementModule: React.FC = () => {
             </div>
 
             {/* Accounts Count */}
-            <span className="text-[10.5px] font-semibold text-slate-400 ml-1 hidden xl:inline">
-              {sortedUsers.length} of {totalUsers} account{totalUsers === 1 ? "" : "s"} shown
+            {/* Guarded, because this toolbar sat directly above a panel saying
+                "No accounts are shown because none arrived" while confidently
+                reporting "0 of 0 accounts shown". One screen must not hold two
+                answers to the same question. */}
+            <span className="text-label text-ink-muted ml-1 hidden xl:inline">
+              {countsUnknown
+                ? "Account count unavailable"
+                : `${sortedUsers.length} of ${totalUsers} account${totalUsers === 1 ? "" : "s"} shown`}
             </span>
           </div>
         </div>
       </div>
 
-      {loadError && (
-        <div className="shrink-0 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-4 py-2.5 rounded-2xl flex items-center gap-2">
+      {loadError && users.length > 0 && (
+        <div className="shrink-0 bg-status-waiting-fill border border-status-waiting-ink/20 text-status-waiting-ink text-label px-4 py-2.5 rounded-plate flex items-center gap-2">
           <AlertCircle size={15} className="shrink-0" />
           <span>{loadError}</span>
         </div>
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 5. DIRECTORY CONTENT - ONLY THIS CONTAINER SCROLLS!            */}
+      {/* 5. DIRECTORY CONTENT - ONLY THIS CONTAINER SCROLLS! */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 shadow-xs flex flex-col items-center justify-center">
-          <Loader2 size={28} className="animate-spin text-[#1E3A5F]" />
-          <span className="text-xs font-bold text-slate-600 mt-2">Loading user accounts...</span>
+        <div className="flex-1 min-h-0 bg-board-plate border border-edge rounded-plate p-12 text-center text-ink-muted flex flex-col items-center justify-center">
+          <Loader2 size={28} className="animate-spin text-board-field" />
+          <span className="text-label text-ink-muted mt-2">Loading user accounts...</span>
+        </div>
+      ) : /* Ordered BEFORE the empty branch. The amber banner above renders
+         whenever loadError is set, but the empty branch used to render
+         underneath it regardless, so a dead /users announced
+         "No user accounts exist yet in the database." directly below a
+         warning that the request had failed. Those are opposite claims,
+         and the reassuring one was the larger of the two.
+
+         Split on whether anything arrived: with stale rows on screen the
+         banner alone is right, because the list is real if old. With
+         nothing on screen the failure is the whole story. */
+      users.length === 0 && loadError ? (
+        <div className="flex-1 min-h-0 bg-board-plate border border-edge rounded-plate p-12 text-center space-y-3 flex flex-col items-center justify-center">
+          <AlertCircle size={22} className="text-status-act-ink" />
+          <div>
+            <p className="text-panel text-ink">The user directory did not load</p>
+            <p className="mt-1.5 max-w-sm mx-auto text-body text-ink-muted">
+              {loadError} No accounts are shown because none arrived, not because none exist.
+            </p>
+          </div>
+          <button
+            onClick={loadBackendUsers}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+          >
+            <RotateCcw size={14} />
+            <span>Try again</span>
+          </button>
         </div>
       ) : sortedUsers.length === 0 ? (
-        <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl p-12 text-center text-slate-400 shadow-xs space-y-3 flex flex-col items-center justify-center">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
-            <Users size={28} />
-          </div>
+        <div className="flex-1 min-h-0 bg-board-plate border border-edge rounded-plate p-12 text-center text-ink-muted space-y-3 flex flex-col items-center justify-center">
           <div>
-            <p className="font-extrabold text-slate-800 text-base">No user accounts found</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            <p className=" text-ink text-panel">No user accounts found</p>
+            <p className="text-label text-ink-muted mt-1 max-w-sm mx-auto">
               {search || selectedRole !== "ALL" || statusFilter !== "ALL"
                 ? "No matching users found for your current filter query."
                 : "No user accounts exist yet in the database."}
@@ -472,7 +560,7 @@ export const UserManagementModule: React.FC = () => {
           {(search || selectedRole !== "ALL" || statusFilter !== "ALL") && (
             <button
               onClick={resetFilters}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-plate bg-board-ground hover:bg-board-ground text-ink text-label transition"
             >
               <span>Reset All Filters</span>
             </button>
@@ -482,7 +570,7 @@ export const UserManagementModule: React.FC = () => {
         <>
           {/* 5A. CARD GRID VIEW - SCROLLABLE */}
           <div
-            className={`flex-1 min-h-0 overflow-y-auto pr-1 pb-4 scrollbar-thin ${
+            className={`flex-1 min-h-0 overflow-y-auto pr-1 pb-4 ${
               viewMode === "cards" ? "block" : viewMode === "table" ? "hidden" : "block lg:hidden"
             }`}
           >
@@ -494,23 +582,25 @@ export const UserManagementModule: React.FC = () => {
                 return (
                   <div
                     key={u.id}
-                    className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-2xs flex flex-col justify-between gap-3 hover:shadow-xs transition"
+                    className="bg-board-plate border border-edge rounded-plate p-4 flex flex-col justify-between gap-3 transition"
                   >
                     {/* Card Header: Avatar, Name, Role & Status */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <StaffAvatar userId={u.id} name={u.name} size={40} />
                         <div className="min-w-0">
-                          <p className="font-extrabold text-slate-900 text-sm truncate">{u.name}</p>
-                          <p className="text-[11px] font-mono text-slate-500 truncate">@{u.username}</p>
+                          <p className=" text-ink text-label truncate">{u.name}</p>
+                          <p className="text-label font-mono text-ink-muted truncate">
+                            @{u.username}
+                          </p>
                         </div>
                       </div>
 
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border shrink-0 ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro uppercase border border-edge shrink-0 ${
                           u.status === "Active"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-slate-100 text-slate-500 border-slate-200"
+                            ? "bg-status-done-fill text-status-done-ink "
+                            : "bg-board-ground text-ink-muted border-edge"
                         }`}
                       >
                         {u.status === "Active" ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
@@ -519,46 +609,50 @@ export const UserManagementModule: React.FC = () => {
                     </div>
 
                     {/* Card Meta & Contacts */}
-                    <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                    <div className="space-y-1.5 text-label text-ink-muted bg-board-ground p-3 rounded-plate border border-hairline">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10.5px] font-semibold text-slate-400">Role</span>
+                        <span className="text-label text-ink-muted">Role</span>
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold border ${roleBadge.bg} ${roleBadge.text} ${roleBadge.border}`}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-label border border-edge ${roleBadge.bg} ${roleBadge.text}`}
                         >
                           <RoleIcon size={12} />
                           <span>{roleBadge.label}</span>
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
-                        <span className="text-[10.5px] font-semibold text-slate-400">Phone</span>
+                      <div className="flex items-center justify-between pt-1 border-t border-edge">
+                        <span className="text-label text-ink-muted">Phone</span>
                         <button
                           type="button"
                           onClick={() => u.phone && handleCopy(u.phone, `phone-${u.id}`)}
-                          className="font-mono text-xs font-bold text-slate-700 hover:text-blue-700 flex items-center gap-1"
+                          className="font-mono text-label text-ink hover:text-ink flex items-center gap-1"
                         >
-                          <span>{u.phone || "—"}</span>
+                          <span>{u.phone || "--"}</span>
                           {u.phone && (
-                            <span className="text-slate-400">
-                              {copiedId === `phone-${u.id}` ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                            <span className="text-ink-muted">
+                              {copiedId === `phone-${u.id}` ? (
+                                <Check size={11} className="text-status-done-ink" />
+                              ) : (
+                                <Copy size={11} />
+                              )}
                             </span>
                           )}
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/50">
-                        <span className="text-[10.5px] font-semibold text-slate-400">Email</span>
-                        <span className="text-xs font-medium text-slate-700 truncate max-w-[170px]" title={u.email}>
-                          {u.email || "—"}
+                      <div className="flex items-center justify-between pt-1 border-t border-edge">
+                        <span className="text-label text-ink-muted">Email</span>
+                        <span className="text-body text-ink truncate max-w-[170px]" title={u.email}>
+                          {u.email || "--"}
                         </span>
                       </div>
                     </div>
 
                     {/* Card Footer: Actions */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                    <div className="pt-2 border-t border-hairline flex items-center justify-end">
                       <button
                         onClick={() => setEditingUser(u)}
-                        className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-amber-50 text-slate-700 hover:text-amber-800 border border-slate-200 hover:border-amber-200 transition flex items-center justify-center gap-1.5"
+                        className="w-full py-2 rounded-plate text-label bg-board-ground hover:bg-status-waiting-fill text-ink hover:text-status-waiting-ink border border-edge hover:border-status-waiting-ink/40 transition-colors flex items-center justify-center gap-1.5"
                       >
                         <Pencil size={13} />
                         <span>Edit User Details</span>
@@ -572,47 +666,42 @@ export const UserManagementModule: React.FC = () => {
 
           {/* 5B. DESKTOP TABULAR VIEW - SCROLLABLE TABLE ROWS */}
           <div
-            className={`flex-1 min-h-0 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xs flex flex-col ${
+            className={`flex-1 min-h-0 bg-board-plate border border-edge rounded-plate overflow-hidden flex flex-col ${
               viewMode === "table" ? "block" : viewMode === "cards" ? "hidden" : "hidden lg:flex"
             }`}
           >
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto relative scrollbar-thin">
-              <table className="w-full text-left text-xs text-slate-700">
-                <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-200 sticky top-0 z-10 select-none shadow-xs backdrop-blur-md">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto relative">
+              <table className="w-full text-left text-label text-ink">
+                {/* over an opaque fill blurred nothing while breaching
+                    the [LOCKED] flat invariant; likewise. text-label
+                    was under the 12px floor. */}
+                <thead className="sticky top-0 z-10 select-none border-b border-edge bg-board-ground text-micro uppercase text-ink-muted">
                   <tr>
-                    <th className="p-4">
-                      <SortButton label="User Profile" sortBy="name" />
+                    <SortTh label="User Profile" sortBy="name" className="p-4" />
+                    <SortTh label="Assigned Role" sortBy="role" className="p-4" />
+                    <SortTh label="Username" sortBy="username" className="p-4" />
+                    <SortTh label="Contact Phone" sortBy="phone" className="p-4" />
+                    <SortTh label="Account Status" sortBy="status" className="p-4" />
+                    <th scope="col" className="p-4 text-right">
+                      Actions
                     </th>
-                    <th className="p-4">
-                      <SortButton label="Assigned Role" sortBy="role" />
-                    </th>
-                    <th className="p-4">
-                      <SortButton label="Username" sortBy="username" />
-                    </th>
-                    <th className="p-4">
-                      <SortButton label="Contact Phone" sortBy="phone" />
-                    </th>
-                    <th className="p-4">
-                      <SortButton label="Account Status" sortBy="status" />
-                    </th>
-                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-hairline">
                   {sortedUsers.map((u) => {
                     const roleBadge = getRoleBadge(u.role);
                     const RoleIcon = roleBadge.icon;
 
                     return (
-                      <tr key={u.id} className="hover:bg-slate-50/80 transition group">
+                      <tr key={u.id} className="hover:bg-board-ground transition group">
                         {/* Name & Email Avatar */}
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <StaffAvatar userId={u.id} name={u.name} size={40} />
                             <div className="min-w-0">
-                              <p className="font-extrabold text-slate-900 text-sm truncate">{u.name}</p>
-                              <p className="text-[11px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
-                                <Mail size={12} className="text-slate-400" />
+                              <p className=" text-ink text-label truncate">{u.name}</p>
+                              <p className="text-label text-ink-muted truncate flex items-center gap-1 mt-0.5">
+                                <Mail size={12} className="text-ink-muted" />
                                 <span>{u.email || "No email provided"}</span>
                               </p>
                             </div>
@@ -622,7 +711,7 @@ export const UserManagementModule: React.FC = () => {
                         {/* Role Badge */}
                         <td className="p-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${roleBadge.bg} ${roleBadge.text} ${roleBadge.border}`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-label border border-edge ${roleBadge.bg} ${roleBadge.text}`}
                           >
                             <RoleIcon size={13} />
                             <span>{roleBadge.label}</span>
@@ -630,24 +719,26 @@ export const UserManagementModule: React.FC = () => {
                         </td>
 
                         {/* Username */}
-                        <td className="p-4 font-mono font-bold text-slate-700 text-xs">
-                          <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">@{u.username}</span>
+                        <td className="p-4 font-mono text-ink text-label">
+                          <span className="bg-board-ground text-ink px-2 py-0.5 rounded-trim">
+                            @{u.username}
+                          </span>
                         </td>
 
                         {/* Phone */}
-                        <td className="p-4 text-slate-600 font-mono text-xs">
+                        <td className="p-4 text-ink-muted font-mono text-label">
                           <button
                             type="button"
                             onClick={() => u.phone && handleCopy(u.phone, `table-phone-${u.id}`)}
-                            className="flex items-center gap-1.5 hover:text-blue-700 transition"
+                            className="flex items-center gap-1.5 hover:text-ink transition"
                             title="Click to copy phone"
                           >
-                            <Phone size={12} className="text-slate-400" />
-                            <span>{u.phone || "—"}</span>
+                            <Phone size={12} className="text-ink-muted" />
+                            <span>{u.phone || "--"}</span>
                             {u.phone && (
-                              <span className="text-slate-400">
+                              <span className="text-ink-muted">
                                 {copiedId === `table-phone-${u.id}` ? (
-                                  <Check size={11} className="text-emerald-600" />
+                                  <Check size={11} className="text-status-done-ink" />
                                 ) : (
                                   <Copy size={11} />
                                 )}
@@ -659,13 +750,17 @@ export const UserManagementModule: React.FC = () => {
                         {/* Status */}
                         <td className="p-4">
                           <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-micro uppercase border border-edge ${
                               u.status === "Active"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-slate-100 text-slate-500 border-slate-200"
+                                ? "bg-status-done-fill text-status-done-ink "
+                                : "bg-board-ground text-ink-muted border-edge"
                             }`}
                           >
-                            {u.status === "Active" ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                            {u.status === "Active" ? (
+                              <CheckCircle2 size={10} />
+                            ) : (
+                              <XCircle size={10} />
+                            )}
                             <span>{u.status}</span>
                           </span>
                         </td>
@@ -674,7 +769,7 @@ export const UserManagementModule: React.FC = () => {
                         <td className="p-4 text-right">
                           <button
                             onClick={() => setEditingUser(u)}
-                            className="p-2 text-slate-600 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition border border-transparent hover:border-amber-200"
+                            className="p-2 text-ink-muted hover:text-status-waiting-ink hover:bg-status-waiting-fill rounded-plate transition-colors border border-transparent hover:border-status-waiting-ink/40"
                             title="Edit User Details"
                           >
                             <Pencil size={15} />
@@ -692,10 +787,7 @@ export const UserManagementModule: React.FC = () => {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <AddUserModal
-          onClose={() => setShowAddModal(false)}
-          onSave={handleAddUser}
-        />
+        <AddUserModal onClose={() => setShowAddModal(false)} onSave={handleAddUser} />
       )}
 
       {/* Edit User Modal */}

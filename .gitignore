@@ -22,7 +22,9 @@ yarn-debug.log*
 .DS_Store
 Thumbs.db
 
-# Agent rules
+# Agent rules & skills
 .agents/
+.claude/
+.codex/
 
 AGENTS.md

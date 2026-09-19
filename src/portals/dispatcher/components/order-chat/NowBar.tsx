@@ -1,6 +1,6 @@
-import * as React from "react";
-import { Eye, Hourglass, CheckCircle2, AlertTriangle, Lock, MapPin } from "lucide-react";
+import { Eye, Hourglass, Check, AlertTriangle, Lock, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import type { NowBarModel, NowAction, NowTone } from "./types";
 
 /**
@@ -11,36 +11,40 @@ import type { NowBarModel, NowAction, NowTone } from "./types";
  * the only question that matters is "am I waiting on them, or are they waiting
  * on me?" That was previously spread across four indicators that could
  * disagree; here it is one line, and the colour answers it before the words do.
+ *
+ * Route board build. The tones were five hand-picked Tailwind tint pairs
+ * (blue-50/blue-200/blue-900, amber, emerald, rose, slate) with no relationship
+ * to any status shown elsewhere in the console, so the same waiting state was
+ * amber here and a different amber on the board. They are now the console's
+ * five status pairs, which means this band and a status chip cannot disagree.
+ *
+ * `you` is the exception and it is deliberate. Your turn is not a tint of
+ * anything: it is the board addressing you, so it takes the navy field itself.
+ * That also keeps the signal red for `problem`, which is the one tone that
+ * genuinely means "you must act on something that has gone wrong" — a
+ * permanently red band would have spent the red on the most ordinary state in
+ * the flow and left nothing to escalate with.
  */
 
-const TONE_STYLES: Record<NowTone, string> = {
-  you: "bg-blue-50 border-blue-200",
-  waiting: "bg-amber-50 border-amber-200",
-  ready: "bg-emerald-50 border-emerald-200",
-  problem: "bg-rose-50 border-rose-200",
-  closed: "bg-slate-100 border-slate-200",
+interface Tone {
+  band: string;
+  text: string;
+  /** Set on the navy tone so the focus ring and selection invert. */
+  onField?: boolean;
+}
+
+const TONES: Record<NowTone, Tone> = {
+  you: { band: "bg-board-field", text: "text-board-plate", onField: true },
+  waiting: { band: "bg-status-waiting-fill", text: "text-status-waiting-ink" },
+  ready: { band: "bg-status-done-fill", text: "text-status-done-ink" },
+  problem: { band: "bg-status-act-fill", text: "text-status-act-ink" },
+  closed: { band: "bg-status-closed-fill", text: "text-status-closed-ink" },
 };
 
-const TONE_TEXT: Record<NowTone, string> = {
-  you: "text-blue-900",
-  waiting: "text-amber-900",
-  ready: "text-emerald-900",
-  problem: "text-rose-900",
-  closed: "text-slate-600",
-};
-
-const TONE_ICON_BG: Record<NowTone, string> = {
-  you: "bg-blue-100 text-blue-700",
-  waiting: "bg-amber-100 text-amber-700",
-  ready: "bg-emerald-100 text-emerald-700",
-  problem: "bg-rose-100 text-rose-700",
-  closed: "bg-slate-200 text-slate-500",
-};
-
-function ToneIcon({ tone, waitingOnMap }: { tone: NowTone; waitingOnMap: boolean }) {
-  const size = 15;
+function ToneMark({ tone, waitingOnMap }: { tone: NowTone; waitingOnMap: boolean }) {
+  const size = 16;
   if (tone === "waiting") return <Hourglass size={size} />;
-  if (tone === "ready") return <CheckCircle2 size={size} />;
+  if (tone === "ready") return <Check size={size} />;
   if (tone === "problem") return <AlertTriangle size={size} />;
   if (tone === "closed") return <Lock size={size} />;
   return waitingOnMap ? <MapPin size={size} /> : <Eye size={size} />;
@@ -55,46 +59,43 @@ interface NowBarProps {
 
 export function NowBar({ model, onAction, isPinStage = false }: NowBarProps) {
   const { tone, sentence, meta, actions } = model;
+  const t = TONES[tone];
 
   return (
     <div
       role="status"
       aria-live="polite"
+      data-on-field={t.onField ? "" : undefined}
       className={cn(
-        "shrink-0 flex items-center gap-3 px-4 sm:px-5 py-2.5 border-b flex-wrap",
-        TONE_STYLES[tone]
+        "shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 sm:px-5",
+        t.band,
+        t.text
       )}
     >
-      <span
-        className={cn(
-          "w-7 h-7 rounded-lg grid place-items-center shrink-0",
-          TONE_ICON_BG[tone]
-        )}
-      >
-        <ToneIcon tone={tone} waitingOnMap={isPinStage} />
+      {/* A bare mark. It used to sit in a 28px tinted rounded square, which is
+          the icon chip the craft floor refuses, repeated on the one element
+          that is on screen for the entire order. */}
+      <span className="shrink-0">
+        <ToneMark tone={tone} waitingOnMap={isPinStage} />
       </span>
 
-      <p className={cn("flex-1 min-w-0 text-xs sm:text-[13px] font-bold m-0", TONE_TEXT[tone])}>
+      <p className="m-0 min-w-0 flex-1 text-label">
         {sentence}
-        {meta ? <span className="font-medium opacity-70">{meta}</span> : null}
+        {meta ? <span className="font-normal opacity-75">{meta}</span> : null}
       </p>
 
       {actions.length > 0 && (
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
           {actions.map((action) => (
-            <button
+            <DispatcherButton
               key={action.label}
               type="button"
+              size="sm"
+              variant={action.kind === "primary" ? "primary" : "secondary"}
               onClick={() => onAction(action)}
-              className={cn(
-                "text-[11px] font-bold px-3 py-1.5 rounded-xl border transition active:scale-95 cursor-pointer",
-                action.kind === "primary"
-                  ? "bg-dispatcher-navy hover:bg-dispatcher-navy-dark text-white border-transparent shadow-xs"
-                  : "bg-white hover:border-dispatcher-navy hover:text-dispatcher-navy text-slate-700 border-slate-300"
-              )}
             >
               {action.label}
-            </button>
+            </DispatcherButton>
           ))}
         </div>
       )}

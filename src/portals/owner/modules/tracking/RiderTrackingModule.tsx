@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import {
-  Navigation,
   Bike,
   Radio,
   BatteryLow,
@@ -9,17 +8,14 @@ import {
   X,
   Check,
   Copy,
-  Moon,
   WifiOff,
-  Package,
-  Target,
   Phone,
-  Layers,
   MapPin,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import LiveFleetMap from "../../../../components/LiveFleetMap";
+import { StandingFigures } from "../../components/StandingFigures";
 import { useRiderFleetPresence, RiderFleetMember } from "../../../../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES, RiderPresenceState } from "../../../../constants/riderPresence";
 import { NotificationBell } from "../../../../components/NotificationBell";
@@ -28,7 +24,7 @@ import { HeaderClock } from "../../../../components/HeaderClock";
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
 export const RiderTrackingModule: React.FC = () => {
-  const { riders, isLoading } = useRiderFleetPresence();
+  const { riders, isLoading, loadError, telemetryError, reload } = useRiderFleetPresence();
   const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [selectedPresence, setSelectedPresence] = useState<"ALL" | RiderPresenceState>("ALL");
@@ -50,13 +46,34 @@ export const RiderTrackingModule: React.FC = () => {
 
   // Fleet presence counts
   const totalRiders = riders.length;
-  const countReady = useMemo(() => riders.filter((r) => r.presence === "AVAILABLE").length, [riders]);
+  const countReady = useMemo(
+    () => riders.filter((r) => r.presence === "AVAILABLE").length,
+    [riders],
+  );
   const countBusy = useMemo(() => riders.filter((r) => r.presence === "BUSY").length, [riders]);
   const countDisconnected = useMemo(
     () => riders.filter((r) => r.presence === "DISCONNECTED").length,
-    [riders]
+    [riders],
   );
-  const countOffDuty = useMemo(() => riders.filter((r) => r.presence === "OFF_DUTY").length, [riders]);
+  const countOffDuty = useMemo(
+    () => riders.filter((r) => r.presence === "OFF_DUTY").length,
+    [riders],
+  );
+
+  /**
+   * Every count on this screen reads from one judgement.
+   *
+   * The presence chip in the header now reports "presence unknown" on a failed
+   * fetch, and without this the four tiles under it, the map badge and the
+   * roster filters all carried on printing a confident 0. A screen that
+   * contradicts itself is worse than one that is uniformly wrong, because the
+   * reader cannot tell which half to trust.
+   *
+   * Unknown means the request failed AND nothing had arrived. A stale count
+   * from a previous poll is still worth showing under the warning.
+   */
+  const unknown = loadError !== null && riders.length === 0;
+  const fig = (n: number) => (unknown ? "--" : String(n));
 
   // Filtered roster
   const filteredRoster = useMemo(() => {
@@ -91,137 +108,99 @@ export const RiderTrackingModule: React.FC = () => {
   return (
     <div className="flex flex-col h-full space-y-3 sm:space-y-3.5 max-w-7xl mx-auto w-full overflow-hidden">
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 1. TOP HERO HEADER & QUICK TELEMETRY ACTIONS (PINNED)         */}
+      {/* 1. TOP HERO HEADER & QUICK TELEMETRY ACTIONS (PINNED) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-hairline pb-3">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs">
-              <Navigation size={18} />
-            </span>
+            {/* The pulsing green dot that used to sit here is gone. It was
+                painted unconditionally, so it announced a live feed even while
+                /riders was returning 401 and every count below it read zero.
+                An indicator that never checks the thing it indicates is not an
+                indicator. Presence is now reported by the chip on the right,
+                which reads the hook's error channel. */}
             <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Tracking</h2>
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
+              <h1 className="truncate text-title uppercase text-ink">Tracking</h1>
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
-          <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-xl shadow-2xs">
-            <Radio size={13} className="text-emerald-600 animate-pulse" />
-            <span className="text-[11px] sm:text-xs">
-              {countReady} Ready • {countBusy} Delivering
+          {/* Three states, not one. This chip was a single emerald pill with
+              an animating radio icon that rendered whatever the counts were,
+              so "0 Ready, 0 Delivering" over a dead endpoint looked exactly
+              like a quiet afternoon. */}
+          {loadError ? (
+            <button
+              type="button"
+              onClick={reload}
+              className="flex items-center gap-1.5 rounded-trim bg-status-act-fill px-3 py-1.5 text-micro uppercase text-status-act-ink transition-opacity hover:opacity-80"
+            >
+              <WifiOff size={13} className="shrink-0" />
+              <span>Presence unknown, retry</span>
+            </button>
+          ) : isLoading ? (
+            <span className="flex items-center gap-1.5 rounded-trim bg-status-closed-fill px-3 py-1.5 text-micro uppercase text-status-closed-ink">
+              <Radio size={13} className="shrink-0" />
+              <span>Reading presence</span>
             </span>
-          </span>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-trim bg-status-done-fill px-3 py-1.5 text-micro uppercase text-status-done-ink">
+              <Radio size={13} className="shrink-0" />
+              <span data-figure>
+                {countReady} Ready, {countBusy} Delivering
+              </span>
+            </span>
+          )}
           <HeaderClock />
           <NotificationBell />
         </div>
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. FLEET 4-STATE PRESENCE METRICS GRID (Psychological Cards)   */}
+      {/* 2. THE FLEET RIGHT NOW                                        */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-        {/* Ready & Available */}
-        <button
-          type="button"
-          onClick={() => setSelectedPresence(selectedPresence === "AVAILABLE" ? "ALL" : "AVAILABLE")}
-          className={`text-left rounded-2xl p-2.5 sm:p-3 border transition shadow-2xs flex items-center gap-2.5 sm:gap-3 ${
-            selectedPresence === "AVAILABLE"
-              ? "bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-200"
-              : "bg-white border-slate-200/80 hover:bg-slate-50 hover:shadow-xs"
-          }`}
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold shrink-0">
-            <Bike size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
-              Online & Ready
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <p className="text-base sm:text-xl font-black text-slate-900">{countReady}</p>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
-            </div>
-          </div>
-        </button>
+      {/* This was four identical metric tiles, each carrying a 40px tinted
+          icon chip, above the map and the roster - the exact arrangement the
+          direction contract refuses by name, and the chip that MetricCard's
+          own docstring calls the most category-generic element in this
+          codebase. These four were the ones that rewrite could not reach,
+          because this screen kept its own header instead of the shell.
 
-        {/* On Active Delivery */}
-        <button
-          type="button"
-          onClick={() => setSelectedPresence(selectedPresence === "BUSY" ? "ALL" : "BUSY")}
-          className={`text-left rounded-2xl p-2.5 sm:p-3 border transition shadow-2xs flex items-center gap-2.5 sm:gap-3 ${
-            selectedPresence === "BUSY"
-              ? "bg-amber-50/90 border-amber-400 ring-2 ring-amber-200"
-              : "bg-white border-slate-200/80 hover:bg-slate-50 hover:shadow-xs"
-          }`}
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold shrink-0">
-            <Package size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
-              On Active Mission
-            </p>
-            <p className="text-base sm:text-xl font-black text-slate-900 mt-0.5">{countBusy}</p>
-          </div>
-        </button>
-
-        {/* Signal Lost */}
-        <button
-          type="button"
-          onClick={() => setSelectedPresence(selectedPresence === "DISCONNECTED" ? "ALL" : "DISCONNECTED")}
-          className={`text-left rounded-2xl p-2.5 sm:p-3 border transition shadow-2xs flex items-center gap-2.5 sm:gap-3 ${
-            selectedPresence === "DISCONNECTED"
-              ? "bg-red-50/90 border-red-400 ring-2 ring-red-200"
-              : "bg-white border-slate-200/80 hover:bg-slate-50 hover:shadow-xs"
-          }`}
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center font-bold shrink-0">
-            <WifiOff size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
-              Signal Lost (&gt;60s)
-            </p>
-            <p className="text-base sm:text-xl font-black text-slate-900 mt-0.5">{countDisconnected}</p>
-          </div>
-        </button>
-
-        {/* Off Duty */}
-        <button
-          type="button"
-          onClick={() => setSelectedPresence(selectedPresence === "OFF_DUTY" ? "ALL" : "OFF_DUTY")}
-          className={`text-left rounded-2xl p-2.5 sm:p-3 border transition shadow-2xs flex items-center gap-2.5 sm:gap-3 ${
-            selectedPresence === "OFF_DUTY"
-              ? "bg-slate-100 border-slate-400 ring-2 ring-slate-200"
-              : "bg-white border-slate-200/80 hover:bg-slate-50 hover:shadow-xs"
-          }`}
-        >
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center font-bold shrink-0">
-            <Moon size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
-              Offline / Off Duty
-            </p>
-            <p className="text-base sm:text-xl font-black text-slate-900 mt-0.5">{countOffDuty}</p>
-          </div>
-        </button>
-      </div>
+          They were also a SECOND copy of a control the screen already has:
+          all four called setSelectedPresence with the same values as the
+          roster's filter strip below, so one screen shipped two controls for
+          one job. Reading and filtering are now separated - this band states
+          what is true right now, in the same device the dashboard uses for
+          the same kind of fact, and the roster strip remains the one place
+          the presence filter is set. */}
+      <StandingFigures
+        label="The fleet right now"
+        columns={4}
+        className="shrink-0"
+        figures={[
+          { label: "Online & ready", value: fig(countReady), sub: "Waiting for a run" },
+          { label: "On active mission", value: fig(countBusy), sub: "Carrying an errand" },
+          {
+            label: "Signal lost",
+            value: fig(countDisconnected),
+            sub: "No beacon for 60s",
+            // The only one of the four that means somebody must act.
+            urgent: !unknown && countDisconnected > 0,
+          },
+          { label: "Offline / off duty", value: fig(countOffDuty), sub: "Not on shift" },
+        ]}
+      />
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. MOBILE VIEW SWITCHER (Visible on Mobile only)              */}
+      {/* 3. MOBILE VIEW SWITCHER (Visible on Mobile only) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex sm:hidden bg-slate-100 p-1 rounded-2xl border border-slate-200">
+      <div className="shrink-0 flex sm:hidden bg-board-ground p-1 rounded-plate border border-edge">
         <button
           type="button"
           onClick={() => setMobileTab("map")}
-          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            mobileTab === "map" ? "bg-white text-[#1E3A5F] shadow-xs" : "text-slate-600"
+          className={`flex-1 py-1.5 rounded-plate text-label transition flex items-center justify-center gap-1.5 ${
+            mobileTab === "map" ? "bg-board-plate text-board-field" : "text-ink-muted"
           }`}
         >
           <MapPin size={13} />
@@ -230,26 +209,28 @@ export const RiderTrackingModule: React.FC = () => {
         <button
           type="button"
           onClick={() => setMobileTab("roster")}
-          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            mobileTab === "roster" ? "bg-white text-[#1E3A5F] shadow-xs" : "text-slate-600"
+          className={`flex-1 py-1.5 rounded-plate text-label transition flex items-center justify-center gap-1.5 ${
+            mobileTab === "roster" ? "bg-board-plate text-board-field" : "text-ink-muted"
           }`}
         >
           <Bike size={13} />
-          <span>Fleet Roster ({filteredRoster.length})</span>
+          <span>Fleet Roster ({fig(filteredRoster.length)})</span>
         </button>
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 4. MAIN 12-COLUMN RESPONSIVE SECTION (Map + Sidebar Roster)   */}
+      {/* 4. MAIN 12-COLUMN RESPONSIVE SECTION (Map + Sidebar Roster) */}
       {/* ───────────────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-[360px] grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-stretch overflow-hidden">
         {/* Left Column: Interactive Map (8 cols on desktop) */}
         <div
-          className={`lg:col-span-8 h-full min-h-[320px] relative rounded-2xl overflow-hidden border border-slate-200/90 shadow-xs ${
+          className={`lg:col-span-8 h-full min-h-[320px] relative rounded-plate overflow-hidden border border-edge ${
             mobileTab === "roster" ? "hidden sm:block" : "block"
           }`}
         >
           <LiveFleetMap
+            presenceUnknown={unknown}
+            telemetryError={telemetryError}
             riders={riders}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRiderId}
@@ -261,22 +242,24 @@ export const RiderTrackingModule: React.FC = () => {
 
           {/* Selected Rider Floating Mission Control Card */}
           {selectedRider && (
-            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl sm:rounded-3xl p-4 sm:p-5 max-w-sm sm:max-w-md w-auto sm:w-full space-y-3 shadow-xl z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-auto bg-board-plate border border-edge rounded-plate sm:rounded-plate p-4 sm:p-5 max-w-sm sm:max-w-md w-auto sm:w-full space-y-3 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
               {/* Card Header */}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
-                    className="w-9 h-9 rounded-xl text-white flex items-center justify-center font-black text-xs shrink-0 shadow-2xs"
+                    className="w-9 h-9 rounded-plate text-white flex items-center justify-center text-label shrink-0"
                     style={{ backgroundColor: selectedTheme.primaryColor }}
                   >
                     {selectedRider.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="font-extrabold text-slate-900 text-sm truncate flex items-center gap-1.5">
+                    <h4 className=" text-ink text-label truncate flex items-center gap-1.5">
                       <span>{selectedRider.name}</span>
-                      <span className="text-slate-400 font-mono text-[11px] font-semibold">#{selectedRider.id}</span>
+                      <span className="text-ink-muted font-mono text-label">
+                        #{selectedRider.id}
+                      </span>
                     </h4>
-                    <p className="text-[10px] text-slate-500 font-medium">
+                    <p className="text-body text-ink-muted">
                       {selectedRider.plottableLocation
                         ? "GPS Location Stream Active"
                         : "No recent GPS coordinates"}
@@ -286,14 +269,14 @@ export const RiderTrackingModule: React.FC = () => {
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase border ${selectedTheme.badgeClassName}`}
+                    className={`text-micro px-2.5 py-0.5 rounded-full uppercase border border-edge ${selectedTheme.badgeClassName}`}
                   >
                     {selectedTheme.badgeLabel}
                   </span>
                   <button
                     type="button"
                     onClick={() => setSelectedRiderId(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                    className="p-1 rounded-trim text-ink-muted hover:text-ink hover:bg-board-ground transition"
                     title="Close selection"
                   >
                     <X size={15} />
@@ -302,24 +285,25 @@ export const RiderTrackingModule: React.FC = () => {
               </div>
 
               {/* Detail Telemetry Grid */}
-              <div className="grid grid-cols-2 gap-2 text-xs pt-2.5 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-2 text-label pt-2.5 border-t border-hairline">
                 {/* Phone */}
-                <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/60">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Contact Phone
-                  </span>
+                <div className="bg-board-ground p-2 rounded-plate border border-edge">
+                  <span className="text-micro text-ink-muted uppercase block">Contact Phone</span>
                   <button
                     type="button"
-                    onClick={() => selectedRider.phone && handleCopy(selectedRider.phone, `floating-phone-${selectedRider.id}`)}
-                    className="flex items-center gap-1.5 font-mono font-bold text-slate-800 hover:text-blue-700 transition mt-0.5"
+                    onClick={() =>
+                      selectedRider.phone &&
+                      handleCopy(selectedRider.phone, `floating-phone-${selectedRider.id}`)
+                    }
+                    className="flex items-center gap-1.5 font-mono font-bold text-ink hover:text-ink transition mt-0.5"
                     title="Click to copy phone"
                   >
-                    <Phone size={12} className="text-slate-400" />
-                    <span className="truncate">{selectedRider.phone || "—"}</span>
+                    <Phone size={12} className="text-ink-muted" />
+                    <span className="truncate">{selectedRider.phone || "--"}</span>
                     {selectedRider.phone && (
-                      <span className="text-slate-400">
+                      <span className="text-ink-muted">
                         {copiedId === `floating-phone-${selectedRider.id}` ? (
-                          <Check size={11} className="text-emerald-600" />
+                          <Check size={11} className="text-status-done-ink" />
                         ) : (
                           <Copy size={11} />
                         )}
@@ -329,18 +313,16 @@ export const RiderTrackingModule: React.FC = () => {
                 </div>
 
                 {/* Active Errand Status */}
-                <div className="bg-slate-50 p-2 rounded-xl border border-slate-200/60">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Active Mission
-                  </span>
-                  <p className="font-bold text-slate-800 mt-0.5 truncate flex items-center gap-1.5">
+                <div className="bg-board-ground p-2 rounded-plate border border-edge">
+                  <span className="text-micro text-ink-muted uppercase block">Active Mission</span>
+                  <p className="font-bold text-ink mt-0.5 truncate flex items-center gap-1.5">
                     {selectedRider.activeOrdersCount > 0 ? (
                       <>
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping inline-block" />
+                        <span className="w-2 h-2 shrink-0 rounded-full bg-status-waiting-ink" />
                         <span>{selectedRider.activeOrdersCount} in progress</span>
                       </>
                     ) : (
-                      <span className="text-slate-500">0 active orders</span>
+                      <span className="text-ink-muted">0 active orders</span>
                     )}
                   </p>
                 </div>
@@ -348,31 +330,29 @@ export const RiderTrackingModule: React.FC = () => {
 
               {/* Battery Telemetry Bar */}
               {selectedRider.batteryLevel !== null && selectedRider.batteryLevel !== undefined && (
-                <div className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                  <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+                <div className="flex items-center justify-between text-label px-2.5 py-1.5 rounded-plate bg-board-ground border border-edge">
+                  <span className="flex items-center gap-1.5 text-ink-muted font-medium">
                     {(() => {
                       const pct =
                         selectedRider.batteryLevel <= 1
                           ? Math.round(selectedRider.batteryLevel * 100)
                           : Math.round(selectedRider.batteryLevel);
                       return pct <= 20 ? (
-                        <BatteryLow size={14} className="text-red-500" />
+                        <BatteryLow size={14} className="text-signal" />
                       ) : (
-                        <Battery size={14} className="text-slate-500" />
+                        <Battery size={14} className="text-ink-muted" />
                       );
                     })()}
                     <span>Battery Telemetry:</span>
                   </span>
                   <span
-                    className={`font-mono font-extrabold ${
-                      (() => {
-                        const pct =
-                          selectedRider.batteryLevel <= 1
-                            ? Math.round(selectedRider.batteryLevel * 100)
-                            : Math.round(selectedRider.batteryLevel);
-                        return pct <= 20 ? "text-red-600 font-black" : "text-slate-800";
-                      })()
-                    }`}
+                    className={`font-mono font-bold ${(() => {
+                      const pct =
+                        selectedRider.batteryLevel <= 1
+                          ? Math.round(selectedRider.batteryLevel * 100)
+                          : Math.round(selectedRider.batteryLevel);
+                      return pct <= 20 ? "text-status-act-ink font-bold" : "text-ink";
+                    })()}`}
                   >
                     {selectedRider.batteryLevel <= 1
                       ? `${Math.round(selectedRider.batteryLevel * 100)}%`
@@ -386,37 +366,41 @@ export const RiderTrackingModule: React.FC = () => {
 
         {/* Right Column: Fleet Roster Sidebar (4 cols on desktop) */}
         <div
-          className={`lg:col-span-4 bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 shadow-xs flex flex-col h-full min-h-0 space-y-2.5 overflow-hidden ${
+          className={`lg:col-span-4 bg-board-plate border border-edge rounded-plate p-3 sm:p-3.5 flex flex-col h-full min-h-0 space-y-2.5 overflow-hidden ${
             mobileTab === "map" ? "hidden sm:flex" : "flex"
           }`}
         >
           {/* Sidebar Header */}
-          <div className="border-b border-slate-100 pb-2.5 shrink-0">
+          <div className="border-b border-hairline pb-2.5 shrink-0">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
-                <Bike size={16} className="text-[#1E3A5F]" />
+              <h3 className="flex items-center gap-2 text-label text-ink">
+                <Bike size={16} className="text-board-field" />
                 <span>Fleet Roster</span>
               </h3>
-              <span className="text-[10.5px] font-bold font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/60">
-                {filteredRoster.length} of {totalRiders}
+              <span className="text-label font-mono text-ink-muted bg-board-ground px-2 py-0.5 rounded-trim border border-edge">
+                {unknown ? "-- of --" : `${filteredRoster.length} of ${totalRiders}`}
               </span>
             </div>
 
             {/* Search Input */}
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                size={14}
+              />
               <input
                 type="text"
+                aria-label="Search the rider roster"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search riders by name, ID, or phone..."
-                className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E3A5F]/20 focus:border-[#1E3A5F] focus:bg-white transition"
+                className="w-full pl-9 pr-8 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
                 >
                   <X size={13} />
                 </button>
@@ -428,62 +412,82 @@ export const RiderTrackingModule: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedPresence("ALL")}
-                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition ${
                   selectedPresence === "ALL"
-                    ? "bg-[#1E3A5F] text-white shadow-2xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-board-field text-white"
+                    : "bg-board-ground text-ink-muted hover:bg-board-ground"
                 }`}
               >
-                All ({totalRiders})
+                All ({fig(totalRiders)})
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedPresence("AVAILABLE")}
-                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
+                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
                   selectedPresence === "AVAILABLE"
-                    ? "bg-emerald-600 text-white shadow-2xs"
-                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    ? "bg-status-done-ink text-white"
+                    : "bg-status-done-fill text-status-done-ink hover:bg-status-done-fill"
                 }`}
               >
-                <span>Ready ({countReady})</span>
+                <span>Ready ({fig(countReady)})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedPresence("BUSY")}
-                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
+                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
                   selectedPresence === "BUSY"
-                    ? "bg-amber-600 text-white shadow-2xs"
-                    : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+                    ? "bg-status-waiting-ink text-white"
+                    : "bg-status-waiting-fill text-status-waiting-ink hover:bg-status-waiting-fill"
                 }`}
               >
-                <span>Busy ({countBusy})</span>
+                <span>Busy ({fig(countBusy)})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedPresence("DISCONNECTED")}
-                className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
+                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
                   selectedPresence === "DISCONNECTED"
-                    ? "bg-red-600 text-white shadow-2xs"
-                    : "bg-red-50 text-red-700 hover:bg-red-100"
+                    ? "bg-signal text-white"
+                    : "bg-status-act-fill text-status-act-ink hover:bg-status-act-fill"
                 }`}
               >
-                <span>Signal ({countDisconnected})</span>
+                <span>Signal ({fig(countDisconnected)})</span>
               </button>
             </div>
           </div>
 
           {/* Roster Scrollable Cards */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
             {isLoading ? (
-              <div className="p-8 text-center text-slate-400 space-y-2">
-                <RefreshCw size={22} className="animate-spin text-[#1E3A5F] mx-auto" />
-                <p className="text-xs font-bold text-slate-600">Streaming live rider fleet...</p>
+              <div className="p-8 text-center text-ink-muted space-y-2">
+                <RefreshCw size={22} className="animate-spin text-board-field mx-auto" />
+                <p className="text-label text-ink-muted">Streaming live rider fleet...</p>
+              </div>
+            ) : unknown ? (
+              /* Ordered before the empty branch. This panel used to say
+               "No riders are currently registered in the system." whenever
+               /riders was unreachable, which is a claim about the business
+               rather than about the request. */
+              <div className="p-6 text-center space-y-2.5 my-auto">
+                <WifiOff size={22} className="mx-auto text-status-act-ink" />
+                <p className="text-panel text-ink">The roster did not load</p>
+                <p className="text-body text-ink-muted">
+                  {loadError} Nobody is listed because nothing arrived.
+                </p>
+                <button
+                  type="button"
+                  onClick={reload}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+                >
+                  <RefreshCw size={14} />
+                  <span>Try again</span>
+                </button>
               </div>
             ) : filteredRoster.length === 0 ? (
-              <div className="p-6 text-center text-slate-400 space-y-2.5 my-auto">
-                <Bike size={28} className="mx-auto text-slate-300" />
-                <p className="text-xs font-extrabold text-slate-700">No riders found</p>
-                <p className="text-[11px] text-slate-500">
+              <div className="p-6 text-center text-ink-muted space-y-2.5 my-auto">
+                <Bike size={28} className="mx-auto text-ink-muted" />
+                <p className="text-label text-ink">No riders found</p>
+                <p className="text-label text-ink-muted">
                   {search || selectedPresence !== "ALL" || hideOffline
                     ? "No riders match your search or presence filter."
                     : "No riders are currently registered in the system."}
@@ -492,7 +496,7 @@ export const RiderTrackingModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-trim bg-board-ground hover:bg-board-ground text-ink text-label transition"
                   >
                     <span>Reset Filter</span>
                   </button>
@@ -504,57 +508,63 @@ export const RiderTrackingModule: React.FC = () => {
                 const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE;
 
                 return (
-                  <div
+                  /* Was a <div> carrying `w-full text-left cursor-pointer` and
+                   an onClick: styled to look exactly like the button it was
+                   not, so selecting a rider from the roster was mouse-only.
+                   aria-pressed reports which rider the map is showing. */
+                  <button
                     key={r.id}
+                    type="button"
+                    aria-pressed={isSelected}
                     onClick={() => {
                       setSelectedRiderId(r.id);
                       if (mobileTab === "roster") setMobileTab("map");
                     }}
-                    className={`w-full text-left p-3 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                    className={`w-full space-y-2 rounded-plate border border-edge p-3 text-left transition-colors ${
                       isSelected
-                        ? "bg-blue-50/80 border-blue-400 ring-2 ring-blue-100 shadow-xs"
-                        : "bg-slate-50/70 border-slate-200/80 hover:bg-slate-100 hover:border-slate-300"
+                        ? "border-board-field bg-board-ground"
+                        : "border-edge bg-board-plate hover:bg-board-ground"
                     }`}
                   >
                     {/* Top Row: Avatar, Name, Presence Badge */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          className="w-8 h-8 rounded-xl text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs"
+                          className="w-8 h-8 rounded-plate text-white flex items-center justify-center text-label shrink-0"
                           style={{ backgroundColor: theme.primaryColor }}
                         >
                           {r.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-bold text-xs text-slate-900 truncate">{r.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono font-medium">#{r.id}</p>
+                          <p className=" text-label text-ink truncate">{r.name}</p>
+                          <p className="text-body text-ink-muted font-mono">#{r.id}</p>
                         </div>
                       </div>
 
                       <span
-                        className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase border shrink-0 ${theme.badgeClassName}`}
+                        className={`text-micro px-2 py-0.5 rounded-full uppercase border border-edge shrink-0 ${theme.badgeClassName}`}
                       >
                         {theme.badgeLabel}
                       </span>
                     </div>
 
                     {/* Bottom Row: Phone, Battery, Errand Pill */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1.5 border-t border-slate-200/50">
+                    <div className="flex items-center justify-between text-label text-ink-muted pt-1.5 border-t border-edge">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (r.phone) handleCopy(r.phone, `roster-phone-${r.id}`);
                         }}
-                        className="flex items-center gap-1 text-slate-600 hover:text-blue-700 transition"
+                        className="flex items-center gap-1 text-ink-muted hover:text-ink transition"
                         title="Click to copy phone"
                       >
-                        <Phone size={11} className="text-slate-400" />
-                        <span className="font-mono">{r.phone || "—"}</span>
+                        <Phone size={11} className="text-ink-muted" />
+                        <span className="font-mono">{r.phone || "--"}</span>
                         {r.phone && (
-                          <span className="text-slate-400">
+                          <span className="text-ink-muted">
                             {copiedId === `roster-phone-${r.id}` ? (
-                              <Check size={10} className="text-emerald-600" />
+                              <Check size={10} className="text-status-done-ink" />
                             ) : (
                               <Copy size={10} />
                             )}
@@ -564,11 +574,11 @@ export const RiderTrackingModule: React.FC = () => {
 
                       <div className="flex items-center gap-2">
                         {r.batteryLevel !== null && r.batteryLevel !== undefined && (
-                          <span className="flex items-center gap-0.5 font-mono text-[10px] text-slate-500 font-semibold">
+                          <span className="flex items-center gap-0.5 font-mono text-label text-ink-muted">
                             {r.batteryLevel <= 0.2 ? (
-                              <BatteryLow size={12} className="text-red-500" />
+                              <BatteryLow size={12} className="text-signal" />
                             ) : (
-                              <Battery size={12} className="text-slate-400" />
+                              <Battery size={12} className="text-ink-muted" />
                             )}
                             <span>
                               {r.batteryLevel <= 1
@@ -579,13 +589,13 @@ export const RiderTrackingModule: React.FC = () => {
                         )}
 
                         {r.activeOrdersCount > 0 && (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800 font-bold text-[9px]">
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-trim bg-status-waiting-fill text-status-waiting-ink text-label">
                             {r.activeOrdersCount} active
                           </span>
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })
             )}
@@ -595,4 +605,3 @@ export const RiderTrackingModule: React.FC = () => {
     </div>
   );
 };
-

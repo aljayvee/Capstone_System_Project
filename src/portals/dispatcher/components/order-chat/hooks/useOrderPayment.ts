@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { apiClient } from "../../../../../services/apiClient";
-import { useInlineMessage } from "../../ui/DispatcherInlineBanner";
+import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL

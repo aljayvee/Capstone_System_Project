@@ -3,8 +3,7 @@ import { useSearchParams } from "react-router";
 import { io, Socket } from "socket.io-client";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
-import { postUnderReview, postAccepted, postDeclined } from "../../../services/chatSystemMessages";
-import { ErrandService } from "../../../services/errandService";
+import { postAccepted, postDeclined } from "../../../services/chatSystemMessages";
 import { getMemoryAccessToken } from "../../../services/apiClient";
 import { Errand, ErrandStatus } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
@@ -36,7 +35,12 @@ function mapPrismaErrand(prismaErrand: any): Errand {
   return {
     id: prismaErrand.id,
     customerName: prismaErrand.customer?.name || "Customer",
-    customerPhone: prismaErrand.customer?.phone || "09123456789",
+    // Empty, never a placeholder number. This defaulted to "09123456789",
+    // which is a dialable Philippine mobile number that a dispatcher chasing a
+    // stalled run would have had no way to tell apart from a real one. It also
+    // defeated every display-level fallback downstream, since the field was
+    // always truthy by the time a panel saw it.
+    customerPhone: prismaErrand.customer?.phone || "",
     category: prismaErrand.category,
     description: prismaErrand.description,
     pickupAddress: prismaErrand.pickupAddress,
@@ -98,6 +102,18 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
   const [searchParams, setSearchParams] = useSearchParams();
   const [errands, setErrands] = useState<Errand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Why these exist: `isLoading` was computed and returned here from the start,
+  // and the portal never destructured it, so every panel rendered its empty
+  // state during the first fetch as though the data were confirmed empty. And
+  // `fetchOrders` caught its own failure with a console.warn and left `errands`
+  // at [], so a dead API and a quiet shift were indistinguishable: the console
+  // answered both with "All Caught Up" under a green check. A failure is now a
+  // state a panel can render, and PanelState orders it ahead of empty.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Failed mutations used to surface through `alert()`, a blocking browser
+  // dialog that is not in-context recovery and cannot be styled or read by the
+  // panel that caused it.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const requestedTab = searchParams.get("tab");
   const activeTab: DispatcherTab = TAB_IDS.includes(requestedTab as DispatcherTab)
@@ -136,8 +152,15 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       const res = await apiClient.get("/errands");
       const mapped = (res.data || []).map(mapPrismaErrand);
       setErrands(mapped);
+      setLoadError(null);
     } catch (err) {
       console.warn("Failed to fetch errands:", err);
+      // The existing list is left alone on purpose. A dispatcher reading a
+      // stale board beside an explicit warning is better served than one
+      // reading an empty board that looks like a finished shift.
+      setLoadError(
+        "The dispatch service did not answer. The board may be out of date, and new orders may not be showing."
+      );
     }
   }, []);
 
@@ -240,7 +263,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       if (!payload?.errandId) return;
       console.warn(
         `[Dispatch] Errand ${payload.errandId}: rider ${payload.riderId} declared ` +
-          `₱${payload.declaredTotal} at a shop that issued no receipt. Unverified — ` +
+          `₱${payload.declaredTotal} at a shop that issued no receipt. Unverified: ` +
           `the photo shows the goods, not a printed total.`
       );
     });
@@ -264,7 +287,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     const dispatcherId = currentUser?.id || 1;
 
     try {
-      const res = await apiClient.patch(`/errands/${orderId}/claim`);
+      await apiClient.patch(`/errands/${orderId}/claim`);
 
       // Write meta info to Firebase Realtime Database
       try {
@@ -330,16 +353,24 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
   };
 
   const handleUpdateStatus = async (errandId: string, targetStatus: ErrandStatus) => {
+    setActionError(null);
     try {
-      const res = await apiClient.patch(`/errands/${errandId}/status`, { status: targetStatus });
+      await apiClient.patch(`/errands/${errandId}/status`, { status: targetStatus });
       setErrands((prev) =>
         prev.map((e) => (e.id === errandId ? { ...e, status: targetStatus } : e))
       );
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to update status");
-      // Fallback update if needed
-      const updated = await ErrandService.updateErrandStatus(errandId, targetStatus);
-      setErrands((prev) => prev.map((e) => (e.id === errandId ? updated : e)));
+      // The old path alerted and then, after the alert, called
+      // ErrandService.updateErrandStatus unguarded as a "fallback". That is a
+      // second write attempt against a status change that had just failed, it
+      // could throw again with nothing to catch it, and it ran whether or not
+      // the first failure was retryable. The failure is now reported in
+      // context and the state is left as the server last described it.
+      setActionError(
+        err?.response?.data?.error ||
+          err?.message ||
+          `This run could not be moved to ${targetStatus}. It may have been changed by someone else.`
+      );
     }
   };
 
@@ -359,7 +390,11 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       );
       fetchOrders();
     } catch (err: any) {
-      alert(err.response?.data?.error || err.message || "Failed to decline order");
+      setActionError(
+        err?.response?.data?.error ||
+          err?.message ||
+          "This run could not be declined. The customer has not been told anything, so it is safe to try again."
+      );
     }
   };
 
@@ -368,6 +403,11 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     setActiveTab,
     errands,
     isLoading,
+    /** Set when the board could not be loaded. Outranks "empty" everywhere. */
+    loadError,
+    /** Set when a claim, status change or decline failed. Replaces alert(). */
+    actionError,
+    dismissActionError: () => setActionError(null),
     selectedErrandId,
     fetchOrders,
     handleClaimOrder,

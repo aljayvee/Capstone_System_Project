@@ -22,9 +22,13 @@ export interface InlineMessage {
 
 const AUTO_DISMISS_MS = 4000;
 
+// Both pairings are token pairs from the status law, computed above 4.5:1.
+// The old success pairing (text-emerald-600 on bg-emerald-50) measured about
+// 3.3:1, so the confirmation a dispatcher most needed to read was the hardest
+// one to read.
 const VARIANT_CLASSES = {
-  success: "text-emerald-600 bg-emerald-50 border-emerald-200",
-  error: "text-rose-600 bg-rose-50 border-rose-200",
+  success: "bg-status-done-fill text-status-done-ink",
+  error: "bg-status-act-fill text-status-act-ink",
 } as const;
 
 interface DispatcherInlineBannerProps {
@@ -45,8 +49,8 @@ export function DispatcherInlineBanner({ message, onDismiss }: DispatcherInlineB
     <p
       role={message.variant === "error" ? "alert" : "status"}
       className={cn(
-        "text-xs text-center font-bold animate-fade-in py-1.5 rounded-lg border flex items-center justify-center gap-1.5",
-        VARIANT_CLASSES[message.variant]
+        "flex items-center justify-center gap-1.5 rounded-plate px-3 py-2 text-label animate-fade-in",
+        VARIANT_CLASSES[message.variant],
       )}
     >
       {message.variant === "error" && <AlertCircle size={13} className="shrink-0" />}
@@ -69,7 +73,10 @@ export function DispatcherInlineBanner({ message, onDismiss }: DispatcherInlineB
 export function useInlineMessage() {
   const [message, setMessage] = React.useState<InlineMessage | null>(null);
 
-  const showSuccess = React.useCallback((text: string) => setMessage({ text, variant: "success" }), []);
+  const showSuccess = React.useCallback(
+    (text: string) => setMessage({ text, variant: "success" }),
+    [],
+  );
   const showError = React.useCallback((text: string) => setMessage({ text, variant: "error" }), []);
   const dismiss = React.useCallback(() => setMessage(null), []);
 

@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Bike, Navigation, WifiOff, Package, Moon, Target, Eye, EyeOff } from "lucide-react";
+import {
+  Bike,
+  Navigation,
+  WifiOff,
+  Package,
+  Moon,
+  Target,
+  Eye,
+  EyeOff,
+  MapPinOff,
+} from "lucide-react";
 import { createRoot, Root } from "react-dom/client";
 import { createMarkerTween, type MarkerTween } from "./markerTween";
 import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
@@ -18,6 +28,29 @@ interface LiveFleetMapProps {
   hideOffline?: boolean;
   onToggleHideOffline?: () => void;
   filterStatus?: RiderPresenceState | "ALL";
+  /**
+   * ADDITIVE: true when the caller could not read presence at all.
+   *
+   * The live pill derives its own counts from `riders`, so an unreachable
+   * /riders made it print "0 Ready, 0 Busy" behind a pulsing green dot. The
+   * Owner Portal's tracking screen now reports that failure in its header,
+   * and without this the map contradicted it two inches below.
+   *
+   * Defaults to false, so the dispatcher's existing call is unchanged.
+   */
+  presenceUnknown?: boolean;
+  /**
+   * ADDITIVE: set when the live position feed itself is down or refusing.
+   *
+   * Distinct from `presenceUnknown`, which means the ROSTER could not be read.
+   * These two fail independently and look identical on an unlabelled map: an
+   * empty board either way. When the roster is healthy and the feed is not,
+   * the map is showing a real fleet with every pin missing, and saying so is
+   * the difference between "nobody is on shift" and "we cannot see anybody".
+   *
+   * Defaults to null, so existing calls are unchanged.
+   */
+  telemetryError?: string | null;
   /**
    * Encoded polyline of the selected errand's road-network route
    * (Errand.routeGeometry). Drawing the real route rather than straight lines
@@ -84,7 +117,7 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
 
       {/* 3. Main Circular Vehicle Container (42x42px) */}
       <div
-        className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-lg transition-all"
+        className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center transition-all"
         style={{
           border: `3px solid ${theme.primaryColor}`,
           boxShadow: isSelected
@@ -123,7 +156,8 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
 
       {/* 5. Floating Rider Name Tag Pill */}
       <div
-        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shadow-md border flex items-center gap-1 transition-all"
+        data-elevate
+        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-trim text-[10px] font-extrabold shadow-plate border flex items-center gap-1 transition-all"
         style={{
           backgroundColor: isSelected ? "#0F172A" : "rgba(15, 23, 42, 0.85)",
           color: "#FFFFFF",
@@ -149,6 +183,8 @@ export default function LiveFleetMap({
   hideOffline = false,
   onToggleHideOffline,
   filterStatus = "ALL",
+  presenceUnknown = false,
+  telemetryError = null,
   routeGeometry = null,
   routeStops = [],
   routeDestination = null,
@@ -166,6 +202,11 @@ export default function LiveFleetMap({
   const routeMarkersRef = useRef<google.maps.Marker[]>([]);
   const routeCirclesRef = useRef<google.maps.Circle[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  // Without this the catch below only reached the console, isMapLoaded stayed
+  // false, and the "Loading Live Fleet Map..." veil span forever: a failed map
+  // was indistinguishable from a slow one, on the surface whose whole job is
+  // saying where the riders are. AGENT_HANDSHAKE [LOCKED] Anti-Happy-Path.
+  const [mapError, setMapError] = useState<string | null>(null);
   const markerLibraryRef = useRef<any>(null);
 
   // Draws the selected errand's road-network route: the decoded polyline plus
@@ -279,8 +320,10 @@ export default function LiveFleetMap({
         mapInstance.current = new Map(mapRef.current, mapOptions);
 
         setIsMapLoaded(true);
+        setMapError(null);
       } catch (err) {
         console.error("Failed to load Google Maps:", err);
+        setMapError("The map did not load.");
       }
     };
 
@@ -402,19 +445,68 @@ export default function LiveFleetMap({
   const activeBusyCount = riders.filter((r) => r.presence === "BUSY").length;
 
   return (
-    <div className="w-full h-full relative rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200/90 shadow-inner bg-slate-50">
+    <div className="w-full h-full relative rounded-plate overflow-hidden border border-edge bg-slate-50">
       <div ref={mapRef} className="w-full h-full bg-slate-100" />
 
-      {!isMapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-50/85 backdrop-blur-xs z-30">
-          <div className="flex flex-col items-center gap-2.5 p-6 rounded-2xl bg-white/90 border border-slate-200 shadow-md">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#1E3A5F] border-t-transparent"></div>
-            <p className="text-xs font-bold text-slate-700">Loading Live Fleet Map...</p>
+      {/* The feed is down but the map itself is fine, so this is a banner and
+          not a scrim: the base map, the controls and any route still drawn on
+          it remain usable and worth looking at. Only the rider pins are gone,
+          and that is exactly what this says. */}
+      {telemetryError && !mapError ? (
+        <div
+          role="alert"
+          className="absolute inset-x-0 top-0 z-30 flex items-start gap-2 border-b border-edge bg-status-act-fill px-3 py-2"
+        >
+          <MapPinOff size={14} className="mt-0.5 shrink-0 text-status-act-ink" />
+          <div className="min-w-0">
+            <p className="text-label text-status-act-ink">{telemetryError}</p>
+            <p className="text-micro text-status-act-ink/80">
+              No rider pins can be drawn until it is restored. The roster still shows who is on
+              duty, and their last known stop is on the errand record.
+            </p>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Floating Status & Controls Bar */}
+      {/* Error first, then loading. A spinner that never resolves is a worse
+          answer than a sentence saying the map failed and what still works. */}
+      {mapError ? (
+        <div
+          role="alert"
+          className="absolute inset-0 flex items-center justify-center bg-board-ground/95 z-30 p-6"
+        >
+          <div className="flex max-w-xs flex-col items-center gap-2 rounded-plate border border-edge bg-board-plate p-6 text-center">
+            <MapPinOff size={20} className="text-status-act-ink" />
+            <p className="text-label text-ink">{mapError}</p>
+            <p className="text-label text-ink-muted">
+              Rider positions are unavailable on the map. The roster beside it still lists who is
+              on duty.
+            </p>
+          </div>
+        </div>
+      ) : !isMapLoaded ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-board-ground/95 z-30">
+          <div
+            className="flex flex-col items-center gap-2.5 rounded-plate border border-edge bg-board-plate p-6"
+            aria-busy="true"
+          >
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-board-field border-t-transparent"></div>
+            <p className="text-label text-ink">Loading Live Fleet Map...</p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Floating Status & Controls Bar.
+          Unmounted while the map is unusable rather than left to print
+          through the failure scrim. The scrim is 95% opaque and sits at z-30
+          over this bar at z-20, so on a failed map these three controls came
+          through at about 1:1 against the wash: illegible, unclickable, and
+          reading as a rendering fault rather than as a disabled state. They
+          also control a map that is not there. Nothing here is a filter on
+          the roster - "Hide Off-Duty" is passed in by the parent and the
+          roster keeps its own presence strip - so removing them for the
+          duration costs the reader no capability. */}
+      {isMapLoaded && !mapError ? (
       <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-wrap items-center justify-end gap-2 z-20">
         {/* Toggle Hide Offline */}
         {onToggleHideOffline && (
@@ -422,7 +514,8 @@ export default function LiveFleetMap({
             type="button"
             onClick={onToggleHideOffline}
             title={hideOffline ? "Show off-duty riders" : "Hide off-duty riders"}
-            className={`h-9 px-3 text-xs font-bold rounded-xl shadow-md border transition flex items-center gap-1.5 ${
+            data-elevate
+            className={`h-9 px-3 text-xs font-bold rounded-plate shadow-plate border transition flex items-center gap-1.5 ${
               hideOffline
                 ? "bg-slate-800 text-white border-slate-800"
                 : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900"
@@ -438,23 +531,38 @@ export default function LiveFleetMap({
           type="button"
           onClick={handleFitBounds}
           title="Fit all visible riders on map"
-          className="h-9 px-3 bg-white/95 hover:bg-white text-slate-700 text-xs font-bold rounded-xl shadow-md border border-slate-200/80 flex items-center gap-1.5 transition active:scale-95 hover:text-[#1E3A5F]"
+          data-elevate
+          className="h-9 px-3 bg-white/95 hover:bg-white text-slate-700 text-xs font-bold rounded-plate shadow-plate border border-slate-200/80 flex items-center gap-1.5 transition hover:text-[#1E3A5F]"
         >
           <Target size={15} className="text-[#1E3A5F]" />
           <span className="hidden sm:inline">Fit All</span>
         </button>
 
-        {/* Live Active Pill */}
-        <div className="bg-white/95 backdrop-blur-xs px-3 py-2 rounded-xl shadow-md border border-slate-200/80 text-xs font-extrabold text-slate-800 flex items-center gap-2">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-          </span>
+        {/* Live Active Pill.
+
+            The pulsing ring is gone. It was painted unconditionally, so it
+            announced a live feed whatever the counts beside it were, including
+            when they were zero because the roster request had failed. A
+            solid mark still reads as a status; a pulse that never checks
+            anything is an assertion the component cannot support. */}
+        <div className="bg-white/95 px-3 py-2 rounded-plate border border-slate-200/80 text-xs font-bold text-slate-800 flex items-center gap-2">
+          <span
+            className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+              presenceUnknown ? "bg-slate-400" : "bg-emerald-500"
+            }`}
+          />
           <span>
-            {activeReadyCount} Ready • {activeBusyCount} Busy
+            {presenceUnknown ? (
+              "Presence unknown"
+            ) : (
+              <>
+                {activeReadyCount} Ready • {activeBusyCount} Busy
+              </>
+            )}
           </span>
         </div>
       </div>
+      ) : null}
     </div>
   );
 }

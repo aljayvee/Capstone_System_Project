@@ -3,7 +3,7 @@ import { ref, update } from "firebase/database";
 import { toast } from "sonner";
 import { database } from "../../../../../firebase/config";
 import { apiClient } from "../../../../../services/apiClient";
-import { useInlineMessage } from "../../ui/DispatcherInlineBanner";
+import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 import type { EditableItem, StorePinpoint, MerchantCategory, OrderChatMessage } from "../types";
 
@@ -115,13 +115,8 @@ export function useOrderItems({
   }, [messages]);
 
   // ── 4-tier helpers: Store > Merchant Category > Item > Qty ──────────────
-  // A pin categorised in stage 2 IS that category — a Jollibee pinned as Fast
-  // Food doesn't stop being Fast Food when an item gets filed under it here.
-  const pinIndexFromStoreLabel = (label: string): number => {
-    const match = /^Store (\d+)/.exec(label || "");
-    return match ? Number(match[1]) - 1 : -1;
-  };
-
+  // A pin categorised in stage 2 IS that category: a Jollibee pinned as Fast
+  // Food does not stop being Fast Food when an item gets filed under it here.
   const categoryNameForPin = (pin?: StorePinpoint | null): string | null => {
     if (!pin?.categoryId) return null;
     return merchantCategories.find((c) => c.id === pin.categoryId)?.name ?? null;
@@ -300,7 +295,7 @@ export function useOrderItems({
 
       pushMessage({
         type: "order_confirmation",
-        text: "Here's your order breakdown and delivery fee — please review and approve.",
+        text: "Here is your order breakdown and delivery fee. Please review and approve.",
         pinpoints: sanitizedPinpoints,
         items: sanitized,
         groupedItems: nestedGrouped,

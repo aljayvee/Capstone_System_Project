@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ReportState } from "./ReportState";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
@@ -14,31 +15,59 @@ import { formatPeso } from "../../../../../utils/format";
 type Transaction = ApiTransactionSummaryReport["transactions"][number];
 
 const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transactions }) => (
-  <table className="w-full text-xs">
+  <table className="w-full text-label">
     <thead>
-      <tr className="text-left text-slate-500 border-b border-slate-100">
-        <th className="py-2">Errand</th>
-        <th className="py-2">Category</th>
-        <th className="py-2">Rider</th>
-        <th className="py-2">Customer</th>
-        <th className="py-2">Location</th>
-        <th className="py-2 text-right">Amount</th>
-        <th className="py-2 text-right">Delivery Fee</th>
-        <th className="py-2">Payment</th>
-        <th className="py-2">Status</th>
+      <tr className="text-left text-ink-muted border-b border-hairline">
+        <th scope="col" className="py-2">
+          Errand
+        </th>
+        <th scope="col" className="py-2">
+          Category
+        </th>
+        <th scope="col" className="py-2">
+          Rider
+        </th>
+        <th scope="col" className="py-2">
+          Customer
+        </th>
+        <th scope="col" className="py-2">
+          Location
+        </th>
+        <th scope="col" className="py-2 text-right">
+          Amount
+        </th>
+        <th scope="col" className="py-2 text-right">
+          Delivery Fee
+        </th>
+        <th scope="col" className="py-2">
+          Payment
+        </th>
+        {/* The GCash/Maya reference read off whichever photo backed the
+            payment, and whose photo it was — the customer's own upload, or a
+            rider's door-side photo. Null on COD, where there's no receipt to
+            reference at all. */}
+        <th scope="col" className="py-2">
+          Payment Ref #
+        </th>
+        <th scope="col" className="py-2">
+          Evidence
+        </th>
+        <th scope="col" className="py-2">
+          Status
+        </th>
       </tr>
     </thead>
     <tbody>
       {transactions.map((t) => (
-        <tr key={t.transactionId} className="border-b border-slate-50">
-          <td className="py-2 font-mono text-slate-500">{formatErrandId(t.errandId)}</td>
+        <tr key={t.transactionId} className="border-b border-hairline">
+          <td className="py-2 font-mono text-ink-muted">{formatErrandId(t.errandId)}</td>
           <td className="py-2">
             {t.category}
             {/* A multi-stop errand is one transaction but several shops. The
                 badge keeps the column readable while the title carries the rest. */}
             {t.categories.length > 1 && (
               <span
-                className="ml-1 px-1 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold cursor-help"
+                className="ml-1 px-1 py-0.5 rounded bg-board-ground text-ink-muted text-label cursor-help"
                 title={t.categories.join(" · ")}
               >
                 +{t.categories.length - 1}
@@ -46,13 +75,21 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
             )}
           </td>
           <td className="py-2">{t.riderName ?? "Unassigned"}</td>
-          <td className="py-2">{t.customerName ?? "—"}</td>
-          <td className="py-2 text-slate-500 max-w-[160px] truncate">{t.deliveryAddress}</td>
+          <td className="py-2">{t.customerName ?? "--"}</td>
+          <td className="py-2 text-ink-muted max-w-[160px] truncate">{t.deliveryAddress}</td>
           <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.amount)}</td>
           <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.deliveryFee)}</td>
           <td className="py-2">{t.paymentMethod}</td>
+          <td className="py-2 font-mono text-ink-muted">{t.paymentReferenceNo ?? "—"}</td>
+          <td className="py-2 text-ink-muted">
+            {t.paymentEvidenceSource === "customer"
+              ? "Customer upload"
+              : t.paymentEvidenceSource === "rider"
+                ? "Rider photo"
+                : "—"}
+          </td>
           <td className="py-2">
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+            <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
               {t.errandStatus}
             </span>
           </td>
@@ -67,16 +104,18 @@ const SubtotalTable: React.FC<{
   title: string;
   rows: Array<{ name: string; count: number; amount: number }>;
 }> = ({ title, rows }) => (
-  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-    <header className="px-5 py-2.5 border-b border-slate-200">
-      <h4 className="text-xs font-extrabold text-slate-800">{title}</h4>
+  <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+    <header className="px-5 py-2.5 border-b border-edge">
+      <h4 className="text-label text-ink">{title}</h4>
     </header>
-    <table className="w-full text-xs">
+    <table className="w-full text-label">
       <tbody>
         {rows.map((r) => (
-          <tr key={r.name} className="border-t border-slate-50 first:border-t-0">
-            <td className="px-5 py-2 text-slate-600 font-medium">{r.name}</td>
-            <td className="px-5 py-2 text-right font-mono tabular-nums text-slate-500">{r.count}</td>
+          <tr key={r.name} className="border-t border-hairline first:border-t-0">
+            <td className="px-5 py-2 text-ink-muted font-medium">{r.name}</td>
+            <td className="px-5 py-2 text-right font-mono tabular-nums text-ink-muted">
+              {r.count}
+            </td>
             <td className="px-5 py-2 text-right font-mono tabular-nums font-semibold">
               {formatPeso(r.amount)}
             </td>
@@ -93,7 +132,7 @@ export const TransactionSummaryReportView: React.FC = () => {
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { data, isLoading, error } = useReport(apiService.getTransactionSummary, apiRange);
+  const { data, isLoading, error, reload } = useReport(apiService.getTransactionSummary, apiRange);
   const pdf = useReportPdf("transactions", apiRange);
 
   const handleExportCSV = () => {
@@ -109,6 +148,8 @@ export const TransactionSummaryReportView: React.FC = () => {
         "Amount (PHP)",
         "Delivery Fee (PHP)",
         "Payment Method",
+        "Payment Ref #",
+        "Evidence",
         "Errand Status",
         "Date",
       ],
@@ -121,9 +162,15 @@ export const TransactionSummaryReportView: React.FC = () => {
         t.amount,
         t.deliveryFee,
         t.paymentMethod,
+        t.paymentReferenceNo ?? "",
+        t.paymentEvidenceSource === "customer"
+          ? "Customer upload"
+          : t.paymentEvidenceSource === "rider"
+            ? "Rider photo"
+            : "",
         t.errandStatus,
         t.createdAt,
-      ])
+      ]),
     );
   };
 
@@ -139,19 +186,23 @@ export const TransactionSummaryReportView: React.FC = () => {
         exportDisabled={!data}
         isGeneratingPdf={pdf.isGenerating}
       />
-
-      {error && <p className="text-xs text-rose-600">{error}</p>}
-      {isLoading && <p className="text-xs text-slate-400">Loading transaction summary...</p>}
+      <ReportState
+        isLoading={isLoading}
+        error={error}
+        onRetry={reload}
+        title="The transaction summary did not load"
+        loadingRows={6}
+      />
 
       {data && (
         <>
-          <p className="text-xs text-slate-500 font-semibold">
-            {data.rangeLabel} · {data.totals.count} transaction{data.totals.count === 1 ? "" : "s"} ·{" "}
-            {formatPeso(data.totals.amount)}
+          <p className="text-label text-ink-muted">
+            {data.rangeLabel} · {data.totals.count} transaction{data.totals.count === 1 ? "" : "s"}{" "}
+            · {formatPeso(data.totals.amount)}
           </p>
 
           {data.transactions.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200 text-center text-sm text-slate-400">
+            <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
               No transactions recorded for this period.
             </div>
           ) : (
@@ -175,7 +226,7 @@ export const TransactionSummaryReportView: React.FC = () => {
                 />
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm overflow-x-auto">
+              <div className="bg-board-plate border border-edge rounded-plate p-6 overflow-x-auto">
                 <TransactionTable transactions={data.transactions} />
               </div>
             </>

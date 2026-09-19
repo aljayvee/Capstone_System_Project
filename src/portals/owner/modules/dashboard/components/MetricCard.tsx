@@ -1,27 +1,90 @@
 import React from "react";
-import { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/**
+ * One figure, stated plainly.
+ *
+ * This component renders 27 times across seven files, and its old signature
+ * was the single largest source of decorative colour in the portal:
+ *
+ *   interface MetricCardProps { ...; icon: LucideIcon; color: string }
+ *
+ * `color` was a free-form string that call sites filled with twelve different
+ * raw hexes, and `style={{ background: `${color}15` }}` minted a tinted icon
+ * square from whatever arrived. The result was colour assigned per tile rather
+ * than per meaning: "money" came out #10B981 in the sales report, #8B5CF6 in
+ * settlement, #1E3A5F in commission and #B45309 in exceptions. Violet on
+ * "Gross Revenue" said nothing at all.
+ *
+ * `color` is gone. In its place `tone` names a MEANING from the status law, so
+ * a figure can only be coloured when the colour carries information. Most
+ * figures take no tone, and that is correct: a count is just a count.
+ *
+ * Also gone: the tinted icon chip (banned outright by the craft floor, and the
+ * most category-generic element in this codebase), the 16px radius, the drop
+ * shadow and its hover shadow, the 10.5px label and the font-black value. The
+ * plate is flat per AGENT_HANDSHAKE's [LOCKED] Flat Design Surface Purity
+ * invariant: one boundary rule, no elevation.
+ */
+
+const TONE_CLASSES = {
+  neutral: "text-ink",
+  /** Someone must act on this. Shares the signal red's one legal meaning. */
+  act: "text-status-act-ink",
+  /** Finished well. */
+  done: "text-status-done-ink",
+  /** Someone else owes the next move. */
+  waiting: "text-status-waiting-ink",
+} as const;
 
 interface MetricCardProps {
   title: string;
+  /**
+   * Already formatted. Pass "--" when the value is not known, never "0": a
+   * confident zero over a failed request is this portal's oldest defect.
+   */
   value: string;
+  /**
+   * Why the value is absent, when it is. A dash tells a reader that a figure
+   * is missing but not whether nobody earned anything or nobody answered, and
+   * those are opposite facts. Follows the one placeholder in this portal that
+   * already got this right, in RiderPerformanceReportView.
+   */
+  valueTitle?: string;
   sub?: string;
-  icon: LucideIcon;
-  color: string;
+  /**
+   * A bare glyph beside the label. Optional, and it sits on the plate rather
+   * than inside a tinted square.
+   */
+  icon?: LucideIcon;
+  /**
+   * Colours the figure, and only where the colour means something. Defaults to
+   * neutral, which is the right answer for a plain count.
+   */
+  tone?: keyof typeof TONE_CLASSES;
 }
 
-export const MetricCard: React.FC<MetricCardProps> = ({ title, value, sub, icon: Icon, color }) => {
+export const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  value,
+  valueTitle,
+  sub,
+  icon: Icon,
+  tone = "neutral",
+}) => {
   return (
-    <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-xs border border-slate-200/90 space-y-1 transition hover:shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-slate-500 text-[10.5px] font-extrabold uppercase tracking-wider truncate">{title}</p>
-          <p className="mt-0.5 text-slate-900 text-xl sm:text-2xl font-black truncate">{value}</p>
-          {sub ? <p className="mt-0.5 text-slate-500 text-[11px] font-medium truncate">{sub}</p> : null}
-        </div>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ml-2 shadow-2xs" style={{ background: `${color}15` }}>
-          <Icon size={20} style={{ color }} />
-        </div>
+    <div className="space-y-1 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
+      <div className="flex min-w-0 items-center gap-1.5">
+        {Icon ? <Icon size={13} className="shrink-0 text-ink-muted" /> : null}
+        <p className="truncate text-micro uppercase text-ink-muted">{title}</p>
       </div>
+      {/* data-figure gives it tabular numerals, so a value that updates does
+          not shift the digits beside it. */}
+      <p data-figure title={valueTitle} className={cn("truncate text-board", TONE_CLASSES[tone])}>
+        {value}
+      </p>
+      {sub ? <p className="truncate text-label text-ink-muted">{sub}</p> : null}
     </div>
   );
 };

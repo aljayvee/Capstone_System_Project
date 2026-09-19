@@ -27,7 +27,10 @@ export default defineConfig({
             if (id.includes('@googlemaps')) {
               return 'vendor-maps';
             }
-            if (id.includes('recharts') || id.includes('d3-')) {
+            if (id.includes('clsx') || id.includes('tailwind-merge') || id.includes('class-variance-authority')) {
+              return 'vendor-utils';
+            }
+            if (id.includes('recharts') || id.includes('victory-vendor') || id.includes('d3-') || id.includes('react-smooth') || id.includes('recharts-scale')) {
               return 'vendor-charts';
             }
             if (id.includes('@radix-ui')) {
@@ -39,7 +42,7 @@ export default defineConfig({
             if (id.includes('firebase')) {
               return 'vendor-firebase';
             }
-            if (id.includes('react-router') || id.includes('react-dom') || id.includes('react/')) {
+            if (id.includes('react-router') || id.includes('react-dom') || id.includes('/react/') || id.includes('react-is') || id.includes('scheduler')) {
               return 'vendor-react';
             }
           }

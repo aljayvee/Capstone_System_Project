@@ -1,0 +1,157 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   THE OWNER SKIN.
+
+   The Owner Portal runs on the same design system as the Dispatcher console:
+   the same seven type roles, the same three radii, the same status law, the
+   same primitives. It differs in nine colour declarations - eight decisions,
+   since hairline and edge are the two halves of one line-weight relationship
+   and are never chosen separately - and this file is all
+   eight of them.
+
+   HOW THIS WORKS, because it looks impossible at first glance.
+
+   Every token utility in this project compiles to a var() reference, not to a
+   literal. Checked against the built CSS:
+
+     .bg-board-plate { background-color: var(--color-board-plate) }
+     .text-ink       { color: var(--color-ink) }
+     .rounded-plate  { border-radius: var(--radius-plate) }
+
+   Tailwind's @theme block emits those variables into a plain `:root,:host`
+   rule. Custom properties resolve PER ELEMENT, so an element that redefines
+   one overrides it for itself and its whole subtree. Specificity only
+   arbitrates between rules competing for the SAME element, and `:root,:host`
+   can never match a div inside <body>, so there is no contest here at all:
+   no layer trap, no source-order fragility.
+
+   The consequence is the point of the whole file. Every component, every
+   primitive and every shared rule in surfaces.css re-skins for this portal
+   without a single edit, and not one of the Dispatcher console's files
+   changes.
+
+   WHAT IS DELIBERATELY NOT HERE.
+
+   Type roles, radii, --ease-board, the SUGO red signal and the five status
+   tones are absent on purpose. A "waiting" chip that changed colour between
+   the two portals would make the shared vocabulary a fiction. The signal red
+   needs no override because it already matches: the Owner portal's red-600 IS
+   #DC2626.
+
+   Shadows are absent for a different reason. AGENT_HANDSHAKE.md records
+   [LOCKED] Flat Design Surface Purity & Zero-Shadow Invariant: "pure solid
+   flat fills only". This portal is a declared flat surface, so it spends no
+   elevation at all, and structure is carried by ground change, macro-gap and
+   one boundary rule. (--shadow-plate could not be re-skinned anyway: Tailwind
+   resolves a shadow's colour at build time and inlines it, so it is the one
+   token in the system that is not a var.)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+[data-surface="owner"] {
+  /* The field. #1E3A5F was hardcoded 105 times in this portal and #162D4A
+     15 times as its hover, while --dispatcher-navy at theme.css:33 already
+     held the same value and was consumed zero times. Those two hexes are the
+     portal's identity, so they become the field rather than being replaced.
+
+     Deeper than the field sits the navigation rail at #0F2035, shared with
+     the Dispatcher. That gives three navies in a fixed order, darkest first:
+     rail #0F2035, field-deep #162D4A, field #1E3A5F. White on the field is
+     11.5:1. */
+  --color-board-field: #1E3A5F;
+  --color-board-field-deep: #162D4A;
+
+  /* Trim: chrome, icons and text ON the navy field, and the scrollbar thumb
+     on the ground. Two jobs pulling opposite ways, so this value is measured
+     rather than picked.
+
+     It is NOT slate-400 (#94A3B8), which the portal uses on navy today.
+     Slate-400 on #1E3A5F measures 4.49:1 and so fails AA for normal text by
+     one hundredth, and PanelShell sets its figure label in text-board-trim
+     at 12px. The Dispatcher never hit this because its field is #0F2035,
+     where the same slate-400 is a comfortable 6.41:1.
+
+     #98A7BB measures 4.70:1 as text on the field and 2.23:1 as a scrollbar
+     thumb on the ground, against the Dispatcher's own 5.31:1 and 2.67:1. A
+     thumb is a UI component, not text, so its floor is 3:1 for
+     identification and it is doing its job at this strength. Do not
+     "simplify" this back to a palette step. */
+  --color-board-trim: #98A7BB;
+
+  /* The ground and the plate. The portal shipped #F8FAFC (slate-50), and
+     this is slate-100, two steps deeper, for one measured reason: with
+     shadows forfeited to the flat invariant, a white plate on #F8FAFC is a
+     1.5% luminance step and effectively invisible. At slate-100 the plate
+     separates on value, and a single boundary rule finishes the job.
+
+     Both are slate neutrals, so the pinned palette holds. Where the
+     Dispatcher is warm bone, this portal is cool slate; that is the whole
+     visible difference between the two skins. */
+  --color-board-ground: #F1F5F9;
+  --color-board-plate: #FFFFFF;
+
+  /* Two ink levels, both slate-tinted, and deliberately no third.
+
+     The portal shipped text-slate-400 on light grounds 142 times at 2.83:1
+     and text-slate-300 14 times at 1.94:1, including the dash at
+     RiderPerformanceReportView.tsx:24 whose entire job is to say that a
+     value is absent. Every one of those resolves to ink-muted. A third,
+     lighter level is exactly how 2.83:1 comes back, so there isn't one.
+
+       --color-ink        16.3:1 on the ground, 17.9:1 on a plate
+       --color-ink-muted   6.9:1 on the ground,  7.6:1 on a plate */
+  --color-ink: #0F172A;
+  --color-ink-muted: #475569;
+
+  /* Two line weights in a fixed relationship, cool to match the ground.
+
+     A surface's own boundary is always heavier than any rule drawn inside
+     it. That is the whole hierarchy, and it is what replaces the ten shadow
+     levels and the depth-4 card nesting this portal shipped: a region is a
+     ground change plus a gap, not a box inside a box.
+
+     Reading the flat invariant precisely, since it bans "decorative card
+     hairline borders": a plate's own edge is structural and stays, a hairline
+     ring added around something for looks does not. */
+  --color-hairline: rgb(100 116 139 / 0.22);
+  --color-edge: rgb(100 116 139 / 0.40);
+}
+
+/* ── The zero-elevation rule, enforced rather than asserted ─────────────────
+
+   This portal is a declared flat surface, and the comment above says it
+   spends no elevation at all. That was an assertion about call sites rather
+   than a property of the stylesheet, and the difference matters: the shared
+   card primitive `DispatcherCard` bakes `shadow-plate` into its class list
+   and `PanelShell` puts `shadow-field` on its header figure. Both are
+   legitimate in the dispatcher, where that single step is reviewed, so
+   neither can be edited.
+
+   Measured before writing this: no Owner file imports DispatcherCard today,
+   and no Owner screen passes a `figure`, so neither shadow currently renders
+   here. This rule is therefore a GUARD, not a repair. It exists because
+   DispatcherCard is the shared card primitive and adopting it is the obvious
+   next refactor for this portal - at which point every white plate on the
+   surface would quietly acquire a drop shadow and contradict the invariant
+   with nothing failing. A finish reviewer read the primitive and concluded
+   exactly that had already happened, which is a fair reading of the code and
+   a good reason to make the stylesheet say what the portal means.
+
+   `shadow-plate` does not compile to `var(--shadow-plate)` - Tailwind emits
+   `--tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, #0f20350f)` - so the skin
+   cannot retire it by redefining a token the way it redefines the other
+   eight. It CAN set the same variable Tailwind composes from, which is what
+   `shadow-none` itself does. Rings and inset rings compose separately and are
+   untouched, so a focus ring still lands. Verified in the browser: the
+   dispatcher keeps its inset highlight, this surface reports none. */
+[data-surface="owner"] .shadow-plate,
+[data-surface="owner"] .shadow-field {
+  --tw-shadow: 0 0 #0000;
+}
+
+/* Elevation survives here in exactly three places, none of them structure:
+   the notification popover, and the two controls plus the name tag that float
+   over map imagery, where a white control on pale tiles needs one step to
+   stay findable. They opt in with data-elevate so the intent is legible in
+   the markup instead of inferred from a class. */
+[data-surface="owner"] [data-elevate].shadow-plate {
+  --tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, #0f20350f);
+}

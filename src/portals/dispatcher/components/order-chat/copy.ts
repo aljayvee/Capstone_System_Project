@@ -63,11 +63,12 @@ export const copy = {
   closedConversation: "This conversation is closed. You can read it, but not reply.",
   chatTab: "Chat",
   stepsTab: "Steps",
+  paymentTab: "Payment",
 
   quickReplies: (who: string) => [
-    "On it — checking your order now.",
+    "On it. Checking your order now.",
     "I've pinned the stores, take a look.",
-    "Sent your list — approve it when you're ready.",
+    "Sent your list. Approve it when you are ready.",
     "Your cash on delivery is confirmed.",
     "Finding you a rider now.",
     `Thanks for waiting, ${who}.`,
@@ -78,10 +79,10 @@ export const copy = {
     checkOrder: (who: string) => `Check what ${who} ordered, then accept it.`,
     waitingOnRevision: (who: string) => `Waiting for ${who} to answer your changes`,
     pinStores: (who: string) => `Pin the shops ${who} needs, then send them over.`,
-    pinStoresNoMap: (who: string) => `Search for the shops ${who} needs — the map is down.`,
+    pinStoresNoMap: (who: string) => `Search for the shops ${who} needs. The map is down.`,
     sendItems: (who: string) => `Put ${who}'s list together and send it for approval.`,
     waitingOnItems: (who: string) => `Waiting for ${who} to approve the item list`,
-    askPayment: (who: string) => `Ask ${who} how she'll pay.`,
+    askPayment: (who: string) => `Ask ${who} how they will pay.`,
     waitingOnPayment: (who: string) => `Waiting for ${who} to choose how to pay`,
     ready: "Everything's confirmed. Send a rider.",
     dispatched: (rider: string) => `${rider} is on the way.`,
@@ -149,21 +150,21 @@ export const copy = {
     hint: "Click the map to drop a pin, or search for a store.",
     searchPlaceholder: "Search for a store in Tacurong…",
     search: "Find",
-    searching: "Searching…",
+    searching: "Searching",
     pickBranch: "Which branch?",
     remove: "Remove",
     setCategory: "What kind of store is this?",
     uncategorised: "Not set",
     send: (who: string) => `Send these stores to ${who}`,
-    sending: "Sending…",
+    sending: "Sending",
     sent: (who: string) => `Stores sent to ${who}.`,
     failed: "Couldn't save the stores. Try again.",
-    atLimit: (max: number) => `That's the limit — ${max} stores for one errand.`,
+    atLimit: (max: number) => `That is the limit: ${max} stores for one errand.`,
     emptyTitle: "No stores pinned yet",
     emptyBody: "Search for the first shop, or click the map.",
 
     /** How sure we are about a pin's category. */
-    categoryGuessed: "guessed — check it",
+    categoryGuessed: "guessed, check it",
     categoryNeeded: "Set the store type",
     categoryGuessedHint: (source: string) =>
       source === "google"
@@ -186,15 +187,15 @@ export const copy = {
     dupCancel: "Cancel",
 
     /** The catalogue lookup failing is not the same as it finding nothing. */
-    catalogueUnreachable: "Couldn't reach your store list — searched the map instead.",
+    catalogueUnreachable: "Could not reach your store list, so the map was searched instead.",
 
     /** Shown instead of the map when Google refuses the key. */
     mapDownTitle: "The store map isn't available right now",
     mapDownBody:
-      "You can still pin stores by searching for them below — everything else about this order works normally.",
+      "You can still pin stores by searching for them below. Everything else about this order works normally.",
     mapDownAdmin: "Tell your admin: map key rejected",
     mapNoKeyAdmin: "Tell your admin: map key missing",
-    mapLoading: "Loading the map…",
+    mapLoading: "Loading the map",
   },
 
   // ── stage 3 — confirm the items ─────────────────────────────────────────
@@ -206,13 +207,13 @@ export const copy = {
     removeItem: "Remove",
     edit: "Change the list",
     send: (who: string) => `Send the list to ${who}`,
-    sending: "Sending…",
-    sent: (who: string) => `Sent — ${who} will see it in the chat.`,
+    sending: "Sending",
+    sent: (who: string) => `Sent. ${who} will see it in the chat.`,
     failed: "Couldn't save the list. Try again.",
     needsOne: "Add at least one item before sending the list.",
-    needsStores: "Pin at least one store first — items are filed under the shop they come from.",
+    needsStores: "Pin at least one store first. Items are filed under the shop they come from.",
     cancel: "Cancel",
-    removedNotice: (item: string) => `"${item}" removed — they were told in the chat.`,
+    removedNotice: (item: string) => `"${item}" removed. They were told in the chat.`,
 
     /** Which shop the rider buys this line at. */
     storeLabel: "Shop",
@@ -220,19 +221,19 @@ export const copy = {
     unassignedTitle: (n: number) =>
       n === 1 ? "One item has no shop yet" : `${n} items have no shop yet`,
     unassignedBody:
-      "They came in with a category but no shop, because the customer picks what they want — not where it comes from. Choose a shop for each so the rider knows where to buy it.",
-    blockedNoStores: "Pin the shops first — every item is bought at one of them.",
-    blockedUnassigned: "Give every item a shop first — the rider needs to know where to go.",
+      "They came in with a category but no shop, because the customer picks what they want, not where it comes from. Choose a shop for each so the rider knows where to buy it.",
+    blockedNoStores: "Pin the shops first. Every item is bought at one of them.",
+    blockedUnassigned: "Give every item a shop first. The rider needs to know where to go.",
   },
 
   // ── stage 4 — payment ───────────────────────────────────────────────────
   stage4: {
     intro: (who: string) =>
-      `${who} chooses how she pays. Anything other than cash is arranged with you directly.`,
-    ask: (who: string) => `Ask ${who} how she'll pay`,
-    asking: "Asking…",
-    asked: (who: string) => `Asked — ${who} will see it in the chat.`,
-    settled: (mode: string) => `Settled — ${mode}.`,
+      `${who} chooses how they pay. Anything other than cash is arranged with you directly.`,
+    ask: (who: string) => `Ask ${who} how they will pay`,
+    asking: "Asking",
+    asked: (who: string) => `Asked. ${who} will see it in the chat.`,
+    settled: (mode: string) => `Settled by ${mode}.`,
     failed: "Couldn't set up payment. Try again.",
     /**
      * Payment cannot be arranged over a basket the customer hasn't agreed to —
@@ -251,12 +252,11 @@ export const copy = {
   // who can say whether it actually landed.
   payments: {
     title: "Payment plan",
-    eyebrow: "50% DOWNPAYMENT",
 
     paidUpFront: "Paid up front",
     paidUpFrontOf: (due: string) => `of ${due} due before dispatch`,
     downpaymentHint: (who: string, amount: string) =>
-      `${who} sends ${amount} — half the item cost — through the Facebook Page. Confirm it here once you see it.`,
+      `${who} sends ${amount}, half the item cost, through the Facebook Page. Confirm it here once you see it.`,
     proofTitle: "Customer's receipt",
     proofNone: "No receipt uploaded yet. They can send one from their app.",
     proofRef: "Reference",
@@ -265,22 +265,26 @@ export const copy = {
     proofDate: "Dated",
     proofRead: (engine: string) => `Read automatically by ${engine}. Check it against the Facebook Page before confirming.`,
     confirmUpfront: "Payment received",
-    confirmingUpfront: "Recording…",
+    confirmingUpfront: "Recording",
     upfrontConfirmed: (amount: string) => `${amount} confirmed.`,
 
     balance: "Balance",
-    balanceHint: "The rider collects this in cash when the items arrive.",
+    balanceHint: "The rider collects this in cash when the items arrive, unless the customer already sent it through the Facebook Page.",
+    balanceProofTitle: "Customer's balance receipt",
+    confirmBalance: "Balance received",
+    confirmingBalance: "Recording",
+    balanceConfirmed: (amount: string) => `${amount} balance confirmed. The rider no longer needs to collect it.`,
 
-    overageTitle: "Goods held — receipt came in higher",
+    overageTitle: "Goods held, receipt came in higher",
     overageHint: (agreed: string, actual: string, gap: string) =>
-      `The receipt is ${actual} against the ${agreed} agreed — ${gap} nobody has approved. ` +
+      `The receipt is ${actual} against the ${agreed} agreed, so ${gap} of it nobody has approved. ` +
       `Call the customer. The rider cannot hand the items over until this clears.`,
     confirmTopUp: "Top-up received",
-    confirmingTopUp: "Recording…",
-    topUpConfirmed: (amount: string) => `${amount} top-up confirmed — goods released.`,
+    confirmingTopUp: "Recording",
+    topUpConfirmed: (amount: string) => `${amount} top-up confirmed. Goods released.`,
 
     refund: "Record a refund",
-    refunding: "Recording…",
+    refunding: "Recording",
     refundConfirmed: (amount: string) => `${amount} refund recorded.`,
     refundReasonRequired: "Say why this refund was issued.",
 
@@ -294,22 +298,36 @@ export const copy = {
     failed: "Couldn't record that. Check the amount and try again.",
     /** The server compares against what is due and refuses a mismatch. */
     mismatch: (due: string) => `That doesn't match the ${due} due.`,
+
+    // ── the standalone half-payment panel, beside the chat rather than
+    // inside the stage accordion ────────────────────────────────────────
+    halfPaymentPanelTitle: "Half-payment",
+    halfPaymentWaitingUpfront: "Waiting on the upfront payment first — see the Payment stage.",
+    halfPaymentOveragePending:
+      "Goods are held on a receipt overage. Resolve that in the Payment stage before the balance applies.",
+    halfPaymentRefunded: "This errand was refunded — there's no balance to collect.",
+    proofPhotoTitle: "Photo evidence",
+    proofPhotoNone: "No photo uploaded yet.",
+    proofPhotoCustomer: "Uploaded by the customer",
+    proofPhotoRider: "Photographed by the rider at the door",
+    proofPhotoSuperseded: "Replaced by a later upload",
+    proofPhotoCapturedAt: (when: string) => `Captured ${when}`,
   },
 
   // ── stage 5 — send a rider ──────────────────────────────────────────────
   stage5: {
     intro: "The nearest free rider gets this. You don't pick one.",
     send: "Send a rider",
-    sending: "Finding the nearest rider…",
+    sending: "Finding the nearest rider",
     assigned: (rider: string, ref: string) => `${rider} is assigned to order #${ref}.`,
-    failed: "Couldn't send a rider right now — try again in a moment.",
+    failed: "Could not send a rider right now. Try again in a moment.",
     missingTitle: "Before a rider can go:",
     missingStores: "Stores pinned",
     missingApproval: (who: string) => `${who} approved the list`,
     missingUpfront: "Payment confirmed",
     missingPayment: "Payment settled",
     /** Shown when the CTA is pressed while blocked — it navigates instead of doing nothing. */
-    redirect: (stage: string) => `${stage} first — then you can send a rider.`,
+    redirect: (stage: string) => `${stage} first, then you can send a rider.`,
   },
 
   // ── close-without-order dialog ──────────────────────────────────────────
