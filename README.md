@@ -173,19 +173,16 @@ The output bundle is compiled into the `dist/` directory.
 
 ## Production Deployment
 
-The production web assets are hosted on a Contabo Linux VPS running Nginx:
+The production web assets are served over HTTPS via Nginx on a Linux production host:
 
-1. Generate a clean production build:
+1. Generate an optimized production build:
    ```bash
    npm run build
    ```
 
-2. Sync the compiled `dist` directory to the web root on the VPS:
-   ```bash
-   scp -r dist/* root@109.123.239.182:/var/www/web/dist/
-   ```
+2. Deploy the compiled `dist/` bundle to the configured web root directory on your web server.
 
-3. Nginx serves the static bundle over HTTPS at `https://sugoonthego.online`.
+3. Nginx serves the static bundle and handles HTTPS termination.
 
 ---
 
