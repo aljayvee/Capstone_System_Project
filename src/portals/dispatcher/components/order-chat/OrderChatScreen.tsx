@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { ArrowLeft, MoreHorizontal, MessageSquare, ListChecks, Slash, X } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, MessageSquare, ListChecks, Wallet, Slash, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "../../../../services/apiClient";
 import { formatErrandId } from "../../../../utils/formatErrandId";
@@ -26,6 +26,7 @@ import { Stage2PinStores } from "./stages/Stage2PinStores";
 import { Stage3ConfirmItems } from "./stages/Stage3ConfirmItems";
 import { Stage4Payment } from "./stages/Stage4Payment";
 import { Stage5SendRider } from "./stages/Stage5SendRider";
+import { PaymentProofPanel } from "./PaymentProofPanel";
 
 import { useOrderDetails } from "./hooks/useOrderDetails";
 import { useOrderChat } from "./hooks/useOrderChat";
@@ -74,7 +75,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     refresh,
   } = useOrderDetails(orderId, dispatcher);
 
-  const [mobilePane, setMobilePane] = useState<"chat" | "steps">("steps");
+  const [mobilePane, setMobilePane] = useState<"chat" | "steps" | "payment">("steps");
   const [openStageId, setOpenStageId] = useState<StageId | null>(null);
   const [showAll, setShowAll] = useState(readStoredShowAll);
   const [flashId, setFlashId] = useState<StageId | null>(null);
@@ -518,13 +519,29 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             {model.doneCount}/5
           </span>
         </button>
+        {payments.ledger?.hasLedger && (
+          <button
+            type="button"
+            onClick={() => setMobilePane("payment")}
+            aria-pressed={mobilePane === "payment"}
+            className={cn(
+              "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
+              mobilePane === "payment"
+                ? "bg-board-field text-board-plate"
+                : "bg-board-ground text-ink-muted hover:text-ink"
+            )}
+          >
+            <Wallet size={14} />
+            {copy.paymentTab}
+          </button>
+        )}
       </div>
 
       {/* ── workspace ─────────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 flex">
         <section
           className={cn(
-            "min-h-0 flex-col bg-board-plate lg:flex lg:w-[38%] lg:border-r lg:border-edge",
+            "min-h-0 flex-col bg-board-plate lg:flex lg:w-[30%] lg:border-r lg:border-edge",
             mobilePane === "chat" ? "flex w-full" : "hidden"
           )}
         >
@@ -551,7 +568,8 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
 
         <section
           className={cn(
-            "min-h-0 overflow-y-auto bg-board-ground lg:block lg:w-[62%]",
+            "min-h-0 overflow-y-auto bg-board-ground lg:block",
+            payments.ledger?.hasLedger ? "lg:w-[45%]" : "lg:w-[70%]",
             mobilePane === "steps" ? "block w-full" : "hidden"
           )}
         >
@@ -572,6 +590,23 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             />
           </div>
         </section>
+
+        {/* ── half-payment, standalone and persistent — not one of the five
+            sequential stages, so a dispatcher can check the receipt or
+            confirm the balance no matter which stage is open. Only takes up
+            room on a ledger errand; COD gets its 70/30 split back. ────────── */}
+        {payments.ledger?.hasLedger && (
+          <section
+            className={cn(
+              "min-h-0 overflow-y-auto bg-board-plate lg:flex lg:w-[25%] lg:border-l lg:border-edge",
+              mobilePane === "payment" ? "flex w-full" : "hidden"
+            )}
+          >
+            <div className="w-full p-3 sm:p-4">
+              <PaymentProofPanel errandId={orderId} payments={payments} readOnly={isReadOnly} />
+            </div>
+          </section>
+        )}
       </div>
 
       {/* ── close without an order ────────────────────────────────────────── */}

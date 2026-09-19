@@ -127,7 +127,11 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
                     ? "No receipt"
                     : img.kind === "PROOF_OF_DELIVERY"
                       ? "Handover"
-                      : "Receipt"}
+                      : img.kind === "CASH_COLLECTED"
+                        ? "Cash"
+                        : img.kind === "PAYMENT_PROOF" || img.kind === "RIDER_BALANCE_PROOF"
+                          ? "Payment"
+                          : "Receipt"}
                 </span>
               </div>
               {figure !== null && figure !== undefined && (

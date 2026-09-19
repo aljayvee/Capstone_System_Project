@@ -46,7 +46,7 @@ export interface PaymentLedger {
   entries: PaymentLedgerEntry[];
 }
 
-type Action = "upfront" | "top-up" | "refund";
+type Action = "upfront" | "top-up" | "balance" | "refund";
 
 interface UseOrderPaymentsArgs {
   orderId: string;
@@ -110,13 +110,14 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
    * be told the figure, not that something went wrong.
    */
   const record = useCallback(
-    async (action: Action, amount: number, note?: string) => {
+    async (action: Action, amount: number, note?: string, proofImageId?: number) => {
       setPending(action);
       feedback.dismiss();
       try {
         const res = await apiClient.post(`/errands/${orderId}/payments/${action}`, {
           amount,
           ...(note?.trim() ? { note: note.trim() } : {}),
+          ...(proofImageId ? { proofImageId } : {}),
         });
         const next: PaymentLedger | null = res.data?.ledger ?? null;
         setLedger(next);
@@ -146,8 +147,8 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
   );
 
   const confirmUpfront = useCallback(
-    async (amount: number, note?: string) => {
-      const r = await record("upfront", amount, note);
+    async (amount: number, note?: string, proofImageId?: number) => {
+      const r = await record("upfront", amount, note, proofImageId);
       if (r.ok) feedback.showSuccess(copy.payments.upfrontConfirmed(peso(amount)));
       return r.ok;
     },
@@ -158,6 +159,15 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     async (amount: number, note?: string) => {
       const r = await record("top-up", amount, note);
       if (r.ok) feedback.showSuccess(copy.payments.topUpConfirmed(peso(amount)));
+      return r.ok;
+    },
+    [record, feedback]
+  );
+
+  const confirmBalance = useCallback(
+    async (amount: number, note?: string, proofImageId?: number) => {
+      const r = await record("balance", amount, note, proofImageId);
+      if (r.ok) feedback.showSuccess(copy.payments.balanceConfirmed(peso(amount)));
       return r.ok;
     },
     [record, feedback]
@@ -181,6 +191,7 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     refresh,
     confirmUpfront,
     confirmTopUp,
+    confirmBalance,
     recordRefund,
     /**
      * True unless money is owed before dispatch and has not arrived. Always true

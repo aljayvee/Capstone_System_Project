@@ -63,6 +63,7 @@ export const copy = {
   closedConversation: "This conversation is closed. You can read it, but not reply.",
   chatTab: "Chat",
   stepsTab: "Steps",
+  paymentTab: "Payment",
 
   quickReplies: (who: string) => [
     "On it. Checking your order now.",
@@ -268,7 +269,11 @@ export const copy = {
     upfrontConfirmed: (amount: string) => `${amount} confirmed.`,
 
     balance: "Balance",
-    balanceHint: "The rider collects this in cash when the items arrive.",
+    balanceHint: "The rider collects this in cash when the items arrive, unless the customer already sent it through the Facebook Page.",
+    balanceProofTitle: "Customer's balance receipt",
+    confirmBalance: "Balance received",
+    confirmingBalance: "Recording",
+    balanceConfirmed: (amount: string) => `${amount} balance confirmed. The rider no longer needs to collect it.`,
 
     overageTitle: "Goods held, receipt came in higher",
     overageHint: (agreed: string, actual: string, gap: string) =>
@@ -293,6 +298,20 @@ export const copy = {
     failed: "Couldn't record that. Check the amount and try again.",
     /** The server compares against what is due and refuses a mismatch. */
     mismatch: (due: string) => `That doesn't match the ${due} due.`,
+
+    // ── the standalone half-payment panel, beside the chat rather than
+    // inside the stage accordion ────────────────────────────────────────
+    halfPaymentPanelTitle: "Half-payment",
+    halfPaymentWaitingUpfront: "Waiting on the upfront payment first — see the Payment stage.",
+    halfPaymentOveragePending:
+      "Goods are held on a receipt overage. Resolve that in the Payment stage before the balance applies.",
+    halfPaymentRefunded: "This errand was refunded — there's no balance to collect.",
+    proofPhotoTitle: "Photo evidence",
+    proofPhotoNone: "No photo uploaded yet.",
+    proofPhotoCustomer: "Uploaded by the customer",
+    proofPhotoRider: "Photographed by the rider at the door",
+    proofPhotoSuperseded: "Replaced by a later upload",
+    proofPhotoCapturedAt: (when: string) => `Captured ${when}`,
   },
 
   // ── stage 5 — send a rider ──────────────────────────────────────────────

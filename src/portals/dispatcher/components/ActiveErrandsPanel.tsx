@@ -9,7 +9,7 @@ import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
-import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { RUN_PROGRESSION, progressIndexOf } from "@/lib/statusPresentation";
 
 interface ActiveErrandsPanelProps {
@@ -161,6 +161,18 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
           {filteredErrands.map((e) => {
             const progressIndex = progressIndexOf(e.status);
             const eta = summarizeEta(e.etaLowAt, e.etaHighAt);
+            // No badge existed anywhere for "this errand still owes a balance
+            // while it's already out for delivery" — a dispatcher had no way to
+            // tell a GCash/Maya run that needs cash-collection supervision apart
+            // from an ordinary COD one. Gated on progressIndex (the same table
+            // the milestone rail below already reads) rather than matching the
+            // raw status string — the API and the type union disagree on
+            // spelling ("IN_TRANSIT" vs "IN TRANSIT" vs "In Route"), which is
+            // exactly the mismatch statusPresentation.ts exists to paper over.
+            const needsSupervision =
+              e.paymentPlan?.hasLedger &&
+              e.paymentPlan?.state === "AWAITING_BALANCE" &&
+              progressIndex >= 1;
             const items =
               e.pabiliDetails && e.pabiliDetails.length > 0
                 ? e.pabiliDetails
@@ -187,6 +199,11 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                       {/* Was the raw status in an ad-hoc blue pill with a
                           pulsing dot. */}
                       <StatusChip status={e.status} />
+                      {needsSupervision ? (
+                        <DispatcherBadge variant="warning">
+                          Balance outstanding
+                        </DispatcherBadge>
+                      ) : null}
                       {eta ? (
                         <span
                           className={cn(

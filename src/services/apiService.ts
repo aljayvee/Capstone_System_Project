@@ -230,19 +230,34 @@ export interface ApiErrandException {
 /** Proof metadata — never the blob. Fetch one image by id to see the bytes. */
 export interface ApiProofImage {
   id: number;
-  kind: "RECEIPT" | "NO_RECEIPT" | "PROOF_OF_DELIVERY" | string;
+  kind:
+    | "RECEIPT"
+    | "NO_RECEIPT"
+    | "PROOF_OF_DELIVERY"
+    | "PAYMENT_PROOF"
+    | "RIDER_BALANCE_PROOF"
+    | "CASH_COLLECTED"
+    | string;
   pinpointId: number | null;
+  /** Exactly one of these is ever set — who captured this photo. */
+  riderId?: number | null;
+  customerId?: number | null;
   mimeType: string;
   byteSize: number;
   clarityVerdict: string | null;
   capturedAt: string;
   verified: boolean;
   declaredTotal: number | null;
+  /** Set once a later upload has replaced this one — null means "current". */
+  supersededAt?: string | null;
   extraction: {
     extractedTotal: number | null;
     confirmedTotal: number | null;
     status: string;
     engine: string | null;
+    referenceNo?: string | null;
+    transactionId?: string | null;
+    extractedDate?: string | null;
   } | null;
 }
 
@@ -515,6 +530,13 @@ export interface ApiTransactionSummaryReport extends ReportMeta {
     amount: number;
     deliveryFee: number;
     paymentMethod: string;
+    /** The GCash/Maya reference number read off whichever photo backed the payment. */
+    paymentReferenceNo: string | null;
+    paymentTransactionId: string | null;
+    /** Who attested the money arrived — the dispatcher/owner who confirmed it. */
+    paymentConfirmedBy: string | null;
+    /** Whose photo backed the confirmation, where one exists. */
+    paymentEvidenceSource: "customer" | "rider" | null;
     status: string;
     errandStatus: string;
     /** Written once at creation and never advanced — see the report's notes. */
@@ -927,9 +949,11 @@ export const apiService = {
    * The photos behind one errand — metadata only, so a queue of ten rows does
    * not pull ten megabytes of base64 nobody has looked at yet.
    */
-  async listProofImages(errandId: string): Promise<ApiProofImage[] | null> {
+  async listProofImages(errandId: string, kind?: string): Promise<ApiProofImage[] | null> {
     try {
-      const response = await apiClient.get<ApiProofImage[]>(`/errands/${errandId}/proof-images`);
+      const response = await apiClient.get<ApiProofImage[]>(`/errands/${errandId}/proof-images`, {
+        params: kind ? { kind } : undefined,
+      });
       return response.data;
     } catch (err) {
       console.warn("API unavailable", err);

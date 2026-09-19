@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
-import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 
@@ -201,10 +201,11 @@ export function RecentChatsPanel({
                 or store category set the width of the whole table. */}
             <table className="w-full table-fixed text-left">
               <colgroup>
-                <col className="w-[18%]" />
-                <col className="w-[30%]" />
-                <col className="w-[20%]" />
-                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[24%]" />
+                <col className="w-[16%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
                 <col className="w-[14%]" />
               </colgroup>
               <thead className="border-b border-hairline bg-board-ground">
@@ -213,39 +214,56 @@ export function RecentChatsPanel({
                   <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Customer</th>
                   <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Category</th>
                   <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Status</th>
+                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Payment</th>
                   <th className="px-4 py-2.5 text-right text-micro uppercase text-ink-muted">
                     <span className="sr-only">Open the conversation</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline">
-                {paginatedErrands.map((e) => (
-                  <tr key={e.id} className="transition-colors hover:bg-board-ground">
-                    <td data-figure className="truncate px-4 py-3 font-mono text-label text-ink">
-                      {formatErrandId(e.id)}
-                    </td>
-                    <td className="truncate px-4 py-3 text-body text-ink">
-                      {e.customerName || "Customer"}
-                    </td>
-                    <td className="truncate px-4 py-3 text-body text-ink-muted">
-                      {e.category || "General errand"}
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* Was the raw value in a locally-computed colour. */}
-                      <StatusChip status={e.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <DispatcherButton
-                        variant="secondary"
-                        size="sm"
-                        icon={<Eye size={14} />}
-                        onClick={() => onOpenChat(e.id)}
-                      >
-                        Open
-                      </DispatcherButton>
-                    </td>
-                  </tr>
-                ))}
+                {paginatedErrands.map((e) => {
+                  // Same supervision signal as ActiveErrandsPanel: an
+                  // outstanding balance on a run that's already claimed and
+                  // moving, with no dispatcher-visible flag for it before now.
+                  const needsSupervision =
+                    e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+                  return (
+                    <tr key={e.id} className="transition-colors hover:bg-board-ground">
+                      <td data-figure className="truncate px-4 py-3 font-mono text-label text-ink">
+                        {formatErrandId(e.id)}
+                      </td>
+                      <td className="truncate px-4 py-3 text-body text-ink">
+                        {e.customerName || "Customer"}
+                      </td>
+                      <td className="truncate px-4 py-3 text-body text-ink-muted">
+                        {e.category || "General errand"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {/* Was the raw value in a locally-computed colour. */}
+                        <StatusChip status={e.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {needsSupervision ? (
+                          <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
+                        ) : (
+                          <span className="text-label text-ink-muted">
+                            {e.paymentSelection?.paymentMode?.name || "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <DispatcherButton
+                          variant="secondary"
+                          size="sm"
+                          icon={<Eye size={14} />}
+                          onClick={() => onOpenChat(e.id)}
+                        >
+                          Open
+                        </DispatcherButton>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

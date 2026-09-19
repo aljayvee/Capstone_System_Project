@@ -42,6 +42,16 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
         <th scope="col" className="py-2">
           Payment
         </th>
+        {/* The GCash/Maya reference read off whichever photo backed the
+            payment, and whose photo it was — the customer's own upload, or a
+            rider's door-side photo. Null on COD, where there's no receipt to
+            reference at all. */}
+        <th scope="col" className="py-2">
+          Payment Ref #
+        </th>
+        <th scope="col" className="py-2">
+          Evidence
+        </th>
         <th scope="col" className="py-2">
           Status
         </th>
@@ -70,6 +80,14 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
           <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.amount)}</td>
           <td className="py-2 text-right font-mono tabular-nums">{formatPeso(t.deliveryFee)}</td>
           <td className="py-2">{t.paymentMethod}</td>
+          <td className="py-2 font-mono text-ink-muted">{t.paymentReferenceNo ?? "—"}</td>
+          <td className="py-2 text-ink-muted">
+            {t.paymentEvidenceSource === "customer"
+              ? "Customer upload"
+              : t.paymentEvidenceSource === "rider"
+                ? "Rider photo"
+                : "—"}
+          </td>
           <td className="py-2">
             <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
               {t.errandStatus}
@@ -130,6 +148,8 @@ export const TransactionSummaryReportView: React.FC = () => {
         "Amount (PHP)",
         "Delivery Fee (PHP)",
         "Payment Method",
+        "Payment Ref #",
+        "Evidence",
         "Errand Status",
         "Date",
       ],
@@ -142,6 +162,12 @@ export const TransactionSummaryReportView: React.FC = () => {
         t.amount,
         t.deliveryFee,
         t.paymentMethod,
+        t.paymentReferenceNo ?? "",
+        t.paymentEvidenceSource === "customer"
+          ? "Customer upload"
+          : t.paymentEvidenceSource === "rider"
+            ? "Rider photo"
+            : "",
         t.errandStatus,
         t.createdAt,
       ]),

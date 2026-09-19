@@ -35,7 +35,7 @@ import type { useOrderPayments } from "./hooks/useOrderPayments";
  * gets vouched for.
  */
 
-const peso = (n: number) =>
+export const peso = (n: number) =>
   `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 interface PaymentLedgerPanelProps {
@@ -100,7 +100,12 @@ export function PaymentLedgerPanel({
           Cloud Vision. It does NOT confirm anything - OCR can be fooled by an
           edited image and the money is real - but it puts a reference on screen
           that the dispatcher can search the Facebook Page for, instead of
-          confirming from memory. */}
+          confirming from memory.
+
+          Balance-state proof viewing and confirmation now live in the
+          standalone PaymentProofPanel (the chat's right-side panel), not
+          here — this stays scoped to the upfront half, which is still part
+          of the sequential Stage 4 flow. */}
       {ledger.state === "AWAITING_UPFRONT" && (
         <div>
           <DispatcherCard.Label as="h5">{c.proofTitle}</DispatcherCard.Label>
@@ -172,8 +177,13 @@ export function PaymentLedgerPanel({
         </div>
       )}
 
-      {!readOnly && ledger.state === "AWAITING_BALANCE" && (
-        <p className="m-0 text-body text-ink-muted">{c.balanceHint}</p>
+      {/* Confirming the balance itself happens in the standalone
+          PaymentProofPanel now — this just points there so a dispatcher
+          working the stage accordion isn't left wondering where it went. */}
+      {ledger.state === "AWAITING_BALANCE" && (
+        <p className="m-0 text-body text-ink-muted">
+          {c.balanceHint} See the Half-payment panel to confirm it.
+        </p>
       )}
 
       {ledger.state === "SETTLED" && (
@@ -253,7 +263,7 @@ const KIND_LABEL: Record<string, string> = {
   REFUND: "Refund",
 };
 
-function PlanBadge({ state }: { state: string }) {
+export function PlanBadge({ state }: { state: string }) {
   switch (state) {
     case "AWAITING_UPFRONT":
       return <DispatcherBadge variant="warning">Awaiting payment</DispatcherBadge>;
@@ -276,7 +286,7 @@ function PlanBadge({ state }: { state: string }) {
  * A null value says the OCR did not return this field, in words. It used to
  * render an em dash, which reads as a value rather than as its absence.
  */
-function ProofRow({
+export function ProofRow({
   label,
   value,
   mono = false,
@@ -303,7 +313,7 @@ function ProofRow({
   );
 }
 
-function Figure({
+export function Figure({
   label,
   value,
   caption,
@@ -334,7 +344,7 @@ function Figure({
  * amount on the Facebook Page must be able to say so, and the refusal that
  * follows is the control working, not an obstacle.
  */
-function AttestationForm({
+export function AttestationForm({
   hint,
   defaultAmount,
   submitLabel,

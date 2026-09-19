@@ -13,7 +13,7 @@ import {
   Phone,
   ShieldCheck,
 } from "lucide-react";
-import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { Field, fieldInputClasses } from "@/components/panel/Field";
@@ -148,6 +148,11 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
     (errand as any).paymentSelection?.paymentMode?.name ?? null;
 
   const progressIndex = progressIndexOf(errand.status);
+
+  // Same supervision signal as ActiveErrandsPanel/RecentChatsPanel: a run
+  // that's out and still owes a balance had no flag at all before now.
+  const needsBalanceSupervision =
+    errand.paymentPlan?.hasLedger && errand.paymentPlan?.state === "AWAITING_BALANCE" && progressIndex >= 1;
 
   const handleCopyId = () => {
     navigator.clipboard.writeText(formatErrandId(errand.id));
@@ -438,11 +443,16 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 </p>
               ) : null}
 
-              <p className="mt-2 text-label text-ink-muted">
-                The delivery fee is realised on completion.{" "}
-                {paymentModeName
-                  ? `The customer pays by ${paymentModeName}.`
-                  : "No payment mode has been chosen yet."}
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-label text-ink-muted">
+                <span>
+                  The delivery fee is realised on completion.{" "}
+                  {paymentModeName
+                    ? `The customer pays by ${paymentModeName}.`
+                    : "No payment mode has been chosen yet."}
+                </span>
+                {needsBalanceSupervision ? (
+                  <DispatcherBadge variant="warning">Balance outstanding</DispatcherBadge>
+                ) : null}
               </p>
             </DispatcherCard.Region>
           </>
