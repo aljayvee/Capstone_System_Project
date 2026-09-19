@@ -107,10 +107,28 @@ apiClient.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
-      } catch (refreshErr) {
+      } catch (refreshErr: any) {
         processQueue(refreshErr, null);
         setMemoryAccessToken(null);
-        if (onLogoutCallback) {
+        const errorMsg = String(
+          refreshErr?.response?.data?.error || refreshErr?.response?.data?.message || ""
+        );
+        const isSuperseded =
+          errorMsg.toLowerCase().includes("another device") ||
+          errorMsg.includes("SUPERSEDED");
+
+        if (isSuperseded && typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("sugo:session-superseded", {
+              detail: {
+                reason: "SUPERSEDED_BY_ANOTHER_DEVICE",
+                deviceInfo: "Another Device",
+                ipAddress: "External IP",
+                timestamp: new Date().toISOString(),
+              },
+            })
+          );
+        } else if (onLogoutCallback) {
           onLogoutCallback();
         }
         return Promise.reject(refreshErr);

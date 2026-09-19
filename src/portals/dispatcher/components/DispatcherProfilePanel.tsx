@@ -22,6 +22,7 @@ import { Field, fieldInputClasses } from "@/components/panel/Field";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { useDraft, forgetDrafts } from "../lib/useDraft";
 import { cn } from "@/lib/utils";
+import { AccountSecurityLogsView } from "@/components/account/AccountSecurityLogsView";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -92,6 +93,7 @@ export function DispatcherProfilePanel() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState<"profile" | "security">("profile");
 
   /**
    * Drafted, keyed by user id: the portal unmounts this panel on every tab
@@ -314,11 +316,36 @@ export function DispatcherProfilePanel() {
       title="Your profile"
       detail={profile?.username ? `Signed in as ${profile.username}` : "Your account and sign-in"}
     >
-      {/* Two columns above xl. A single 3xl column left about 45% of a 1440
-          viewport empty, which is a lot of nothing on the one surface in this
-          product that argues for density. The prose measure is still capped;
-          it is the shelf that got used. */}
-      <div className="grid max-w-6xl grid-cols-1 items-start gap-3 pb-2 xl:grid-cols-2">
+      {/* Sub-tab segmented control */}
+      <div className="mb-4 flex items-center gap-1.5 border-b border-hairline pb-2.5">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("profile")}
+          className={cn(
+            "px-3.5 py-1.5 text-label font-medium rounded-plate transition-colors cursor-pointer",
+            activeSubTab === "profile"
+              ? "bg-board-field text-white"
+              : "text-ink-muted hover:text-ink hover:bg-board-ground"
+          )}
+        >
+          Profile Information
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab("security")}
+          className={cn(
+            "px-3.5 py-1.5 text-label font-medium rounded-plate transition-colors cursor-pointer",
+            activeSubTab === "security"
+              ? "bg-board-field text-white"
+              : "text-ink-muted hover:text-ink hover:bg-board-ground"
+          )}
+        >
+          Account Logs &amp; Security
+        </button>
+      </div>
+
+      {activeSubTab === "profile" ? (
+        <div className="grid max-w-6xl grid-cols-1 items-start gap-3 pb-2 xl:grid-cols-2">
         {/* who you are */}
         <DispatcherCard padding="md">
           <div className="flex items-center gap-4">
@@ -658,6 +685,11 @@ export function DispatcherProfilePanel() {
           </div>
         </DispatcherCard>
       </div>
+      ) : (
+        <div className="max-w-6xl pb-4">
+          <AccountSecurityLogsView showHeader={false} />
+        </div>
+      )}
     </PanelShell>
   );
 }

@@ -111,16 +111,30 @@
   - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\CommissionReportView.tsx` (Default preset set to "TODAY")
   - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\RiderPerformanceReportView.tsx` (Default preset set to "TODAY")
   - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\ExceptionReportView.tsx` (Default preset set to "TODAY")
-  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\TransactionSummaryReportView.tsx` (Added `<>` Full Screen table button and full-screen modal overlay with Esc listener and CSV export)
+  - `C:\Capstone_Server\server\prisma\schema.prisma` (Added `AccountLoginLog` model mapped to `account_login_logs` with indexes on `[userId, role]` and `[createdAt]`)
+  - `C:\Capstone_Server\server\src\lib\requestContext.ts` (Added `parseDeviceInfo` utility to extract client browser and operating system hints from User-Agent)
+  - `C:\Capstone_Server\server\src\lib\socket.ts` (Added `user:${userId}` room join for staff sockets and exported `notifySessionRevoked` broadcast helper)
+  - `C:\Capstone_Server\server\src\services\sessionService.ts` (Added `findActiveStaffSession`, `listActiveSessions`, `revokeOtherSessions`, `recordLoginLog`, and `getAccountLoginLogs`)
+  - `C:\Capstone_Server\server\src\validators\authValidators.ts` (Added `confirmTakeover?: boolean` to `loginSchema`)
+  - `C:\Capstone_Server\server\src\controllers\authController.ts` & `routes\authRoutes.ts` (Added single-device takeover gate returning `anotherDeviceActive: true`, superseded session revocation with `notifySessionRevoked`, session listing endpoint `GET /api/account/sessions`, remote session termination `DELETE /api/account/sessions/:sessionId` & `POST /api/account/sessions/revoke-others`, and audit log retrieval `GET /api/account/login-logs`)
+  - `C:\Capstone_Project_Web\src\types\auth.ts` (Added `ActiveSession`, `AccountLoginLog`, `SupersededSessionInfo`, `AnotherDeviceActivePayload`, and updated `AuthContextType`)
+  - `C:\Capstone_Project_Web\src\services\apiService.ts` (Added `getActiveSessions`, `revokeSession`, `revokeOtherSessions`, `getAccountLoginLogs`, and updated `login` with `confirmTakeover`)
+  - `C:\Capstone_Project_Web\src\services\apiClient.ts` (Configured 401 refresh handler to dispatch window event `sugo:session-superseded` upon device eviction)
+  - `C:\Capstone_Project_Web\src\context\AuthContext.tsx` (Added `supersededInfo`, `isSessionExpired`, Socket.IO listener for `session:revoked`, window event listener for `sugo:session-superseded`, `dismissSupersededNotice`, and `dismissSessionExpiredNotice`)
+  - `C:\Capstone_Project_Web\src\hooks\useIdleTimer.ts` (Created 30-min idle governance hook: 28m active, 2m countdown warning with mouse/keyboard/scroll tracking)
+  - `C:\Capstone_Project_Web\src\components\modals\SessionModals.tsx` (Created `AnotherDeviceEvictionModal`, `SessionExpiryWarningModal`, and `SessionExpiredNoticeModal`)
+  - `C:\Capstone_Project_Web\src\components\modals\SessionGuard.tsx` (Mounted central session lifecycle and eviction guard inside `<AuthProvider>`)
+  - `C:\Capstone_Project_Web\src\app\App.tsx` (Integrated `<SessionGuard />` across all web portal routes)
+  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Added interactive Takeover Confirmation Dialog when existing session is active on another device)
+  - `C:\Capstone_Project_Web\src\components\account\AccountSecurityLogsView.tsx` (Built adaptive Active Devices list with remote sign-out CTAs and filterable Login History / Security Audit table with design system tokens)
+  - `C:\Capstone_Project_Web\src\portals\dispatcher\components\DispatcherProfilePanel.tsx` (Added sub-tab navigation: `[ Profile Information | Account Logs & Security ]` embedding `AccountSecurityLogsView`)
+  - `C:\Capstone_Project_Web\src\portals\owner\OwnerPortal.tsx` (Integrated `"security"` module in `ModuleId`, `MODULE_IDS`, `NAV_SECTIONS["Settings"]`, sidebar footer profile click, and main console rendering)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
-  - `npm test` verified 52 passed test suites (743 tests passing) on Capstone_Server/server.
-  - Backend changes committed and pushed to `origin main` (commit `4c10390`).
+  - `npm test` verified 53 passed test suites (745 tests passing) on Capstone_Server/server.
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
-  - `npm run build` completed cleanly on Capstone_Project_Web (dist/ built in 1m 6s).
+  - `npm run build` completed cleanly on Capstone_Project_Web (dist/ built in 38.27s).
 * **Notes for Claude & Next Session**:
-  - Backend server updated with `TZ=Asia/Manila` and client-passed date parameter in `analyticsService` and `reportService`.
-  - Frontend presets unified to "Today (Default)", "Week", "Month", "Year" with "Today (Default)" active across all reports and dashboard.
-  - Transaction Summary table full-screen modal implemented (`<>` button).
-  - Production build in `dist/` is ready for user deployment to Contabo VPS via SCP.
-
+  - Web portal enterprise session governance and account logs are fully deployed in source code.
+  - Exclusivity rules and inactivity timers strictly apply to administrative roles (`OWNER`, `DISPATCHER`), leaving mobile customer/rider experiences untouched.
+  - When deploying to Contabo VPS via SCP, production assets are built in `C:\Capstone_Project_Web\dist`.

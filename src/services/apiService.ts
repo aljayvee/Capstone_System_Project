@@ -1,6 +1,6 @@
 import { apiClient, setMemoryAccessToken } from "./apiClient";
 import { filenameFromDisposition } from "../utils/downloadBlob";
-import { User } from "../types/auth";
+import { User, ActiveSession, AccountLoginLog } from "../types/auth";
 
 export interface ApiUser {
   id: number;
@@ -41,6 +41,16 @@ export interface LoginSuccessResponse {
   message?: string;
 }
 
+export interface LoginAnotherDeviceResponse {
+  anotherDeviceActive: true;
+  existingSession: {
+    ipAddress: string;
+    deviceInfo: string;
+    lastUsedAt: string;
+    createdAt: string;
+  };
+}
+
 export interface LoginErrorResponse {
   error: string;
   statusCode?: number;
@@ -48,10 +58,18 @@ export interface LoginErrorResponse {
   isRateLimit?: boolean;
 }
 
-export type LoginResponse = LoginSuccessResponse | LoginChallengeResponse | LoginErrorResponse;
+export type LoginResponse =
+  | LoginSuccessResponse
+  | LoginChallengeResponse
+  | LoginAnotherDeviceResponse
+  | LoginErrorResponse;
 
 export function isLoginChallenge(res: LoginResponse): res is LoginChallengeResponse {
   return "challengeToken" in res;
+}
+
+export function isAnotherDeviceActive(res: LoginResponse): res is LoginAnotherDeviceResponse {
+  return "anotherDeviceActive" in res && (res as any).anotherDeviceActive === true;
 }
 
 export interface CompleteLoginProfileInput {
@@ -604,12 +622,15 @@ export const apiService = {
   // `identifier` is a username OR an email address — the server decides which by
   // looking for "@". The wire key stays `username` because the rider mobile app
   // is a separate deploy that still posts that field.
-  async login(identifier: string, password: string): Promise<LoginResponse> {
+  async login(identifier: string, password: string, confirmTakeover?: boolean): Promise<LoginResponse> {
     try {
-      const response = await apiClient.post("/auth/login", { username: identifier, password });
+      const response = await apiClient.post("/auth/login", {
+        username: identifier,
+        password,
+        confirmTakeover,
+      });
       const data = response.data;
-      // A challenge response carries no token, so this is correctly skipped and
-      // no session is established until the challenge is completed.
+      // A challenge or another-device prompt response carries no token, so this is correctly skipped
       if (data.token) {
         setMemoryAccessToken(data.token);
       }
@@ -1009,6 +1030,47 @@ export const apiService = {
     } catch (err) {
       console.warn("API Error:", err);
       return null;
+    }
+  },
+
+  // Active Sessions & Account Logs
+  async getActiveSessions(): Promise<ActiveSession[]> {
+    try {
+      const response = await apiClient.get<{ sessions: ActiveSession[] }>("/account/sessions");
+      return response.data?.sessions || [];
+    } catch (err) {
+      console.warn("Failed to fetch active sessions:", err);
+      return [];
+    }
+  },
+
+  async revokeSession(sessionId: string): Promise<boolean> {
+    try {
+      await apiClient.delete(`/account/sessions/${sessionId}`);
+      return true;
+    } catch (err) {
+      console.warn("Failed to revoke session:", err);
+      return false;
+    }
+  },
+
+  async revokeOtherSessions(): Promise<boolean> {
+    try {
+      await apiClient.post("/account/sessions/revoke-others");
+      return true;
+    } catch (err) {
+      console.warn("Failed to revoke other sessions:", err);
+      return false;
+    }
+  },
+
+  async getAccountLoginLogs(limit = 50): Promise<AccountLoginLog[]> {
+    try {
+      const response = await apiClient.get<{ logs: AccountLoginLog[] }>(`/account/login-logs?limit=${limit}`);
+      return response.data?.logs || [];
+    } catch (err) {
+      console.warn("Failed to fetch account login logs:", err);
+      return [];
     }
   },
 };

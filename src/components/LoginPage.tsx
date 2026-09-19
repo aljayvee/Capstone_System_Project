@@ -2,14 +2,22 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Eye, EyeOff, ChevronRight,
-  Loader2
+  Loader2, ShieldAlert, Laptop, Globe, Clock
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { UserRole, User as UserType } from "../types/auth";
-import { apiService, isLoginChallenge } from "../services/apiService";
+import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
 import type { LoginSuccessResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 const MobileAppNoticeModal = React.lazy(() =>
   import("./MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
 );
@@ -77,6 +85,12 @@ export default function LoginPage() {
   const [challengeExpiresAt, setChallengeExpiresAt] = useState(0);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [isResending, setIsResending] = useState(false);
+  const [takeoverNotice, setTakeoverNotice] = useState<{
+    ipAddress: string;
+    deviceInfo: string;
+    lastUsedAt: string;
+    createdAt: string;
+  } | null>(null);
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
 
@@ -219,6 +233,13 @@ export default function LoginPage() {
         return;
       }
 
+      // Check if this staff account is already actively signed in on another device
+      if (isAnotherDeviceActive(response)) {
+        setIsLoading(false);
+        setTakeoverNotice(response.existingSession);
+        return;
+      }
+
       // Must be checked before touching response.user: a challenge response has
       // no user object to read a role off.
       if (isLoginChallenge(response)) {
@@ -228,12 +249,45 @@ export default function LoginPage() {
 
       completeSession(response);
     } catch (err: any) {
-      console.error("Login execution error:", err);
       setIsLoading(false);
       setActiveAlert({
         variant: "error",
         title: "Connection Error",
         message: err.message || "An unexpected error occurred during login.",
+      });
+    }
+  };
+
+  const handleConfirmTakeover = async () => {
+    setTakeoverNotice(null);
+    setIsLoading(true);
+    try {
+      const response = await apiService.login(identifier.trim(), password.trim(), true);
+      if ("error" in response) {
+        setIsLoading(false);
+        setActiveAlert({
+          variant: "error",
+          title: "Sign In Failed",
+          message: response.error || "Unable to complete session takeover.",
+        });
+        return;
+      }
+      if (isAnotherDeviceActive(response)) {
+        setIsLoading(false);
+        setTakeoverNotice(response.existingSession);
+        return;
+      }
+      if (isLoginChallenge(response)) {
+        enterChallenge(response);
+        return;
+      }
+      completeSession(response);
+    } catch (err: any) {
+      setIsLoading(false);
+      setActiveAlert({
+        variant: "error",
+        title: "Connection Error",
+        message: err.message || "Unable to complete takeover.",
       });
     }
   };
@@ -543,6 +597,78 @@ export default function LoginPage() {
           Tacurong City Logistics &amp; Fleet Operations
         </p>
       </footer>
+
+      {/* Another Device Active Takeover Confirmation Modal */}
+      {takeoverNotice && (
+        <Dialog open={true} onOpenChange={() => setTakeoverNotice(null)}>
+          <DialogContent className="max-w-md bg-slate-900 border border-amber-500/20 text-white shadow-2xl p-6 rounded-2xl">
+            <DialogHeader className="gap-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <ShieldAlert size={24} />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-white tracking-tight">
+                  Another Device Is Signed In
+                </DialogTitle>
+                <DialogDescription className="text-slate-300 text-sm mt-1">
+                  This account is currently active on another device. Signing in here will sign out the other device.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+
+            <div className="my-4 p-3.5 rounded-xl bg-slate-950 border border-white/10 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <Laptop size={14} className="text-slate-400" />
+                  Active Device
+                </span>
+                <span className="font-medium text-slate-200">{takeoverNotice.deviceInfo || "Unknown Device"}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <Globe size={14} className="text-slate-400" />
+                  IP Address
+                </span>
+                <span className="font-mono text-slate-200">{takeoverNotice.ipAddress || "Unknown IP"}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <Clock size={14} className="text-slate-400" />
+                  Last Active
+                </span>
+                <span className="font-mono text-slate-200">
+                  {new Date(takeoverNotice.lastUsedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4 flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setTakeoverNotice(null)}
+                className="w-full sm:w-1/2 px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-slate-300 font-medium text-sm transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTakeover}
+                disabled={isLoading}
+                className="w-full sm:w-1/2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <span>Continue Here</span>
+                )}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Rider / Customer Mobile Redirection Modal */}
       {mobileAppRoleAlert && (

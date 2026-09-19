@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { User, AuthContextType } from "../types/auth";
+import { User, AuthContextType, SupersededSessionInfo } from "../types/auth";
 import { setMemoryAccessToken, getMemoryAccessToken, setOnLogoutCallback, apiClient } from "../services/apiClient";
 import { endRealtimeSession, ensureRealtimeSession } from "../firebase/realtimeSession";
+import { io } from "socket.io-client";
 
 const USER_SESSION_KEY = "errand_system_session_user";
 
@@ -19,6 +20,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [token, setTokenState] = useState<string | null>(() => getMemoryAccessToken());
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [supersededInfo, setSupersededInfo] = useState<SupersededSessionInfo | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState<boolean>(false);
 
   const updateToken = useCallback((newToken: string | null) => {
     setMemoryAccessToken(newToken);
@@ -129,6 +132,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const dismissSupersededNotice = useCallback(() => {
+    setSupersededInfo(null);
+    void logout();
+  }, [logout]);
+
+  const dismissSessionExpiredNotice = useCallback(() => {
+    setIsSessionExpired(false);
+    void logout();
+  }, [logout]);
+
+  const notifySessionExpired = useCallback(() => {
+    setIsSessionExpired(true);
+    void logout();
+  }, [logout]);
+
+  // Listen for custom window event from apiClient 401 interceptor
+  useEffect(() => {
+    const handleSuperseded = (e: Event) => {
+      const customEvent = e as CustomEvent<SupersededSessionInfo>;
+      if (customEvent.detail) {
+        setSupersededInfo(customEvent.detail);
+        void endRealtimeSession();
+        setUser(null);
+        updateToken(null);
+        sessionStorage.removeItem(USER_SESSION_KEY);
+        if (typeof document !== "undefined") {
+          document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
+        }
+      }
+    };
+
+    window.addEventListener("sugo:session-superseded", handleSuperseded);
+    return () => {
+      window.removeEventListener("sugo:session-superseded", handleSuperseded);
+    };
+  }, [updateToken]);
+
+  // Connect Socket.IO to receive instant push eviction when superseded
+  useEffect(() => {
+    if (!token || !user) return;
+
+    const backendUrl = (import.meta as any).env?.VITE_API_URL
+      ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/?$/, "")
+      : "http://localhost:5000";
+
+    const socket = io(backendUrl, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+
+    socket.on("session:revoked", (payload: any) => {
+      if (payload?.reason === "SUPERSEDED_BY_ANOTHER_DEVICE") {
+        setSupersededInfo({
+          ipAddress: payload.newDevice?.ipAddress || "Another IP",
+          deviceInfo: payload.newDevice?.deviceInfo || "Another Device",
+          timestamp: payload.newDevice?.timestamp || new Date().toISOString(),
+        });
+        void endRealtimeSession();
+        setUser(null);
+        updateToken(null);
+        sessionStorage.removeItem(USER_SESSION_KEY);
+        if (typeof document !== "undefined") {
+          document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
+        }
+      } else if (payload?.reason === "REVOKED_BY_USER" || payload?.reason === "REVOKED_ALL_OTHERS") {
+        void logout();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token, user?.id, updateToken, logout]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -138,6 +215,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         isAuthenticated: !!user && !!token,
         isInitializing,
+        supersededInfo,
+        dismissSupersededNotice,
+        isSessionExpired,
+        dismissSessionExpiredNotice,
+        notifySessionExpired,
       }}
     >
       {children}

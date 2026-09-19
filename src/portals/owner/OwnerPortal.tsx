@@ -8,6 +8,7 @@ import { MerchantCategoryModule } from "./modules/merchants/MerchantCategoryModu
 import { ServiceRatesModule } from "./modules/rates/ServiceRatesModule";
 import { FinancialReportsModule } from "./modules/reports/FinancialReportsModule";
 import { RiderTrackingModule } from "./modules/tracking/RiderTrackingModule";
+import { AccountSecurityLogsView } from "@/components/account/AccountSecurityLogsView";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -20,6 +21,7 @@ import {
   LogOut,
   Bike as BikeIcon,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,7 +51,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-type ModuleId = "dashboard" | "users" | "riders" | "merchants" | "rates" | "reports" | "tracking";
+type ModuleId = "dashboard" | "users" | "riders" | "merchants" | "rates" | "reports" | "tracking" | "security";
 
 const MODULE_IDS: ModuleId[] = [
   "dashboard",
@@ -59,6 +61,7 @@ const MODULE_IDS: ModuleId[] = [
   "rates",
   "reports",
   "tracking",
+  "security",
 ];
 
 interface NavSection {
@@ -91,6 +94,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "merchants", label: "Merchants Category", icon: Store },
       { id: "rates", label: "Service Rates", icon: DollarSign },
+      { id: "security", label: "Account Logs", icon: ShieldCheck },
     ],
   },
 ];
@@ -242,7 +246,12 @@ export default function OwnerPortal() {
 
             {/* Sidebar User Profile & Sign Out Footer */}
             <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2.5 transition-all duration-300 gap-2">
-              <div className="flex items-center gap-2.5 px-3 py-1 min-w-0 group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setActiveModule("security")}
+                className="flex items-center gap-2.5 px-3 py-1 min-w-0 group-data-[collapsible=icon]:hidden text-left rounded-plate hover:bg-white/5 transition-colors cursor-pointer w-full"
+                title="View Account Logs & Security"
+              >
                 <div
                   className="w-9 h-9 rounded-plate bg-signal flex items-center justify-center text-board-plate text-micro shrink-0 ring-1 ring-white/10"
                   title={user?.name || "System Administrator"}
@@ -262,7 +271,7 @@ export default function OwnerPortal() {
                     {user?.email || "owner@sugo.ph"}
                   </p>
                 </div>
-              </div>
+              </button>
 
               <button
                 onClick={() => setShowSignOutConfirm(true)}
@@ -342,6 +351,11 @@ export default function OwnerPortal() {
               {activeModule === "rates" && <ServiceRatesModule />}
               {activeModule === "reports" && <FinancialReportsModule />}
               {activeModule === "tracking" && <RiderTrackingModule />}
+              {activeModule === "security" && (
+                <div className="h-full overflow-y-auto pr-1">
+                  <AccountSecurityLogsView showHeader={true} />
+                </div>
+              )}
             </main>
           </SidebarInset>
         </div>

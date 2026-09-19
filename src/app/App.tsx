@@ -5,12 +5,14 @@ import { router } from "./routes";
 import { AuthProvider } from "../context/AuthContext";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { SessionGuard } from "../components/modals/SessionGuard";
 
 export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
         <OfflineBanner />
+        <SessionGuard />
         <Toaster richColors position="top-right" />
         <RouterProvider router={router} />
       </AuthProvider>
