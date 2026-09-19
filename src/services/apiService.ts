@@ -860,11 +860,16 @@ export const apiService = {
   // Analytics API
   async getDashboardSummary(
     frequency: DashboardFrequency,
-    range?: { start: string; end: string }
+    range?: { start: string; end: string },
+    date?: string
   ): Promise<ApiDashboardSummary | null> {
     try {
       const response = await apiClient.get<ApiDashboardSummary>("/analytics/dashboard", {
-        params: { frequency, ...(range ? { start: range.start, end: range.end } : {}) },
+        params: {
+          frequency,
+          ...(range ? { start: range.start, end: range.end } : {}),
+          ...(date ? { date } : {}),
+        },
       });
       return response.data;
     } catch (err) {

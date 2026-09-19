@@ -47,7 +47,10 @@ export function useDashboardMetrics(
       // request did not return goes to a dash in that same beat rather than
       // holding a stale number under a lit indicator.
       setData(null);
-      const summary = await apiService.getDashboardSummary(frequency, range);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const summary = await apiService.getDashboardSummary(frequency, range, todayStr);
       if (cancelled) return;
       if (summary) {
         setData(summary);

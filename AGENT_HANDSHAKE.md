@@ -101,14 +101,26 @@
   - `C:\Capstone_Project_Web\AGENTS.md`, `CustomerApp\AGENTS.md`, `RiderMobileApp\AGENTS.md`, `server\AGENTS.md` (Propagated invariant across all workspace AGENTS configurations)
   - `C:\Capstone_Server\server\src\services\reportService.ts` (Hardened getTransactionSummary with safe null-coerced canonicalPaymentMethod, optional chaining on customer information and errand fields)
   - `C:\Capstone_Server\server\src\services\patterns\categoryRevenueAllocation.ts` (Safeguarded toCategoryEvidence with default fallback arrays for pinpoints, proofImages, and item requests)
-  - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Enclosed credential inputs in an explicit HTML form element with type="submit" to eliminate Chrome password autofill DOM warnings)
-  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\TransactionSummaryReportView.tsx` (Resolved cramped transaction summary table: added horizontal cell padding px-3 py-2.5, min-width min-w-[1100px], tabular-nums, whitespace-nowrap, and row hover transitions)
+  - `C:\Capstone_Server\server\src\index.ts` & `.env` (Set `TZ=Asia/Manila` to prevent timezone mismatch on UTC production servers)
+  - `C:\Capstone_Server\server\src\validators\reportValidators.ts` & `analyticsValidators.ts` (Added calendarDay schema supporting client-passed `date` parameter in reports and dashboard summary)
+  - `C:\Capstone_Server\server\src\services\analyticsService.ts` & `controllers\analyticsController.ts` (Supported `referenceDate` in `getDashboardSummary` to align Tacurong calendar day)
+  - `C:\Capstone_Project_Web\src\components\RangeSelector.tsx` (Renamed preset option to "Today (Default)", passes local calendar date `date: todayStr`)
+  - `C:\Capstone_Project_Web\src\services\apiService.ts` (Updated `getDashboardSummary` to accept optional `date?: string`)
+  - `C:\Capstone_Project_Web\src\portals\owner\hooks\useDashboardMetrics.ts` (Passes client local `todayStr` to `apiService.getDashboardSummary`)
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\SalesReportView.tsx` (Default preset set to "TODAY")
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\CommissionReportView.tsx` (Default preset set to "TODAY")
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\RiderPerformanceReportView.tsx` (Default preset set to "TODAY")
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\ExceptionReportView.tsx` (Default preset set to "TODAY")
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\TransactionSummaryReportView.tsx` (Added `<>` Full Screen table button and full-screen modal overlay with Esc listener and CSV export)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
-  - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
   - `npm test` verified 52 passed test suites (743 tests passing) on Capstone_Server/server.
-  - `npm run build` completed cleanly on Capstone_Project_Web (dist/ built in 45s).
+  - Backend changes committed and pushed to `origin main` (commit `4c10390`).
+  - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
+  - `npm run build` completed cleanly on Capstone_Project_Web (dist/ built in 1m 6s).
 * **Notes for Claude & Next Session**:
-  - Database migration applied on Contabo VPS (`109.123.239.182`); Prisma client regenerated (`npx prisma generate`) and server restarted.
-  - Web frontend built (`dist/`). User deploys via canonical SCP command to `/var/www/web/dist/`.
+  - Backend server updated with `TZ=Asia/Manila` and client-passed date parameter in `analyticsService` and `reportService`.
+  - Frontend presets unified to "Today (Default)", "Week", "Month", "Year" with "Today (Default)" active across all reports and dashboard.
+  - Transaction Summary table full-screen modal implemented (`<>` button).
+  - Production build in `dist/` is ready for user deployment to Contabo VPS via SCP.
 

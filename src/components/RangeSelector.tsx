@@ -12,7 +12,7 @@ import type { ApiDateRange, ReportPeriod } from "../services/apiService";
 export type RangePreset = "TODAY" | "WEEK" | "MONTH" | "YEAR";
 
 export const PRESET_OPTIONS: Array<{ label: string; value: RangePreset }> = [
-  { label: "Today", value: "TODAY" },
+  { label: "Today (Default)", value: "TODAY" },
   { label: "Week", value: "WEEK" },
   { label: "Month", value: "MONTH" },
   { label: "Year", value: "YEAR" },
@@ -33,12 +33,14 @@ const PRESET_TO_PERIOD: Record<RangePreset, ReportPeriod> = {
  * another.
  */
 export function toApiRange(preset: RangePreset, range: DateRange | null): ApiDateRange {
+  const pad = (n: number) => String(n).padStart(2, "0");
   if (range) {
-    const pad = (n: number) => String(n).padStart(2, "0");
     const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     return { start: iso(range.start), end: iso(range.end) };
   }
-  return { period: PRESET_TO_PERIOD[preset] };
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return { period: PRESET_TO_PERIOD[preset], date: todayStr };
 }
 
 interface RangeSelectorProps {

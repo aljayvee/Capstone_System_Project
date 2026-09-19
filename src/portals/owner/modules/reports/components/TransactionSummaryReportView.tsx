@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { ChevronsLeftRight, Maximize2, Minimize2 } from "lucide-react";
 import { ReportState } from "./ReportState";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
@@ -138,8 +139,20 @@ export const TransactionSummaryReportView: React.FC = () => {
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const { data, isLoading, error, reload } = useReport(apiService.getTransactionSummary, apiRange);
   const pdf = useReportPdf("transactions", apiRange);
+
+  useEffect(() => {
+    if (!isFullScreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullScreen]);
 
   const handleExportCSV = () => {
     if (!data) return;
@@ -232,14 +245,91 @@ export const TransactionSummaryReportView: React.FC = () => {
                 />
               </div>
 
-              <div className="bg-board-plate border border-edge rounded-plate p-6 overflow-x-auto">
-                <TransactionTable transactions={data.transactions} />
+              <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+                <div className="px-5 py-3 border-b border-edge flex items-center justify-between bg-board-plate">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-label text-ink font-semibold">Transactions Log</h4>
+                    <span className="text-label text-ink-muted">
+                      ({data.transactions.length})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFullScreen(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-plate border border-edge bg-board-ground hover:bg-board-ground/70 text-label text-ink transition-colors text-xs"
+                    title="Open Full Screen (<>)"
+                  >
+                    <ChevronsLeftRight size={13} className="text-ink-muted" />
+                    <span className="font-mono text-[11px] font-bold text-ink-muted">&lt;&gt;</span>
+                    <span>Full Screen</span>
+                  </button>
+                </div>
+                <div className="p-6 overflow-x-auto">
+                  <TransactionTable transactions={data.transactions} />
+                </div>
               </div>
             </>
           )}
 
           <ReportNotes notes={data.notes} />
         </>
+      )}
+
+      {isFullScreen && data && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col p-4 sm:p-6 lg:p-8 animate-in fade-in duration-150"
+        >
+          <div className="flex-1 flex flex-col bg-board-plate border border-edge rounded-plate shadow-2xl overflow-hidden w-full max-w-[96vw] mx-auto">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-edge flex items-center justify-between bg-board-plate">
+              <div className="flex items-center gap-3">
+                <h3 className="text-body font-semibold text-ink">Transaction Summary</h3>
+                <span className="text-label px-2.5 py-0.5 rounded-full bg-board-ground text-ink font-medium">
+                  {data.rangeLabel}
+                </span>
+                <span className="text-label text-ink-muted">
+                  {data.totals.count} transaction{data.totals.count === 1 ? "" : "s"} · {formatPeso(data.totals.amount)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="px-3 py-1.5 rounded-plate border border-edge text-label text-ink hover:bg-board-ground transition flex items-center gap-1.5"
+                >
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFullScreen(false)}
+                  className="px-3 py-1.5 rounded-plate border border-edge bg-board-ground text-label text-ink hover:bg-board-ground/70 transition flex items-center gap-1.5"
+                  title="Exit Full Screen (Esc)"
+                >
+                  <Minimize2 size={14} />
+                  <span>Exit Full Screen</span>
+                  <kbd className="font-mono text-[10px] text-ink-muted bg-board-plate px-1.5 py-0.5 rounded border border-edge">Esc</kbd>
+                </button>
+              </div>
+            </div>
+
+            {/* Content Table */}
+            <div className="flex-1 overflow-auto p-6 bg-board-plate">
+              <TransactionTable transactions={data.transactions} />
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-edge bg-board-plate flex items-center justify-between text-label text-ink-muted">
+              <div>Showing all {data.transactions.length} transaction records</div>
+              <div className="flex items-center gap-2">
+                <span>Press</span>
+                <kbd className="font-mono text-xs bg-board-ground px-1.5 py-0.5 rounded border border-edge">Esc</kbd>
+                <span>or click Exit to return</span>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <DigitalReportReviewModal

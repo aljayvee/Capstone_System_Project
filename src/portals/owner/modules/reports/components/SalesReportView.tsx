@@ -13,7 +13,7 @@ import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatPeso } from "../../../../../utils/format";
 
 export const SalesReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
