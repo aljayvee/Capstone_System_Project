@@ -102,11 +102,13 @@
   - `C:\Capstone_Server\server\src\services\reportService.ts` (Hardened getTransactionSummary with safe null-coerced canonicalPaymentMethod, optional chaining on customer information and errand fields)
   - `C:\Capstone_Server\server\src\services\patterns\categoryRevenueAllocation.ts` (Safeguarded toCategoryEvidence with default fallback arrays for pinpoints, proofImages, and item requests)
   - `C:\Capstone_Project_Web\src\components\LoginPage.tsx` (Enclosed credential inputs in an explicit HTML form element with type="submit" to eliminate Chrome password autofill DOM warnings)
+  - `C:\Capstone_Project_Web\src\portals\owner\modules\reports\components\TransactionSummaryReportView.tsx` (Resolved cramped transaction summary table: added horizontal cell padding px-3 py-2.5, min-width min-w-[1100px], tabular-nums, whitespace-nowrap, and row hover transitions)
 * **Verification Ledger**:
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Server/server.
   - `npx tsc --noEmit` verified with 0 errors on Capstone_Project_Web.
   - `npm test` verified 52 passed test suites (743 tests passing) on Capstone_Server/server.
+  - `npm run build` completed cleanly on Capstone_Project_Web (dist/ built in 45s).
 * **Notes for Claude & Next Session**:
-  - Defensive hardening applied to prevent runtime null pointer exceptions on Transaction Summary report.
-  - Pending action: Execute database migration on Contabo VPS (`109.123.239.182`) to add `proofImageId` to `errand_payments` and `settlement_records`.
+  - Database migration applied on Contabo VPS (`109.123.239.182`); Prisma client regenerated (`npx prisma generate`) and server restarted.
+  - Web frontend built (`dist/`). User deploys via canonical SCP command to `/var/www/web/dist/`.
 
