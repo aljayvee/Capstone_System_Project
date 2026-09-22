@@ -28,6 +28,44 @@ export const setOnLogoutCallback = (cb: () => void) => {
   onLogoutCallback = cb;
 };
 
+/**
+ * A stable identity for this browser, sent as `x-device-id`.
+ *
+ * Both mobile apps have always sent one; the portal never did, so the server's
+ * single-device guard had no way to tell "the same dispatcher signing in again
+ * on the browser they always use" from "someone on another machine". It treated
+ * every portal login as a new device, reported the dispatcher's own earlier
+ * session back to them as "another device active", and confirming it signed
+ * out any tab still holding that session - the reload that logged people out.
+ *
+ * localStorage rather than sessionStorage: it has to be the same across every
+ * tab of this browser, since the tabs share one refresh cookie. Where storage
+ * is unavailable (some private modes) no header is sent at all, which leaves
+ * the server behaving exactly as it did before this existed.
+ */
+const DEVICE_ID_KEY = "sugo_device_id";
+
+function getDeviceId(): string | null {
+  try {
+    let id = localStorage.getItem(DEVICE_ID_KEY);
+    if (!id) {
+      id =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? `web-${crypto.randomUUID()}`
+          : `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem(DEVICE_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** Headers every call must carry, including the raw axios refresh below. */
+export const deviceHeaders = (): Record<string, string> => {
+  const id = getDeviceId();
+  return id ? { "x-device-id": id } : {};
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // Required for HttpOnly refresh cookie support
@@ -41,6 +79,14 @@ apiClient.interceptors.request.use(
   (config) => {
     if (memoryAccessToken && config.headers) {
       config.headers.Authorization = `Bearer ${memoryAccessToken}`;
+    }
+    // On every request, not only login: the server also compares it on each
+    // refresh rotation, so a refresh that arrived without it would read as a
+    // different device from the one that signed in.
+    if (config.headers) {
+      for (const [name, value] of Object.entries(deviceHeaders())) {
+        config.headers[name] = value;
+      }
     }
     return config;
   },
@@ -98,7 +144,10 @@ apiClient.interceptors.response.use(
         const res = await axios.post(
           `${API_BASE_URL}/auth/refresh`,
           {},
-          { withCredentials: true }
+          // Raw axios, not apiClient, so the request interceptor never sees it -
+          // the device header has to be attached by hand or this one refresh
+          // would reach the server looking like a different device.
+          { withCredentials: true, headers: deviceHeaders() }
         );
 
         const newAccessToken = res.data.token;
