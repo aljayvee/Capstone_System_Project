@@ -363,16 +363,20 @@ export function Stage1CheckOrder({
 
       {/* The verb this stage was missing. Editing and deleting were here;
           adding was not, so a dispatcher taking a correction over the phone
-          had to ask the customer to re-submit the whole order. */}
-      {!isAccepted && (
-        <button
-          type="button"
-          onClick={addItem}
-          className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-trim border border-edge bg-board-plate text-micro uppercase text-ink-muted transition-colors hover:text-ink"
-        >
-          <Plus size={14} /> {copy.stage1.addItem}
-        </button>
-      )}
+          had to ask the customer to re-submit the whole order.
+
+          Offered after acceptance too, on the same terms as editing and
+          deleting: the copy above promises "you can still change the items
+          afterwards", and hiding only this one verb once the order was
+          accepted left a basket you could shrink but not grow. Any change
+          still goes to the customer through the same revision. */}
+      <button
+        type="button"
+        onClick={addItem}
+        className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-trim border border-edge bg-board-plate text-micro uppercase text-ink-muted transition-colors hover:text-ink"
+      >
+        <Plus size={14} /> {copy.stage1.addItem}
+      </button>
 
       {/* unsent edits must go to the customer before accept unlocks */}
       {hasUnsentEdits && (

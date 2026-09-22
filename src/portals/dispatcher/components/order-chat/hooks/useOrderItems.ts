@@ -267,6 +267,28 @@ export function useOrderItems({
   );
 
   /**
+   * Which of THIS screen's pins a placement refers to.
+   *
+   * By id first, then by name. Id alone never matched in practice: pins added
+   * in the current session carry no id until the page reloads, so a placement
+   * naming pin 16 found nothing, and every suggestion quietly rendered as
+   * "no change". The server echoes the pin's own storeName back, which is
+   * the same string this screen holds, so the name is a safe second key.
+   */
+  const stopIndexFor = useCallback(
+    (placement: Pick<ApiItemPlacement, "pinpointId" | "storeName">): number => {
+      if (placement.pinpointId != null) {
+        const byId = pinpoints.findIndex((pin) => pin.id != null && pin.id === placement.pinpointId);
+        if (byId >= 0) return byId;
+      }
+      const wanted = (placement.storeName || "").trim();
+      if (!wanted) return -1;
+      return pinpoints.findIndex((pin) => (pin.storeName || "").trim() === wanted);
+    },
+    [pinpoints]
+  );
+
+  /**
    * Files a row under the shop AND category the suggester proposed.
    *
    * Both halves, because either alone leaves the row incomplete: a category
@@ -284,13 +306,13 @@ export function useOrderItems({
         prev.map((row, i) => {
           if (i !== index) return row;
           const { store, assigned } = parseStoreAndCat(row.storeCategory);
-          const stopIndex = pinpoints.findIndex((pin) => pin.id === placement.pinpointId);
+          const stopIndex = stopIndexFor(placement);
           const nextStore = stopIndex >= 0 ? storeLabelFor(stopIndex) : assigned ? store : "";
           return { ...row, storeCategory: `${nextStore} | ${placement.categoryName}` };
         })
       );
     },
-    [categoryGuesses, parseStoreAndCat, pinpoints]
+    [categoryGuesses, parseStoreAndCat, stopIndexFor]
   );
   const updateItem = useCallback((index: number, patch: Partial<EditableItem>) => {
     setEditableItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -478,6 +500,7 @@ export function useOrderItems({
     updateItem,
     removeItem,
     categoryGuesses,
+    stopIndexFor,
     guessCategoryFor,
     applyCategoryGuess,
     sendToCustomer,

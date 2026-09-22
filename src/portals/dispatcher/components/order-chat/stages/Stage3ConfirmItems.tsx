@@ -81,6 +81,7 @@ export function Stage3ConfirmItems({
     storeOptions,
     unassignedCount,
     categoryGuesses,
+    stopIndexFor,
     guessCategoryFor,
     applyCategoryGuess,
   } = items;
@@ -302,10 +303,15 @@ export function Stage3ConfirmItems({
                   const p = categoryGuesses[index];
                   if (!p?.categoryName) return null;
 
-                  const stopIndex = pinpoints.findIndex((pin) => pin.id === p.pinpointId);
+                  const stopIndex = stopIndexFor(p);
                   const suggestedStore = stopIndex >= 0 ? storeOptions[stopIndex] : null;
                   const changesCategory = p.categoryName !== category;
-                  const changesStore = Boolean(suggestedStore) && suggestedStore !== store;
+                  // Against the shop actually CHOSEN, not the fallback. An
+                  // unassigned row reports the first pin as its store, so a
+                  // suggestion of that same pin read as "no change" and was
+                  // hidden - on exactly the rows that most needed it.
+                  const currentStore = assigned ? store : null;
+                  const changesStore = Boolean(suggestedStore) && suggestedStore !== currentStore;
                   if (!changesCategory && !changesStore) return null;
 
                   const learned = p.source === 'learned';

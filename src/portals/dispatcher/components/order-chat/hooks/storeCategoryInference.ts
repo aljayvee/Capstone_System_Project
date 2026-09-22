@@ -30,6 +30,16 @@ export const GOOGLE_TYPE_TO_CATEGORY: ReadonlyArray<{
   categoryName: string;
 }> = [
   {
+    // Ahead of Fast Food, which also lists "bakery". The live catalogue has a
+    // Bakery category, and filing Google's `bakery` type under Fast Food sent a
+    // pinned Julie's Bakeshop there on 2026-09-23 - and because this rule had
+    // answered, the category service (which only fills MISSING categories) was
+    // never asked. Where the catalogue has no Bakery row, the name lookup below
+    // finds nothing and falls through to the Fast Food rule, as before.
+    categoryName: "Bakery",
+    types: ["bakery"],
+  },
+  {
     categoryName: "Pharmacy & Health",
     types: ["pharmacy", "drugstore", "doctor", "hospital", "dentist", "physiotherapist", "health"],
   },
