@@ -1,4 +1,13 @@
-import { Plus, Minus, Trash2, Send, Package, Sparkles, MapPinOff } from "lucide-react";
+import {
+  Plus,
+  Minus,
+  Trash2,
+  Send,
+  Package,
+  Sparkles,
+  MapPinOff,
+  BrainCircuit,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
@@ -279,33 +288,67 @@ export function Stage3ConfirmItems({
                   </p>
                 )}
 
-                {/* What the category service made of this line. A suggestion,
-                    never an answer: shown only when it DISAGREES with what the
-                    row currently says, because agreeing with the dropdown is
-                    not worth a row of screen. */}
-                {categoryGuesses[index] && categoryGuesses[index].categoryName !== category && (
-                  <div
-                    className="mt-2 flex flex-wrap items-center gap-2"
-                    title={copy.stage3.categorySuggestionHint(
-                      categoryGuesses[index].categoryName,
-                      Math.round(categoryGuesses[index].confidence * 100),
-                      categoryGuesses[index].runnerUp
-                    )}
-                  >
-                    <span className="flex items-center gap-1.5 text-label text-status-waiting-ink">
-                      <Sparkles size={13} className="shrink-0" />
-                      {copy.stage3.categorySuggestion(categoryGuesses[index].categoryName)}
-                    </span>
-                    <DispatcherButton
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => applyCategoryGuess(index)}
-                    >
-                      {copy.stage3.categorySuggestionApply}
-                    </DispatcherButton>
-                  </div>
-                )}
+                {/* Where this line should be bought, from what dispatchers have
+                    already decided. Appears as soon as the row has a name, and
+                    applies the shop AND the category in one press - the two
+                    halves are one decision, and a category with no shop is
+                    exactly the unassigned state that blocks sending.
+
+                    Shown whenever it would CHANGE the row, not only when the
+                    category differs: a row already on the right category but
+                    the wrong shop is precisely the mistake a rider discovers
+                    at the counter. */}
+                {(() => {
+                  const p = categoryGuesses[index];
+                  if (!p?.categoryName) return null;
+
+                  const stopIndex = pinpoints.findIndex((pin) => pin.id === p.pinpointId);
+                  const suggestedStore = stopIndex >= 0 ? storeOptions[stopIndex] : null;
+                  const changesCategory = p.categoryName !== category;
+                  const changesStore = Boolean(suggestedStore) && suggestedStore !== store;
+                  if (!changesCategory && !changesStore) return null;
+
+                  const learned = p.source === 'learned';
+                  return (
+                    <div className="mt-2 flex flex-wrap items-center gap-2" title={p.reason}>
+                      <span
+                        className={cn(
+                          'flex min-w-0 items-center gap-1.5 text-label',
+                          learned ? 'text-status-done-ink' : 'text-status-waiting-ink'
+                        )}
+                      >
+                        {learned ? (
+                          <BrainCircuit size={13} className="shrink-0" />
+                        ) : (
+                          <Sparkles size={13} className="shrink-0" />
+                        )}
+                        <span className="truncate">
+                          {copy.stage3.placementSuggestion(
+                            p.categoryName,
+                            suggestedStore ? parseStoreAndCat(`${suggestedStore} | x`).store : null
+                          )}
+                        </span>
+                      </span>
+                      {/* Provenance, stated plainly. "Filed here 9 of the last
+                          10 times" and "the name was read" deserve different
+                          amounts of trust, and the dispatcher is the one who
+                          has to decide how much to give it. */}
+                      <span className="text-micro uppercase text-ink-muted">
+                        {learned
+                          ? copy.stage3.placementLearned(p.learnedFrom)
+                          : copy.stage3.placementModelled}
+                      </span>
+                      <DispatcherButton
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => applyCategoryGuess(index)}
+                      >
+                        {copy.stage3.placementApply}
+                      </DispatcherButton>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

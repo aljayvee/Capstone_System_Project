@@ -264,13 +264,20 @@ export const copy = {
         ? `Pin the shop that sells "${item}", then come back and file it there.`
         : "Pin the shop this item comes from, then come back and file it there.",
 
-    /** What the category service made of a line. */
-    categorySuggestion: (name: string) => `Looks like ${name}`,
-    categorySuggestionApply: "Use it",
-    categorySuggestionHint: (name: string, pct: number, runnerUp?: string) =>
-      runnerUp
-        ? `Read the item as ${name} (${pct}% sure). Next likeliest: ${runnerUp}.`
-        : `Read the item as ${name} (${pct}% sure).`,
+    /**
+     * Where a line should be bought.
+     *
+     * Names the shop when one of the pinned stops fits, because that is the
+     * half the rider acts on. Falls back to the category alone when two stops
+     * share it or none matches, rather than picking on a coin flip.
+     */
+    placementSuggestion: (category: string, store: string | null) =>
+      store ? `Buy at ${store} (${category})` : `Looks like ${category}`,
+    placementApply: "Use it",
+    /** Provenance. A remembered decision and a read name are not the same claim. */
+    placementLearned: (n: number) =>
+      n === 1 ? "filed once before" : `filed this way ${n}x`,
+    placementModelled: "read from the name",
   },
 
   // ── stage 4 — payment ───────────────────────────────────────────────────

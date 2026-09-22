@@ -14,6 +14,7 @@ export interface ApiUser {
   phone: string;
   status: "Active" | "Inactive";
   version: number;
+  isOnline?: boolean;
 }
 
 export interface ConflictError extends Error {
@@ -243,6 +244,29 @@ export interface ApiErrandException {
   resolvedAt: string | null;
   resolvedBy: string | null;
   resolutionReason: string | null;
+}
+
+/**
+ * Where one item should be bought on a specific errand.
+ *
+ * Distinct from ApiCategoryInference in two ways that matter. It names one of
+ * THIS errand's pinned shops rather than a bare category, and it says where the
+ * answer came from: `learned` means a dispatcher filed this same item before,
+ * `model` means nobody has and the name was read. A learned answer carries the
+ * count behind it, because "filed here 9 of the last 10 times" and "someone did
+ * this once" deserve different amounts of trust.
+ */
+export interface ApiItemPlacement {
+  name: string;
+  categoryId: number | null;
+  categoryName: string | null;
+  pinpointId: number | null;
+  storeName: string | null;
+  confidence: number;
+  /** "learned" | "model" | "none" */
+  source: string;
+  learnedFrom: number;
+  reason: string;
 }
 
 /**
@@ -1137,6 +1161,27 @@ export const apiService = {
     } catch (err) {
       console.warn("Category inference unavailable:", err);
       return names.map(() => UNAVAILABLE_INFERENCE);
+    }
+  },
+
+  /**
+   * Where each item should be bought, for one errand.
+   *
+   * Index-aligned with `names`. Never throws: an unreachable service comes back
+   * as a row with source "none", which the panel renders as "no suggestion"
+   * rather than an error - the dispatcher's own dropdowns work regardless.
+   */
+  async suggestItemPlacements(errandId: string, names: string[]): Promise<ApiItemPlacement[]> {
+    if (names.length === 0) return [];
+    try {
+      const response = await apiClient.post<{ placements: ApiItemPlacement[] }>(
+        `/category-inference/errands/${errandId}/item-placements`,
+        { names }
+      );
+      return response.data?.placements ?? [];
+    } catch (err) {
+      console.warn("Item placement suggestion unavailable:", err);
+      return [];
     }
   },
 

@@ -3,7 +3,7 @@ import { ref, update } from "firebase/database";
 import { toast } from "sonner";
 import { database } from "../../../../../firebase/config";
 import { apiClient } from "../../../../../services/apiClient";
-import { apiService } from "../../../../../services/apiService";
+import { apiService, type ApiItemPlacement } from "../../../../../services/apiService";
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 import type { EditableItem, StorePinpoint, MerchantCategory, OrderChatMessage } from "../types";
@@ -98,16 +98,19 @@ export function useOrderItems({
   const [isCustomerConfirmed, setIsCustomerConfirmed] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
   /**
-   * What the category service made of each editable row, keyed by its index.
+   * Where each editable row should be bought, keyed by its index.
+   *
+   * A full placement now, not just a category: the shop as well, chosen from
+   * the stops stage 2 pinned. It also carries where the answer came from -
+   * `learned` when a dispatcher filed this same item before, `model` when
+   * nobody has and the name was read.
    *
    * Held beside the rows rather than written into them, because a suggestion is
    * not an answer. The dispatcher sees what the machine thought and applies it
    * or ignores it; only their choice reaches `storeCategory`, which the rider's
    * shopping list and the errand's dwell allowance are both built from.
    */
-  const [categoryGuesses, setCategoryGuesses] = useState<
-    Record<number, { categoryName: string; confidence: number; runnerUp?: string }>
-  >({});
+  const [categoryGuesses, setCategoryGuesses] = useState<Record<number, ApiItemPlacement>>({});
   const feedback = useInlineMessage();
 
   const savedItems: any[] =
@@ -182,19 +185,17 @@ export function useOrderItems({
       const named = targets.filter((t) => t.name.trim().length >= 2);
       if (named.length === 0) return;
 
-      const results = await apiService.inferItemCategories(named.map((t) => t.name.trim()));
+      const placements = await apiService.suggestItemPlacements(
+        orderId,
+        named.map((t) => t.name.trim())
+      );
 
       setCategoryGuesses((prev) => {
         const next = { ...prev };
-        results.forEach((result, i) => {
-          const target = named[i];
-          if (!target) return;
-          if (result.available && result.categoryName) {
-            next[target.index] = {
-              categoryName: result.categoryName,
-              confidence: result.confidence ?? 0,
-              runnerUp: result.alternatives?.[0]?.categoryName,
-            };
+        named.forEach((target, i) => {
+          const placement = placements[i];
+          if (placement && placement.categoryId != null) {
+            next[target.index] = placement;
           } else {
             // Cleared rather than left stale: a row whose name has been
             // rewritten since the last guess must not keep showing the old one.
@@ -204,9 +205,22 @@ export function useOrderItems({
         return next;
       });
     },
-    []
+    [orderId]
   );
 
+  /**
+   * One row, once its name has stopped changing.
+   *
+   * Called on blur rather than on every keystroke: a dispatcher typing
+   * "paracetamol" would otherwise fire eleven lookups to answer a question
+   * they were still half-way through asking.
+   */
+  const guessCategoryFor = useCallback(
+    (index: number, name: string) => {
+      void guessCategories([{ index, name }]);
+    },
+    [guessCategories]
+  );
   const startEditing = useCallback(() => {
     const rows = savedItems.map((d: any) => ({
       itemName: d.itemName,
@@ -226,20 +240,6 @@ export function useOrderItems({
     setEditableItems([]);
     setCategoryGuesses({});
   }, []);
-
-  /**
-   * One row, once its name has stopped changing.
-   *
-   * Called on blur rather than on every keystroke: a dispatcher typing
-   * "paracetamol" would otherwise fire eleven model evaluations to answer a
-   * question they were still in the middle of asking.
-   */
-  const guessCategoryFor = useCallback(
-    (index: number, name: string) => {
-      void guessCategories([{ index, name }]);
-    },
-    [guessCategories]
-  );
 
   const addItem = useCallback(
     (storeName?: string, catName?: string) => {
@@ -266,25 +266,32 @@ export function useOrderItems({
     [pinpoints, merchantCategories, parseStoreAndCat]
   );
 
-  /** Files a row under the category the service suggested for it. */
+  /**
+   * Files a row under the shop AND category the suggester proposed.
+   *
+   * Both halves, because either alone leaves the row incomplete: a category
+   * with no shop is exactly the unassigned state stage 3 already blocks
+   * sending on. When the suggester could not pick a shop - two pinned stops
+   * share the category, or none matches it - the category is applied and the
+   * shop is left for the dispatcher rather than filled with a guess.
+   */
   const applyCategoryGuess = useCallback(
     (index: number) => {
-      const guess = categoryGuesses[index];
-      if (!guess) return;
+      const placement = categoryGuesses[index];
+      if (!placement?.categoryName) return;
+
       setEditableItems((prev) =>
         prev.map((row, i) => {
           if (i !== index) return row;
           const { store, assigned } = parseStoreAndCat(row.storeCategory);
-          return {
-            ...row,
-            storeCategory: `${assigned ? store : ""} | ${guess.categoryName}`,
-          };
+          const stopIndex = pinpoints.findIndex((pin) => pin.id === placement.pinpointId);
+          const nextStore = stopIndex >= 0 ? storeLabelFor(stopIndex) : assigned ? store : "";
+          return { ...row, storeCategory: `${nextStore} | ${placement.categoryName}` };
         })
       );
     },
-    [categoryGuesses, parseStoreAndCat]
+    [categoryGuesses, parseStoreAndCat, pinpoints]
   );
-
   const updateItem = useCallback((index: number, patch: Partial<EditableItem>) => {
     setEditableItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   }, []);
