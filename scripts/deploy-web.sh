@@ -61,11 +61,14 @@ echo "==> staged $REMOTE_STAGED files, matches the build"
 #                     Outside the destination tree so rsync does not sync it.
 # --chmod=F644,D755 : normalises permissions. The scp history left a mix of
 #                     -rwxr-xr-x and -rw-r--r-- on static assets.
-# -rlt, not -a      : skip owner/group/perm preservation in favour of --chmod.
+# -p is required    : without it rsync does not manage permissions at all, so
+#                     --chmod only reaches files it actually transfers and an
+#                     unchanged file keeps whatever mode scp gave it. -rlpt,
+#                     not -a, so owner and group are still left alone.
 echo "==> syncing into $REMOTE_DIST (--delete-after, deleted files parked)"
 ssh -o BatchMode=yes "$HOST" bash -s <<EOF
 set -euo pipefail
-rsync -rlt --delete-after \
+rsync -rlpt --delete-after \
       --backup --backup-dir='$BACKUP_DIR' \
       --chmod=F644,D755 \
       --itemize-changes \
@@ -97,7 +100,7 @@ if [ "\$missing" -eq 0 ]; then
   echo "  every referenced chunk resolves"
 else
   echo "  \$missing broken reference(s) - restore with:"
-  echo "    rsync -rlt '$BACKUP_DIR/' '$REMOTE_DIST/'"
+  echo "    rsync -rlpt '$BACKUP_DIR/' '$REMOTE_DIST/'"
   exit 1
 fi
 EOF
@@ -108,7 +111,7 @@ curl -s -o /dev/null -w "  https://sugo-express.org -> HTTP %{http_code}\n" -m 2
 cat <<EOF
 
 Deployed. Rollback if needed:
-  ssh $HOST "rsync -rlt '$BACKUP_DIR/' '$REMOTE_DIST/'"
+  ssh $HOST "rsync -rlpt '$BACKUP_DIR/' '$REMOTE_DIST/'"
 
 Note: --delete removes superseded chunks immediately. A browser tab left open
 across this deploy may fail to lazy-load a chunk it has not fetched yet; a
