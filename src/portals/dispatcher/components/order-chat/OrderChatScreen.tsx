@@ -202,9 +202,12 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
   // reproducing the very jump it exists to stop, one step later.
   useEffect(() => {
     if (userTouchedStage.current) return;
-    if (openStageId === 2 && model.activeStageId > 2) return;
+    // Only when the send happened on this screen. An order whose stores went
+    // out in an earlier session must open on the stage that is actually
+    // active, not be parked on a finished one - see sentThisSession.
+    if (openStageId === 2 && model.activeStageId > 2 && pins.sentThisSession) return;
     setOpenStageId(model.activeStageId);
-  }, [model.activeStageId, openStageId]);
+  }, [model.activeStageId, openStageId, pins.sentThisSession]);
 
   // Unread badge for the chat tab, since the conversation can be off-screen.
   useEffect(() => {

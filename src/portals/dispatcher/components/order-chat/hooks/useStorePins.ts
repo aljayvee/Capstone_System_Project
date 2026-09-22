@@ -870,6 +870,19 @@ export function useStorePins({
    */
   const [storesSentAt, setStoresSentAt] = useState<number | null>(null);
 
+  /**
+   * Whether the stores were sent by pressing the button on THIS screen, as
+   * opposed to being recovered from the conversation on load.
+   *
+   * The screen holds the dispatcher on stage 2 after a send so they can press
+   * "Continue to step 3" themselves. That must not apply to an order whose
+   * stores went out in an earlier session: on load the chat arrives a moment
+   * after the panel opens, so stage 2 opens first, the recovered send then
+   * completes it - and the hold kept a returning dispatcher parked on a
+   * finished stage. Found by reloading a real test order on 2026-09-23.
+   */
+  const [sentThisSession, setSentThisSession] = useState(false);
+
   useEffect(() => {
     const card = [...messages].reverse().find((m: any) => m?.type === "pinpoints");
     if (!card) return;
@@ -915,6 +928,7 @@ export function useStorePins({
       // the first of three pins finished the stage and threw the dispatcher
       // out of the map and into stage 3 mid-task.
       setStoresSentAt(Date.now());
+      setSentThisSession(true);
       feedback.showSuccess(copy.stage2.sent(customerDisplayName));
     } catch (err) {
       console.error("Failed to save store pinpoints:", err);
@@ -947,6 +961,7 @@ export function useStorePins({
     focusPin,
     sendToCustomer,
     storesSentAt,
+    sentThisSession,
     pendingDuplicate,
     confirmPendingDuplicate,
     dismissPendingDuplicate,
