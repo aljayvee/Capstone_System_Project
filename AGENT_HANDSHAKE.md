@@ -31,18 +31,45 @@
       outside this file: no entering passwords or credentials, no destructive database action
       without an explicit confirmation and a backup taken first.
   - Deployment targets:
-    1. Landing Page (`https://sugoonthego.online`):
+    1. **Web & Staff Portal** (`https://sugo-express.org`): `scripts/deploy-web.sh`
+       (add `--no-build` to ship the existing `dist/`). Replaced the raw
+       `scp -r dist/*` on 2026-09-23 — see the self-cleaning note below.
+    2. Landing Page (`https://sugoonthego.online`): still raw scp, and still
+       accumulates. `scripts/deploy-web.sh` takes `DEPLOY_ROOT=/var/www/landing`
+       and can be pointed at it when someone wants the same treatment:
        `scp -r C:\Capstone_Landing_Page\dist\* root@109.123.239.182:/var/www/landing/dist/`
-    2. Web & Staff Portal (`https://sugo-express.org`):
-       `scp -r C:\Capstone_Project_Web\dist\* root@109.123.239.182:/var/www/web/dist/`
-    3. Backend (`/var/www/server`): `npm run build && pm2 restart capstone-backend`
+    3. Backend (`/var/www/server`): `git pull && npm run build && pm2 restart capstone-backend`.
+       **Build ON the server**, from the source checked out there. A prebuilt
+       `dist` copied up is how the binary and the source drifted apart and
+       crash-looped production on 2026-09-23 (see the recon entry below).
   - **Database deploys use `prisma db push`, NEVER `prisma migrate deploy`.** There is no
     `_prisma_migrations` table on production, so Prisma reports all 55 migrations as unapplied.
     Running `migrate deploy` would attempt to replay from `0_baseline` against a populated
     database. Verified 2026-09-23.
-  - **`scp -r dist/*` never deletes.** `/var/www/web/dist/assets/` had accumulated 418 files
-    and 33 stale `DispatcherPortal-*.js` bundles (41 MB) by 2026-09-23. Prune periodically;
-    the live bundle is whichever one `dist/index.html` actually references.
+  - **The web portal deploy is self-cleaning as of 2026-09-23.** `scp -r dist/*` copies over
+    but never deletes, so every build ever shipped had accumulated: 433 files, 43 MB, 33
+    `DispatcherPortal-*.js` bundles. `scripts/deploy-web.sh` now uploads a tar stream to a
+    staging directory and runs `rsync -rlt --delete-after` server-side, leaving exactly the
+    72 files of the current build (13 MB).
+    - The upload is staged rather than `rsync`ed directly because rsync must exist on BOTH
+      ends and the Windows workstation has none; the VPS has 3.2.7. Staging needs only ssh
+      and tar locally.
+    - Deleted files are parked in `/root/deploy-backups/web-<stamp>/`, never destroyed.
+      Roll back with `rsync -rlt '<backup>/' /var/www/web/dist/`.
+    - The script verifies that every chunk referenced by `index.html` AND every chunk
+      referenced from inside the other JS files still resolves. That second check matters:
+      `DispatcherPortal-*.js` is lazy-imported and appears in no HTML, so a keep-list built
+      from `index.html` alone would delete the live dispatcher bundle.
+  - **`index.html` is served `no-cache, must-revalidate`** (nginx `location = /index.html`).
+    It carried no `Cache-Control` at all until 2026-09-23, so browsers cached the SPA
+    manifest heuristically — and because `try_files $uri $uri/ /index.html` serves the HTML
+    for any missing path, a chunk that had been pruned came back as HTML where JavaScript
+    was expected, rendering a blank app instead of a clean 404. Hashed assets keep their
+    1-year immutable caching; the exact-match `location =` outranks the asset regex.
+  - **Residual, accepted:** `--delete` removes superseded chunks immediately, so a tab left
+    open across a deploy may fail to lazy-load a chunk it had not yet fetched. A refresh
+    fixes it, and the manifest is now always fresh. No cache header can prevent this — a
+    running SPA holds its manifest in memory.
 * `[LOCKED]` `Outdated FigmaPrototype Folder Quarantine`:
   - `C:\Capstone_Project_Web\FigmaPrototype\` contains obsolete prototype code and must NEVER be referenced, inspected, or modified.
 * `[LOCKED]` `Flat Design Surface Purity & Zero-Shadow Invariant`:
