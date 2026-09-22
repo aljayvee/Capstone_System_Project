@@ -30,14 +30,20 @@
     - Standing permission covers deployment. It does NOT extend to the prohibitions that sit
       outside this file: no entering passwords or credentials, no destructive database action
       without an explicit confirmation and a backup taken first.
-  - Deployment targets:
+  - Deployment targets. Both replaced raw `scp -r dist/*` on 2026-09-23 and are
+    now self-cleaning; add `--no-build` to either to ship the existing `dist/`:
     1. **Web & Staff Portal** (`https://sugo-express.org`): `scripts/deploy-web.sh`
-       (add `--no-build` to ship the existing `dist/`). Replaced the raw
-       `scp -r dist/*` on 2026-09-23 — see the self-cleaning note below.
-    2. Landing Page (`https://sugoonthego.online`): still raw scp, and still
-       accumulates. `scripts/deploy-web.sh` takes `DEPLOY_ROOT=/var/www/landing`
-       and can be pointed at it when someone wants the same treatment:
-       `scp -r C:\Capstone_Landing_Page\dist\* root@109.123.239.182:/var/www/landing/dist/`
+    2. **Landing Page** (`https://sugoonthego.online`): `scripts/deploy-landing.sh`
+       - Its source lives at `C:\Capstone_Landing_Page`, **outside this repo, and
+         that folder is not a git repository at all** — so the script that deploys
+         it is kept here where it can be version controlled. `LANDING_SOURCE`
+         overrides the path if the checkout moves.
+       - `DEPLOY_HEAVY="downloads"` names the 125 MB customer APK. It is compared
+         by size then md5 and skipped when unchanged, so it does not cross the
+         wire on every deploy — and because the skip is an rsync `--exclude`,
+         `--delete` cannot remove it either. Verified by md5 after the first run.
+    - Both wrap `scripts/deploy-site.sh`, which holds all the machinery and is
+      driven by `DEPLOY_HOST/ROOT/SOURCE/URL/LABEL/HEAVY`.
     3. Backend (`/var/www/server`): `git pull && npm run build && pm2 restart capstone-backend`.
        **Build ON the server**, from the source checked out there. A prebuilt
        `dist` copied up is how the binary and the source drifted apart and
@@ -60,7 +66,15 @@
       referenced from inside the other JS files still resolves. That second check matters:
       `DispatcherPortal-*.js` is lazy-imported and appears in no HTML, so a keep-list built
       from `index.html` alone would delete the live dispatcher bundle.
-  - **`index.html` is served `no-cache, must-revalidate`** (nginx `location = /index.html`).
+  - **`sugoonthego.online` sits behind Cloudflare with bot protection.** A `curl` to the
+    public URL answers `403` with `cf-mitigated: challenge` while real browsers are served
+    normally, and an automated browser gets the "Just a moment..." interstitial. Any deploy
+    check against that URL therefore reports failure on success. `deploy-site.sh` probes
+    local nginx with `curl --resolve <domain>:443:127.0.0.1`, which is both CDN-independent
+    and immune to the CDN serving a cached copy of the previous deploy. `sugo-express.org`
+    is not currently challenged, but the same probe is used for both.
+  - **`index.html` is served `no-cache, must-revalidate`** on BOTH sites (nginx
+    `location = /index.html`).
     It carried no `Cache-Control` at all until 2026-09-23, so browsers cached the SPA
     manifest heuristically — and because `try_files $uri $uri/ /index.html` serves the HTML
     for any missing path, a chunk that had been pruned came back as HTML where JavaScript
