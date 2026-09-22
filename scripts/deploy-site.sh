@@ -53,6 +53,7 @@ LOCAL_COUNT=$(find dist -type f | wc -l)
 # identical 125 MB APK turns a two-minute deploy into a two-second one.
 TAR_EXCLUDE=()
 RSYNC_EXCLUDE=()
+SKIPPED_PATHS=()
 SKIPPED_FILES=0
 
 for path in $HEAVY; do
@@ -70,6 +71,7 @@ for path in $HEAVY; do
     # not delete excluded paths unless --delete-excluded is given.
     TAR_EXCLUDE+=(--exclude="./$path")
     RSYNC_EXCLUDE+=(--exclude="/$path")
+    SKIPPED_PATHS+=("$path")
     echo "==> $path unchanged on the server ($n file(s)) - not re-uploading"
   else
     echo "==> $path differs - will upload"
@@ -117,6 +119,22 @@ rm -rf '$STAGING'
 echo "live: \$(find '$REMOTE_DIST' -type f | wc -l) files, \$(du -sh '$REMOTE_DIST' | cut -f1)"
 echo "parked: \$(find '$BACKUP_DIR' -type f 2>/dev/null | wc -l) files in $BACKUP_DIR"
 EOF
+
+# ── normalise the paths rsync was told to leave alone ──────────────────────
+# A skipped heavy path is excluded from the sync, so --chmod never reaches it
+# and it keeps whatever mode it was first created with. /var/www/landing/dist/
+# downloads had sat at 707 - world-writable - since it arrived by scp from
+# Windows, while every sibling directory was 755. Without this, "the deploy
+# normalises permissions" would be true except for exactly the paths nobody
+# looks at.
+if [ ${#SKIPPED_PATHS[@]} -gt 0 ]; then
+  echo "==> normalising permissions on skipped paths: ${SKIPPED_PATHS[*]}"
+  for path in "${SKIPPED_PATHS[@]}"; do
+    ssh -o BatchMode=yes "$HOST" \
+      "find '$REMOTE_DIST/$path' -type d -exec chmod 755 {} + ; \
+       find '$REMOTE_DIST/$path' -type f -exec chmod 644 {} +"
+  done
+fi
 
 # ── verify ─────────────────────────────────────────────────────────────────
 # A deploy that silently drops a lazy-loaded chunk looks fine until someone
