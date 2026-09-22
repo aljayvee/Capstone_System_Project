@@ -245,6 +245,35 @@ export interface ApiErrandException {
   resolutionReason: string | null;
 }
 
+/**
+ * A merchant-category guess, or an honest account of why there isn't one.
+ *
+ * Three distinct outcomes, kept distinct on purpose. `available: false` means
+ * the service could not be reached at all; `available: true` with a null
+ * category means it looked and was not confident enough to say; a populated
+ * category is an actual answer. The panel words all three differently, because
+ * "we didn't ask" and "we asked and it's genuinely ambiguous" are different
+ * things to tell a dispatcher.
+ */
+export interface ApiCategoryInference {
+  available: boolean;
+  categoryId?: number;
+  categoryName?: string;
+  confidence?: number;
+  /** True only well above the threshold. Selects wording, never behaviour. */
+  strong?: boolean;
+  /** "name" or "google+name" — what the answer was actually based on. */
+  source?: string;
+  alternatives?: Array<{ categoryId: number; categoryName: string; confidence: number }>;
+  reason?: string;
+}
+
+/** The shape every failure path returns, so no caller needs a special case. */
+const UNAVAILABLE_INFERENCE: ApiCategoryInference = {
+  available: false,
+  reason: "The category service is not reachable.",
+};
+
 /** Proof metadata — never the blob. Fetch one image by id to see the bytes. */
 export interface ApiProofImage {
   id: number;
@@ -1061,6 +1090,53 @@ export const apiService = {
     } catch (err) {
       console.warn("Failed to revoke other sessions:", err);
       return false;
+    }
+  },
+
+  /**
+   * What kind of shop this name refers to, from the category service.
+   *
+   * Never throws and never returns a rejected promise: this is a guess that
+   * improves a pin, not a step in placing one. An unreachable service, a 500,
+   * a timeout and "the model wasn't sure" all arrive as the same
+   * `available: false` / `category: null` shape, because the panel renders them
+   * the same way - the dispatcher picks the category by hand, exactly as they
+   * did before this service existed.
+   */
+  async inferStoreCategory(
+    name: string,
+    googleTypes?: string[] | null
+  ): Promise<ApiCategoryInference> {
+    try {
+      const response = await apiClient.post<ApiCategoryInference>("/category-inference/store", {
+        name,
+        googleTypes: googleTypes?.length ? googleTypes : undefined,
+      });
+      return response.data;
+    } catch (err) {
+      console.warn("Category inference unavailable:", err);
+      return { available: false, reason: "The category service is not reachable." };
+    }
+  },
+
+  /**
+   * What kind of shop each item is bought at. Index-aligned with `names`.
+   *
+   * Batched because stage 3 asks about a whole basket when the editor opens,
+   * and eleven round trips inside a panel someone is looking at is eleven
+   * chances to be slower than the dispatcher.
+   */
+  async inferItemCategories(names: string[]): Promise<ApiCategoryInference[]> {
+    if (names.length === 0) return [];
+    try {
+      const response = await apiClient.post<{ results: ApiCategoryInference[] }>(
+        "/category-inference/items",
+        { names }
+      );
+      return response.data?.results ?? names.map(() => UNAVAILABLE_INFERENCE);
+    } catch (err) {
+      console.warn("Category inference unavailable:", err);
+      return names.map(() => UNAVAILABLE_INFERENCE);
     }
   },
 

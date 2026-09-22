@@ -104,6 +104,7 @@ export const copy = {
     accepted: "Accepted",
     awaitingReply: (who: string) => `${who} hasn't replied yet`,
     storesPinned: (n: number) => (n === 1 ? "1 store pinned" : `${n} stores pinned`),
+    storesSent: (n: number) => (n === 1 ? "1 store sent" : `${n} stores sent`),
     noStoresYet: "No stores pinned yet",
     itemCount: (n: number) => (n === 1 ? "1 item" : `${n} items`),
     approvedBy: (who: string) => `${who} approved it`,
@@ -123,10 +124,15 @@ export const copy = {
     customerNote: "Their note",
     noItems: "This order arrived with no items listed. Ask them what they need before accepting.",
     accept: "Accept the order",
+    /** Past tense, on the greyed-out button, so it reads as a state not a dud. */
+    accepted: "Order accepted",
+    addItem: "Add an item",
     release: "Put back in queue",
     decline: "Decline",
     sendChanges: (who: string) => `Send these changes to ${who}`,
     changeNotePlaceholder: "Tell them why, in a sentence (optional)",
+    blockedAccepted: "You already accepted this order.",
+    blockedEmptyItem: "Name every item before sending the changes.",
     blockedUnsent: (who: string) => `Send your changes to ${who} first.`,
     blockedAwaiting: (who: string) => `Waiting for ${who} to answer your changes.`,
     wasRejected: (who: string) => `${who} turned down your changes. Try again or decline the order.`,
@@ -163,13 +169,29 @@ export const copy = {
     emptyTitle: "No stores pinned yet",
     emptyBody: "Search for the first shop, or click the map.",
 
+    /**
+     * The handover. Pinning no longer finishes this stage on its own, so the
+     * dispatcher needs somewhere to say "I'm done here" - pinning the first of
+     * three shops used to complete the stage and throw them into stage 3.
+     */
+    continueTitle: (who: string) => `${who} has the stores.`,
+    continueBody: "Add more shops if you need to, or move on to the item list.",
+    continueAction: "Continue to step 3",
+
     /** How sure we are about a pin's category. */
     categoryGuessed: "guessed, check it",
     categoryNeeded: "Set the store type",
     categoryGuessedHint: (source: string) =>
       source === "google"
         ? "Guessed from Google. Change it if that's wrong."
-        : "Guessed from a similar shop in your store list. Change it if that's wrong.",
+        : source === "model"
+          ? "Guessed by reading the shop name. Change it if that's wrong."
+          : "Guessed from a similar shop in your store list. Change it if that's wrong.",
+    /** What the model thought, for a dispatcher deciding whether to trust it. */
+    categoryModelHint: (name: string, pct: number, runnerUp?: string) =>
+      runnerUp
+        ? `Read the name as ${name} (${pct}% sure). Next likeliest: ${runnerUp}.`
+        : `Read the name as ${name} (${pct}% sure).`,
 
     /** Duplicate pins. A second pin on the same shop is charged as a second store. */
     dupExact: (name: string, n: number) => `${name} is already pinned as #${n}.`,
@@ -224,6 +246,31 @@ export const copy = {
       "They came in with a category but no shop, because the customer picks what they want, not where it comes from. Choose a shop for each so the rider knows where to buy it.",
     blockedNoStores: "Pin the shops first. Every item is bought at one of them.",
     blockedUnassigned: "Give every item a shop first. The rider needs to know where to go.",
+
+    /**
+     * The shop question, asked per line.
+     *
+     * A new line inherits the shop of the one above it, which is right most of
+     * the time and silently wrong the rest. Asking makes the inherited answer
+     * visible instead of leaving it to be discovered by a rider at the counter.
+     */
+    sameStoreAsk: (store: string) => `Bought at ${store}?`,
+    sameStoreYes: "Yes, same shop",
+    otherStore: "A different shop",
+    /** The escape hatch back to stage 2 when the shop isn't pinned yet. */
+    storeNotPinned: "Not pinned yet",
+    needsNewStore: (item: string) =>
+      item
+        ? `Pin the shop that sells "${item}", then come back and file it there.`
+        : "Pin the shop this item comes from, then come back and file it there.",
+
+    /** What the category service made of a line. */
+    categorySuggestion: (name: string) => `Looks like ${name}`,
+    categorySuggestionApply: "Use it",
+    categorySuggestionHint: (name: string, pct: number, runnerUp?: string) =>
+      runnerUp
+        ? `Read the item as ${name} (${pct}% sure). Next likeliest: ${runnerUp}.`
+        : `Read the item as ${name} (${pct}% sure).`,
   },
 
   // ── stage 4 — payment ───────────────────────────────────────────────────

@@ -1,4 +1,13 @@
-import { Search, Loader2, MapPin, X, Map as MapIcon, Store, AlertTriangle } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  MapPin,
+  X,
+  Map as MapIcon,
+  Store,
+  AlertTriangle,
+  ArrowRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
@@ -43,6 +52,12 @@ interface Stage2Props {
   orderDetails: any;
   /** Server rate config, so the duplicate warning can name the real cost. */
   rateConfig?: any;
+  /**
+   * Moves on to stage 3. Deliberately an explicit act: pinning a shop no longer
+   * completes this stage, so the dispatcher says when they are finished here
+   * rather than being thrown forward by their own first pin.
+   */
+  onContinue: () => void;
   readOnly?: boolean;
 }
 
@@ -99,6 +114,7 @@ export function Stage2PinStores({
   customerFirstName,
   orderDetails,
   rateConfig,
+  onContinue,
   readOnly = false,
 }: Stage2Props) {
   const {
@@ -120,6 +136,7 @@ export function Stage2PinStores({
     setPinCategory,
     focusPin,
     sendToCustomer,
+    storesSentAt,
     pendingDuplicate,
     confirmPendingDuplicate,
     dismissPendingDuplicate,
@@ -135,7 +152,31 @@ export function Stage2PinStores({
   /** Inferred rather than chosen - marked as waiting until someone confirms. */
   const isGuess = (pin: StorePinpoint) =>
     pin.categoryId != null &&
-    (pin.categorySource === "google" || pin.categorySource === "name");
+    (pin.categorySource === "google" ||
+      pin.categorySource === "name" ||
+      pin.categorySource === "model");
+
+  /**
+   * What the machine thought, in words, for the tooltip on a guessed category.
+   *
+   * A model guess says how sure it was and what it nearly said instead. That
+   * second half is the useful one: a dispatcher who disagrees can see the
+   * runner-up was the category they were about to pick, and stop second
+   * guessing themselves.
+   */
+  const guessHint = (pin: StorePinpoint): string | undefined => {
+    if (!isGuess(pin)) return undefined;
+    if (pin.categorySource !== "model") {
+      return copy.stage2.categoryGuessedHint(pin.categorySource || "");
+    }
+    const name =
+      merchantCategories.find((c) => c.id === pin.categoryId)?.name ?? "that category";
+    return copy.stage2.categoryModelHint(
+      name,
+      Math.round((pin.categoryConfidence ?? 0) * 100),
+      pin.categoryRunnerUp
+    );
+  };
 
   /** No category at all, and the dispatcher is the only one who can fix that. */
   const needsCategory = (pin: StorePinpoint) => pin.categoryId == null;
@@ -354,11 +395,7 @@ export function Stage2PinStores({
                       ? `${copy.stage2.setCategory} (${copy.stage2.categoryGuessed})`
                       : copy.stage2.setCategory
                   }
-                  title={
-                    isGuess(pin)
-                      ? copy.stage2.categoryGuessedHint(pin.categorySource || "")
-                      : undefined
-                  }
+                  title={guessHint(pin)}
                   className={cn(
                     "min-h-9 max-w-full cursor-pointer rounded-trim border px-2 text-label transition-colors",
                     needsCategory(pin)
@@ -393,7 +430,7 @@ export function Stage2PinStores({
       <DispatcherInlineBanner message={feedback.message} onDismiss={feedback.dismiss} />
 
       <DispatcherButton
-        variant="primary"
+        variant={storesSentAt ? "secondary" : "primary"}
         size="lg"
         loading={isSaving}
         loadingText={copy.stage2.sending}
@@ -404,6 +441,32 @@ export function Stage2PinStores({
       >
         {copy.stage2.send(customerFirstName)}
       </DispatcherButton>
+
+      {/* Hidden until the stores have actually been sent, then this is the way
+          forward. Placing a pin used to complete the stage by itself, so
+          clicking a search result threw the dispatcher straight into stage 3
+          with two shops still unpinned. Moving on is now something they say,
+          and they can keep adding shops above until they say it. */}
+      {storesSentAt && (
+        <div className="rounded-plate bg-status-done-fill p-3">
+          <p className="m-0 text-label text-status-done-ink">
+            {copy.stage2.continueTitle(customerFirstName)}
+          </p>
+          <p className="mb-0 mt-1 text-body text-status-done-ink/85">
+            {copy.stage2.continueBody}
+          </p>
+          <DispatcherButton
+            type="button"
+            variant="primary"
+            size="md"
+            className="mt-2.5 w-full justify-center"
+            icon={<ArrowRight size={15} />}
+            onClick={onContinue}
+          >
+            {copy.stage2.continueAction}
+          </DispatcherButton>
+        </div>
+      )}
     </div>
   );
 }

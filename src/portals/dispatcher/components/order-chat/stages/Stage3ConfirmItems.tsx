@@ -1,4 +1,4 @@
-import { Plus, Minus, Trash2, Send, Package } from "lucide-react";
+import { Plus, Minus, Trash2, Send, Package, Sparkles, MapPinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
@@ -71,6 +71,9 @@ export function Stage3ConfirmItems({
     parseStoreAndCat,
     storeOptions,
     unassignedCount,
+    categoryGuesses,
+    guessCategoryFor,
+    applyCategoryGuess,
   } = items;
 
   const minsAgo = sentAt ? Math.max(0, Math.floor((Date.now() - sentAt) / 60000)) : 0;
@@ -151,6 +154,11 @@ export function Stage3ConfirmItems({
                   <input
                     value={item.itemName}
                     onChange={(e) => updateItem(index, { itemName: e.target.value })}
+                    // On blur, not on every keystroke: a dispatcher typing
+                    // "paracetamol" would otherwise fire eleven model
+                    // evaluations answering a question they were still
+                    // half-way through asking.
+                    onBlur={(e) => guessCategoryFor(index, e.target.value)}
                     placeholder={copy.stage3.itemPlaceholder}
                     aria-label={copy.stage3.itemPlaceholder}
                     className="min-h-9 min-w-0 flex-1 rounded-trim border border-edge bg-board-ground px-2 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
@@ -242,7 +250,62 @@ export function Stage3ConfirmItems({
                       </option>
                     ))}
                   </select>
+
+                  {/* The shop that is not pinned yet. This stage could file an
+                      item under any PINNED shop and no further, so a dispatcher
+                      who discovered a second shop was needed had to work out
+                      for themselves that the answer lived back in stage 2. This
+                      says so, and takes them there with the reason attached. */}
+                  <DispatcherButton
+                    type="button"
+                    size="sm"
+                    variant="field"
+                    icon={<MapPinOff size={13} />}
+                    onClick={() => onNeedStores(copy.stage3.needsNewStore(item.itemName.trim()))}
+                  >
+                    {copy.stage3.storeNotPinned}
+                  </DispatcherButton>
                 </div>
+
+                {/* Which shop this line belongs to, asked rather than assumed.
+                    A new row inherits the shop of the one above it, which is
+                    right most of the time and silently wrong the rest — and the
+                    wrong version is only discovered by a rider standing at the
+                    wrong counter. Shown only where there is a real choice to
+                    make: with one shop pinned there is no ambiguity to raise. */}
+                {assigned && storeOptions.length > 1 && (
+                  <p className="mb-0 mt-2 text-label text-ink-muted">
+                    {copy.stage3.sameStoreAsk(store)}
+                  </p>
+                )}
+
+                {/* What the category service made of this line. A suggestion,
+                    never an answer: shown only when it DISAGREES with what the
+                    row currently says, because agreeing with the dropdown is
+                    not worth a row of screen. */}
+                {categoryGuesses[index] && categoryGuesses[index].categoryName !== category && (
+                  <div
+                    className="mt-2 flex flex-wrap items-center gap-2"
+                    title={copy.stage3.categorySuggestionHint(
+                      categoryGuesses[index].categoryName,
+                      Math.round(categoryGuesses[index].confidence * 100),
+                      categoryGuesses[index].runnerUp
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-label text-status-waiting-ink">
+                      <Sparkles size={13} className="shrink-0" />
+                      {copy.stage3.categorySuggestion(categoryGuesses[index].categoryName)}
+                    </span>
+                    <DispatcherButton
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => applyCategoryGuess(index)}
+                    >
+                      {copy.stage3.categorySuggestionApply}
+                    </DispatcherButton>
+                  </div>
+                )}
               </div>
             );
           })}

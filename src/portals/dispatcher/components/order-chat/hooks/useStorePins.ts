@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { apiClient } from "../../../../../services/apiClient";
+import { apiService } from "../../../../../services/apiService";
 import {
   loadGoogleMapsScript,
   importGoogleMapsLibrary,
@@ -18,7 +19,12 @@ import {
   findDuplicatePin,
   type DuplicateVerdict,
 } from "./storeCategoryInference";
-import type { StorePinpoint, MerchantCategory, CategorySource } from "../types";
+import type {
+  StorePinpoint,
+  MerchantCategory,
+  CategorySource,
+  OrderChatMessage,
+} from "../types";
 
 export const MAX_PINPOINTS = 3;
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
@@ -121,6 +127,13 @@ interface UseStorePinsArgs {
   merchantCategories: MerchantCategory[];
   customerDisplayName: string;
   initialPinpoints: StorePinpoint[] | null;
+  /**
+   * The conversation, read only to find out whether the stores have already
+   * been sent. Stage 2 completes on that, and a dispatcher who reloads the
+   * page mid-order must not be sent back to re-send stores the customer
+   * already has.
+   */
+  messages: OrderChatMessage[];
   onOrderUpdated: (errand: any) => void;
   pushMessage: (payload: Record<string, any>) => void;
   /** Only mount the map when stage 2 is actually open. */
@@ -133,6 +146,7 @@ export function useStorePins({
   merchantCategories,
   customerDisplayName,
   initialPinpoints,
+  messages,
   onOrderUpdated,
   pushMessage,
   mapVisible,
@@ -198,6 +212,47 @@ export function useStorePins({
     verdict: Extract<DuplicateVerdict, { kind: "likely" }>;
   } | null>(null);
 
+  /**
+   * Fills in a category the local rules could not work out, by asking the
+   * category service to read the shop name (see server/ml).
+   *
+   * Runs AFTER the pin is on screen, never before it. The dispatcher gets their
+   * pin at the speed of a click and the category arrives a moment later if it
+   * arrives at all — putting this in front of the pin would mean a sidecar
+   * having a slow morning is felt as the map being broken.
+   *
+   * Only ever fills a category that is MISSING. It cannot overwrite a catalogue
+   * match, a Google type or anything the dispatcher chose: those are all better
+   * evidence than reading a name, and a guess that quietly replaces a known
+   * answer is the one failure mode that would make this worse than nothing.
+   */
+  const enrichCategory = useCallback(async (pin: StorePinpoint) => {
+    if (pin.categoryId != null) return;
+
+    const guess = await apiService.inferStoreCategory(pin.storeName, pin.googleTypes);
+    if (!guess.available || guess.categoryId == null) return;
+
+    setPinpoints((prev) =>
+      prev.map((p) =>
+        // Matched on identity rather than index: a dispatcher can remove a pin
+        // while this request is in flight, and patching by position would then
+        // categorise a different shop.
+        p.categoryId == null &&
+        p.storeName === pin.storeName &&
+        p.latitude === pin.latitude &&
+        p.longitude === pin.longitude
+          ? {
+              ...p,
+              categoryId: guess.categoryId!,
+              categorySource: "model" as CategorySource,
+              categoryConfidence: guess.confidence,
+              categoryRunnerUp: guess.alternatives?.[0]?.categoryName,
+            }
+          : p
+      )
+    );
+  }, []);
+
   /** Adds without asking. Only for a pin the dispatcher has already confirmed. */
   const forceAddPin = useCallback(
     (pin: StorePinpoint): boolean => {
@@ -210,9 +265,12 @@ export function useStorePins({
         added = true;
         return [...prev, pin];
       });
+      // The single funnel every pin passes through, so the search result, the
+      // map click and the "pin it anyway" override all get the same treatment.
+      if (added) void enrichCategory(pin);
       return added;
     },
-    [notifyAtLimit]
+    [notifyAtLimit, enrichCategory]
   );
 
   /**
@@ -778,6 +836,9 @@ export function useStorePins({
                   longitude: lng,
                   categoryId: byTypes ?? byName,
                   categorySource: byTypes ? "google" : byName ? "name" : null,
+                  // Carried even when the local rules already matched: the
+                  // category service uses them as a prior when neither did.
+                  googleTypes: place.types || [],
                 });
                 setSearchInput("");
                 panTo(lat, lng);
@@ -798,6 +859,24 @@ export function useStorePins({
     },
     [searchInput, pinpoints.length, mapUnavailable, addPin, notifyAtLimit, panTo]
   );
+
+  /**
+   * When the stores were last sent to the customer, or null.
+   *
+   * Seeded from the conversation rather than held only in memory: the
+   * `pinpoints` card this hook posts is a durable record that the handover
+   * happened, so a reload, a second dispatcher opening the order, or a browser
+   * crash all recover the same answer instead of asking for the stores again.
+   */
+  const [storesSentAt, setStoresSentAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    const card = [...messages].reverse().find((m: any) => m?.type === "pinpoints");
+    if (!card) return;
+    setStoresSentAt((prev) =>
+      prev ?? (typeof card.timestamp === "number" ? card.timestamp : Date.now())
+    );
+  }, [messages]);
 
   const sendToCustomer = useCallback(async () => {
     setIsSaving(true);
@@ -832,6 +911,10 @@ export function useStorePins({
         pinpoints: sanitized,
       });
 
+      // What actually completes stage 2. Pinning used to, which meant placing
+      // the first of three pins finished the stage and threw the dispatcher
+      // out of the map and into stage 3 mid-task.
+      setStoresSentAt(Date.now());
       feedback.showSuccess(copy.stage2.sent(customerDisplayName));
     } catch (err) {
       console.error("Failed to save store pinpoints:", err);
@@ -863,6 +946,7 @@ export function useStorePins({
     setPinCategory,
     focusPin,
     sendToCustomer,
+    storesSentAt,
     pendingDuplicate,
     confirmPendingDuplicate,
     dismissPendingDuplicate,

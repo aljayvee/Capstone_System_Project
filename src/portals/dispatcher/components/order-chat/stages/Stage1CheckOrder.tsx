@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Minus, Plus, Trash2, Send, MapPin, AlertTriangle } from "lucide-react";
+import { Minus, Plus, Trash2, Send, MapPin, AlertTriangle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "../../../../../services/apiClient";
 import { postItemRevision, type RevisedItem } from "../../../../../services/chatSystemMessages";
@@ -46,6 +46,14 @@ interface Stage1Props {
   customerFirstName: string;
   merchantCategories: MerchantCategory[];
   messages: OrderChatMessage[];
+  /**
+   * The order has already been accepted, so accepting again is not an action.
+   *
+   * Finished stages stay re-openable in this console, which is right — a
+   * dispatcher rereads the basket all the time. It also meant Accept sat there
+   * live and clickable on an order that was accepted twenty minutes ago.
+   */
+  isAccepted: boolean;
   onAccept: () => Promise<void>;
   onRelease: () => Promise<void>;
   onDecline: (reason: string) => Promise<void>;
@@ -61,6 +69,7 @@ export function Stage1CheckOrder({
   customerFirstName,
   merchantCategories,
   messages,
+  isAccepted,
   onAccept,
   onRelease,
   onDecline,
@@ -134,16 +143,46 @@ export function Stage1CheckOrder({
     });
   }, [draft, originalItems]);
 
-  const acceptBlockedReason = awaitingCustomer
-    ? copy.stage1.blockedAwaiting(customerFirstName)
-    : hasUnsentEdits
-      ? copy.stage1.blockedUnsent(customerFirstName)
-      : null;
+  /** A row someone started typing and left blank. */
+  const hasEmptyItem = items.some((item) => !item.itemName.trim());
+
+  const acceptBlockedReason = isAccepted
+    ? copy.stage1.blockedAccepted
+    : awaitingCustomer
+      ? copy.stage1.blockedAwaiting(customerFirstName)
+      : hasUnsentEdits
+        ? copy.stage1.blockedUnsent(customerFirstName)
+        : null;
 
   const updateItem = (index: number, patch: Partial<RevisedItem>) =>
     setDraft(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 
   const removeItem = (index: number) => setDraft(items.filter((_, i) => i !== index));
+
+  /**
+   * Adds a line the customer did not list.
+   *
+   * This stage could already edit and delete but not add, which made it the one
+   * place a dispatcher taking a correction over the phone had to give up and
+   * ask the customer to re-submit. A new line is a change like any other, so it
+   * flows through the same revision the edits do: `hasUnsentEdits` sees the
+   * extra row and holds Accept until the customer has been told.
+   *
+   * `previousQuantity: 0` is what marks it as new rather than changed, so the
+   * card the customer reads says "added" instead of showing a quantity that
+   * went from one to one.
+   */
+  const addItem = () =>
+    setDraft([
+      ...items,
+      {
+        itemName: "",
+        quantity: 1,
+        storeCategory: categoryOptions[0],
+        available: true,
+        previousQuantity: 0,
+      },
+    ]);
 
   const sendRevision = async () => {
     setIsSaving(true);
@@ -322,6 +361,19 @@ export function Stage1CheckOrder({
         </div>
       )}
 
+      {/* The verb this stage was missing. Editing and deleting were here;
+          adding was not, so a dispatcher taking a correction over the phone
+          had to ask the customer to re-submit the whole order. */}
+      {!isAccepted && (
+        <button
+          type="button"
+          onClick={addItem}
+          className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-trim border border-edge bg-board-plate text-micro uppercase text-ink-muted transition-colors hover:text-ink"
+        >
+          <Plus size={14} /> {copy.stage1.addItem}
+        </button>
+      )}
+
       {/* unsent edits must go to the customer before accept unlocks */}
       {hasUnsentEdits && (
         <div className="space-y-2 rounded-plate bg-status-waiting-fill p-3">
@@ -333,6 +385,9 @@ export function Stage1CheckOrder({
             aria-label={copy.stage1.changeNotePlaceholder}
             className="w-full resize-none rounded-trim border border-edge bg-board-plate px-2.5 py-2 text-body text-ink placeholder:text-ink-muted"
           />
+          {/* An added line with no name is dropped by sendRevision's own
+              filter, so without this the dispatcher adds a row, forgets to
+              name it, sends, and watches it silently disappear. */}
           <DispatcherButton
             size="sm"
             variant="primary"
@@ -340,10 +395,17 @@ export function Stage1CheckOrder({
             loadingText="Sending"
             icon={<Send size={14} />}
             onClick={sendRevision}
+            disabled={hasEmptyItem}
+            title={hasEmptyItem ? copy.stage1.blockedEmptyItem : undefined}
             className="w-full justify-center"
           >
             {copy.stage1.sendChanges(customerFirstName)}
           </DispatcherButton>
+          {hasEmptyItem && (
+            <p className="m-0 text-body text-status-waiting-ink">
+              {copy.stage1.blockedEmptyItem}
+            </p>
+          )}
         </div>
       )}
 
@@ -380,15 +442,28 @@ export function Stage1CheckOrder({
             disabled={Boolean(acceptBlockedReason)}
             onClick={() => run(onAccept)}
             title={acceptBlockedReason || undefined}
+            icon={isAccepted ? <Check size={15} /> : undefined}
           >
-            {copy.stage1.accept}
+            {isAccepted ? copy.stage1.accepted : copy.stage1.accept}
           </DispatcherButton>
-          <DispatcherButton variant="secondary" size="md" onClick={() => run(onRelease)}>
-            {copy.stage1.release}
-          </DispatcherButton>
-          <DispatcherButton variant="danger-ghost" size="md" onClick={() => setShowDecline(true)}>
-            {copy.stage1.decline}
-          </DispatcherButton>
+          {/* Both of these end the dispatcher's claim on the order. Offering
+              them after acceptance would be offering to undo work the customer
+              has already been told about, through a control that does not
+              actually undo it. */}
+          {!isAccepted && (
+            <>
+              <DispatcherButton variant="secondary" size="md" onClick={() => run(onRelease)}>
+                {copy.stage1.release}
+              </DispatcherButton>
+              <DispatcherButton
+                variant="danger-ghost"
+                size="md"
+                onClick={() => setShowDecline(true)}
+              >
+                {copy.stage1.decline}
+              </DispatcherButton>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2 rounded-plate bg-status-act-fill p-3">

@@ -16,6 +16,16 @@ interface UseStageModelArgs {
   customerFirstName: string;
   hasPins: boolean;
   pinCount: number;
+  /**
+   * When the pinned stores were actually sent to the customer, or null.
+   *
+   * Stage 2 completes on this, NOT on `hasPins`. Pinning a shop used to finish
+   * the stage, which meant clicking a search result to place a pin instantly
+   * made stage 3 the active stage and yanked the open panel across to it — a
+   * dispatcher pinning the first of three shops was thrown out of the map
+   * mid-task. A pin is work in progress; sending is the handover.
+   */
+  storesSentAt: number | null;
   hasItems: boolean;
   itemCount: number;
   hasSentConfirmationCard: boolean;
@@ -56,6 +66,7 @@ export function useStageModel({
   customerFirstName,
   hasPins,
   pinCount,
+  storesSentAt,
   hasItems,
   itemCount,
   hasSentConfirmationCard,
@@ -92,7 +103,8 @@ export function useStageModel({
     // ── per-stage completion, each on its own work ────────────────────────
     const done: Record<StageId, boolean> = {
       1: isVerified,
-      2: hasPins,
+      // Sent, not merely pinned — see storesSentAt above.
+      2: Boolean(storesSentAt),
       3: isCustomerConfirmed,
       4: isPaymentConfirmed,
       5: Boolean(riderId),
@@ -109,6 +121,7 @@ export function useStageModel({
           if (revisionPending) return copy.status.awaitingReply(who);
           return hasItems ? copy.status.itemCount(itemCount) : copy.status.notStarted;
         case 2:
+          if (done[2]) return copy.status.storesSent(pinCount);
           return hasPins ? copy.status.storesPinned(pinCount) : copy.status.noStoresYet;
         case 3:
           if (done[3]) return copy.status.approvedBy(who);
@@ -254,6 +267,7 @@ export function useStageModel({
     customerFirstName,
     hasPins,
     pinCount,
+    storesSentAt,
     hasItems,
     itemCount,
     hasSentConfirmationCard,

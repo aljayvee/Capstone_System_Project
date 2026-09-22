@@ -124,6 +124,9 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     merchantCategories,
     customerDisplayName: customerFirstName,
     initialPinpoints,
+    // Read only to recover "the stores were already sent", which is what
+    // completes stage 2 and must survive a reload.
+    messages: chat.messages,
     onOrderUpdated: setOrderDetails,
     pushMessage: chat.pushMessage,
     mapVisible: showAll || openStageId === 2,
@@ -176,6 +179,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     customerFirstName,
     hasPins: pins.pinpoints.length > 0,
     pinCount: pins.pinpoints.length,
+    storesSentAt: pins.storesSentAt,
     hasItems: items.savedItems.length > 0,
     itemCount: items.savedItems.length,
     hasSentConfirmationCard: items.hasSentConfirmationCard,
@@ -190,9 +194,17 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
   });
 
   // Open on whatever needs attention, until the dispatcher picks for themselves.
+  //
+  // Stage 2 is the one exception: it hands over through its own "Continue to
+  // step 3" button, which only appears once the stores have been sent. Without
+  // the guard below, sending would complete the stage and this effect would
+  // immediately pull the panel to stage 3 — making that button unreachable and
+  // reproducing the very jump it exists to stop, one step later.
   useEffect(() => {
-    if (!userTouchedStage.current) setOpenStageId(model.activeStageId);
-  }, [model.activeStageId]);
+    if (userTouchedStage.current) return;
+    if (openStageId === 2 && model.activeStageId > 2) return;
+    setOpenStageId(model.activeStageId);
+  }, [model.activeStageId, openStageId]);
 
   // Unread badge for the chat tab, since the conversation can be off-screen.
   useEffect(() => {
@@ -323,9 +335,18 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             merchantCategories={merchantCategories}
             messages={chat.messages}
             readOnly={isReadOnly}
+            // Already accepted. Stage 1 stays re-openable like every other
+            // finished stage, so Accept has to visibly stop being an action —
+            // it was still live and clickable on a verified order.
+            isAccepted={model.stages[0]?.state === "done"}
             onAccept={async () => {
               await onVerify?.(orderId);
               refresh();
+              // Accepting IS the handover to stage 2. The auto-open effect
+              // would do this only while the dispatcher has never touched a
+              // stage, and someone who opened stage 1 by hand to read the
+              // basket before accepting has already forfeited that.
+              jumpToStage(2);
             }}
             onRelease={async () => {
               await onRelease?.(orderId);
@@ -348,6 +369,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             customerFirstName={customerFirstName}
             orderDetails={orderDetails}
             rateConfig={rateConfig}
+            onContinue={() => jumpToStage(3)}
             readOnly={isReadOnly}
           />
         );

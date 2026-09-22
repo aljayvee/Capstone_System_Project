@@ -37,6 +37,20 @@ export interface StorePinpoint {
    * read this field.
    */
   categorySource?: CategorySource;
+  /**
+   * Google's own `types` for this result, kept so the category service can use
+   * them as a prior. Absent for a bare map click or a catalogue hit, which is
+   * the normal case for most Tacurong shops.
+   */
+  googleTypes?: string[];
+  /**
+   * How sure the category service was, 0-1. Present only for a "model" guess.
+   * Shown to the dispatcher rather than acted on: the decision to speak at all
+   * was already made server-side against the confidence floor.
+   */
+  categoryConfidence?: number;
+  /** The runner-up category name, so a correction is one glance not a list. */
+  categoryRunnerUp?: string;
 }
 
 export type CategorySource =
@@ -48,6 +62,8 @@ export type CategorySource =
   | "google"
   /** Inferred by matching the name against the catalogue - a guess. */
   | "name"
+  /** Read from the shop name by the category service (server/ml) - a guess. */
+  | "model"
   /** The dispatcher picked it. */
   | "manual"
   | null;
