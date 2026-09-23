@@ -628,7 +628,15 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             )}
           >
             <div className="w-full p-3 sm:p-4">
-              <PaymentProofPanel errandId={orderId} payments={payments} readOnly={isReadOnly} />
+              <PaymentProofPanel
+                errandId={orderId}
+                payments={payments}
+                readOnly={isReadOnly}
+                customerFirstName={customerFirstName}
+                riderName={riderName}
+                messages={chat.messages}
+                pushMessage={chat.pushMessage}
+              />
             </div>
           </section>
         )}

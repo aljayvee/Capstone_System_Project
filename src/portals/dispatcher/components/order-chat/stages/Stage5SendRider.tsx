@@ -101,12 +101,8 @@ export function Stage5SendRider({
               label={copy.stage5.missingApproval(customerFirstName)}
             />
             <Requirement met={isPaymentConfirmed} label={copy.stage5.missingPayment} />
-            {/* Only shown when it can actually be unmet — a COD errand has no
-                downpayment, and listing a requirement that never applies makes
-                the whole list read as boilerplate. */}
-            {!isUpfrontConfirmed && (
-              <Requirement met={false} label={copy.stage5.missingUpfront} />
-            )}
+            {/* The 50% is not listed: it is collected mid-way, once the rider
+                has bought the items, so it cannot be missing at dispatch. */}
           </ul>
         </div>
       )}

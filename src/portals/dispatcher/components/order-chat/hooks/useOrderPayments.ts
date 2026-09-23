@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { apiClient } from "../../../../../services/apiClient";
+import { io, Socket } from "socket.io-client";
+import { apiClient, getMemoryAccessToken } from "../../../../../services/apiClient";
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 
@@ -30,8 +31,12 @@ export interface PaymentLedger {
   errandId: string;
   /** False on COD, where there is no ledger and nothing below applies. */
   hasLedger: boolean;
-  /** Half the goods — what must arrive before a rider is sent. */
+  /** Half the goods: half of what the rider actually paid, once they have. */
   dueUpFront: number;
+  /** The goods figure the half is taken on. The rider's receipts once filed. */
+  goodsTotal: number;
+  /** When the rider, holding every item, asked for the half. Null until then. */
+  halfPaymentRequestedAt: string | null;
   amountPaid: number;
   /** What the rider collects at the door. */
   balanceDue: number;
@@ -47,6 +52,10 @@ export interface PaymentLedger {
 }
 
 type Action = "upfront" | "top-up" | "balance" | "refund";
+
+const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
+  ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
+  : "http://localhost:5000";
 
 interface UseOrderPaymentsArgs {
   orderId: string;
@@ -100,6 +109,29 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Live, not on reload. The rider asking, the customer's receipt landing and
+  // an automatic confirmation all happen while this panel is open, and it used
+  // to learn about none of them until the dispatcher pressed something.
+  // Authenticated, because these are errand-scoped events: an anonymous socket
+  // (like useOrderPayment's) is never in the staff room they are sent to.
+  useEffect(() => {
+    if (!orderId) return;
+    const socket: Socket = io(BACKEND_URL, {
+      auth: { token: getMemoryAccessToken() ?? undefined },
+    });
+    const onEvent = (payload: { errandId?: string } | undefined) => {
+      if (payload?.errandId && String(payload.errandId) === String(orderId)) void refresh();
+    };
+    socket.on("errand:payment_updated", onEvent);
+    socket.on("errand:payment_proof_uploaded", onEvent);
+    socket.on("errand:half_payment_requested", onEvent);
+    // Anything missed while disconnected.
+    socket.on("connect", () => void refresh());
+    return () => {
+      socket.disconnect();
+    };
+  }, [orderId, refresh]);
 
   /**
    * Records one attestation.
@@ -194,8 +226,8 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     confirmBalance,
     recordRefund,
     /**
-     * True unless money is owed before dispatch and has not arrived. Always true
-     * on COD, which owes nothing up front — what stage 5 gates on.
+     * True unless the half is owed and has not arrived. Always true on COD.
+     * No longer gates stage 5: the half is collected mid-way, after purchase.
      */
     isUpfrontConfirmed:
       !ledger?.hasLedger || ledger.entries.some((e) => e.kind === "UPFRONT"),

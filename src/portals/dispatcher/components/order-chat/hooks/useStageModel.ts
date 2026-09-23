@@ -155,13 +155,14 @@ export function useStageModel({
       turn: turnFor(id),
     }));
 
-    // Unchanged from the screen this replaces: the server-facing precondition
-    // for assignment. The display model above was wrong; this never was.
-    // isUpfrontConfirmed is TRUE for every COD errand — it only bites on the
-    // downpayment plan, where sending a rider means fronting the company's cash
-    // against a basket nobody has paid a peso towards.
-    const canSendRider =
-      hasItems && hasPins && isCustomerConfirmed && isPaymentConfirmed && isUpfrontConfirmed;
+    // The server-facing precondition for assignment.
+    //
+    // The 50% no longer gates this. It is collected mid-way: the rider buys the
+    // items, then asks for half of what they actually paid before heading to
+    // the customer (errandPaymentService.requestHalfPayment), and the server
+    // still refuses the handover until it lands. Asking for it here, before a
+    // single receipt exists, was asking for half of a guess.
+    const canSendRider = hasItems && hasPins && isCustomerConfirmed && isPaymentConfirmed;
 
     // ── the now bar ───────────────────────────────────────────────────────
     const now: NowBarModel = (() => {

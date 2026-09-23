@@ -307,10 +307,10 @@ export const copy = {
   payments: {
     title: "Payment plan",
 
-    paidUpFront: "Paid up front",
-    paidUpFrontOf: (due: string) => `of ${due} due before dispatch`,
+    paidUpFront: "Half-payment",
+    paidUpFrontOf: (due: string) => `of ${due}, half of what the rider paid`,
     downpaymentHint: (who: string, amount: string) =>
-      `${who} sends ${amount}, half the item cost, through the Facebook Page. Confirm it here once you see it.`,
+      `${who} sends ${amount}, half the item cost, once the rider has bought everything. A receipt that checks out confirms itself; confirm here only if you received it another way.`,
     proofTitle: "Customer's receipt",
     proofNone: "No receipt uploaded yet. They can send one from their app.",
     proofRef: "Reference",
@@ -357,6 +357,27 @@ export const copy = {
     // inside the stage accordion ────────────────────────────────────────
     halfPaymentPanelTitle: "Half-payment",
     halfPaymentWaitingUpfront: "Waiting on the upfront payment first — see the Payment stage.",
+
+    // ── the 50%, collected mid-way ────────────────────────────────────────
+    halfNotYet: (rider: string) =>
+      `${rider} asks for this after buying everything, so it is half of what they actually paid. Nothing to do yet.`,
+    halfRequestedTitle: (rider: string) => `${rider} has every item and is waiting`,
+    halfRequestedBody: (who: string, amount: string, goods: string, since: string) =>
+      `${who} owes ${amount}, half of the ${goods} spent. Waiting ${since}.`,
+    halfAsk: (who: string, amount: string) => `Ask ${who} for ${amount}`,
+    halfAsked: (who: string) => `Asked ${who} for the half-payment`,
+    halfShowUpload: (who: string) => `Show ${who} where to send the receipt`,
+    halfShowedUpload: (who: string) => `${who} was shown where to send the receipt`,
+    halfRequestMessage: (amount: string, goods: string) =>
+      `Your rider has bought all your items (${goods}). Please send the half-payment of ${amount} through GCash or PayMaya so they can bring them to you.`,
+    halfUploadMessage: (amount: string) =>
+      `Once you've sent the ${amount}, upload a screenshot of your GCash or PayMaya receipt here. Tap "Send my receipt".`,
+    halfReceiptWaiting: "No receipt yet.",
+    halfReceiptReview: "Receipt received, but its reference number already paid for another order. Check it before confirming.",
+    halfAutoConfirmed: (rider: string) =>
+      `Confirmed automatically from the customer's receipt. ${rider} was told to head to the customer.`,
+    halfConfirmedBy: (who: string, rider: string) => `Confirmed by ${who}. ${rider} was told to head to the customer.`,
+    halfManualTitle: "Received it another way?",
     halfPaymentOveragePending:
       "Goods are held on a receipt overage. Resolve that in the Payment stage before the balance applies.",
     halfPaymentRefunded: "This errand was refunded — there's no balance to collect.",
