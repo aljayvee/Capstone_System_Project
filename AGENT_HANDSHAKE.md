@@ -1530,3 +1530,17 @@
   - **Server** (`src/controllers/sysAdminAuthController.ts:106`, `src/services/sysAdminAuthService.ts:165,369,491`): the production fallback origin for sysadmin unlock and email-verification links is now `https://portal.sugo-express.org`. These links are normally built from the request Origin/Referer, so this only matters when neither header arrives. Patched in place on the VPS (the files there matched local byte for byte; no other `src` change was waiting since the running build), then `npx tsc --noEmit` OK, `npm run build`, `pm2 restart capstone-backend`, health 200. Backup: `/root/deploy-backups/server-20261005-040444` (files + dist). The same patch was applied to `C:\Capstone_Server\server`; the two are identical.
   - **Not committed** in either repo.
 
+---
+
+* **Session Log (2026-10-05 10:35 | Secret audit, sysadmin default password removed, both repos committed and pushed)**:
+  - **Driver**: Claude (Opus 5.5), on the user's instruction.
+  - **Both GitHub repositories are PUBLIC** (`aljayvee/Capstone_System_Project`, `aljayvee/capstone_server`). Scan before every commit.
+  - **Audit result**: no current `.env` value (51 checked across web, server and mobile apps) appears in either repo or its history. An old Google key in web history (`.agents/rules/backend_and_database.md`, commit `8f627ff`) matches no current key. Database URLs in docs are placeholders.
+  - **Real leak found and closed**: the root sysadmin seed and every IT administrator created without a password shared one built-in password, committed to the public server repo, pre-filled in the live SysAdmin bundle, and written beside its username in this file (now redacted).
+    - Server: `seedSysAdmin.ts` reads `SYSADMIN_SEED_PASSWORD`; `createItAdministrator` requires a password meeting `sysAdminPasswordPolicy` (400 otherwise). New test `tests/itAdminPasswordRequired.test.ts`. Deployed in place as VPS copy + patch only (local copy also holds another session's undeployed maintenance push broadcast, which was NOT shipped). Backup `/root/deploy-backups/server-20261005-042936`.
+    - Web: `ItStaffModule.tsx` starts with an empty password and requires one. Deployed (rollback `/root/deploy-backups/web-20261005-103105`); the previous build's `SysAdminPortal-V4yC24rQ.js`, which still held the password, was moved into that backup folder. No live file contains it.
+    - **OUTSTANDING (user action)**: change the password of `sysadminit` and of every IT administrator created without an explicit password. The old value stays public in git history and forks.
+  - **Kept out of git** (`.gitignore`): server `Training_Data_*/` (real receipt photos with names, phone numbers, reference numbers), live-map debug screenshots, crash dumps; web root `.docx`, editor notes, crash dumps.
+  - **Commits pushed**: web `c8ea2e3` (order chat in three steps), `3e83a26` (portal domain), `d8374e2` (ignore rules), `c532ea3` (working-tree snapshot); server `a167523` (sysadmin password; note: this file-level commit also carries the other session's undeployed maintenance push broadcast in `sysAdminDevOpsService.ts`), `56a75f9` (emailed-link fallback), `6a2c60f` (working-tree snapshot). `FigmaPrototype` left uncommitted (quarantined).
+  - **Noted, not changed**: `scratch/extracted_doc_text.txt` (tracked since July) contains the owner's email; `public/` serves database design diagrams on the live portal; seed `owner123` remains in dev seeds.
+
