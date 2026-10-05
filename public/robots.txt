@@ -1,11 +1,33 @@
+# =============================================================================
+# SUGO EXPRESS OPERATIONS PORTAL — ROBOTS EXCLUSION STANDARD
+# Domain: https://portal.sugo-express.org
+# =============================================================================
+# This application is strictly an internal operations portal for authorized
+# personnel, dispatchers, cashiers, and system administrators.
+# Public search indexing and scraping of all routes are strictly forbidden.
+# =============================================================================
+
 User-agent: *
-Allow: /
-Allow: /logo.png
-Allow: /favicon.png
+Disallow: /
 
-# Prevent public search indexing of internal operational portals
-Disallow: /dispatcher/
-Disallow: /owner/
-Disallow: /api/
+# Explicit AI Scrapers & Web Harvesters Exclusion
+User-agent: GPTBot
+Disallow: /
 
-Sitemap: https://sugo-express.org/sitemap.xml
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
