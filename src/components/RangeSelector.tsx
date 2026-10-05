@@ -12,10 +12,10 @@ import type { ApiDateRange, ReportPeriod } from "../services/apiService";
 export type RangePreset = "TODAY" | "WEEK" | "MONTH" | "YEAR";
 
 export const PRESET_OPTIONS: Array<{ label: string; value: RangePreset }> = [
-  { label: "Today (Default)", value: "TODAY" },
-  { label: "Week", value: "WEEK" },
-  { label: "Month", value: "MONTH" },
-  { label: "Year", value: "YEAR" },
+  { label: "Daily", value: "TODAY" },
+  { label: "Weekly", value: "WEEK" },
+  { label: "Monthly", value: "MONTH" },
+  { label: "Yearly", value: "YEAR" },
 ];
 
 const PRESET_TO_PERIOD: Record<RangePreset, ReportPeriod> = {

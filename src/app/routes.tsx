@@ -1,17 +1,25 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense } from "react";
 import { createBrowserRouter } from "react-router";
 import LoginPage from "../components/LoginPage";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { GuestRoute } from "../components/GuestRoute";
+import { lazyWithRetry } from "../utils/lazyWithRetry";
+import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 
-const OwnerPortal = lazy(() => import("../portals/owner/OwnerPortal"));
-const DispatcherPortal = lazy(() => import("../portals/dispatcher/DispatcherPortal"));
-const PlacesDirectoryScreen = lazy(() => import("../portals/owner/screens/PlacesDirectoryScreen"));
-const MobileAppNoticeModal = lazy(() =>
+const OwnerPortal = lazyWithRetry(() => import("../portals/owner/OwnerPortal"));
+const DispatcherPortal = lazyWithRetry(() => import("../portals/dispatcher/DispatcherPortal"));
+const PlacesDirectoryScreen = lazyWithRetry(() => import("../portals/owner/screens/PlacesDirectoryScreen"));
+const MobileAppNoticeModal = lazyWithRetry(() =>
   import("../components/MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
 );
-const NotFoundPage = lazy(() =>
+const NotFoundPage = lazyWithRetry(() =>
   import("../components/NotFoundPage").then((m) => ({ default: m.NotFoundPage }))
+);
+const SysAdminPortal = lazyWithRetry(() => import("../portals/sysadmin/SysAdminPortal"));
+const SysAdminMagicLinkVerificationPage = lazyWithRetry(() =>
+  import("../portals/sysadmin/components/SysAdminMagicLinkVerificationPage").then((m) => ({
+    default: m.SysAdminMagicLinkVerificationPage,
+  }))
 );
 
 const RouteLoadingFallback: React.FC = () => (
@@ -29,6 +37,7 @@ export const router = createBrowserRouter([
         <LoginPage />
       </GuestRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/owner",
@@ -39,6 +48,7 @@ export const router = createBrowserRouter([
         </Suspense>
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/places",
@@ -49,6 +59,7 @@ export const router = createBrowserRouter([
         </Suspense>
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/dispatcher",
@@ -59,6 +70,7 @@ export const router = createBrowserRouter([
         </Suspense>
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/rider",
@@ -67,6 +79,7 @@ export const router = createBrowserRouter([
         <MobileAppNoticeModal isOpen={true} roleName="Rider" />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/customer",
@@ -75,6 +88,25 @@ export const router = createBrowserRouter([
         <MobileAppNoticeModal isOpen={true} roleName="Customer" />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/sysadmin",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <SysAdminPortal />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/sysadmin/verify-email",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <SysAdminMagicLinkVerificationPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "*",
@@ -83,6 +115,7 @@ export const router = createBrowserRouter([
         <NotFoundPage />
       </Suspense>
     ),
+    errorElement: <RouteErrorBoundary />,
   },
 ]);
 

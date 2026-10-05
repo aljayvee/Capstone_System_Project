@@ -20,6 +20,7 @@
    opts in above. The login page and the marketing shell keep them hidden. */
 * {
   scrollbar-width: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 *::-webkit-scrollbar {
@@ -27,3 +28,58 @@
   height: 1px;
   background: transparent;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   MOBILE SMARTPHONE FOUNDATION & SAFE AREA INSETS (50-Point Mobile Architecture)
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Zero iOS Safari Auto-Zoom: Enforce 16px minimum font size on mobile inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Controlled Mobile Overscroll Physics */
+.mobile-scroll-contain {
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* App-Like Micro-Press Tactile Feedback */
+.active-press {
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
+}
+.active-press:active {
+  transform: scale(0.98);
+}
+
+/* Modern Dynamic Viewport Helpers */
+.min-h-dvh {
+  min-height: 100dvh;
+}
+.h-dvh {
+  height: 100dvh;
+}
+.max-h-dvh {
+  max-height: 100dvh;
+}
+
+/* Safe Area Inset Utility Classes */
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+.bottom-safe {
+  bottom: max(0px, env(safe-area-inset-bottom, 0px));
+}
+

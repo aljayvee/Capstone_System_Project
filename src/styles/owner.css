@@ -76,16 +76,10 @@
      "simplify" this back to a palette step. */
   --color-board-trim: #98A7BB;
 
-  /* The ground and the plate. The portal shipped #F8FAFC (slate-50), and
-     this is slate-100, two steps deeper, for one measured reason: with
-     shadows forfeited to the flat invariant, a white plate on #F8FAFC is a
-     1.5% luminance step and effectively invisible. At slate-100 the plate
-     separates on value, and a single boundary rule finishes the job.
-
-     Both are slate neutrals, so the pinned palette holds. Where the
-     Dispatcher is warm bone, this portal is cool slate; that is the whole
-     visible difference between the two skins. */
-  --color-board-ground: #F1F5F9;
+  /* The ground and the plate. Neutral off-white / Apple White #F5F5F7
+     for clean structural contrast with pure white plates (#FFFFFF) and
+     subtle hairlines. */
+  --color-board-ground: #F5F5F7;
   --color-board-plate: #FFFFFF;
 
   /* Two ink levels, both slate-tinted, and deliberately no third.

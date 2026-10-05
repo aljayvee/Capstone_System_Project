@@ -1,9 +1,6 @@
 import * as React from "react";
 import { useState } from "react";
 import {
-  Archive,
-  Store,
-  MapPin,
   RotateCcw,
   Loader2,
   AlertCircle,
@@ -11,20 +8,6 @@ import {
 } from "lucide-react";
 import { apiClient } from "../../../../../services/apiClient";
 import { apiService, type ApiMerchantCategory } from "../../../../../services/apiService";
-
-/**
- * Where retired things live, and the only place they can be brought back from.
- *
- * Setting a category Inactive (or a store Retired) now moves it out of its
- * normal tab entirely rather than hiding it behind a filter chip. That is the
- * difference between "archived" and "filtered": an archived thing exists in
- * exactly one place, so an owner scanning their live categories is looking at
- * the live set, not a view of it.
- *
- * Nothing here deletes. Restoring is always available, and the counts a
- * category carries (its stores) are untouched by archiving, so restoring puts
- * it back exactly as it was.
- */
 
 export interface ArchivedPlace {
   id: string;
@@ -42,12 +25,7 @@ interface ArchiveTabProps {
   categories: ApiMerchantCategory[];
   places: ArchivedPlace[];
   isLoadingPlaces?: boolean;
-  /** Set when the retired-stores fetch failed. Distinct from `error`, which is
-   *  a failed restore. A failure may not be reported as an empty archive. */
   placesError?: string | null;
-  /** Set when the CATEGORY fetch failed upstream. Without it this tab prints
-   *  "Archived categories (0)" underneath the parent's own notice that the
-   *  categories did not load, which is one screen giving two answers. */
   categoriesError?: string | null;
   onCategoryRestored: (updated: ApiMerchantCategory) => void;
   onPlaceRestored: () => void;
@@ -68,7 +46,6 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
   const archivedCategories = categories.filter((c) => c.status !== "Active");
   const retiredPlaces = places.filter((p) => !p.isActive);
 
-  // A count is only reportable when the list behind it actually arrived.
   const categoryCount =
     categoriesError && categories.length === 0 ? "--" : String(archivedCategories.length);
   const placeCount = placesError && places.length === 0 ? "--" : String(retiredPlaces.length);
@@ -92,8 +69,6 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
     setBusyId(`p${place.id}`);
     setError(null);
     try {
-      // PUT is a partial update server-side (placeUpdateSchema is the create
-      // schema `.partial()`), so only the flag being changed is sent.
       await apiClient.put(`/places/${place.id}`, { isActive: true });
       onPlaceRestored();
     } catch (err: any) {
@@ -105,20 +80,16 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
 
   const nothingArchived = archivedCategories.length === 0 && retiredPlaces.length === 0;
 
-  // `!placesError` is the load-bearing clause. Without it, a failed fetch
-  // left retiredPlaces empty and this returned the all-clear panel: a green
-  // tick and "Nothing archived" over stores nobody could see.
   if (nothingArchived && !isLoadingPlaces && !placesError) {
     return (
-      <div className="flex-1 min-h-0 flex items-center justify-center">
+      <div className="flex-1 min-h-0 bg-board-plate border border-edge rounded-plate flex items-center justify-center">
         <div className="text-center max-w-sm px-6 py-10">
-          <div className="w-14 h-14 rounded-plate bg-status-done-fill border border-status-done-ink/20 grid place-items-center mx-auto text-status-done-ink">
-            <CheckCircle2 size={26} />
+          <div className="w-12 h-12 rounded-plate bg-status-done-fill border border-status-done-ink/20 grid place-items-center mx-auto text-status-done-ink">
+            <CheckCircle2 size={22} />
           </div>
-          <p className="text-label text-ink mt-3 mb-0">Nothing archived</p>
+          <p className="text-label font-semibold text-ink mt-3 mb-0">Nothing archived</p>
           <p className="text-label text-ink-muted mt-1 mb-0 leading-relaxed">
-            Categories you set to Inactive and stores you retire will appear here, ready to bring
-            back.
+            Categories set to Archive and retired stores appear here for one-click restoration.
           </p>
         </div>
       </div>
@@ -126,126 +97,119 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1 pb-4">
+    <div className="flex-1 min-h-0 bg-board-plate border border-edge rounded-plate flex flex-col overflow-hidden">
       {error && (
         <p
           role="alert"
-          className="flex items-center gap-2 text-label text-status-act-ink bg-status-act-fill border border-status-act-ink/20 rounded-plate px-3 py-2 m-0"
+          className="flex items-center gap-2 text-label text-status-act-ink bg-status-act-fill border-b border-status-act-ink/20 px-4 py-2.5 m-0 shrink-0"
         >
           <AlertCircle size={14} className="shrink-0" />
           {error}
         </p>
       )}
 
-      {/* ── archived categories ─────────────────────────────────────── */}
-      <section className="bg-board-plate border border-edge rounded-plate overflow-hidden">
-        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-board-ground border-b border-edge">
-          <p className="flex items-center gap-1.5 text-micro text-ink uppercase m-0">
-            <Store size={13} className="text-ink-muted" />
-            Archived categories ({categoryCount})
-          </p>
-        </header>
-
-        {archivedCategories.length === 0 ? (
-          <p className="text-label text-ink-muted px-4 py-4 m-0">No archived categories.</p>
-        ) : (
-          <ul className="divide-y divide-hairline m-0 p-0 list-none">
-            {archivedCategories.map((category) => (
-              <li
-                key={category.id}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-board-ground transition"
-              >
-                <span className="w-2 h-2 rounded-full bg-status-closed-ink shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-label text-ink truncate m-0">{category.name}</p>
-                  <p className="text-label text-ink-muted truncate m-0">
-                    {category._count?.places ?? 0} store
-                    {(category._count?.places ?? 0) === 1 ? "" : "s"} still linked
-                    {category.description ? ` · ${category.description}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => restoreCategory(category)}
-                  disabled={busyId === `c${category.id}`}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:border-status-done-ink/40 hover:text-status-done-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+      <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-hairline">
+        {/* Archived Categories Section (shown when non-empty or if both sections are displayed) */}
+        {(archivedCategories.length > 0 || Boolean(categoriesError)) && (
+          <div>
+            <div className="px-4 py-2.5 bg-board-ground border-b border-edge">
+              <p className="text-label font-semibold text-ink m-0">
+                Archived Categories ({categoryCount})
+              </p>
+            </div>
+            <ul className="divide-y divide-hairline m-0 p-0 list-none">
+              {archivedCategories.map((category) => (
+                <li
+                  key={category.id}
+                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-board-ground/60 transition"
                 >
-                  {busyId === `c${category.id}` ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={12} />
-                  )}
-                  Restore
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-label font-semibold text-ink truncate m-0">
+                      {category.name}
+                    </p>
+                    <p className="text-label text-ink-muted truncate m-0 mt-0.5">
+                      {category._count?.places ?? 0} store
+                      {(category._count?.places ?? 0) === 1 ? "" : "s"} linked
+                      {category.description ? ` · ${category.description}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => restoreCategory(category)}
+                    disabled={busyId === `c${category.id}`}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:bg-board-ground transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    {busyId === `c${category.id}` ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <RotateCcw size={13} />
+                    )}
+                    <span>Restore</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-      </section>
 
-      {/* ── retired stores ──────────────────────────────────────────── */}
-      <section className="bg-board-plate border border-edge rounded-plate overflow-hidden">
-        <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-board-ground border-b border-edge">
-          <p className="flex items-center gap-1.5 text-micro text-ink uppercase m-0">
-            <MapPin size={13} className="text-ink-muted" />
-            Retired stores ({placeCount})
-          </p>
-        </header>
+        {/* Retired Stores Section */}
+        {(retiredPlaces.length > 0 || isLoadingPlaces || Boolean(placesError)) && (
+          <div>
+            <div className="px-4 py-2.5 bg-board-ground border-b border-edge">
+              <p className="text-label font-semibold text-ink m-0">
+                Retired Stores ({placeCount})
+              </p>
+            </div>
 
-        {isLoadingPlaces ? (
-          <p className="flex items-center gap-2 text-label text-ink-muted px-4 py-4 m-0">
-            <Loader2 size={13} className="animate-spin" />
-            Loading retired stores…
-          </p>
-        ) : placesError ? (
-          <p
-            role="alert"
-            className="flex items-center gap-2 px-4 py-4 m-0 text-label text-status-act-ink"
-          >
-            <AlertCircle size={14} className="shrink-0" />
-            {placesError} Any retired store is still retired; this list is just not showing them.
-          </p>
-        ) : retiredPlaces.length === 0 ? (
-          <p className="text-label text-ink-muted px-4 py-4 m-0">No retired stores.</p>
-        ) : (
-          <ul className="divide-y divide-hairline m-0 p-0 list-none">
-            {retiredPlaces.map((place) => (
-              <li
-                key={place.id}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-board-ground transition"
+            {isLoadingPlaces ? (
+              <p className="flex items-center gap-2 text-label text-ink-muted px-4 py-4 m-0">
+                <Loader2 size={14} className="animate-spin" />
+                Loading retired stores...
+              </p>
+            ) : placesError ? (
+              <p
+                role="alert"
+                className="flex items-center gap-2 px-4 py-4 m-0 text-label text-status-act-ink"
               >
-                <span className="w-2 h-2 rounded-full bg-status-closed-ink shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-label text-ink truncate m-0">{place.name}</p>
-                  <p className="text-label text-ink-muted truncate m-0">
-                    {categoryName(place.categoryId)}
-                    {place.barangay ? ` · ${place.barangay}` : ""} · {place.address}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => restorePlace(place)}
-                  disabled={busyId === `p${place.id}`}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:border-status-done-ink/40 hover:text-status-done-ink transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {busyId === `p${place.id}` ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={12} />
-                  )}
-                  Restore
-                </button>
-              </li>
-            ))}
-          </ul>
+                <AlertCircle size={14} className="shrink-0" />
+                {placesError}
+              </p>
+            ) : (
+              <ul className="divide-y divide-hairline m-0 p-0 list-none">
+                {retiredPlaces.map((place) => (
+                  <li
+                    key={place.id}
+                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-board-ground/60 transition"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-label font-semibold text-ink truncate m-0">
+                        {place.name}
+                      </p>
+                      <p className="text-label text-ink-muted truncate m-0 mt-0.5">
+                        {categoryName(place.categoryId)}
+                        {place.barangay ? ` · ${place.barangay}` : ""} · {place.address}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => restorePlace(place)}
+                      disabled={busyId === `p${place.id}`}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate bg-board-plate border border-edge text-label text-ink hover:bg-board-ground transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      {busyId === `p${place.id}` ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <RotateCcw size={13} />
+                      )}
+                      <span>Restore</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
-      </section>
-
-      <p className="flex items-center gap-1.5 text-label text-ink-muted px-1 m-0">
-        <Archive size={11} className="shrink-0" />
-        Archiving never deletes. Stores stay linked to their category, so restoring puts everything
-        back as it was.
-      </p>
+      </div>
     </div>
   );
 };

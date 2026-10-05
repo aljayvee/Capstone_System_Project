@@ -10,6 +10,7 @@ import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
 import type { LoginSuccessResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
+import { io, Socket } from "socket.io-client";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-const MobileAppNoticeModal = React.lazy(() =>
+import { lazyWithRetry } from "../utils/lazyWithRetry";
+const MobileAppNoticeModal = lazyWithRetry(() =>
   import("./MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
 );
 import { ProfileSetupStep } from "./login/ProfileSetupStep";
@@ -94,12 +96,96 @@ export default function LoginPage() {
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
 
+  // 500 Server Error [nginx] Outage Simulation State
+  const [isServerErrorOverlayActive, setIsServerErrorOverlayActive] = useState<boolean>(() => {
+    return localStorage.getItem("sugo_simulate_500_error") === "true";
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkServerError = async () => {
+      try {
+        const res = await apiClient.get<{ active: boolean }>("/system/server-error-status", {
+          timeout: 4000,
+        });
+        if (isMounted && typeof res.data?.active === "boolean") {
+          setIsServerErrorOverlayActive(res.data.active);
+          localStorage.setItem("sugo_simulate_500_error", res.data.active ? "true" : "false");
+        }
+      } catch {
+        // Fail silently; fallback to cached state
+      }
+    };
+
+    checkServerError();
+    const pollInterval = setInterval(checkServerError, 5000);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sugo_simulate_500_error") {
+        setIsServerErrorOverlayActive(e.newValue === "true");
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+
+    const handleCustomEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ active: boolean }>;
+      if (custom.detail && typeof custom.detail.active === "boolean") {
+        setIsServerErrorOverlayActive(custom.detail.active);
+      }
+    };
+    window.addEventListener("sugo:server-error-update", handleCustomEvent as EventListener);
+
+    let socket: Socket | null = null;
+    try {
+      const backendUrl = (import.meta as any).env?.VITE_API_URL
+        ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/?$/, "")
+        : "http://localhost:5000";
+
+      socket = io(backendUrl, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 2000,
+      });
+
+      socket.on("system:server_error_update", (payload: { active: boolean }) => {
+        if (!isMounted) return;
+        if (payload && typeof payload.active === "boolean") {
+          setIsServerErrorOverlayActive(payload.active);
+          localStorage.setItem("sugo_simulate_500_error", payload.active ? "true" : "false");
+        }
+      });
+    } catch {
+      // Polling fallback active
+    }
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("sugo:server-error-update", handleCustomEvent as EventListener);
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, []);
+
   // Automatically focus the username/email input when the login authentication UI is active
   useEffect(() => {
-    if (stage === "CREDENTIALS") {
+    if (stage === "CREDENTIALS" && !isServerErrorOverlayActive) {
       usernameInputRef.current?.focus();
     }
-  }, [stage]);
+  }, [stage, isServerErrorOverlayActive]);
+
+  useEffect(() => {
+    if (isServerErrorOverlayActive) {
+      const prevTitle = document.title;
+      document.title = "500 Internal Server Error";
+      return () => {
+        document.title = prevTitle;
+      };
+    }
+  }, [isServerErrorOverlayActive]);
 
   const resetToCredentials = useCallback((message = "") => {
     setStage("CREDENTIALS");
@@ -174,7 +260,11 @@ export default function LoginPage() {
       return;
     }
 
-    login(toPortalUser(rawUser, identifier.trim(), response.token), response.token);
+    login(
+      toPortalUser(rawUser, identifier.trim(), response.token),
+      response.token,
+      (response as any).refreshToken
+    );
     setIsLoading(false);
     navigate(`/${rawRole}`);
   };
@@ -375,12 +465,32 @@ export default function LoginPage() {
     OTP: { title: "Verify Your Email", description: "Enter the 6-digit verification code sent to your email" },
   };
 
+  if (isServerErrorOverlayActive) {
+    return (
+      <div
+        data-testid="server-error-500-overlay"
+        className="fixed inset-0 z-[99999] bg-white text-black font-serif select-none overflow-auto"
+        style={{ fontFamily: '"Times New Roman", Times, serif' }}
+      >
+        <div className="w-full pt-4">
+          <h1 className="text-center text-2xl sm:text-3xl font-bold my-3 text-black">
+            500 Internal Server Error
+          </h1>
+          <hr className="w-full border-t border-slate-300 my-2" />
+          <div className="text-center text-sm sm:text-base text-black mt-2">
+            nginx
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const isCooldownActive = activeAlert?.variant === "security_cooldown" && (activeAlert.cooldownSeconds ?? 0) > 0;
 
   return (
     <main
       role="main"
-      className="min-h-screen flex flex-col items-center justify-center p-4 relative select-none bg-[#0B132B]"
+      className="min-h-screen min-h-dvh flex flex-col items-center justify-center p-4 pt-safe pb-safe relative select-none bg-[#0B132B]"
     >
       {/* Flat Minimalist Form */}
       <div className="relative w-full max-w-md z-10 my-auto selection:bg-red-950 selection:text-white">

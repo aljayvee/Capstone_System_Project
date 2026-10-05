@@ -17,14 +17,16 @@ import { toast } from "sonner";
 import LiveFleetMap from "../../../../components/LiveFleetMap";
 import { StandingFigures } from "../../components/StandingFigures";
 import { useRiderFleetPresence, RiderFleetMember } from "../../../../hooks/useRiderFleetPresence";
-import { RIDER_STATUS_THEMES, RiderPresenceState } from "../../../../constants/riderPresence";
+import { RIDER_STATUS_THEMES, describeRiderStatus, RiderPresenceState } from "../../../../constants/riderPresence";
+import { useRiderActiveRoute } from "../../../../hooks/useRiderActiveRoute";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
+import { cn } from "@/lib/utils";
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
 export const RiderTrackingModule: React.FC = () => {
-  const { riders, isLoading, loadError, telemetryError, reload } = useRiderFleetPresence();
+  const { riders, isLoading, loadError, telemetryError, reload, liveLink } = useRiderFleetPresence();
   const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [selectedPresence, setSelectedPresence] = useState<"ALL" | RiderPresenceState>("ALL");
@@ -40,23 +42,26 @@ export const RiderTrackingModule: React.FC = () => {
     return undefined;
   }, [riders, selectedRiderId]);
 
+  // The owner portal holds no errand list, so this fetches the one route.
+  const selectedRoute = useRiderActiveRoute(selectedRider);
+
   const selectedTheme = selectedRider
-    ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE
-    : RIDER_STATUS_THEMES.AVAILABLE;
+    ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE
+    : RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
 
   // Fleet presence counts
   const totalRiders = riders.length;
   const countReady = useMemo(
-    () => riders.filter((r) => r.presence === "AVAILABLE").length,
+    () => riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length,
     [riders],
   );
-  const countBusy = useMemo(() => riders.filter((r) => r.presence === "BUSY").length, [riders]);
+  const countBusy = useMemo(() => riders.filter((r) => r.presence === "ON_DELIVERY").length, [riders]);
   const countDisconnected = useMemo(
-    () => riders.filter((r) => r.presence === "DISCONNECTED").length,
+    () => riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length,
     [riders],
   );
   const countOffDuty = useMemo(
-    () => riders.filter((r) => r.presence === "OFF_DUTY").length,
+    () => riders.filter((r) => r.presence === "OFFLINE").length,
     [riders],
   );
 
@@ -78,7 +83,7 @@ export const RiderTrackingModule: React.FC = () => {
   // Filtered roster
   const filteredRoster = useMemo(() => {
     return riders.filter((r) => {
-      if (hideOffline && r.presence === "OFF_DUTY") return false;
+      if (hideOffline && r.presence === "OFFLINE") return false;
       if (selectedPresence !== "ALL" && r.presence !== selectedPresence) return false;
 
       const q = search.trim().toLowerCase();
@@ -148,7 +153,7 @@ export const RiderTrackingModule: React.FC = () => {
             <span className="flex items-center gap-1.5 rounded-trim bg-status-done-fill px-3 py-1.5 text-micro uppercase text-status-done-ink">
               <Radio size={13} className="shrink-0" />
               <span data-figure>
-                {countReady} Ready, {countBusy} Delivering
+                {countReady} Online, {countBusy} On delivery
               </span>
             </span>
           )}
@@ -179,16 +184,43 @@ export const RiderTrackingModule: React.FC = () => {
         columns={4}
         className="shrink-0"
         figures={[
-          { label: "Online & ready", value: fig(countReady), sub: "Waiting for a run" },
-          { label: "On active mission", value: fig(countBusy), sub: "Carrying an errand" },
           {
-            label: "Signal lost",
-            value: fig(countDisconnected),
-            sub: "No beacon for 60s",
-            // The only one of the four that means somebody must act.
-            urgent: !unknown && countDisconnected > 0,
+            label: "Available Online",
+            value: fig(countReady),
+            sub: "Can be assigned",
+            active: selectedPresence === "AVAILABLE_ONLINE",
+            onClick: () =>
+              setSelectedPresence((prev) =>
+                prev === "AVAILABLE_ONLINE" ? "ALL" : "AVAILABLE_ONLINE",
+              ),
           },
-          { label: "Offline / off duty", value: fig(countOffDuty), sub: "Not on shift" },
+          {
+            label: "On delivery",
+            value: fig(countBusy),
+            sub: "Online, carrying an errand",
+            active: selectedPresence === "ON_DELIVERY",
+            onClick: () =>
+              setSelectedPresence((prev) => (prev === "ON_DELIVERY" ? "ALL" : "ON_DELIVERY")),
+          },
+          {
+            label: "Available Signal Lost",
+            value: fig(countDisconnected),
+            sub: "On duty, phone not reporting",
+            urgent: !unknown && countDisconnected > 0,
+            active: selectedPresence === "AVAILABLE_SIGNAL_LOST",
+            onClick: () =>
+              setSelectedPresence((prev) =>
+                prev === "AVAILABLE_SIGNAL_LOST" ? "ALL" : "AVAILABLE_SIGNAL_LOST",
+              ),
+          },
+          {
+            label: "Offline",
+            value: fig(countOffDuty),
+            sub: "Logged out or shift ended",
+            active: selectedPresence === "OFFLINE",
+            onClick: () =>
+              setSelectedPresence((prev) => (prev === "OFFLINE" ? "ALL" : "OFFLINE")),
+          },
         ]}
       />
 
@@ -231,6 +263,10 @@ export const RiderTrackingModule: React.FC = () => {
           <LiveFleetMap
             presenceUnknown={unknown}
             telemetryError={telemetryError}
+            liveLink={liveLink}
+            routeGeometry={selectedRoute.routeGeometry}
+            routeStops={selectedRoute.routeStops}
+            routeDestination={selectedRoute.routeDestination}
             riders={riders}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRiderId}
@@ -242,20 +278,23 @@ export const RiderTrackingModule: React.FC = () => {
 
           {/* Selected Rider Floating Mission Control Card */}
           {selectedRider && (
-            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-auto bg-board-plate border border-edge rounded-plate sm:rounded-plate p-4 sm:p-5 max-w-sm sm:max-w-md w-auto sm:w-full space-y-3 z-20 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              {/* Card Header */}
-              <div className="flex items-center justify-between gap-3">
+            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-auto bg-board-plate border border-edge rounded-plate p-4 max-w-sm sm:max-w-md w-auto sm:w-full space-y-3 z-20 shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
+              {/* Header: Rider Name, ID, Badge, Close */}
+              <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-hairline">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className="w-9 h-9 rounded-plate text-white flex items-center justify-center text-label shrink-0"
-                    style={{ backgroundColor: selectedTheme.primaryColor }}
-                  >
-                    {selectedRider.name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <span
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full shrink-0",
+                      selectedRider.presence === "AVAILABLE_ONLINE" && "bg-status-done-ink",
+                      selectedRider.presence === "ON_DELIVERY" && "bg-status-waiting-ink",
+                      selectedRider.presence === "AVAILABLE_SIGNAL_LOST" && "bg-signal animate-pulse",
+                      selectedRider.presence === "OFFLINE" && "bg-ink-muted/40",
+                    )}
+                  />
                   <div className="min-w-0">
-                    <h4 className=" text-ink text-label truncate flex items-center gap-1.5">
+                    <h4 className="text-ink text-label font-medium truncate flex items-center gap-1.5">
                       <span>{selectedRider.name}</span>
-                      <span className="text-ink-muted font-mono text-label">
+                      <span className="text-ink-muted font-mono text-body">
                         #{selectedRider.id}
                       </span>
                     </h4>
@@ -267,9 +306,12 @@ export const RiderTrackingModule: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-micro px-2.5 py-0.5 rounded-full uppercase border border-edge ${selectedTheme.badgeClassName}`}
+                    className={cn(
+                      "text-micro px-2.5 py-0.5 rounded-full uppercase border",
+                      selectedTheme.badgeClassName,
+                    )}
                   >
                     {selectedTheme.badgeLabel}
                   </span>
@@ -284,22 +326,22 @@ export const RiderTrackingModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Detail Telemetry Grid */}
-              <div className="grid grid-cols-2 gap-2 text-label pt-2.5 border-t border-hairline">
+              {/* Detail Telemetry: Clean tabular rows without nested card boxes */}
+              <div className="space-y-2 text-label">
                 {/* Phone */}
-                <div className="bg-board-ground p-2 rounded-plate border border-edge">
-                  <span className="text-micro text-ink-muted uppercase block">Contact Phone</span>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-ink-muted">Contact Phone</span>
                   <button
                     type="button"
                     onClick={() =>
                       selectedRider.phone &&
                       handleCopy(selectedRider.phone, `floating-phone-${selectedRider.id}`)
                     }
-                    className="flex items-center gap-1.5 font-mono font-bold text-ink hover:text-ink transition mt-0.5"
+                    className="flex items-center gap-1.5 font-mono text-ink hover:text-board-field transition font-medium"
                     title="Click to copy phone"
                   >
                     <Phone size={12} className="text-ink-muted" />
-                    <span className="truncate">{selectedRider.phone || "--"}</span>
+                    <span>{selectedRider.phone || "--"}</span>
                     {selectedRider.phone && (
                       <span className="text-ink-muted">
                         {copiedId === `floating-phone-${selectedRider.id}` ? (
@@ -313,9 +355,9 @@ export const RiderTrackingModule: React.FC = () => {
                 </div>
 
                 {/* Active Errand Status */}
-                <div className="bg-board-ground p-2 rounded-plate border border-edge">
-                  <span className="text-micro text-ink-muted uppercase block">Active Mission</span>
-                  <p className="font-bold text-ink mt-0.5 truncate flex items-center gap-1.5">
+                <div className="flex items-center justify-between py-1 border-t border-hairline">
+                  <span className="text-ink-muted">Active Mission</span>
+                  <div className="font-medium text-ink flex items-center gap-1.5">
                     {selectedRider.activeOrdersCount > 0 ? (
                       <>
                         <span className="w-2 h-2 shrink-0 rounded-full bg-status-waiting-ink" />
@@ -324,59 +366,74 @@ export const RiderTrackingModule: React.FC = () => {
                     ) : (
                       <span className="text-ink-muted">0 active orders</span>
                     )}
-                  </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Battery Telemetry Bar */}
-              {selectedRider.batteryLevel !== null && selectedRider.batteryLevel !== undefined && (
-                <div className="flex items-center justify-between text-label px-2.5 py-1.5 rounded-plate bg-board-ground border border-edge">
-                  <span className="flex items-center gap-1.5 text-ink-muted font-medium">
-                    {(() => {
-                      const pct =
-                        selectedRider.batteryLevel <= 1
-                          ? Math.round(selectedRider.batteryLevel * 100)
-                          : Math.round(selectedRider.batteryLevel);
-                      return pct <= 20 ? (
-                        <BatteryLow size={14} className="text-signal" />
-                      ) : (
-                        <Battery size={14} className="text-ink-muted" />
-                      );
-                    })()}
-                    <span>Battery Telemetry:</span>
-                  </span>
-                  <span
-                    className={`font-mono font-bold ${(() => {
-                      const pct =
-                        selectedRider.batteryLevel <= 1
-                          ? Math.round(selectedRider.batteryLevel * 100)
-                          : Math.round(selectedRider.batteryLevel);
-                      return pct <= 20 ? "text-status-act-ink font-bold" : "text-ink";
-                    })()}`}
-                  >
-                    {selectedRider.batteryLevel <= 1
-                      ? `${Math.round(selectedRider.batteryLevel * 100)}%`
-                      : `${Math.round(selectedRider.batteryLevel)}%`}
-                  </span>
-                </div>
-              )}
+                {/* Battery Telemetry */}
+                {selectedRider.batteryLevel !== null && selectedRider.batteryLevel !== undefined && (
+                  <div className="flex items-center justify-between py-1 border-t border-hairline">
+                    <span className="flex items-center gap-1.5 text-ink-muted">
+                      {(() => {
+                        const pct =
+                          selectedRider.batteryLevel <= 1
+                            ? Math.round(selectedRider.batteryLevel * 100)
+                            : Math.round(selectedRider.batteryLevel);
+                        return pct <= 20 ? (
+                          <BatteryLow size={14} className="text-signal" />
+                        ) : (
+                          <Battery size={14} className="text-ink-muted" />
+                        );
+                      })()}
+                      <span>Battery Level</span>
+                    </span>
+                    <span
+                      className={cn(
+                        "font-mono font-medium",
+                        (() => {
+                          const pct =
+                            selectedRider.batteryLevel <= 1
+                              ? Math.round(selectedRider.batteryLevel * 100)
+                              : Math.round(selectedRider.batteryLevel);
+                          return pct <= 20 ? "text-status-act-ink font-bold" : "text-ink";
+                        })(),
+                      )}
+                    >
+                      {selectedRider.batteryLevel <= 1
+                        ? `${Math.round(selectedRider.batteryLevel * 100)}%`
+                        : `${Math.round(selectedRider.batteryLevel)}%`}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Right Column: Fleet Roster Sidebar (4 cols on desktop) */}
         <div
-          className={`lg:col-span-4 bg-board-plate border border-edge rounded-plate p-3 sm:p-3.5 flex flex-col h-full min-h-0 space-y-2.5 overflow-hidden ${
+          className={`lg:col-span-4 bg-board-plate border border-edge rounded-plate flex flex-col h-full min-h-0 overflow-hidden ${
             mobileTab === "map" ? "hidden sm:flex" : "flex"
           }`}
         >
           {/* Sidebar Header */}
-          <div className="border-b border-hairline pb-2.5 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="flex items-center gap-2 text-label text-ink">
-                <Bike size={16} className="text-board-field" />
-                <span>Fleet Roster</span>
-              </h3>
+          <div className="p-3 sm:p-3.5 border-b border-hairline shrink-0 space-y-2.5 bg-board-plate">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-label font-medium text-ink flex items-center gap-2">
+                  <Bike size={16} className="text-board-field" />
+                  <span>Fleet Roster</span>
+                </h3>
+                {selectedPresence !== "ALL" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPresence("ALL")}
+                    className="text-micro text-board-field hover:underline"
+                    title="Clear status filter"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               <span className="text-label font-mono text-ink-muted bg-board-ground px-2 py-0.5 rounded-trim border border-edge">
                 {unknown ? "-- of --" : `${filteredRoster.length} of ${totalRiders}`}
               </span>
@@ -406,68 +463,16 @@ export const RiderTrackingModule: React.FC = () => {
                 </button>
               )}
             </div>
-
-            {/* Status Filter Capsules */}
-            <div className="flex items-center gap-1 overflow-x-auto pt-2 pb-0.5 scrollbar-none">
-              <button
-                type="button"
-                onClick={() => setSelectedPresence("ALL")}
-                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition ${
-                  selectedPresence === "ALL"
-                    ? "bg-board-field text-white"
-                    : "bg-board-ground text-ink-muted hover:bg-board-ground"
-                }`}
-              >
-                All ({fig(totalRiders)})
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPresence("AVAILABLE")}
-                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
-                  selectedPresence === "AVAILABLE"
-                    ? "bg-status-done-ink text-white"
-                    : "bg-status-done-fill text-status-done-ink hover:bg-status-done-fill"
-                }`}
-              >
-                <span>Ready ({fig(countReady)})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPresence("BUSY")}
-                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
-                  selectedPresence === "BUSY"
-                    ? "bg-status-waiting-ink text-white"
-                    : "bg-status-waiting-fill text-status-waiting-ink hover:bg-status-waiting-fill"
-                }`}
-              >
-                <span>Busy ({fig(countBusy)})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPresence("DISCONNECTED")}
-                className={`px-2.5 py-0.5 rounded-trim text-label whitespace-nowrap transition flex items-center gap-1 ${
-                  selectedPresence === "DISCONNECTED"
-                    ? "bg-signal text-white"
-                    : "bg-status-act-fill text-status-act-ink hover:bg-status-act-fill"
-                }`}
-              >
-                <span>Signal ({fig(countDisconnected)})</span>
-              </button>
-            </div>
           </div>
 
-          {/* Roster Scrollable Cards */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pr-1">
+          {/* Roster Scrollable Plate: Single continuous list with hairlines */}
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-hairline">
             {isLoading ? (
               <div className="p-8 text-center text-ink-muted space-y-2">
                 <RefreshCw size={22} className="animate-spin text-board-field mx-auto" />
                 <p className="text-label text-ink-muted">Streaming live rider fleet...</p>
               </div>
             ) : unknown ? (
-              /* Ordered before the empty branch. This panel used to say
-               "No riders are currently registered in the system." whenever
-               /riders was unreachable, which is a claim about the business
-               rather than about the request. */
               <div className="p-6 text-center space-y-2.5 my-auto">
                 <WifiOff size={22} className="mx-auto text-status-act-ink" />
                 <p className="text-panel text-ink">The roster did not load</p>
@@ -505,97 +510,95 @@ export const RiderTrackingModule: React.FC = () => {
             ) : (
               filteredRoster.map((r) => {
                 const isSelected = r.id === selectedRiderId;
-                const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE;
+                const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
 
                 return (
-                  /* Was a <div> carrying `w-full text-left cursor-pointer` and
-                   an onClick: styled to look exactly like the button it was
-                   not, so selecting a rider from the roster was mouse-only.
-                   aria-pressed reports which rider the map is showing. */
-                  <button
+                  <div
                     key={r.id}
-                    type="button"
-                    aria-pressed={isSelected}
                     onClick={() => {
                       setSelectedRiderId(r.id);
                       if (mobileTab === "roster") setMobileTab("map");
                     }}
-                    className={`w-full space-y-2 rounded-plate border border-edge p-3 text-left transition-colors ${
+                    className={cn(
+                      "px-3.5 py-3 transition-colors cursor-pointer text-left relative",
                       isSelected
-                        ? "border-board-field bg-board-ground"
-                        : "border-edge bg-board-plate hover:bg-board-ground"
-                    }`}
+                        ? "bg-board-ground border-l-2 border-board-field"
+                        : "hover:bg-board-ground/60 bg-board-plate",
+                    )}
                   >
-                    {/* Top Row: Avatar, Name, Presence Badge */}
+                    {/* Row 1: Name, Status Pill */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                          className="w-8 h-8 rounded-plate text-white flex items-center justify-center text-label shrink-0"
-                          style={{ backgroundColor: theme.primaryColor }}
-                        >
-                          {r.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className=" text-label text-ink truncate">{r.name}</p>
-                          <p className="text-body text-ink-muted font-mono">#{r.id}</p>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={cn(
+                            "w-2 h-2 rounded-full shrink-0",
+                            r.presence === "AVAILABLE_ONLINE" && "bg-status-done-ink",
+                            r.presence === "ON_DELIVERY" && "bg-status-waiting-ink",
+                            r.presence === "AVAILABLE_SIGNAL_LOST" && "bg-signal animate-pulse",
+                            r.presence === "OFFLINE" && "bg-ink-muted/40",
+                          )}
+                        />
+                        <span className="text-label font-medium text-ink truncate">{r.name}</span>
+                        <span className="text-body font-mono text-ink-muted">#{r.id}</span>
                       </div>
 
                       <span
-                        className={`text-micro px-2 py-0.5 rounded-full uppercase border border-edge shrink-0 ${theme.badgeClassName}`}
+                        className={cn(
+                          "text-micro px-2 py-0.5 rounded-full uppercase border shrink-0",
+                          theme.badgeClassName,
+                        )}
                       >
                         {theme.badgeLabel}
                       </span>
                     </div>
 
-                    {/* Bottom Row: Phone, Battery, Errand Pill */}
-                    <div className="flex items-center justify-between text-label text-ink-muted pt-1.5 border-t border-edge">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (r.phone) handleCopy(r.phone, `roster-phone-${r.id}`);
-                        }}
-                        className="flex items-center gap-1 text-ink-muted hover:text-ink transition"
-                        title="Click to copy phone"
-                      >
-                        <Phone size={11} className="text-ink-muted" />
-                        <span className="font-mono">{r.phone || "--"}</span>
-                        {r.phone && (
-                          <span className="text-ink-muted">
-                            {copiedId === `roster-phone-${r.id}` ? (
-                              <Check size={10} className="text-status-done-ink" />
-                            ) : (
-                              <Copy size={10} />
-                            )}
-                          </span>
-                        )}
-                      </button>
+                    {/* Row 2: Telemetry details (Phone, Battery, Active orders) */}
+                    <div className="flex items-center justify-between text-body text-ink-muted mt-1.5 pl-4">
+                      <div className="flex items-center gap-3">
+                        {/* Phone */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (r.phone) handleCopy(r.phone, `roster-phone-${r.id}`);
+                          }}
+                          className="flex items-center gap-1 hover:text-ink transition font-mono"
+                          title="Click to copy phone"
+                        >
+                          <Phone size={11} className="text-ink-muted" />
+                          <span>{r.phone || "--"}</span>
+                          {r.phone && copiedId === `roster-phone-${r.id}` && (
+                            <Check size={10} className="text-status-done-ink" />
+                          )}
+                        </button>
 
-                      <div className="flex items-center gap-2">
+                        {/* Battery */}
                         {r.batteryLevel !== null && r.batteryLevel !== undefined && (
-                          <span className="flex items-center gap-0.5 font-mono text-label text-ink-muted">
+                          <span className="flex items-center gap-1 font-mono">
                             {r.batteryLevel <= 0.2 ? (
                               <BatteryLow size={12} className="text-signal" />
                             ) : (
                               <Battery size={12} className="text-ink-muted" />
                             )}
-                            <span>
+                            <span className={r.batteryLevel <= 0.2 ? "text-status-act-ink font-semibold" : ""}>
                               {r.batteryLevel <= 1
                                 ? `${Math.round(r.batteryLevel * 100)}%`
                                 : `${Math.round(r.batteryLevel)}%`}
                             </span>
                           </span>
                         )}
-
-                        {r.activeOrdersCount > 0 && (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded-trim bg-status-waiting-fill text-status-waiting-ink text-label">
-                            {r.activeOrdersCount} active
-                          </span>
-                        )}
                       </div>
+
+                      {/* Active Orders */}
+                      {r.activeOrdersCount > 0 ? (
+                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-micro font-medium bg-status-waiting-fill text-status-waiting-ink border border-status-waiting-ink/20">
+                          {r.activeOrdersCount} active
+                        </span>
+                      ) : (
+                        <span className="text-micro text-ink-muted">Idle</span>
+                      )}
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}

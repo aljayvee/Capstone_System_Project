@@ -133,7 +133,18 @@ export interface ApiRider {
   presumed: boolean;
   /** Why an otherwise-present rider cannot be offered work. */
   impediments: RiderImpediment[];
+  /**
+   * The status dispatch and the owner see (2026-09-23): derived server-side
+   * from `availability`, with the reason in words and the last time the
+   * rider was heard from, so "signal lost" can say for how long.
+   */
+  riderStatus: ApiRiderStatus;
+  riderStatusReason: string;
+  riderStatusText: string;
+  lastBeaconAt: number | null;
 }
+
+export type ApiRiderStatus = "AVAILABLE_ONLINE" | "AVAILABLE_SIGNAL_LOST" | "OFFLINE";
 
 // Metadata for the category's hero photo (`store_cat_image`). The list
 // endpoint returns this shape and never the base64 payload, so a category grid
@@ -233,6 +244,27 @@ export type ExceptionKind =
   | "OVERAGE_PENDING"
   | "UNPAID_BALANCE";
 
+/**
+ * A suggested reason for clearing an exception, from the server's trained
+ * network. Below `threshold` (0.75) it is not confident, and `suggestion` is
+ * null: the model says nothing rather than guess into an audit record.
+ */
+export interface ApiReasonSuggestion {
+  confident: boolean;
+  /** The model's probability for its best reason, 0 to 1. */
+  confidence: number;
+  threshold: number;
+  reasonCode: string | null;
+  suggestion: string | null;
+  modelVersion: string;
+  /**
+   * The large model's reading of the same evidence (Gemini, or Gemma behind
+   * it), pooled into `confidence`. Null or absent when there was none.
+   * `reasonCode` null means it found that none of the reasons fits.
+   */
+  secondOpinion?: { reasonCode: string | null; confidence: number; model: string; label: string } | null;
+}
+
 export interface ApiErrandException {
   errandId: string;
   kind: ExceptionKind;
@@ -256,6 +288,59 @@ export interface ApiErrandException {
  * count behind it, because "filed here 9 of the last 10 times" and "someone did
  * this once" deserve different amounts of trust.
  */
+/**
+ * May a store be pinned at a spot. Mirrors the server's storeLocationGuard:
+ * "inside" Tacurong, "outside" the border but on the loaded road map (allowed
+ * once the dispatcher confirms), or "blocked" off the road map.
+ */
+export interface ApiStoreLocationVerdict {
+  status: "inside" | "outside" | "blocked";
+  reason: "inside_border" | "outside_border" | "off_road_map" | "beyond_cap";
+  kmBeyondBorder: number;
+  nearestRoadMeters: number | null;
+  graphChecked: boolean;
+  message: string;
+}
+
+/** One store the pin predictor proposes, with the items it is for. */
+export interface ApiPredictedStore {
+  storeName: string;
+  latitude: number;
+  longitude: number;
+  placeId: string | null;
+  categoryId: number | null;
+  categoryName: string | null;
+  items: string[];
+  confidence: number;
+  source: "named" | "learned" | "similar" | "category";
+  learnedFrom: number;
+  reason: string;
+  location: ApiStoreLocationVerdict;
+  alreadyPinned: boolean;
+}
+
+export interface ApiStorePrediction {
+  stores: ApiPredictedStore[];
+  uncovered: Array<{ name: string; reason: string }>;
+  trainingExamples: number;
+}
+
+/** The fee for stops being placed, from POST /errands/:id/pinpoints/quote. */
+export interface ApiPinQuote {
+  deliveryFee: number;
+  totalCost: number;
+  distanceFee: number | null;
+  multiStoreFee: number | null;
+  groceryFee: number | null;
+  nonCodFee: number | null;
+  distanceKm: number;
+  /** No routing engine answered, so the distance is a straight-line estimate. */
+  estimated: boolean;
+  /** The customer already agreed a fare; these stops do not change it. */
+  fareAgreed: boolean;
+  stops: number;
+}
+
 export interface ApiItemPlacement {
   name: string;
   categoryId: number | null;
@@ -1065,6 +1150,28 @@ export const apiService = {
     return true;
   },
 
+  /**
+   * The model's suggested reason for clearing one exception. Null means the
+   * request failed, which is not the same as the model being unsure: an unsure
+   * model answers with `confident: false`.
+   */
+  async suggestExceptionReason(
+    errandId: string,
+    kind: ExceptionKind,
+    occurredAt: string
+  ): Promise<ApiReasonSuggestion | null> {
+    try {
+      const response = await apiClient.get<ApiReasonSuggestion>(
+        `/errands/${errandId}/exceptions/reason-suggestion`,
+        { params: { kind, occurredAt } }
+      );
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
   // Notifications API
   async getNotifications(): Promise<ApiNotification[] | null> {
     try {
@@ -1083,6 +1190,16 @@ export const apiService = {
     } catch (err) {
       console.warn("API Error:", err);
       return null;
+    }
+  },
+
+  async markAllNotificationsRead(): Promise<boolean> {
+    try {
+      await apiClient.patch("/notifications/read-all");
+      return true;
+    } catch (err) {
+      console.warn("Failed to mark all notifications as read:", err);
+      return false;
     }
   },
 
@@ -1185,6 +1302,57 @@ export const apiService = {
     }
   },
 
+  /**
+   * Asks whether a store may be pinned at this spot. Resolves null when the
+   * check itself could not be made, so the caller can decide how to fail; the
+   * server re-checks on save either way.
+   */
+  async checkStoreLocation(latitude: number, longitude: number): Promise<ApiStoreLocationVerdict | null> {
+    try {
+      const response = await apiClient.post<ApiStoreLocationVerdict>("/places/location-check", {
+        latitude,
+        longitude,
+      });
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Store location check unavailable:", err);
+      return null;
+    }
+  },
+
+  /**
+   * What these stops would cost, before they are saved. Step 3 asks as pins are
+   * placed so the fee is on screen with the stores. Writes nothing and tells the
+   * customer nothing on the server (errandService.quotePinpoints). Throws, with
+   * the server's own sentence where it gave one, so the caller can show it.
+   */
+  async quotePinpoints(
+    errandId: string,
+    pinpoints: Array<{ storeName: string; latitude: number; longitude: number; placeId: string | null; categoryId: number | null }>
+  ): Promise<ApiPinQuote> {
+    const response = await apiClient.post<{ quote: ApiPinQuote }>(`/errands/${errandId}/pinpoints/quote`, {
+      pinpoints,
+    });
+    return response.data.quote;
+  },
+
+  /**
+   * The stores the predictor proposes for this errand's step 1 list. Null on
+   * failure, distinct from an empty prediction ("nothing to suggest").
+   */
+  async predictStores(errandId: string, names: string[]): Promise<ApiStorePrediction | null> {
+    try {
+      const response = await apiClient.post<ApiStorePrediction>(
+        `/category-inference/errands/${errandId}/store-predictions`,
+        names.length > 0 ? { names } : {}
+      );
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Store prediction unavailable:", err);
+      return null;
+    }
+  },
+
   async getAccountLoginLogs(limit = 50): Promise<AccountLoginLog[]> {
     try {
       const response = await apiClient.get<{ logs: AccountLoginLog[] }>(`/account/login-logs?limit=${limit}`);
@@ -1192,6 +1360,48 @@ export const apiService = {
     } catch (err) {
       console.warn("Failed to fetch account login logs:", err);
       return [];
+    }
+  },
+
+  async updateItemFulfillmentStatus(
+    errandId: string,
+    itemId: number,
+    fulfillmentStatus: "PENDING" | "PURCHASED" | "OUT_OF_STOCK"
+  ): Promise<{ item?: any; errand?: any } | null> {
+    try {
+      const response = await apiClient.patch(`/errands/${errandId}/items/${itemId}/status`, {
+        fulfillmentStatus,
+      });
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to update item fulfillment status:", err);
+      return null;
+    }
+  },
+
+  async suggestItemSubstitutes(
+    errandId: string,
+    itemId: number
+  ): Promise<{ substitutes: string[]; chatMessage: string; source: "ai" | "catalog" } | null> {
+    try {
+      const response = await apiClient.post(`/errands/${errandId}/items/${itemId}/suggest-substitutes`);
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to suggest item substitutes:", err);
+      return null;
+    }
+  },
+
+  async declineItemSubstitute(
+    errandId: string,
+    itemId: number
+  ): Promise<{ success: boolean; item?: any; errand?: any } | null> {
+    try {
+      const response = await apiClient.post(`/errands/${errandId}/items/${itemId}/decline-substitute`);
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to decline item substitute:", err);
+      return null;
     }
   },
 };

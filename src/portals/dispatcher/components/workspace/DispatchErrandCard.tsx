@@ -4,11 +4,13 @@ import { formatErrandId } from "../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../utils/format";
 import { cn } from "@/lib/utils";
 import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { MessageCircle } from "lucide-react";
 
 interface DispatchErrandCardProps {
   errand: Errand;
   isSelected: boolean;
   onClick: () => void;
+  unreadChatCount?: number;
 }
 
 function getRelativeTime(createdAtString: string): { label: string; isUrgent: boolean } {
@@ -60,6 +62,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
   errand,
   isSelected,
   onClick,
+  unreadChatCount = 0,
 }) => {
   const isAvailable = String(errand.status).toUpperCase() === "AVAILABLE";
   const { label: timeLabel, isUrgent } = getRelativeTime(errand.createdAt);
@@ -70,6 +73,15 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
     errand.pabiliDetails?.[0]?.storeCategory ||
     errand.category ||
     "Custom Store";
+
+  const customerDisplayName =
+    (errand.customerName || (errand as any).customer?.name || "Customer").trim();
+
+  const extraStops = (errand.pinpoints?.length || 0) > 1 ? errand.pinpoints!.length - 1 : 0;
+  const secondaryStoreLabel =
+    extraStops > 0
+      ? `${primaryStoreName} (+${extraStops} store${extraStops > 1 ? "s" : ""})`
+      : primaryStoreName;
 
   const itemCount = errand.pabiliDetails?.length || errand.pabiliItemRequests?.length || 0;
 
@@ -92,16 +104,31 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
           : "border border-edge bg-board-plate hover:border-board-trim"
       )}
     >
-      {/* Destination and departure clock */}
+      {/* Customer and departure clock */}
       <div className="flex items-baseline justify-between gap-3">
-        <h3
-          className={cn(
-            "min-w-0 flex-1 truncate text-title uppercase",
-            isSelected ? "text-board-plate" : "text-ink"
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <h3
+            className={cn(
+              "truncate text-title uppercase",
+              isSelected ? "text-board-plate" : "text-ink"
+            )}
+          >
+            {customerDisplayName}
+          </h3>
+          {unreadChatCount > 0 && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-bold shrink-0 animate-pulse",
+                isSelected
+                  ? "bg-amber-400/30 text-amber-200 border border-amber-300/40"
+                  : "bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+              )}
+            >
+              <MessageCircle size={11} />
+              <span>{unreadChatCount} new</span>
+            </span>
           )}
-        >
-          {primaryStoreName}
-        </h3>
+        </div>
         <span
           data-figure
           className={cn(
@@ -119,7 +146,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
         </span>
       </div>
 
-      {/* Route number, customer, and what it comes to */}
+      {/* Route number and store / merchant category */}
       <div className="mt-1 flex items-center justify-between gap-3">
         <span
           data-figure
@@ -136,7 +163,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
             isSelected ? "text-board-plate/90" : "text-ink-muted"
           )}
         >
-          {errand.customerName || "Customer"}
+          {secondaryStoreLabel}
         </span>
       </div>
 
@@ -163,6 +190,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
             {itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "General errand"}
             {" · "}
             {formatPeso(totalDisplay)}
+            {errand.totalCost ? "" : " fee"}
           </span>
         </div>
 

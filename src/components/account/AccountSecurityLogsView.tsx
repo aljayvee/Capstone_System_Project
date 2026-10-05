@@ -32,13 +32,17 @@ function getDeviceIcon(deviceInfo: string) {
   return <Laptop size={18} className="text-slate-400" />;
 }
 
-function getStatusBadge(status: string, reason?: string | null) {
+function getStatusBadge(status: string, reason?: string | null, isOnline?: boolean) {
   const norm = status.toUpperCase();
   if (norm === "SUCCESS") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-plate text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-plate text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+        <span
+          className={`size-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-400"}`}
+          title={isOnline ? "Active connection" : "Offline"}
+        />
         <CheckCircle2 size={12} />
-        Signed In
+        {isOnline ? "Signed In (Online)" : "Signed In"}
       </span>
     );
   }
@@ -294,7 +298,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
                         {log.ipAddress}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {getStatusBadge(log.status, log.revokedReason)}
+                        {getStatusBadge(log.status, log.revokedReason, log.isOnline)}
                       </td>
                     </tr>
                   ))}

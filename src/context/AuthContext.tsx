@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { User, AuthContextType, SupersededSessionInfo } from "../types/auth";
 import { setMemoryAccessToken, getMemoryAccessToken, setOnLogoutCallback, apiClient } from "../services/apiClient";
 import { endRealtimeSession, ensureRealtimeSession } from "../firebase/realtimeSession";
 import { io } from "socket.io-client";
 
 const USER_SESSION_KEY = "errand_system_session_user";
+const REFRESH_TOKEN_FALLBACK_KEY = "sugo_refresh_fallback";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -30,7 +31,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post("/auth/logout").catch(() => {});
+      const fallbackToken = typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(REFRESH_TOKEN_FALLBACK_KEY)
+        : null;
+      await apiClient.post("/auth/logout", { refreshToken: fallbackToken || undefined }).catch(() => {});
     } finally {
       // Before the local session is cleared, so the Firebase credential does
       // not outlive the account that owns it. A browser left holding one would
@@ -40,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       updateToken(null);
       sessionStorage.removeItem(USER_SESSION_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
       if (typeof document !== "undefined") {
         document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
       }
@@ -47,9 +52,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [updateToken]);
 
   const login = useCallback(
-    (newUser: User, newToken?: string) => {
+    (newUser: User, newToken?: string, newRefreshToken?: string) => {
+      // Purge any lingering SysAdmin credentials to ensure strict mutual exclusion
+      try {
+        // Only when a SysAdmin session is actually open in this tab. This used
+        // to run on every staff login, clearing the SysAdmin token and then
+        // calling logout without it: the logout could never authenticate, so
+        // it revoked nothing, 401d, and set off a doomed refresh that 401d too.
+        // Logging out BEFORE the token is cleared is what lets it revoke.
+        const hadSysAdminSession = sessionStorage.getItem("sugo_sysadmin_active") !== null;
+        sessionStorage.removeItem("sugo_sysadmin_active");
+        import("../services/sysAdminApiService").then(({ setSysAdminMemoryToken, getSysAdminMemoryToken, sysAdminApiService }) => {
+          if (hadSysAdminSession && getSysAdminMemoryToken()) {
+            // logout() clears the token itself when it finishes.
+            sysAdminApiService.logout().catch(() => {});
+          } else {
+            setSysAdminMemoryToken(null);
+          }
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+
       setUser(newUser);
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(newUser));
+      if (newRefreshToken) {
+        sessionStorage.setItem(REFRESH_TOKEN_FALLBACK_KEY, newRefreshToken);
+      }
       if (typeof document !== "undefined") {
         document.cookie = "sugo_session_active=1; path=/; max-age=2592000; SameSite=Lax; Secure";
       }
@@ -79,15 +108,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   // Initial silent token refresh on page load/mount. Only executed if there is
-  // evidence of an existing session (either session cookie or sessionStorage).
+  // evidence of an existing session (either session cookie, sessionStorage, or fallback token).
   // Fresh guest visits and search crawlers skip this to avoid unnecessary network latency
   // and prevent false 401 unauthorized errors in the browser console.
   useEffect(() => {
     let isMounted = true;
     const initializeAuth = async () => {
+      const fallbackToken = typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(REFRESH_TOKEN_FALLBACK_KEY)
+        : null;
+
       const hasPossibleSession =
         typeof document !== "undefined" &&
-        (document.cookie.includes("sugo_session_active=1") || !!sessionStorage.getItem(USER_SESSION_KEY));
+        (document.cookie.includes("sugo_session_active=1") ||
+         !!sessionStorage.getItem(USER_SESSION_KEY) ||
+         !!fallbackToken);
 
       if (!hasPossibleSession) {
         if (isMounted) {
@@ -97,23 +132,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        const res = await apiClient.post("/auth/refresh");
+        const res = await apiClient.post("/auth/refresh", {
+          refreshToken: fallbackToken || undefined,
+        });
+
         if (isMounted && res.data?.token) {
           updateToken(res.data.token);
           if (res.data.user) {
             setUser(res.data.user);
+          }
+          if (res.data.refreshToken && typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem(REFRESH_TOKEN_FALLBACK_KEY, res.data.refreshToken);
           }
           // A reload restores the JWT session silently, and the Firebase one
           // has to come back with it. Without this, the map worked only on the
           // tab where the user actually typed their password.
           void ensureRealtimeSession();
         }
-      } catch (err) {
+      } catch (err: any) {
+        console.warn("[AuthContext] Silent token refresh failed on initializeAuth:", err?.response?.data || err?.message || err);
         if (isMounted) {
           // No valid refresh cookie (or it's expired/revoked) — genuinely logged out.
           setUser(null);
           updateToken(null);
           sessionStorage.removeItem(USER_SESSION_KEY);
+          sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
           if (typeof document !== "undefined") {
             document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
           }
@@ -130,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [updateToken]);
 
   const dismissSupersededNotice = useCallback(() => {
     setSupersededInfo(null);
@@ -157,6 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         updateToken(null);
         sessionStorage.removeItem(USER_SESSION_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
         if (typeof document !== "undefined") {
           document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
         }
@@ -169,16 +213,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [updateToken]);
 
-  // Connect Socket.IO to receive instant push eviction when superseded
+  // Connect Socket.IO to receive instant push eviction when superseded.
+  //
+  // Keyed on whether a token EXISTS, not on the token itself: it rotates every
+  // silent refresh, and rebuilding the socket each time tore it down mid-upgrade
+  // (a browser "WebSocket is closed before the connection is established"
+  // error) for no gain. The auth callback reads the current token at every
+  // handshake, so reconnects stay authenticated.
+  const latestTokenRef = useRef(token);
+  latestTokenRef.current = token;
+  const hasToken = Boolean(token);
   useEffect(() => {
-    if (!token || !user) return;
+    if (!hasToken || !user) return;
 
     const backendUrl = (import.meta as any).env?.VITE_API_URL
       ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/?$/, "")
       : "http://localhost:5000";
 
     const socket = io(backendUrl, {
-      auth: { token },
+      auth: (cb) => cb({ token: latestTokenRef.current ?? undefined }),
       transports: ["websocket", "polling"],
     });
 
@@ -193,6 +246,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         updateToken(null);
         sessionStorage.removeItem(USER_SESSION_KEY);
+        sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
         if (typeof document !== "undefined") {
           document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
         }
@@ -204,7 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       socket.disconnect();
     };
-  }, [token, user?.id, updateToken, logout]);
+  }, [hasToken, user?.id, updateToken, logout]);
 
   return (
     <AuthContext.Provider

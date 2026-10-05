@@ -18,26 +18,35 @@ export function useIdleTimer({
   const [isExpired, setIsExpired] = useState(false);
 
   const lastActivityRef = useRef<number>(Date.now());
-  const countdownIntervalRef = useRef<any>(null);
-  const checkIntervalRef = useRef<any>(null);
+  const warningStartRef = useRef<number | null>(null);
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
 
   const resetTimer = useCallback(() => {
     lastActivityRef.current = Date.now();
+    warningStartRef.current = null;
     setIsWarning(false);
     setIsExpired(false);
     setRemainingSeconds(Math.round(warningDurationMs / 1000));
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
   }, [warningDurationMs]);
 
-  // Activity listeners
+  // When disabled (e.g. user logged out or session ended), immediately reset all states
+  useEffect(() => {
+    if (!enabled) {
+      lastActivityRef.current = Date.now();
+      warningStartRef.current = null;
+      setIsWarning(false);
+      setIsExpired(false);
+      setRemainingSeconds(Math.round(warningDurationMs / 1000));
+    }
+  }, [enabled, warningDurationMs]);
+
+  // Activity listeners to record interactions
   useEffect(() => {
     if (!enabled) return;
 
     const handleUserActivity = () => {
-      // Only reset if not already in the countdown warning modal
+      // Only refresh activity timestamp if not currently displaying the warning or already expired
       if (!isWarning && !isExpired) {
         lastActivityRef.current = Date.now();
       }
@@ -51,41 +60,54 @@ export function useIdleTimer({
     };
   }, [enabled, isWarning, isExpired]);
 
-  // Periodic check for idle threshold
+  // Inactivity detection interval: periodically checks if user crossed the idle timeout threshold
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || isWarning || isExpired) return;
 
-    checkIntervalRef.current = setInterval(() => {
-      if (isWarning || isExpired) return;
-
+    const checkInterval = setInterval(() => {
       const idleTime = Date.now() - lastActivityRef.current;
       if (idleTime >= idleTimeoutMs) {
+        warningStartRef.current = Date.now();
+        setRemainingSeconds(Math.round(warningDurationMs / 1000));
         setIsWarning(true);
-        const warningStart = Date.now();
-
-        countdownIntervalRef.current = setInterval(() => {
-          const elapsedInWarning = Date.now() - warningStart;
-          const timeLeft = Math.max(0, Math.ceil((warningDurationMs - elapsedInWarning) / 1000));
-          setRemainingSeconds(timeLeft);
-
-          if (timeLeft <= 0) {
-            clearInterval(countdownIntervalRef.current);
-            countdownIntervalRef.current = null;
-            setIsWarning(false);
-            setIsExpired(true);
-            if (onExpired) {
-              onExpired();
-            }
-          }
-        }, 1000);
       }
-    }, 5000);
+    }, 1000);
 
     return () => {
-      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      clearInterval(checkInterval);
     };
-  }, [enabled, idleTimeoutMs, warningDurationMs, isWarning, isExpired, onExpired]);
+  }, [enabled, idleTimeoutMs, warningDurationMs, isWarning, isExpired]);
+
+  // Active countdown timer: runs second-by-second while warning modal is visible
+  useEffect(() => {
+    if (!enabled || !isWarning || isExpired) return;
+
+    if (!warningStartRef.current) {
+      warningStartRef.current = Date.now();
+    }
+
+    const tick = () => {
+      const start = warningStartRef.current || Date.now();
+      const elapsed = Date.now() - start;
+      const timeLeft = Math.max(0, Math.ceil((warningDurationMs - elapsed) / 1000));
+      setRemainingSeconds(timeLeft);
+
+      if (timeLeft <= 0) {
+        setIsWarning(false);
+        setIsExpired(true);
+        if (onExpiredRef.current) {
+          onExpiredRef.current();
+        }
+      }
+    };
+
+    tick();
+    const countdownInterval = setInterval(tick, 500);
+
+    return () => {
+      clearInterval(countdownInterval);
+    };
+  }, [enabled, isWarning, isExpired, warningDurationMs]);
 
   return {
     isWarning,

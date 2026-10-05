@@ -30,6 +30,7 @@ export interface ErrandItem {
   quantity?: number;
   unitPrice?: number;
   estimatedSubtotal?: number;
+  fulfillmentStatus?: "PENDING" | "PURCHASED" | "OUT_OF_STOCK";
   notes?: string;
 }
 

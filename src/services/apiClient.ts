@@ -16,8 +16,30 @@ const AUTH_ENDPOINT_PATHS = [
 let memoryAccessToken: string | null = null;
 let onLogoutCallback: (() => void) | null = null;
 
+// Told when the access token appears, rotates, or is cleared. Lets a socket
+// wait for a real token instead of connecting anonymously at page load and
+// being torn down seconds later when the token arrives.
+const tokenListeners = new Set<(token: string | null) => void>();
+
+export const onMemoryAccessTokenChange = (listener: (token: string | null) => void): (() => void) => {
+  tokenListeners.add(listener);
+  return () => {
+    tokenListeners.delete(listener);
+  };
+};
+
 export const setMemoryAccessToken = (token: string | null) => {
+  const changed = token !== memoryAccessToken;
   memoryAccessToken = token;
+  if (changed) {
+    tokenListeners.forEach((listener) => {
+      try {
+        listener(token);
+      } catch {
+        // A listener's failure is its own; the token is set regardless.
+      }
+    });
+  }
 };
 
 export const getMemoryAccessToken = (): string | null => {
@@ -65,6 +87,7 @@ function getDeviceId(): string | null {
 export const deviceHeaders = (): Record<string, string> => {
   const id = getDeviceId();
   return id ? { "x-device-id": id } : {};
+};
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -140,23 +163,33 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Attempt silent token refresh via HttpOnly cookie
+        const fallbackRefreshToken = typeof sessionStorage !== "undefined"
+          ? sessionStorage.getItem("sugo_refresh_fallback")
+          : null;
+
+        // Attempt silent token refresh via HttpOnly cookie (with sessionStorage fallback)
+        // Raw axios, not apiClient, so the request interceptor never sees it -
+        // the device header has to be attached by hand or this one refresh
+        // would reach the server looking like a different device.
         const res = await axios.post(
           `${API_BASE_URL}/auth/refresh`,
-          {},
-          // Raw axios, not apiClient, so the request interceptor never sees it -
-          // the device header has to be attached by hand or this one refresh
-          // would reach the server looking like a different device.
+          { refreshToken: fallbackRefreshToken || undefined },
           { withCredentials: true, headers: deviceHeaders() }
         );
 
         const newAccessToken = res.data.token;
+        if (res.data?.refreshToken && typeof sessionStorage !== "undefined") {
+          sessionStorage.setItem("sugo_refresh_fallback", res.data.refreshToken);
+        }
         setMemoryAccessToken(newAccessToken);
         processQueue(null, newAccessToken);
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr: any) {
+        if (typeof sessionStorage !== "undefined") {
+          sessionStorage.removeItem("sugo_refresh_fallback");
+        }
         processQueue(refreshErr, null);
         setMemoryAccessToken(null);
         const errorMsg = String(

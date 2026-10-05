@@ -66,23 +66,33 @@ export const MobileAppNoticeModal: React.FC<MobileAppNoticeModalProps> = ({
           Please access your account services using the dedicated <span className="text-slate-200 font-medium">{isRider ? "Rider Mobile App" : "Customer Mobile App"}</span>.
         </p>
 
-        {/* Exit Button */}
-        <div className="mt-8">
+        {/* Actions */}
+        <div className="mt-7 space-y-3">
+          <a
+            href="https://sugoonthego.online#download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 px-4 rounded-xl font-semibold text-xs text-white bg-[#0F1A30] hover:bg-slate-800 border border-slate-700 transition-all flex items-center justify-center gap-2 shadow-sm min-h-[48px] active:scale-[0.98]"
+          >
+            <Smartphone size={16} className="text-red-400" />
+            <span>Download Mobile App (.APK)</span>
+          </a>
+
           <button
             type="button"
             onClick={handleExit}
             disabled={isExiting}
-            className="w-full py-3.5 px-5 rounded-xl font-semibold text-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 active:scale-98 cursor-pointer"
+            className="w-full py-3 px-4 rounded-xl font-semibold text-xs text-white bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 transition-all flex items-center justify-center gap-2 shadow-sm min-h-[48px] active:scale-[0.98] cursor-pointer"
           >
             {isExiting ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 <span>Signing Out...</span>
               </>
             ) : (
               <>
-                <LogOut size={18} />
-                <span>Exit & Return to Login</span>
+                <LogOut size={16} />
+                <span>Exit &amp; Return to Login</span>
               </>
             )}
           </button>

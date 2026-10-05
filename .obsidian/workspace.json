@@ -4,17 +4,17 @@
     "type": "split",
     "children": [
       {
-        "id": "f5e17920273de4db",
+        "id": "833bdaf6a16b08f3",
         "type": "tabs",
         "children": [
           {
-            "id": "2d24c6564481b070",
+            "id": "67d1fbf6510083ff",
             "type": "leaf",
             "state": {
-              "type": "graph",
+              "type": "empty",
               "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "icon": "lucide-file",
+              "title": "New tab"
             }
           }
         ]
@@ -181,8 +181,10 @@
       "bases:Create new base": false
     }
   },
-  "active": "2d24c6564481b070",
+  "active": "67d1fbf6510083ff",
   "lastOpenFiles": [
+    "Untitled.base",
+    "2026-09-27.md",
     "node_modules/@base-ui/react/docs/react/overview/releases.md",
     "Backend/node_modules/ecdsa-sig-formatter/README.md",
     "node_modules/recharts/CONTRIBUTING.md",

@@ -40,6 +40,10 @@ export interface StandingFigure {
    * spend it on mere emphasis.
    */
   urgent?: boolean;
+  /** Optional click handler to filter by this metric */
+  onClick?: () => void;
+  /** True when this metric filter is currently active */
+  active?: boolean;
 }
 
 interface StandingFiguresProps {
@@ -71,33 +75,56 @@ export function StandingFigures({
         className,
       )}
     >
-      {figures.map((f) => (
-        <div
-          key={f.label}
-          // The rule sits between figures, not around them: a divider on the
-          // first cell would read as a border on the plate itself, and a
-          // plate's own edge is always heavier than a rule inside it.
-          className={cn(
-            "min-w-0 border-t border-field-line px-4 py-3 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0",
-            // At four columns the band wraps to 2x2 below lg, so the cell that
-            // starts the second row must drop the left rule it would inherit.
-            columns === 4 && "sm:odd:border-l-0 lg:odd:border-l lg:first:border-l-0",
-          )}
-        >
-          <p className="truncate text-micro uppercase text-board-trim">{f.label}</p>
-          <p
-            data-figure
-            title={f.valueTitle}
-            className={cn(
-              "truncate text-board",
-              f.urgent ? "text-signal-on-field" : "text-board-plate",
-            )}
-          >
-            {f.value}
-          </p>
-          {f.sub ? <p className="truncate text-label text-board-trim">{f.sub}</p> : null}
-        </div>
-      ))}
+      {figures.map((f) => {
+        const isClickable = Boolean(f.onClick);
+        const cellClassName = cn(
+          "min-w-0 border-t border-field-line px-4 py-3 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0 text-left transition-colors relative",
+          columns === 4 && "sm:odd:border-l-0 lg:odd:border-l lg:first:border-l-0",
+          isClickable && "hover:bg-white/5 cursor-pointer focus:outline-none focus:bg-white/10",
+          f.active && "bg-white/10 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-board-plate",
+        );
+
+        const content = (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="truncate text-micro uppercase text-board-trim">{f.label}</p>
+              {f.active && (
+                <span className="w-1.5 h-1.5 rounded-full bg-board-plate shrink-0" />
+              )}
+            </div>
+            <p
+              data-figure
+              title={f.valueTitle}
+              className={cn(
+                "truncate text-board",
+                f.urgent ? "text-signal-on-field" : "text-board-plate",
+              )}
+            >
+              {f.value}
+            </p>
+            {f.sub ? <p className="truncate text-label text-board-trim">{f.sub}</p> : null}
+          </>
+        );
+
+        if (isClickable) {
+          return (
+            <button
+              key={f.label}
+              type="button"
+              onClick={f.onClick}
+              className={cellClassName}
+            >
+              {content}
+            </button>
+          );
+        }
+
+        return (
+          <div key={f.label} className={cellClassName}>
+            {content}
+          </div>
+        );
+      })}
     </section>
   );
 }

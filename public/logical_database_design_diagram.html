@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logical Database Design Diagram - Non-Crossing Paths</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body {
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .erd-table {
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.08);
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .erd-table:hover {
+      box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.2), 0 4px 10px -2px rgba(0, 0, 0, 0.1);
+    }
+    .erd-table.highlighted {
+      border-color: #22c55e !important;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35), 0 12px 28px rgba(0, 0, 0, 0.2);
+    }
+    .erd-table.dimmed {
+      opacity: 0.25;
+    }
+    .connection-line {
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease;
+    }
+    .connection-line.highlighted {
+      stroke: #16a34a !important;
+      stroke-width: 2.8 !important;
+      opacity: 1 !important;
+    }
+    .connection-line.dimmed {
+      opacity: 0.12 !important;
+    }
+    .blueprint-grid {
+      background-size: 24px 24px;
+      background-image: 
+        linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen w-screen overflow-hidden flex flex-col antialiased">
+
+  <!-- Top Navigation & Controls Toolbar -->
+  <header class="h-14 bg-slate-950 border-b border-slate-800 px-5 flex items-center justify-between shrink-0 z-30 shadow-md">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center font-black text-white text-base shadow">
+        ER
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+          Logical Database Design Diagram
+          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-medium">Non-Crossing Orthogonal Corridors</span>
+        </h1>
+        <p class="text-[11px] text-slate-400">Tacurong Logistics & Pabili Errand System (20 Core Entities • SysAdmin Excluded)</p>
+      </div>
+    </div>
+
+    <!-- Center Legend / Domain Filter -->
+    <div class="hidden lg:flex items-center gap-2 text-xs">
+      <span class="text-slate-400 font-medium mr-1">Domains:</span>
+      <button onclick="filterDomain('all')" class="domain-btn active px-2.5 py-1 rounded bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition" data-domain="all">All (20)</button>
+      <button onclick="filterDomain('errand')" class="domain-btn px-2.5 py-1 rounded bg-slate-900 text-emerald-400 border border-emerald-800/60 hover:bg-slate-800 transition" data-domain="errand">Errand & Pabili</button>
+      <button onclick="filterDomain('users')" class="domain-btn px-2.5 py-1 rounded bg-slate-900 text-blue-400 border border-blue-800/60 hover:bg-slate-800 transition" data-domain="users">Users & Customers</button>
+      <button onclick="filterDomain('merchant')" class="domain-btn px-2.5 py-1 rounded bg-slate-900 text-amber-400 border border-amber-800/60 hover:bg-slate-800 transition" data-domain="merchant">Stores & Categories</button>
+      <button onclick="filterDomain('finance')" class="domain-btn px-2.5 py-1 rounded bg-slate-900 text-purple-400 border border-purple-800/60 hover:bg-slate-800 transition" data-domain="finance">Finance & Rates</button>
+    </div>
+
+    <!-- Zoom, Theme & Download Controls -->
+    <div class="flex items-center space-x-2">
+      <!-- Theme Switcher -->
+      <button id="theme-btn" onclick="toggleTheme()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-1.5 transition">
+        <span id="theme-icon">☀️</span>
+        <span id="theme-text">White Canvas</span>
+      </button>
+
+      <div class="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-xs">
+        <button id="zoom-out" title="Zoom Out" class="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+        </button>
+        <span id="zoom-level" class="px-2 font-mono text-[11px] text-slate-300">72%</span>
+        <button id="zoom-in" title="Zoom In" class="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+        <button id="zoom-reset" title="Fit to View" class="px-2 py-1 hover:bg-slate-700 rounded text-[11px] text-slate-300 hover:text-white font-medium">Reset</button>
+      </div>
+
+      <button onclick="downloadPNG()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow flex items-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Download PNG (White)
+      </button>
+
+      <button onclick="downloadSVG()" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow flex items-center gap-1.5 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>
+        Download SVG
+      </button>
+
+      <button onclick="window.print()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-medium text-xs shadow flex items-center gap-1.5 transition">
+        Print / PDF
+      </button>
+    </div>
+  </header>
+
+  <!-- Canvas Container with Pan/Zoom & SVG Layer -->
+  <div id="viewport" class="relative flex-1 bg-slate-900 blueprint-grid overflow-hidden cursor-grab active:cursor-grabbing">
+    
+    <div id="canvas" class="absolute left-0 top-0 origin-top-left" style="width: 2400px; height: 1600px; transform: matrix(0.72, 0, 0, 0.72, 20, 20);">
+      
+      <!-- SVG Connectors Layer -->
+      <svg id="connections-svg" class="absolute inset-0 w-full h-full pointer-events-none z-10" style="width: 2400px; height: 1600px;">
+        <defs>
+          <marker id="one-bar" viewBox="0 0 10 14" refX="5" refY="7" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <line x1="3" y1="1" x2="3" y2="13" stroke="#475569" stroke-width="2.2" />
+            <line x1="7" y1="1" x2="7" y2="13" stroke="#475569" stroke-width="2.2" />
+          </marker>
+          <marker id="crowsfoot" viewBox="0 0 14 14" refX="12" refY="7" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
+            <path d="M 0 2 L 12 7 L 0 12 M 12 0 L 12 14" fill="none" stroke="#475569" stroke-width="2" />
+          </marker>
+        </defs>
+        <path d="M 370 240 L 300 240" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="customer_accounts" data-to="customer_information" />
+        <path d="M 485 343 L 485 450" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="customer_accounts" data-to="saved_delivery_locations" />
+        <path d="M 600 260 L 660 260 L 660 400 L 750 400" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="customer_accounts" data-to="errands" />
+        <path d="M 800 360 L 800 254" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="pabili_item_requests" />
+        <path d="M 960 360 L 960 310 L 1080 310 L 1080 296" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="pabili_details" />
+        <path d="M 990 360 L 990 325 L 1400 325 L 1400 317" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="errand_pinpoints" />
+        <path d="M 1240 160 L 1320 160" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="pabili_details" data-to="errand_pinpoints" />
+        <path d="M 1550 160 L 1680 160" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errand_pinpoints" data-to="merchant_categories" />
+        <path d="M 1795 275 L 1795 360" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="merchant_categories" data-to="verified_places" />
+        <path d="M 1680 400 L 1610 400 L 1610 240 L 1550 240" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="verified_places" data-to="errand_pinpoints" />
+        <path d="M 1140 420 L 1010 420" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="payment_modes" data-to="errands" />
+        <path d="M 1140 580 L 1060 580 L 1060 500 L 1010 500" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="rate_configs" data-to="errands" />
+        <path d="M 870 745 L 870 840" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="dispatch_logs" />
+        <path d="M 1140 880 L 990 880" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="dispatch_logs" />
+        <path d="M 1200 840 L 1200 780 L 1080 780 L 1080 650 L 1010 650" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="errands" />
+        <path d="M 1380 880 L 1480 880" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="rider_presence" />
+        <path d="M 1260 1078 L 1260 1100 L 1740 1100 L 1740 920 L 1780 920" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="notifications" />
+        <path d="M 750 710 L 670 710 L 670 760 L 600 760" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="errand_decline_reasons" />
+        <path d="M 1140 960 L 1040 960 L 1040 1020 L 670 1020 L 670 820 L 600 820" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="errand_decline_reasons" />
+        <path d="M 1010 720 L 1080 720 L 1080 780 L 1640 780 L 1640 680 L 1680 680" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="ratings" />
+        <path d="M 1340 840 L 1340 760 L 1640 760 L 1640 710 L 1680 710" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="ratings" />
+        <path d="M 800 745 L 800 800 L 720 800 L 720 1120 L 840 1120 L 840 1180" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="settlement_records" />
+        <path d="M 1180 1078 L 1180 1140 L 950 1140 L 950 1180" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="settlement_records" />
+        <path d="M 750 620 L 690 620 L 690 1140 L 580 1140 L 580 1180" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="errands" data-to="errand_payments" />
+        <path d="M 1220 1078 L 1220 1180" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="users" data-to="rider_commissions" />
+        <path d="M 485 200 L 485 40 L 2040 40 L 2040 880 L 2000 880" class="connection-line" fill="none" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#one-bar)" marker-end="url(#crowsfoot)" data-from="customer_accounts" data-to="notifications" />
+      </svg>
+
+      <!-- Tables Layer -->
+      <div id="tables-container" class="relative z-20 w-full h-full">
+
+        <div id="table-customer_information" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 80px; top: 200px; width: 220px;" data-id="customer_information" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">customer_information_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">7</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">customerId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">firstName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">middleName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">lastName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">phone</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">birthdate</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-customer_accounts" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 370px; top: 200px; width: 230px;" data-id="customer_accounts" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">customer_accounts_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">6</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">username</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">email</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">emailVerified</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">expoPushToken</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-saved_delivery_locations" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 370px; top: 450px; width: 230px;" data-id="saved_delivery_locations" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">saved_delivery_locations_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">7</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">customerId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">label</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">address</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">latitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">longitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">isDefault</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-errand_decline_reasons" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 370px; top: 720px; width: 230px;" data-id="errand_decline_reasons" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">errand_decline_reasons_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">6</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">dispatcherId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">reason</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">isCustom</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">createdAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-pabili_item_requests" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 720px; top: 100px; width: 220px;" data-id="pabili_item_requests" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">pabili_item_requests_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">6</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">pinpointId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">itemName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">storeCategory</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">quantity</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-pabili_details" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1010px; top: 100px; width: 230px;" data-id="pabili_details" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">pabili_details_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">pinpointId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">itemName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">storeCategory</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">quantity</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">unitPrice</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">estimatedSubtotal</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-errands" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 750px; top: 360px; width: 260px;" data-id="errands" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">errands_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">17</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">customerId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">riderId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">paymentModeId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">category</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">description</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">pickupAddress</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">deliveryAddress</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">estimatedCost</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">deliveryFee</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">tip</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">totalCost</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">storeCount</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">assignedAt</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">deliveredAt</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">completedAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-dispatch_logs" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 750px; top: 840px; width: 240px;" data-id="dispatch_logs" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">dispatch_logs_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">6</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">dispatcherId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">notes</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">dispatchedAt</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">verifiedAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-errand_pinpoints" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1320px; top: 100px; width: 230px;" data-id="errand_pinpoints" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">errand_pinpoints_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">10</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">categoryId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">placeId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">sequence</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">storeName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">latitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">longitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">arrivedAt</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">departedAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-payment_modes" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1140px; top: 360px; width: 210px;" data-id="payment_modes" data-domain="finance">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">payment_modes_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">4</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">name</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">description</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-rate_configs" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1140px; top: 540px; width: 230px;" data-id="rate_configs" data-domain="finance">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">service_rate_configs_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">baseFee</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">perKmRate</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">multiStoreFeePerStore</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">groceryFeeThreshold</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">groceryFeePercent</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">groceryFeeFlat</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">nonCodThreshold</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-users" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1140px; top: 840px; width: 240px;" data-id="users" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">users_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">10</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">username</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">role</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">firstName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">middleName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">lastName</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">email</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">phone</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">profileCompleted</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-merchant_categories" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1680px; top: 100px; width: 230px;" data-id="merchant_categories" data-domain="merchant">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">merchant_categories_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">7</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">name</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">description</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">handlingFeeMode</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">dwellP50Seconds</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">geofenceRadiusMeters</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-verified_places" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1680px; top: 360px; width: 230px;" data-id="verified_places" data-domain="merchant">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">verified_places_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">categoryId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">name</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">address</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">barangay</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">latitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">longitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">isActive</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-ratings" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1680px; top: 620px; width: 220px;" data-id="ratings" data-domain="errand">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">ratings_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">6</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">riderId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">stars</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">comment</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">createdAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-rider_presence" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1480px; top: 840px; width: 230px;" data-id="rider_presence" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">rider_presence_tracking_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">riderId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">latitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">longitude</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">onDuty</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">backgroundLocation</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">connectivity</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">lastBeaconAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-notifications" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1780px; top: 840px; width: 220px;" data-id="notifications" data-domain="users">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">notifications_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">7</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">userId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">customerId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">type</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">title</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">body</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">isRead</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-errand_payments" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 450px; top: 1180px; width: 230px;" data-id="errand_payments" data-domain="finance">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">errand_payments_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">7</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">confirmedByUserId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">proofImageId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">kind</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">amount</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">confirmedAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-settlement_records" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 770px; top: 1180px; width: 230px;" data-id="settlement_records" data-domain="finance">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">settlement_records_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">riderId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">expectedAmount</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">collectedAmount</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">variance</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">status</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">settledAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+        <div id="table-rider_commissions" class="erd-table absolute bg-white text-slate-800 rounded-lg border border-slate-400 overflow-hidden cursor-move" style="left: 1090px; top: 1180px; width: 230px;" data-id="rider_commissions" data-domain="finance">
+          <div class="table-header bg-emerald-600 px-3 py-1.5 flex items-center justify-between text-white border-b border-emerald-700">
+            <span class="font-bold text-xs tracking-wide uppercase">rider_commissions_tbl</span>
+            <span class="text-[10px] opacity-75 font-mono">8</span>
+          </div>
+          <div class="table-body text-[11px] divide-y divide-slate-100 font-sans">
+  
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-amber-700 font-black bg-amber-50">PK</span>
+              <span class="font-medium text-slate-800 truncate font-semibold">id</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">errandId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-blue-700 font-bold bg-blue-50">FK</span>
+              <span class="font-medium text-slate-800 truncate ">riderId</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">deliveryFee</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">tip</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">riderShare</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">businessShare</span>
+            </div>
+    
+            <div class="flex items-center px-2.5 py-0.5 hover:bg-emerald-50/50 transition">
+              <span class="w-8 shrink-0 text-[10px] font-mono text-slate-400"></span>
+              <span class="font-medium text-slate-800 truncate ">computedAt</span>
+            </div>
+    
+          </div>
+        </div>
+  
+      </div>
+    </div>
+
+    <!-- Quick Floating Instructions Overlay -->
+    <div class="absolute bottom-4 left-4 z-30 bg-slate-950/85 backdrop-blur-md border border-slate-800 rounded-lg px-3.5 py-2 text-[11px] text-slate-400 shadow-lg flex items-center gap-3">
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> <strong>Drag</strong> background to Pan</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-blue-500"></span> <strong>Scroll</strong> to Zoom</span>
+      <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500"></span> <strong>Click Table</strong> to highlight linked relations</span>
+    </div>
+  </div>
+
+  <script>
+    const viewport = document.getElementById("viewport");
+    const canvas = document.getElementById("canvas");
+    let currentScale = 0.72;
+    let panX = 20;
+    let panY = 20;
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
+    function updateTransform() {
+      canvas.style.transform = `matrix(${currentScale}, 0, 0, ${currentScale}, ${panX}, ${panY})`;
+      document.getElementById("zoom-level").textContent = `${Math.round(currentScale * 100)}%`;
+    }
+
+    // Zoom Buttons
+    document.getElementById("zoom-in").addEventListener("click", () => {
+      currentScale = Math.min(currentScale * 1.2, 2.5);
+      updateTransform();
+    });
+
+    document.getElementById("zoom-out").addEventListener("click", () => {
+      currentScale = Math.max(currentScale / 1.2, 0.35);
+      updateTransform();
+    });
+
+    document.getElementById("zoom-reset").addEventListener("click", () => {
+      currentScale = 0.72;
+      panX = 20;
+      panY = 20;
+      updateTransform();
+      resetHighlight();
+    });
+
+    // Mouse Wheel Zoom
+    viewport.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      const newScale = Math.min(Math.max(currentScale * zoomFactor, 0.35), 2.5);
+      const rect = viewport.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
+      panX = cursorX - (cursorX - panX) * (newScale / currentScale);
+      panY = cursorY - (cursorY - panY) * (newScale / currentScale);
+      currentScale = newScale;
+      updateTransform();
+    }, { passive: false });
+
+    // Background Pan Dragging
+    viewport.addEventListener("mousedown", (e) => {
+      if (e.target.closest(".erd-table")) return;
+      isPanning = true;
+      panStartX = e.clientX - panX;
+      panStartY = e.clientY - panY;
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isPanning) return;
+      panX = e.clientX - panStartX;
+      panY = e.clientY - panStartY;
+      updateTransform();
+    });
+
+    window.addEventListener("mouseup", () => {
+      isPanning = false;
+    });
+
+    viewport.addEventListener("click", (e) => {
+      if (!e.target.closest(".erd-table")) {
+        resetHighlight();
+      }
+    });
+
+    // Card Clicking & Highlighting
+    document.querySelectorAll(".erd-table").forEach(card => {
+      card.addEventListener("click", (e) => {
+        e.stopPropagation();
+        highlightTable(card.dataset.id);
+      });
+    });
+
+    function highlightTable(tableId) {
+      const allCards = document.querySelectorAll(".erd-table");
+      const allLines = document.querySelectorAll(".connection-line");
+      const linkedTables = new Set([tableId]);
+
+      allLines.forEach(line => {
+        if (line.dataset.from === tableId) {
+          linkedTables.add(line.dataset.to);
+          line.classList.add("highlighted");
+          line.classList.remove("dimmed");
+        } else if (line.dataset.to === tableId) {
+          linkedTables.add(line.dataset.from);
+          line.classList.add("highlighted");
+          line.classList.remove("dimmed");
+        } else {
+          line.classList.remove("highlighted");
+          line.classList.add("dimmed");
+        }
+      });
+
+      allCards.forEach(card => {
+        if (linkedTables.has(card.dataset.id)) {
+          card.classList.add("highlighted");
+          card.classList.remove("dimmed");
+        } else {
+          card.classList.remove("highlighted");
+          card.classList.add("dimmed");
+        }
+      });
+    }
+
+    function resetHighlight() {
+      document.querySelectorAll(".erd-table").forEach(card => {
+        card.classList.remove("highlighted", "dimmed");
+      });
+      document.querySelectorAll(".connection-line").forEach(line => {
+        line.classList.remove("highlighted", "dimmed");
+      });
+    }
+
+    function filterDomain(domain) {
+      document.querySelectorAll(".domain-btn").forEach(btn => {
+        if (btn.dataset.domain === domain) {
+          btn.classList.add("bg-emerald-600", "text-white");
+          btn.classList.remove("bg-slate-900", "bg-slate-800");
+        } else {
+          btn.classList.remove("bg-emerald-600", "text-white");
+          btn.classList.add("bg-slate-900");
+        }
+      });
+
+      if (domain === "all") {
+        resetHighlight();
+        return;
+      }
+
+      document.querySelectorAll(".erd-table").forEach(card => {
+        if (card.dataset.domain === domain) {
+          card.classList.remove("dimmed");
+          card.classList.add("highlighted");
+        } else {
+          card.classList.add("dimmed");
+          card.classList.remove("highlighted");
+        }
+      });
+    }
+
+    // Theme Switcher
+    let isWhiteTheme = false;
+    function toggleTheme() {
+      isWhiteTheme = !isWhiteTheme;
+      const themeText = document.getElementById("theme-text");
+      const themeIcon = document.getElementById("theme-icon");
+      if (isWhiteTheme) {
+        viewport.classList.remove("bg-slate-900", "blueprint-grid");
+        viewport.classList.add("bg-white");
+        themeText.textContent = "Dark Canvas";
+        themeIcon.textContent = "🌙";
+      } else {
+        viewport.classList.remove("bg-white");
+        viewport.classList.add("bg-slate-900", "blueprint-grid");
+        themeText.textContent = "White Canvas";
+        themeIcon.textContent = "☀️";
+      }
+    }
+
+    // Download SVG
+    function downloadSVG() {
+      const link = document.createElement("a");
+      link.href = "logical_database_design.svg";
+      link.download = "SUGO_Logical_Database_Design_Diagram.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Download PNG
+    function downloadPNG() {
+      fetch("logical_database_design.svg")
+        .then(r => r.text())
+        .then(svgText => {
+          const img = new Image();
+          const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+          const URL = window.URL || window.webkitURL || window;
+          const blobURL = URL.createObjectURL(svgBlob);
+          img.onload = function() {
+            const canvas = document.createElement("canvas");
+            const scale = 2; // 2x high resolution
+            canvas.width = (img.width || 2100) * scale;
+            canvas.height = (img.height || 1450) * scale;
+            const ctx = canvas.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(blobURL);
+            
+            const a = document.createElement("a");
+            a.download = "SUGO_Logical_Database_Design_White.png";
+            a.href = canvas.toDataURL("image/png");
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+          img.src = blobURL;
+        })
+        .catch(err => {
+          console.error("Failed to render PNG directly, downloading SVG instead:", err);
+          downloadSVG();
+        });
+    }
+  </script>
+</body>
+</html>

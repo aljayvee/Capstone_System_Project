@@ -12,6 +12,7 @@ import { toApiRange, type RangePreset } from "../../../../../components/RangeSel
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatErrandId } from "../../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../../utils/format";
+import { MobileResponsiveTable } from "../../../../../components/table";
 
 type Transaction = ApiTransactionSummaryReport["transactions"][number];
 
@@ -134,12 +135,14 @@ const SubtotalTable: React.FC<{
 );
 
 export const TransactionSummaryReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("TODAY");
+  const [preset, setPreset] = useState<RangePreset>("MONTH");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [tableSearch, setTableSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const { data, isLoading, error, reload } = useReport(apiService.getTransactionSummary, apiRange);
   const pdf = useReportPdf("transactions", apiRange);
 
@@ -245,29 +248,169 @@ export const TransactionSummaryReportView: React.FC = () => {
                 />
               </div>
 
-              <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
-                <div className="px-5 py-3 border-b border-edge flex items-center justify-between bg-board-plate">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-label text-ink font-semibold">Transactions Log</h4>
-                    <span className="text-label text-ink-muted">
-                      ({data.transactions.length})
-                    </span>
+              {(() => {
+                const filteredTransactions = data.transactions.filter((t) => {
+                  const matchesSearch =
+                    !tableSearch ||
+                    t.errandId.toLowerCase().includes(tableSearch.toLowerCase()) ||
+                    t.category.toLowerCase().includes(tableSearch.toLowerCase()) ||
+                    (t.riderName && t.riderName.toLowerCase().includes(tableSearch.toLowerCase())) ||
+                    (t.customerName && t.customerName.toLowerCase().includes(tableSearch.toLowerCase())) ||
+                    (t.deliveryAddress && t.deliveryAddress.toLowerCase().includes(tableSearch.toLowerCase()));
+
+                  const matchesStatus = statusFilter === "ALL" || t.errandStatus === statusFilter;
+                  return matchesSearch && matchesStatus;
+                });
+
+                const desktopTable = (
+                  <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+                    <div className="px-5 py-3 border-b border-edge flex items-center justify-between bg-board-plate">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-label text-ink font-semibold">Transactions Log</h4>
+                        <span className="text-label text-ink-muted">
+                          ({filteredTransactions.length})
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsFullScreen(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-plate border border-edge bg-board-ground hover:bg-board-ground/70 text-label text-ink transition-colors text-xs"
+                        title="Open Full Screen (<>)"
+                      >
+                        <ChevronsLeftRight size={13} className="text-ink-muted" />
+                        <span className="font-mono text-[11px] font-bold text-ink-muted">&lt;&gt;</span>
+                        <span>Full Screen</span>
+                      </button>
+                    </div>
+                    <div className="p-6 overflow-x-auto">
+                      <TransactionTable transactions={filteredTransactions} />
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsFullScreen(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-plate border border-edge bg-board-ground hover:bg-board-ground/70 text-label text-ink transition-colors text-xs"
-                    title="Open Full Screen (<>)"
-                  >
-                    <ChevronsLeftRight size={13} className="text-ink-muted" />
-                    <span className="font-mono text-[11px] font-bold text-ink-muted">&lt;&gt;</span>
-                    <span>Full Screen</span>
-                  </button>
-                </div>
-                <div className="p-6 overflow-x-auto">
-                  <TransactionTable transactions={data.transactions} />
-                </div>
-              </div>
+                );
+
+                return (
+                  <MobileResponsiveTable<Transaction>
+                    data={filteredTransactions}
+                    keyExtractor={(t) => t.transactionId}
+                    desktopView={desktopTable}
+                    primaryHeader="Errand & Category"
+                    secondaryHeader="Amount & Status"
+                    renderPrimary={(t) => (
+                      <div className="min-w-0">
+                        <div className="font-mono font-medium text-ink text-xs flex items-center gap-1.5">
+                          <span>{formatErrandId(t.errandId)}</span>
+                          {t.categories.length > 1 && (
+                            <span className="px-1 py-0.5 rounded bg-board-ground text-ink-muted text-[10px]">
+                              +{t.categories.length - 1}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-ink-muted mt-0.5 truncate">
+                          {t.category}
+                        </div>
+                      </div>
+                    )}
+                    renderSecondary={(t) => (
+                      <div className="text-right shrink-0">
+                        <div className="font-mono font-semibold text-ink text-xs tabular-nums">
+                          {formatPeso(t.amount)}
+                        </div>
+                        <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full bg-board-ground text-ink-muted text-[10px] uppercase font-medium">
+                          {t.errandStatus}
+                        </span>
+                      </div>
+                    )}
+                    renderPreview={(t) => (
+                      <div className="space-y-1.5 pt-1 text-ink-muted">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-ink-muted">Rider:</span>
+                          <span className="font-medium text-ink">{t.riderName ?? "Unassigned"}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-ink-muted">Customer:</span>
+                          <span className="text-ink">{t.customerName ?? "--"}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-ink-muted">Delivery Fee:</span>
+                          <span className="font-mono font-medium text-ink tabular-nums">
+                            {formatPeso(t.deliveryFee)} ({t.paymentMethod})
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    inspectorTitle={(t) => formatErrandId(t.errandId)}
+                    inspectorSubtitle={(t) => `${t.category} · ${t.paymentMethod}`}
+                    inspectorStatusBadge={(t) => (
+                      <span className="px-2.5 py-0.5 rounded-full bg-board-ground text-ink text-xs font-medium">
+                        {t.errandStatus}
+                      </span>
+                    )}
+                    inspectorSections={(t) => [
+                      {
+                        title: "Order & Route Details",
+                        items: [
+                          { label: "Errand ID", value: t.errandId, copyable: true, copyValue: t.errandId },
+                          { label: "Category", value: t.categories.join(", ") },
+                          { label: "Customer", value: t.customerName ?? "—" },
+                          { label: "Assigned Rider", value: t.riderName ?? "Unassigned" },
+                          { label: "Delivery Address", value: t.deliveryAddress, fullWidth: true },
+                        ],
+                      },
+                      {
+                        title: "Financial Breakdown",
+                        items: [
+                          { label: "Total Amount", value: formatPeso(t.amount) },
+                          { label: "Delivery Fee", value: formatPeso(t.deliveryFee) },
+                          { label: "Payment Method", value: t.paymentMethod },
+                          {
+                            label: "Payment Ref #",
+                            value: t.paymentReferenceNo ?? "—",
+                            copyable: !!t.paymentReferenceNo,
+                            copyValue: t.paymentReferenceNo ?? "",
+                          },
+                          {
+                            label: "Evidence Source",
+                            value:
+                              t.paymentEvidenceSource === "customer"
+                                ? "Customer upload"
+                                : t.paymentEvidenceSource === "rider"
+                                ? "Rider photo"
+                                : "—",
+                          },
+                        ],
+                      },
+                    ]}
+                    searchPlaceholder="Search transactions..."
+                    searchValue={tableSearch}
+                    onSearchChange={setTableSearch}
+                    filterDrawerTitle="Filter Transactions"
+                    activeFilterCount={statusFilter !== "ALL" ? 1 : 0}
+                    onResetFilters={() => setStatusFilter("ALL")}
+                    filterDrawerContent={
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                            Errand Status
+                          </label>
+                          <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:border-red-500 focus:outline-hidden"
+                          >
+                            <option value="ALL">All Statuses</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="DELIVERED">DELIVERED</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                            <option value="IN_TRANSIT">IN_TRANSIT</option>
+                            <option value="ASSIGNED">ASSIGNED</option>
+                            <option value="PENDING">PENDING</option>
+                          </select>
+                        </div>
+                      </div>
+                    }
+                  />
+                );
+              })()}
             </>
           )}
 

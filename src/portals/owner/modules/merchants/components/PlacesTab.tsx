@@ -25,6 +25,7 @@ import {
   ArrowDown,
   RotateCcw,
 } from "lucide-react";
+import { MobileResponsiveTable } from "../../../../../components/table";
 
 export interface PlaceCategory {
   id: number;
@@ -52,7 +53,7 @@ interface PlacesTabProps {
   preSelectedCategory?: number | "ALL";
 }
 
-type PlaceSortField = "name" | "category" | "address" | "status" | "newest";
+type PlaceSortField = "name" | "category" | "address" | "newest";
 type SortDirection = "asc" | "desc";
 
 export default function PlacesTab({
@@ -343,6 +344,8 @@ export default function PlacesTab({
     setShowForm(true);
   };
 
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+
   // A warning only licenses saving THIS place at THIS spot. Editing the name or
   // moving the pin makes it stale, so it clears and the next save re-checks -
   // otherwise one dismissed warning would wave through every later edit too.
@@ -350,7 +353,57 @@ export default function PlacesTab({
     setDuplicateWarning(null);
   }, [formName, formLatitude, formLongitude]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const getPlaceModifiedFields = (): Array<{ label: string; from: string; to: string }> => {
+    if (!isEditing || !editingId) return [];
+    const current = places.find((p) => p.id === editingId);
+    if (!current) return [];
+
+    const changes: Array<{ label: string; from: string; to: string }> = [];
+    const trimmedName = formName.trim();
+    const trimmedAddress = formAddress.trim();
+    const trimmedBarangay = formBarangay.trim();
+    const currentCat =
+      categories.find((c) => c.id === current.categoryId)?.name || `Category #${current.categoryId}`;
+    const newCat =
+      categories.find((c) => c.id === Number(formCategoryId))?.name || `Category #${formCategoryId}`;
+    const latNum = parseFloat(formLatitude);
+    const lngNum = parseFloat(formLongitude);
+
+    if (trimmedName !== current.name) {
+      changes.push({ label: "Store Name", from: current.name, to: trimmedName });
+    }
+    if (Number(formCategoryId) !== current.categoryId) {
+      changes.push({ label: "Category", from: currentCat, to: newCat });
+    }
+    if (trimmedAddress !== current.address) {
+      changes.push({ label: "Address", from: current.address, to: trimmedAddress });
+    }
+    if (trimmedBarangay !== (current.barangay || "")) {
+      changes.push({
+        label: "Barangay",
+        from: current.barangay || "(none)",
+        to: trimmedBarangay || "(none)",
+      });
+    }
+    if (Math.abs(latNum - current.latitude) > 0.00001 || Math.abs(lngNum - current.longitude) > 0.00001) {
+      changes.push({
+        label: "Pin Coordinates",
+        from: `${current.latitude.toFixed(4)}, ${current.longitude.toFixed(4)}`,
+        to: `${latNum.toFixed(4)}, ${lngNum.toFixed(4)}`,
+      });
+    }
+    if (formIsActive !== current.isActive) {
+      changes.push({
+        label: "Status",
+        from: current.isActive ? "Active" : "Retired",
+        to: formIsActive ? "Active" : "Retired",
+      });
+    }
+
+    return changes;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -374,11 +427,6 @@ export default function PlacesTab({
       return;
     }
 
-    // Nothing stops the same shop being registered twice - the table has no
-    // uniqueness of any kind and the API does no pre-existence check - and a
-    // duplicate then splits the dispatcher's store search, the reverse lookup
-    // and the wrong-branch check between two rows. Warn once; a second press
-    // saves anyway.
     if (!duplicateWarning) {
       const clash = findDuplicatePlace(
         { name: formName.trim(), latitude: latNum, longitude: lngNum },
@@ -391,6 +439,20 @@ export default function PlacesTab({
       }
     }
 
+    if (isEditing && editingId) {
+      const changes = getPlaceModifiedFields();
+      if (changes.length === 0) {
+        setFormError("No changes detected.");
+        return;
+      }
+    }
+
+    setShowSaveConfirm(true);
+  };
+
+  const handleConfirmSavePlace = async () => {
+    const latNum = parseFloat(formLatitude);
+    const lngNum = parseFloat(formLongitude);
     setIsSaving(true);
     try {
       const payload = {
@@ -413,8 +475,10 @@ export default function PlacesTab({
       await fetchPlaces();
       resetForm();
       setDuplicateWarning(null);
+      setShowSaveConfirm(false);
       setShowForm(false);
     } catch (err: any) {
+      setShowSaveConfirm(false);
       setFormError(err.response?.data?.message || "Failed to save establishment details.");
     } finally {
       setIsSaving(false);
@@ -544,8 +608,6 @@ export default function PlacesTab({
         const addrA = `${a.barangay || ""} ${a.address}`;
         const addrB = `${b.barangay || ""} ${b.address}`;
         comparison = addrA.localeCompare(addrB);
-      } else if (sortField === "status") {
-        comparison = a.isActive === b.isActive ? 0 : a.isActive ? -1 : 1;
       } else if (sortField === "newest") {
         comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
@@ -558,7 +620,7 @@ export default function PlacesTab({
       {/* DIRECTORY TABLE & SEARCH CONTAINER (Fills Height) */}
       <div className="flex-1 min-h-0 bg-board-plate rounded-plate border border-edge flex flex-col overflow-hidden">
         {/* Search, Filter & Sort Rail (STATIC NON-SCROLLING) */}
-        <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground space-y-2.5">
+        <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground space-y-2">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1">
@@ -575,10 +637,33 @@ export default function PlacesTab({
               />
             </div>
 
-            {/* Right Group: Sort Selector + New Pin Button */}
+            {/* Right Group: Category Filter + Sort Selector + New Pin Button */}
             <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {/* Category Filter Dropdown */}
+              <div className="flex items-center gap-1.5 bg-board-plate border border-edge px-2.5 py-1.5 rounded-plate">
+                <span className="text-label text-ink-muted">Category:</span>
+                <select
+                  aria-label="Filter by category"
+                  value={selectedCategory}
+                  onChange={(e) =>
+                    setSelectedCategory(e.target.value === "ALL" ? "ALL" : Number(e.target.value))
+                  }
+                  className="bg-transparent text-label text-ink cursor-pointer"
+                >
+                  <option value="ALL">All Categories ({fig(livePlaces.length)})</option>
+                  {categories.map((c) => {
+                    const count = livePlaces.filter((p) => p.categoryId === c.id).length;
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({fig(count)})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
               {/* Sort Selector Dropdown */}
-              <div className="flex items-center gap-1.5 bg-board-plate border border-edge px-2.5 py-1 rounded-plate">
+              <div className="flex items-center gap-1.5 bg-board-plate border border-edge px-2.5 py-1.5 rounded-plate">
                 <ArrowUpDown size={13} className="text-ink-muted" />
                 <span className="text-label text-ink-muted">Sort:</span>
                 <select
@@ -595,8 +680,6 @@ export default function PlacesTab({
                   <option value="category-asc">Category (A → Z)</option>
                   <option value="category-desc">Category (Z → A)</option>
                   <option value="address-asc">Barangay / Address (A → Z)</option>
-                  <option value="status-asc">Active First</option>
-                  <option value="status-desc">Retired First</option>
                   <option value="newest-asc">Recently Registered</option>
                 </select>
               </div>
@@ -614,11 +697,6 @@ export default function PlacesTab({
             </div>
           </div>
 
-          {/* Reported where it bites. A missing category list does not stop
-              the directory listing stores, so it does not belong in the
-              directory's failure panel - but it does leave this rail with
-              nothing but "All Categories" and the register form with no
-              options for a required field, and silently. */}
           {categoriesError ? (
             <p
               role="alert"
@@ -629,36 +707,6 @@ export default function PlacesTab({
               category and a new store pin cannot be assigned one.
             </p>
           ) : null}
-
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-            <button
-              onClick={() => setSelectedCategory("ALL")}
-              className={`px-2.5 py-0.5 rounded-full text-label border border-edge transition shrink-0 ${
-                selectedCategory === "ALL"
-                  ? "bg-board-field text-white border-board-field"
-                  : "bg-board-plate text-ink-muted border-edge hover:bg-board-ground"
-              }`}
-            >
-              All Categories ({fig(places.length)})
-            </button>
-            {categories.map((c) => {
-              const count = livePlaces.filter((p) => p.categoryId === c.id).length;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedCategory(c.id)}
-                  className={`px-2.5 py-0.5 rounded-full text-label border border-edge transition shrink-0 ${
-                    selectedCategory === c.id
-                      ? "bg-board-field text-white border-board-field"
-                      : "bg-board-plate text-ink-muted border-edge hover:bg-board-ground"
-                  }`}
-                >
-                  {c.name} ({fig(count)})
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Directory List Table - ONLY THIS SECTION SCROLLS! */}
@@ -669,10 +717,6 @@ export default function PlacesTab({
               <p className="text-body">Loading verified directory...</p>
             </div>
           ) : places.length === 0 && placesError ? (
-            /* Ordered before the empty branch. Without this the directory
-               announced "No location store pins have been registered yet."
-               over a failed request, which is a claim about the business
-               rather than about the fetch. */
             <div
               role="alert"
               className="flex h-full min-h-[300px] flex-col items-center justify-center space-y-3 p-12 text-center"
@@ -706,95 +750,154 @@ export default function PlacesTab({
               </p>
             </div>
           ) : (
-            <table className="w-full text-left text-label">
-              {/* removed: the header is opaque (bg-board-ground), so
-                  it was blurring nothing while breaching the [LOCKED] flat
-                  invariant. text-label was below the 12px floor. */}
-              <thead className="sticky top-0 z-10 select-none border-b border-edge bg-board-ground text-micro uppercase text-ink-muted">
-                <tr>
-                  <SortTh field="name" label="Establishment / Store" />
-                  <SortTh field="category" label="Category" />
-                  <SortTh field="address" label="Barangay & Address" />
-                  <th scope="col" className="p-4">
-                    GPS Coordinates
-                  </th>
-                  <SortTh field="status" label="Status" />
-                  <th scope="col" className="p-4 text-right">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {sortedPlaces.map((place) => {
-                  const isCurrentEdit = isEditing && editingId === place.id;
-                  return (
-                    /* The 4px amber left border is gone. The detector calls a
-                       thick coloured side border the most recognisable tell of
-                       generated UI, and it was redundant here: the row already
-                       carries the waiting fill, which is the status law's way
-                       of saying this record is mid-edit. */
-                    <tr
-                      key={place.id}
-                      className={`transition hover:bg-board-ground ${
-                        isCurrentEdit ? "bg-status-waiting-fill text-status-waiting-ink" : ""
-                      }`}
-                    >
-                      <td className="p-4 font-bold text-ink">
-                        <p className="flex items-center gap-2">
-                          <span className="truncate max-w-[240px] text-label text-ink">
-                            {place.name}
-                          </span>
-                        </p>
-                        {place.keywords && (
-                          <p className="text-body text-ink-muted truncate max-w-[240px] mt-0.5">
-                            {place.keywords}
-                          </p>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <span className="bg-board-ground text-ink px-2.5 py-1 rounded-trim text-label border border-edge whitespace-nowrap">
-                          {place.category?.name || "General"}
-                        </span>
-                      </td>
-                      <td className="p-4 text-ink-muted max-w-[260px]">
-                        <p className="font-bold text-ink">{place.barangay || "Tacurong City"}</p>
-                        <p className="text-label text-ink-muted truncate mt-0.5">{place.address}</p>
-                      </td>
-                      <td className="p-4 font-mono text-label text-ink-muted whitespace-nowrap">
-                        {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
-                      </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-micro uppercase border border-edge ${
-                            place.isActive
-                              ? "bg-status-done-fill text-status-done-ink "
-                              : "bg-board-ground text-ink-muted border-edge"
+            <MobileResponsiveTable<VerifiedPlace>
+              data={sortedPlaces}
+              keyExtractor={(place) => place.id}
+              primaryHeader="Establishment & Address"
+              secondaryHeader="Category"
+              renderPrimary={(place) => (
+                <div className="min-w-0">
+                  <div className="font-semibold text-ink text-xs truncate">
+                    {place.name}
+                  </div>
+                  <div className="text-[10px] text-ink-muted truncate">
+                    {place.barangay || "Tacurong City"} · {place.address}
+                  </div>
+                </div>
+              )}
+              renderSecondary={(place) => (
+                <div className="text-right shrink-0">
+                  <div className="text-xs text-ink-muted">
+                    {place.category?.name || "General"}
+                  </div>
+                </div>
+              )}
+              renderPreview={(place) => (
+                <div className="space-y-1.5 pt-1 text-ink-muted">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-ink-muted">Barangay:</span>
+                    <span className="text-ink font-medium">{place.barangay || "Tacurong City"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-ink-muted">Coordinates:</span>
+                    <span className="font-mono text-ink">{place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}</span>
+                  </div>
+                  {place.keywords && (
+                    <div className="text-[11px] text-ink-muted line-clamp-1">
+                      <span className="text-ink-muted">Keywords:</span> <span className="text-ink">{place.keywords}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              renderRowActions={(place) => (
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => handleEditPlace(place)}
+                    className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
+                    title="Edit Store Details"
+                  >
+                    <Edit2 size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePlace(place.id, place.name)}
+                    className="p-2 text-status-act-ink hover:bg-status-act-fill rounded-plate transition-colors"
+                    title="Delete Store Pin"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              )}
+              inspectorTitle={(place) => place.name}
+              inspectorSubtitle={(place) => `${place.category?.name || "General"} · ${place.barangay || "Tacurong City"}`}
+              inspectorSections={(place) => [
+                {
+                  title: "Establishment Information",
+                  items: [
+                    { label: "Store Name", value: place.name },
+                    { label: "Category", value: place.category?.name || "General" },
+                    { label: "Keywords", value: place.keywords || "None", fullWidth: true },
+                  ],
+                },
+                {
+                  title: "Location & Coordinates",
+                  items: [
+                    { label: "Barangay", value: place.barangay || "Tacurong City" },
+                    { label: "Address", value: place.address, fullWidth: true },
+                    { label: "Latitude", value: place.latitude.toFixed(6) },
+                    { label: "Longitude", value: place.longitude.toFixed(6) },
+                  ],
+                },
+              ]}
+              desktopView={
+                <table className="w-full text-left text-label">
+                  <thead className="sticky top-0 z-10 select-none border-b border-edge bg-board-ground text-micro uppercase text-ink-muted">
+                    <tr>
+                      <SortTh field="name" label="Establishment / Store" />
+                      <SortTh field="category" label="Category" />
+                      <SortTh field="address" label="Barangay & Address" />
+                      <th scope="col" className="p-4">
+                        GPS Coordinates
+                      </th>
+                      <th scope="col" className="p-4 text-right">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {sortedPlaces.map((place) => {
+                      const isCurrentEdit = isEditing && editingId === place.id;
+                      return (
+                        <tr
+                          key={place.id}
+                          className={`transition hover:bg-board-ground ${
+                            isCurrentEdit ? "bg-status-waiting-fill text-status-waiting-ink" : ""
                           }`}
                         >
-                          {place.isActive ? "Active" : "Retired"}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          onClick={() => handleEditPlace(place)}
-                          className="p-2 text-status-waiting-ink hover:bg-status-waiting-fill rounded-plate transition-colors border border-transparent hover:border-status-waiting-ink/40"
-                          title="Edit Store Details"
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePlace(place.id, place.name)}
-                          className="p-2 text-status-act-ink hover:bg-status-act-fill rounded-plate transition-colors border border-transparent hover:border-status-act-ink/40"
-                          title="Delete Store Pin"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          <td className="p-4 font-semibold text-ink">
+                            <p className="truncate max-w-[240px] text-label text-ink">
+                              {place.name}
+                            </p>
+                            {place.keywords && (
+                              <p className="text-body text-ink-muted truncate max-w-[240px] mt-0.5 font-normal">
+                                {place.keywords}
+                              </p>
+                            )}
+                          </td>
+                          <td className="p-4 text-label text-ink whitespace-nowrap">
+                            {place.category?.name || "General"}
+                          </td>
+                          <td className="p-4 text-ink-muted max-w-[260px]">
+                            <p className="font-semibold text-ink">{place.barangay || "Tacurong City"}</p>
+                            <p className="text-label text-ink-muted truncate mt-0.5">{place.address}</p>
+                          </td>
+                          <td className="p-4 font-mono text-label text-ink-muted whitespace-nowrap">
+                            {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                          </td>
+                          <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              onClick={() => handleEditPlace(place)}
+                              className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
+                              title="Edit Store Details"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlace(place.id, place.name)}
+                              className="p-2 text-status-act-ink hover:bg-status-act-fill rounded-plate transition-colors"
+                              title="Delete Store Pin"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              }
+            />
           )}
         </div>
       </div>
@@ -802,44 +905,25 @@ export default function PlacesTab({
       {/* ADD / EDIT ESTABLISHMENT MODAL DIALOG */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 sm:p-6 animate-fade-in">
-          <div className="bg-board-plate rounded-plate w-full max-w-5xl max-h-[92vh] flex flex-col md:flex-row overflow-hidden relative border border-edge">
-            {/* Modal Close Button */}
-            <button
-              onClick={() => {
-                setShowForm(false);
-                resetForm();
-              }}
-              className="absolute top-4 right-4 p-2 bg-board-plate rounded-full text-ink-muted hover:text-ink z-20 border border-edge hover:bg-board-plate transition"
-              title="Close Dialog"
-            >
-              <X size={18} />
-            </button>
-
+          <div className="bg-board-plate rounded-plate w-full max-w-5xl max-h-[92vh] flex flex-col md:flex-row overflow-hidden border border-edge">
             {/* Left Side: Interactive Map Pin-Dropper */}
             <div className="flex-1 flex flex-col h-72 md:h-auto min-h-[300px] border-b md:border-b-0 md:border-r border-edge relative bg-board-ground">
               <div className="px-4 py-3 bg-board-ground border-b border-edge flex items-center justify-between text-label text-ink">
-                {/* The label no longer promises an interaction the map may
-                    not be able to offer, and the em dash is gone with it. */}
                 <span className="flex items-center gap-1.5 text-ink">
                   <MapPin size={15} />
                   <span>
                     {mapError
                       ? "Map unavailable"
                       : isMapReady
-                        ? "Interactive map, click to drop a pin"
-                        : "Loading the map"}
+                        ? "Click map to drop store pin"
+                        : "Loading map..."}
                   </span>
                 </span>
-                <span className="font-mono text-label text-ink-muted bg-board-plate px-2 py-0.5 rounded border border-edge">
+                <span className="font-mono text-label text-ink-muted">
                   {formLatitude}, {formLongitude}
                 </span>
               </div>
               <div ref={mapRef} className="flex-1 w-full h-full min-h-[240px]" />
-              {/* isMapReady was computed and set here and read nowhere, so a
-                  Google Maps failure left a blank grey rectangle with no
-                  explanation. Both states are now visible, over the map
-                  container rather than replacing it, because the map may
-                  still arrive. */}
               {mapError ? (
                 <div
                   role="alert"
@@ -849,27 +933,28 @@ export default function PlacesTab({
                 </div>
               ) : !isMapReady ? (
                 <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-plate bg-status-closed-fill px-3 py-2 text-label text-status-closed-ink">
-                  Loading the map. The coordinate fields below work either way.
+                  Loading the map. The coordinate fields work either way.
                 </div>
               ) : null}
             </div>
 
             {/* Right Side: Form Inputs */}
             <div className="w-full md:w-[460px] p-6 flex flex-col overflow-y-auto max-h-[60vh] md:max-h-[92vh] shrink-0 bg-board-plate">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-hairline mb-4">
-                <div
-                  className={`w-9 h-9 rounded-plate flex items-center justify-center font-bold text-white ${
-                    isEditing ? "bg-status-waiting-ink" : "bg-board-field"
-                  }`}
+              <div className="flex items-center justify-between pb-3 border-b border-hairline mb-4">
+                <h3 className="text-panel font-semibold text-ink">
+                  {isEditing ? "Edit Store Pin" : "Register Store Pin"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="p-1.5 rounded-trim hover:bg-board-ground text-ink-muted hover:text-ink transition"
+                  title="Close Dialog"
                 >
-                  {isEditing ? <Edit2 size={16} /> : <Plus size={16} />}
-                </div>
-                <div>
-                  <h3 className=" text-ink text-label">
-                    {isEditing ? "Edit Location Store Pin" : "Register Location Store Pin"}
-                  </h3>
-                  <p className="text-body text-ink-muted">Ground-truth GPS coordinate mapping</p>
-                </div>
+                  <X size={18} />
+                </button>
               </div>
 
               {duplicateWarning && (
@@ -898,7 +983,7 @@ export default function PlacesTab({
                 <div className="space-y-3.5">
                   {/* Store Name */}
                   <div>
-                    <label className="block text-micro text-ink uppercase mb-1">
+                    <label className="block text-label font-medium text-ink mb-1">
                       Store / Establishment Name *
                     </label>
                     <input
@@ -907,20 +992,20 @@ export default function PlacesTab({
                       placeholder="e.g. Jollibee Tacurong Highway"
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                     />
                   </div>
 
                   {/* Category & Barangay */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-micro text-ink uppercase mb-1">
-                        Merchant Category *
+                      <label className="block text-label font-medium text-ink mb-1">
+                        Category *
                       </label>
                       <select
                         value={formCategoryId}
                         onChange={(e) => setFormCategoryId(Number(e.target.value))}
-                        className="w-full px-3.5 py-2.5 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                       >
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -931,20 +1016,20 @@ export default function PlacesTab({
                     </div>
 
                     <div>
-                      <label className="block text-micro text-ink uppercase mb-1">Barangay</label>
+                      <label className="block text-label font-medium text-ink mb-1">Barangay</label>
                       <input
                         type="text"
                         placeholder="e.g. Poblacion, New Isabela"
                         value={formBarangay}
                         onChange={(e) => setFormBarangay(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                       />
                     </div>
                   </div>
 
                   {/* Street Address */}
                   <div>
-                    <label className="block text-micro text-ink uppercase mb-1">
+                    <label className="block text-label font-medium text-ink mb-1">
                       Street Address / Landmark *
                     </label>
                     <input
@@ -953,15 +1038,15 @@ export default function PlacesTab({
                       placeholder="e.g. Alunan Highway corner Bonifacio St"
                       value={formAddress}
                       onChange={(e) => setFormAddress(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                     />
                   </div>
 
                   {/* Coordinates (Lat / Lng) */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-micro text-ink uppercase mb-1">
-                        Latitude (GPS) *
+                      <label className="block text-label font-medium text-ink mb-1">
+                        Latitude *
                       </label>
                       <input
                         type="text"
@@ -973,8 +1058,8 @@ export default function PlacesTab({
                       />
                     </div>
                     <div>
-                      <label className="block text-micro text-ink uppercase mb-1">
-                        Longitude (GPS) *
+                      <label className="block text-label font-medium text-ink mb-1">
+                        Longitude *
                       </label>
                       <input
                         type="text"
@@ -989,70 +1074,68 @@ export default function PlacesTab({
 
                   {/* Search Keywords / Tags */}
                   <div>
-                    <label className="block text-micro text-ink uppercase mb-1">
-                      Search Aliases & Keywords (Comma separated)
+                    <label className="block text-label font-medium text-ink mb-1">
+                      Search Keywords (Comma separated)
                     </label>
                     <input
                       type="text"
                       placeholder="e.g. jollibee, burger, chickenjoy, fastfood"
                       value={formKeywords}
                       onChange={(e) => setFormKeywords(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                     />
                   </div>
 
-                  {/* Active / Retired status */}
-                  <div>
-                    <label className="block text-micro text-ink uppercase mb-1">
-                      Store Availability Status
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFormIsActive(true)}
-                        className={`px-3.5 py-1.5 rounded-plate text-label transition ${
-                          formIsActive
-                            ? "bg-status-done-ink text-white"
-                            : "bg-board-ground text-ink-muted hover:bg-board-ground"
-                        }`}
-                      >
-                        Active
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFormIsActive(false)}
-                        className={`px-3.5 py-1.5 rounded-plate text-label transition ${
-                          !formIsActive
-                            ? "bg-board-field text-white"
-                            : "bg-board-ground text-ink-muted hover:bg-board-ground"
-                        }`}
-                      >
-                        Retired / Inactive
-                      </button>
+                  {/* Active / Retired status (Shown only when editing an existing store) */}
+                  {isEditing && (
+                    <div>
+                      <label className="block text-label font-medium text-ink mb-1">
+                        Availability
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormIsActive(true)}
+                          className={`flex-1 px-3.5 py-2 rounded-plate border text-label transition ${
+                            formIsActive
+                              ? "bg-status-done-ink text-white border-status-done-ink"
+                              : "bg-board-ground text-ink-muted border-edge hover:text-ink"
+                          }`}
+                        >
+                          Active
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormIsActive(false)}
+                          className={`flex-1 px-3.5 py-2 rounded-plate border text-label transition ${
+                            !formIsActive
+                              ? "bg-board-field text-white border-board-field"
+                              : "bg-board-ground text-ink-muted border-edge hover:text-ink"
+                          }`}
+                        >
+                          Archive / Retire
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Submit Buttons */}
-                <div className="pt-4 border-t border-hairline flex items-center justify-end gap-3">
+                <div className="pt-4 border-t border-hairline flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => {
                       resetForm();
                       setShowForm(false);
                     }}
-                    className="px-4 py-2.5 rounded-plate border border-edge text-label text-ink-muted hover:bg-board-ground transition"
+                    className="px-4 py-2 rounded-plate border border-edge text-label text-ink-muted hover:bg-board-ground transition"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className={`px-5 py-2.5 rounded-plate text-white text-label transition flex items-center gap-2 ${
-                      isEditing
-                        ? "bg-status-waiting-ink hover:bg-status-waiting-ink"
-                        : "bg-board-field hover:bg-board-field-deep"
-                    }`}
+                    className="px-4 py-2 rounded-plate bg-board-field hover:bg-board-field-deep text-white text-label transition flex items-center gap-1.5"
                   >
                     {isSaving ? (
                       <Loader2 size={15} className="animate-spin" />
@@ -1067,6 +1150,81 @@ export default function PlacesTab({
           </div>
         </div>
       )}
+
+      {/* Store Pin Create / Edit Confirmation Modal */}
+      <ConfirmDialog
+        open={showSaveConfirm}
+        onOpenChange={setShowSaveConfirm}
+        title={isEditing ? "Confirm Store Pinpoint Updates" : "Confirm Store Pinpoint Registration"}
+        tone="info"
+        busy={isSaving}
+        confirmLabel={isEditing ? "Confirm & Save" : "Register Store Pin"}
+        cancelLabel="Back to Form"
+        onConfirm={() => void handleConfirmSavePlace()}
+        consequence={
+          !isEditing
+            ? "This verified store will appear immediately on the dispatch map and customer merchant directory."
+            : undefined
+        }
+        body={
+          isEditing ? (
+            <div className="space-y-3">
+              <p className="text-body text-ink">
+                Are you sure you want to update store establishment{" "}
+                <span className="font-semibold text-ink">{formName.trim()}</span>?
+              </p>
+              <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label divide-y divide-hairline">
+                {getPlaceModifiedFields().map((change, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start justify-between gap-3 ${idx > 0 ? "pt-2" : ""}`}
+                  >
+                    <span className="text-ink-muted shrink-0">{change.label}:</span>
+                    <span className="text-ink text-right font-medium">
+                      <span className="line-through text-ink-muted mr-1.5">{change.from}</span>
+                      <span className="text-board-field font-semibold">→ {change.to}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-body text-ink">
+                Are you sure you want to register this verified store with the following details?
+              </p>
+              <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label">
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted">Store Name:</span>
+                  <span className="font-semibold text-ink">{formName.trim()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted">Category:</span>
+                  <span className="font-semibold text-ink">
+                    {categories.find((c) => c.id === Number(formCategoryId))?.name ||
+                      `Category #${formCategoryId}`}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-ink-muted shrink-0">Address:</span>
+                  <span className="text-ink text-right font-medium">{formAddress.trim()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted">Barangay:</span>
+                  <span className="text-ink">{formBarangay.trim() || "Poblacion"}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted">Coordinates:</span>
+                  <span className="text-ink font-mono text-micro">
+                    {parseFloat(formLatitude || "0").toFixed(4)},{" "}
+                    {parseFloat(formLongitude || "0").toFixed(4)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      />
 
       {/* Replaces window.confirm. The consequence line is the point: the old
           box asked "Are you sure you want to delete" and never said that the

@@ -110,11 +110,14 @@ echo "==> syncing into $REMOTE_DIST (--delete-after, deleted files parked)"
 ssh -o BatchMode=yes "$HOST" bash -s <<EOF
 set -euo pipefail
 rsync -rlpt --delete-after \
+      --filter='P /assets/**' \
       --backup --backup-dir='$BACKUP_DIR' \
       --chmod=F644,D755 \
       --itemize-changes \
       ${RSYNC_EXCLUDE[@]+${RSYNC_EXCLUDE[@]}} \
       '$STAGING/' '$REMOTE_DIST/' | tail -20
+# Prune assets older than 2 days so active sessions avoid 404 ChunkLoadErrors
+find '$REMOTE_DIST/assets' -type f -mtime +2 -delete 2>/dev/null || true
 rm -rf '$STAGING'
 echo "live: \$(find '$REMOTE_DIST' -type f | wc -l) files, \$(du -sh '$REMOTE_DIST' | cut -f1)"
 echo "parked: \$(find '$BACKUP_DIR' -type f 2>/dev/null | wc -l) files in $BACKUP_DIR"
@@ -183,8 +186,7 @@ cat <<EOF
 Deployed $DEPLOY_LABEL. Rollback if needed:
   ssh $HOST "rsync -rlpt '$BACKUP_DIR/' '$REMOTE_DIST/'"
 
-Note: --delete removes superseded chunks immediately. A browser tab left open
-across this deploy may fail to lazy-load a chunk it has not fetched yet; a
-refresh fixes it, and index.html is served no-cache so the refresh always gets
-the current manifest.
+Note: Hashed assets in assets/ are protected for 48 hours to prevent 404
+ChunkLoadErrors for active browser sessions. Old assets older than 2 days are
+pruned automatically, and index.html is served no-cache.
 EOF

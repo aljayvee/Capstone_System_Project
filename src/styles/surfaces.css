@@ -188,13 +188,16 @@
   color: var(--color-board-plate);
 }
 
-[data-surface] [data-on-field] [data-bell] {
+[data-surface] [data-on-field] [data-bell],
+[data-surface] [data-on-field] [data-audio-status] {
   background-color: transparent;
   border-color: var(--color-field-line);
   color: var(--color-board-trim);
 }
 
-[data-surface] [data-on-field] [data-bell]:hover {
+[data-surface] [data-on-field] [data-bell]:hover,
+[data-surface] [data-on-field] [data-audio-status]:hover {
   background-color: rgb(255 255 255 / 0.08);
   color: var(--color-board-plate);
 }
+

@@ -4,7 +4,6 @@ import {
   Store,
   AlertCircle,
   Search,
-  FolderPlus,
   Check,
   X,
   Loader2,
@@ -23,6 +22,7 @@ import { OwnerTabs } from "../../components/OwnerTabs";
 import { CategoryRowCard } from "./components/CategoryCard";
 import PlacesTab from "./components/PlacesTab";
 import { ArchiveTab, type ArchivedPlace } from "./components/ArchiveTab";
+import { ConfirmDialog } from "@/components/panel";
 import { NotificationBell } from "../../../../components/NotificationBell";
 import { HeaderClock } from "../../../../components/HeaderClock";
 
@@ -77,6 +77,7 @@ export const MerchantCategoryModule: React.FC = () => {
 
   // Create Category Modal State
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddConfirm, setShowAddConfirm] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatDesc, setNewCatDesc] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,7 +127,7 @@ export const MerchantCategoryModule: React.FC = () => {
     loadCategories();
   }, []);
 
-  const handleAddCategory = async (e: React.FormEvent) => {
+  const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -135,6 +136,10 @@ export const MerchantCategoryModule: React.FC = () => {
       return;
     }
 
+    setShowAddConfirm(true);
+  };
+
+  const handleConfirmAddCategory = async () => {
     setIsSubmitting(true);
     try {
       const created = await apiService.createMerchantCategory({
@@ -146,11 +151,14 @@ export const MerchantCategoryModule: React.FC = () => {
         setCategories((prev) => [...prev, created]);
         setNewCatName("");
         setNewCatDesc("");
+        setShowAddConfirm(false);
         setShowAddForm(false);
       } else {
+        setShowAddConfirm(false);
         setFormError("Failed to create category. A category with this name may already exist.");
       }
     } catch (err: any) {
+      setShowAddConfirm(false);
       setFormError(err.response?.data?.message || "Failed to create category.");
     } finally {
       setIsSubmitting(false);
@@ -297,11 +305,10 @@ export const MerchantCategoryModule: React.FC = () => {
           role="tabpanel"
           id="merchants-panel-categories"
           aria-labelledby="merchants-tab-categories"
-          className="flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden"
+          className="flex-1 min-h-0 bg-board-plate rounded-plate border border-edge flex flex-col overflow-hidden"
         >
-          {/* Search, Filter & Sort Rail (STATIC) */}
-          <div className="shrink-0 bg-board-plate p-2.5 sm:p-3 rounded-plate border border-edge flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
-            {/* Search Input */}
+          {/* Search & Sort Header Bar */}
+          <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             <div className="relative flex-1">
               <Search
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
@@ -313,15 +320,12 @@ export const MerchantCategoryModule: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search category name or description..."
-                className="w-full pl-9 pr-4 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                className="w-full pl-9 pr-4 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field transition"
               />
             </div>
 
-            {/* Right Group: Sorting. Archived categories are not filtered here -
-                they live in the Archive tab. */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5 bg-board-ground border border-edge px-3 py-1.5 rounded-plate">
+              <div className="flex items-center gap-1.5 bg-board-plate border border-edge px-3 py-1.5 rounded-plate">
                 <ArrowUpDown size={14} className="text-ink-muted" />
                 <span className="text-label text-ink-muted">Sort:</span>
                 <select
@@ -342,25 +346,20 @@ export const MerchantCategoryModule: React.FC = () => {
           </div>
 
           {loadError && categories.length > 0 && (
-            <div className="shrink-0 bg-status-waiting-fill border border-status-waiting-ink/20 text-status-waiting-ink text-label px-4 py-2.5 rounded-plate flex items-center gap-2">
+            <div className="shrink-0 bg-status-waiting-fill border-b border-status-waiting-ink/20 text-status-waiting-ink text-label px-4 py-2.5 flex items-center gap-2">
               <AlertCircle size={15} className="shrink-0" />
               <span>{loadError}</span>
             </div>
           )}
 
-          {/* Cards Grid - ONLY THIS SECTION SCROLLS! */}
+          {/* Category Rows List */}
           {isLoading ? (
-            <div className="flex-1 min-h-0 p-12 text-center text-ink-muted space-y-3 bg-board-plate rounded-plate border border-edge flex flex-col items-center justify-center">
+            <div className="flex-1 min-h-0 p-12 text-center text-ink-muted space-y-3 flex flex-col items-center justify-center">
               <Loader2 size={28} className="animate-spin text-board-field" />
               <p className="text-body">Loading merchant categories...</p>
             </div>
-          ) : /* Ordered before the empty branch, for the same reason as the
-             user directory: the banner above rendered on a failure and
-             this panel rendered under it anyway, so a dead endpoint read
-             "No merchant categories have been registered yet." The empty
-             branch now only runs when the fetch actually succeeded. */
-          categories.length === 0 && loadError ? (
-            <div className="flex-1 min-h-0 bg-board-plate rounded-plate p-12 border border-edge text-center space-y-3 flex flex-col items-center justify-center">
+          ) : categories.length === 0 && loadError ? (
+            <div className="flex-1 min-h-0 p-12 text-center space-y-3 flex flex-col items-center justify-center">
               <AlertCircle size={22} className="text-status-act-ink" />
               <p className="text-panel text-ink">The categories did not load</p>
               <p className="max-w-sm text-body text-ink-muted">
@@ -375,28 +374,26 @@ export const MerchantCategoryModule: React.FC = () => {
               </button>
             </div>
           ) : sortedCategories.length === 0 ? (
-            <div className="flex-1 min-h-0 bg-board-plate rounded-plate p-12 border border-edge text-center space-y-3 flex flex-col items-center justify-center">
+            <div className="flex-1 min-h-0 p-12 text-center space-y-3 flex flex-col items-center justify-center">
               <Store size={40} className="text-ink-muted" />
-              <h4 className=" text-ink text-label">No categories found</h4>
+              <h4 className="text-ink text-label">No categories found</h4>
               <p className="text-label text-ink-muted max-w-sm">
                 {categories.length === 0
                   ? "No merchant categories have been registered yet. Click 'Add Category' above to create one."
-                  : "No categories match your search or status filter."}
+                  : "No categories match your search."}
               </p>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {sortedCategories.map((cat) => (
-                  <CategoryRowCard
-                    key={cat.id}
-                    category={cat}
-                    onUpdated={handleCategoryUpdated}
-                    onSelectCategoryForPlaces={handleSelectCategoryForPlaces}
-                    rateConfig={rateConfig}
-                  />
-                ))}
-              </div>
+            <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-hairline">
+              {sortedCategories.map((cat) => (
+                <CategoryRowCard
+                  key={cat.id}
+                  category={cat}
+                  onUpdated={handleCategoryUpdated}
+                  onSelectCategoryForPlaces={handleSelectCategoryForPlaces}
+                  rateConfig={rateConfig}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -433,21 +430,13 @@ export const MerchantCategoryModule: React.FC = () => {
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 5. MODAL FORM: CREATE NEW CATEGORY */}
+      {/* MODAL FORM: CREATE NEW CATEGORY */}
       {/* ───────────────────────────────────────────────────────────── */}
       {showAddForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-fade-in">
-          <div className="bg-board-plate border border-edge rounded-plate p-6 sm:p-8 max-w-lg w-full space-y-5">
+          <div className="bg-board-plate border border-edge rounded-plate p-6 max-w-lg w-full space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-hairline">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-plate bg-board-field text-white flex items-center justify-center font-bold">
-                  <FolderPlus size={18} />
-                </div>
-                <div>
-                  <h3 className="text-panel text-ink">Add Merchant Category</h3>
-                  <p className="text-label text-ink-muted">Create a new store classification</p>
-                </div>
-              </div>
+              <h3 className="text-panel font-semibold text-ink">Add Merchant Category</h3>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
@@ -466,40 +455,40 @@ export const MerchantCategoryModule: React.FC = () => {
 
             <form onSubmit={handleAddCategory} className="space-y-4">
               <div>
-                <label className="block text-micro text-ink uppercase mb-1">Category Name *</label>
+                <label className="block text-label font-medium text-ink mb-1">Category Name *</label>
                 <input
                   type="text"
                   required
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="e.g. Bakeries & Pastries, Hardware & Construction"
-                  className="w-full bg-board-ground border border-edge rounded-plate px-4 py-2.5 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                 />
               </div>
 
               <div>
-                <label className="block text-micro text-ink uppercase mb-1">Description</label>
+                <label className="block text-label font-medium text-ink mb-1">Description</label>
                 <textarea
                   rows={3}
                   value={newCatDesc}
                   onChange={(e) => setNewCatDesc(e.target.value)}
                   placeholder="Describe the types of items, partner shops, and services included in this category..."
-                  className="w-full bg-board-ground border border-edge rounded-plate px-4 py-2.5 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition resize-none"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition resize-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-hairline">
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-hairline">
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="px-4 py-2.5 rounded-plate text-label text-ink-muted hover:bg-board-ground transition"
+                  className="px-4 py-2 rounded-plate border border-edge text-label text-ink-muted hover:bg-board-ground transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-plate text-label bg-board-field hover:bg-board-field-deep text-white transition flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-plate text-label bg-board-field hover:bg-board-field-deep text-white transition flex items-center gap-1.5"
                 >
                   {isSubmitting ? (
                     <Loader2 size={14} className="animate-spin" />
@@ -513,6 +502,36 @@ export const MerchantCategoryModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={showAddConfirm}
+        onOpenChange={setShowAddConfirm}
+        title="Confirm New Merchant Category"
+        tone="info"
+        busy={isSubmitting}
+        confirmLabel="Create Category"
+        cancelLabel="Back to Form"
+        onConfirm={handleConfirmAddCategory}
+        body={
+          <div className="space-y-3">
+            <p className="text-body text-ink">
+              Are you sure you want to add this new merchant category to the platform?
+            </p>
+            <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label">
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Category Name:</span>
+                <span className="font-semibold text-ink">{newCatName.trim()}</span>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-ink-muted shrink-0">Description:</span>
+                <span className="text-ink text-right">
+                  {newCatDesc.trim() || "Partner store & errand category"}
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+      />
     </div>
   );
 };

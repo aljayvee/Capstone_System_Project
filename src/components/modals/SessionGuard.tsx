@@ -33,13 +33,13 @@ export const SessionGuard: React.FC = () => {
     },
   });
 
-  const handleStaySignedIn = async () => {
-    try {
-      await apiClient.post("/auth/refresh");
-      resetTimer();
-    } catch {
-      notifySessionExpired();
-    }
+  const handleSignOut = () => {
+    resetTimer();
+    void logout();
+  };
+
+  const handleStaySignedInSuccess = () => {
+    resetTimer();
   };
 
   return (
@@ -49,10 +49,10 @@ export const SessionGuard: React.FC = () => {
         onDismiss={dismissSupersededNotice}
       />
       <SessionExpiryWarningModal
-        isOpen={isWarning}
+        isOpen={isStaff && isWarning}
         remainingSeconds={remainingSeconds}
-        onStaySignedIn={handleStaySignedIn}
-        onSignOut={logout}
+        onSuccess={handleStaySignedInSuccess}
+        onSignOut={handleSignOut}
       />
       <SessionExpiredNoticeModal
         isOpen={isSessionExpired}

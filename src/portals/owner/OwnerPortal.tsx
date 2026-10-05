@@ -1,15 +1,24 @@
 import React, { useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { useMaintenanceCheck } from "../../hooks/useMaintenanceCheck";
+import { MaintenanceOverlay } from "../../components/MaintenanceOverlay";
+import { MaintenanceWarningBanner } from "../../components/MaintenanceWarningBanner";
 import { DashboardModule } from "./modules/dashboard/DashboardModule";
 import { UserManagementModule } from "./modules/users/UserManagementModule";
 import { RiderManagementModule } from "./modules/riders/RiderManagementModule";
 import { MerchantCategoryModule } from "./modules/merchants/MerchantCategoryModule";
 import { ServiceRatesModule } from "./modules/rates/ServiceRatesModule";
-import { FinancialReportsModule } from "./modules/reports/FinancialReportsModule";
+import { FinancialReportsModule, type ReportTab } from "./modules/reports/FinancialReportsModule";
 import { RiderTrackingModule } from "./modules/tracking/RiderTrackingModule";
 import { AccountSecurityLogsView } from "@/components/account/AccountSecurityLogsView";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useDeviceTier } from "../../hooks/useDeviceTier";
+import { MobileHeader } from "../../components/navigation/MobileHeader";
+import { MobileBottomNav, type MobileNavTab } from "../../components/navigation/MobileBottomNav";
+import { ScrollToTopButton } from "../../components/common/ScrollToTopButton";
+
 import {
   LayoutDashboard,
   Users,
@@ -103,6 +112,8 @@ export default function OwnerPortal() {
   const { user, logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [selectedReportTab, setSelectedReportTab] = useState<ReportTab>("sales");
+  const maintenance = useMaintenanceCheck("owner");
 
   const requestedModule = searchParams.get("module");
   const activeModule: ModuleId = MODULE_IDS.includes(requestedModule as ModuleId)
@@ -113,8 +124,98 @@ export default function OwnerPortal() {
     setSearchParams({ module: id }, { replace: true });
   };
 
+  const { isMobile } = useDeviceTier();
+
+  const mobilePrimaryTabs: MobileNavTab[] = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboard className="w-5 h-5" />,
+      isActive: activeModule === "dashboard",
+      onClick: () => setActiveModule("dashboard"),
+    },
+    {
+      id: "reports",
+      label: "Reports",
+      icon: <BarChart2 className="w-5 h-5" />,
+      isActive: activeModule === "reports",
+      onClick: () => setActiveModule("reports"),
+    },
+    {
+      id: "users",
+      label: "Users",
+      icon: <Users className="w-5 h-5" />,
+      isActive: activeModule === "users",
+      onClick: () => setActiveModule("users"),
+    },
+    {
+      id: "rates",
+      label: "Rates",
+      icon: <DollarSign className="w-5 h-5" />,
+      isActive: activeModule === "rates",
+      onClick: () => setActiveModule("rates"),
+    },
+  ];
+
+  const mobileMoreTabs: MobileNavTab[] = [
+    {
+      id: "riders",
+      label: "Riders",
+      icon: <Bike className="w-5 h-5" />,
+      isActive: activeModule === "riders",
+      onClick: () => setActiveModule("riders"),
+      description: "Manage rider profiles and delivery permissions",
+    },
+    {
+      id: "tracking",
+      label: "Tracking",
+      icon: <MapPin className="w-5 h-5" />,
+      isActive: activeModule === "tracking",
+      onClick: () => setActiveModule("tracking"),
+      description: "Live GPS map of online delivery fleet",
+    },
+    {
+      id: "merchants",
+      label: "Merchants Category",
+      icon: <Store className="w-5 h-5" />,
+      isActive: activeModule === "merchants",
+      onClick: () => setActiveModule("merchants"),
+      description: "Configure active merchant categories",
+    },
+    {
+      id: "security",
+      label: "Account Logs",
+      icon: <ShieldCheck className="w-5 h-5" />,
+      isActive: activeModule === "security",
+      onClick: () => setActiveModule("security"),
+      description: "Security audit trail, logins & active sessions",
+    },
+  ];
+
   return (
-    <TooltipProvider>
+    <>
+      {maintenance.showWarningBanner && (
+        <MaintenanceWarningBanner
+          portal="owner"
+          maintenanceType={maintenance.maintenanceType}
+          countdownSeconds={maintenance.countdownSeconds}
+          header={maintenance.header}
+          customColor={maintenance.customColor}
+        />
+      )}
+      {maintenance.showFullScreenOverlay && (
+        <MaintenanceOverlay
+          portal="owner"
+          header={maintenance.header}
+          message={maintenance.message}
+          notice={maintenance.notice}
+          maintenanceType={maintenance.maintenanceType}
+          supportContact={maintenance.supportContact}
+          customColor={maintenance.customColor}
+        />
+      )}
+      <TooltipProvider>
+
       <SidebarProvider defaultOpen={false}>
         {/* data-surface opts this portal into src/styles/surfaces.css, which
             owns the parts nobody draws: the focus ring, themed scrollbars,
@@ -140,6 +241,7 @@ export default function OwnerPortal() {
               navy outline on a navy rail is not a focus ring. The attribute
               lands on the primitive's sidebar-container, an ancestor of every
               row, so one declaration covers the lot. */}
+          {!isMobile && (
           <Sidebar
             data-on-field
             collapsible="icon"
@@ -292,6 +394,7 @@ export default function OwnerPortal() {
             </SidebarFooter>
             <SidebarRail />
           </Sidebar>
+          )}
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
             {/* data-surface because DialogContent renders through a portal at
@@ -342,14 +445,44 @@ export default function OwnerPortal() {
 
           {/* Main Workspace Console */}
           <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full h-full min-h-0 flex flex-col overflow-hidden">
-            <main className="flex-1 p-3 sm:p-4 md:p-5 flex flex-col h-full w-full min-h-0 overflow-hidden">
+            {isMobile && (
+              <MobileHeader
+                title="SUGO Owner"
+                subtitle={activeModule.toUpperCase()}
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowSignOutConfirm(true)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Sign Out"
+                    aria-label="Sign Out"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-400" />
+                  </button>
+                }
+              />
+            )}
+            <main className={cn("flex-1 p-3 sm:p-4 md:p-5 flex flex-col h-full w-full min-h-0 overflow-hidden", isMobile && "pb-20 pt-1")}>
               {/* Dynamic Light Mode Modules */}
-              {activeModule === "dashboard" && <DashboardModule />}
+              {activeModule === "dashboard" && (
+                <DashboardModule
+                  onNavigateToReport={(tab) => {
+                    setSelectedReportTab(tab);
+                    setActiveModule("reports");
+                  }}
+                  onNavigateToModule={(mod) => setActiveModule(mod as any)}
+                />
+              )}
               {activeModule === "users" && <UserManagementModule />}
               {activeModule === "riders" && <RiderManagementModule />}
               {activeModule === "merchants" && <MerchantCategoryModule />}
               {activeModule === "rates" && <ServiceRatesModule />}
-              {activeModule === "reports" && <FinancialReportsModule />}
+              {activeModule === "reports" && (
+                <FinancialReportsModule
+                  initialTab={selectedReportTab}
+                  onTabChange={setSelectedReportTab}
+                />
+              )}
               {activeModule === "tracking" && <RiderTrackingModule />}
               {activeModule === "security" && (
                 <div className="h-full overflow-y-auto pr-1">
@@ -357,9 +490,15 @@ export default function OwnerPortal() {
                 </div>
               )}
             </main>
+
+            {isMobile && (
+              <MobileBottomNav primaryTabs={mobilePrimaryTabs} moreTabs={mobileMoreTabs} />
+            )}
+            <ScrollToTopButton />
           </SidebarInset>
         </div>
       </SidebarProvider>
     </TooltipProvider>
+    </>
   );
 }

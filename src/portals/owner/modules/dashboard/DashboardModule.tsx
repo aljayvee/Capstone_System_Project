@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { MetricCard } from "./components/MetricCard";
 import { RevenueChart } from "./components/RevenueChart";
 import { useDashboardMetrics } from "../../hooks/useDashboardMetrics";
 import {
@@ -8,13 +7,22 @@ import {
   toApiDate,
   type DateRange,
 } from "../../../../components/DateRangePicker";
-import { RangeSelector, PRESET_OPTIONS } from "../../../../components/RangeSelector";
+import { RangeSelector, PRESET_OPTIONS, toApiRange } from "../../../../components/RangeSelector";
 import type { DashboardFrequency } from "../../../../services/apiService";
 import { OwnerPanelShell } from "../../components/OwnerPanelShell";
 import { StandingFigures } from "../../components/StandingFigures";
+import {
+  DashboardReportsSummary,
+  type ReportTab,
+} from "./components/DashboardReportsSummary";
 
 function formatPeso(amount: number): string {
   return `₱${Math.round(amount).toLocaleString("en-US")}`;
+}
+
+export interface DashboardModuleProps {
+  onNavigateToReport?: (tab: ReportTab) => void;
+  onNavigateToModule?: (module: string) => void;
 }
 
 /**
@@ -39,10 +47,13 @@ function formatPeso(amount: number): string {
  * The period selector re-reads all three at once, which is the signature
  * interaction the direction contract names.
  */
-export const DashboardModule: React.FC = () => {
+export const DashboardModule: React.FC<DashboardModuleProps> = ({
+  onNavigateToReport,
+  onNavigateToModule,
+}) => {
   // The dashboard's frequency enum and RangeSelector's preset enum are the same
   // four values, so the pills drive this directly.
-  const [frequency, setFrequency] = useState<DashboardFrequency>("TODAY");
+  const [frequency, setFrequency] = useState<DashboardFrequency>("MONTH");
 
   // The presets and the calendar are two ways to ask, and only one can be in
   // force. RangeSelector owns that coordination for both this page and the
@@ -58,7 +69,9 @@ export const DashboardModule: React.FC = () => {
 
   const activeLabel = customRange
     ? formatRangeLabel(customRange)
-    : (PRESET_OPTIONS.find((f) => f.value === frequency)?.label ?? "Today");
+    : (PRESET_OPTIONS.find((f) => f.value === frequency)?.label ?? "Monthly");
+
+  const apiRange = toApiRange(frequency, customRange);
 
   // Two glyphs for two different absences, which was already correct here and
   // stays: an ellipsis means the request is still in flight, a dash means
@@ -129,6 +142,7 @@ export const DashboardModule: React.FC = () => {
                     `${data.riders.offDuty} off duty`,
                   ].join(" · ")
                 : "On shift now",
+              onClick: onNavigateToModule ? () => onNavigateToModule("tracking") : undefined,
             },
             {
               label: "Errands pending",
@@ -151,31 +165,24 @@ export const DashboardModule: React.FC = () => {
         {/* THIS PERIOD. The money and the shape it made, as one reading. */}
         <section className="space-y-3">
           <h2 className="text-micro uppercase text-ink-muted">This period</h2>
-          <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-12">
-            <div className="lg:col-span-8">
-              <RevenueChart
-                data={chartData}
-                timeframe={activeLabel}
-                isLoading={isLoading}
-                error={error}
-              />
-            </div>
-            <div className="space-y-3 lg:col-span-4">
-              <MetricCard
-                title="Gross revenue"
-                value={data ? formatPeso(data.revenue.gross) : placeholder}
-                valueTitle={data ? undefined : placeholderWhy}
-                sub={`Earnings (${activeLabel.toLowerCase()})`}
-              />
-              <MetricCard
-                title="Estimated payouts"
-                value={data ? formatPeso(data.revenue.estimatedRiderPayouts) : placeholder}
-                valueTitle={data ? undefined : placeholderWhy}
-                sub="Rider payout pool"
-              />
-            </div>
-          </div>
+          <RevenueChart
+            data={chartData}
+            timeframe={activeLabel}
+            grossRevenue={data?.revenue.gross}
+            estimatedPayouts={data?.revenue.estimatedRiderPayouts}
+            placeholder={placeholder}
+            placeholderWhy={placeholderWhy}
+            isLoading={isLoading}
+            error={error}
+          />
         </section>
+
+        {/* REPORTS & ANALYTICS SUMMARY. Executive summary of all 6 reporting domains with dual professional charts */}
+        <DashboardReportsSummary
+          range={apiRange}
+          timeframe={activeLabel}
+          onNavigateToReport={onNavigateToReport}
+        />
 
         {/* ALL TIME. A footnote, because it ignores the selector above. */}
         <p className="border-t border-hairline pt-3 text-label text-ink-muted">

@@ -7,6 +7,7 @@ import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
+import { MobileResponsiveTable } from "@/components/table";
 
 const STATUS_FILTERS = [
   { id: "ALL", label: "All" },
@@ -118,7 +119,7 @@ export function RecentChatsPanel({
 
   return (
     <PanelShell
-      title="Customer chats"
+      title="Customer Chat History"
       figure={{
         label: "Conversations",
         value: isLoading || loadError ? "--" : String(closedErrands.length),
@@ -193,80 +194,168 @@ export function RecentChatsPanel({
           errorTitle="The conversation history did not load"
           loadingRows={5}
         >
-          {/* overflow-x-auto is the table's own, so a wide table scrolls
-              sideways inside the plate instead of widening the page. */}
-          <div className="overflow-x-auto">
-            {/* table-fixed with explicit column widths. Without it the cells
-                sized themselves from their content, so one long customer name
-                or store category set the width of the whole table. */}
-            <table className="w-full table-fixed text-left">
-              <colgroup>
-                <col className="w-[16%]" />
-                <col className="w-[24%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-                <col className="w-[16%]" />
-                <col className="w-[14%]" />
-              </colgroup>
-              <thead className="border-b border-hairline bg-board-ground">
-                <tr>
-                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Route</th>
-                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Customer</th>
-                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Category</th>
-                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Status</th>
-                  <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Payment</th>
-                  <th className="px-4 py-2.5 text-right text-micro uppercase text-ink-muted">
-                    <span className="sr-only">Open the conversation</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-hairline">
-                {paginatedErrands.map((e) => {
-                  // Same supervision signal as ActiveErrandsPanel: an
-                  // outstanding balance on a run that's already claimed and
-                  // moving, with no dispatcher-visible flag for it before now.
-                  const needsSupervision =
-                    e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
-                  return (
-                    <tr key={e.id} className="transition-colors hover:bg-board-ground">
-                      <td data-figure className="truncate px-4 py-3 font-mono text-label text-ink">
-                        {formatErrandId(e.id)}
-                      </td>
-                      <td className="truncate px-4 py-3 text-body text-ink">
-                        {e.customerName || "Customer"}
-                      </td>
-                      <td className="truncate px-4 py-3 text-body text-ink-muted">
-                        {e.category || "General errand"}
-                      </td>
-                      <td className="px-4 py-3">
-                        {/* Was the raw value in a locally-computed colour. */}
-                        <StatusChip status={e.status} />
-                      </td>
-                      <td className="px-4 py-3">
-                        {needsSupervision ? (
-                          <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
-                        ) : (
-                          <span className="text-label text-ink-muted">
-                            {e.paymentSelection?.paymentMode?.name || "—"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <DispatcherButton
-                          variant="secondary"
-                          size="sm"
-                          icon={<Eye size={14} />}
-                          onClick={() => onOpenChat(e.id)}
-                        >
-                          Open
-                        </DispatcherButton>
-                      </td>
+          <MobileResponsiveTable<any>
+            data={paginatedErrands}
+            keyExtractor={(e) => e.id}
+            primaryHeader="Route & Customer"
+            secondaryHeader="Status & Payment"
+            renderPrimary={(e) => (
+              <div>
+                <p className="font-mono text-body font-semibold text-ink">{formatErrandId(e.id)}</p>
+                <p className="text-micro text-ink-muted truncate max-w-[180px] sm:max-w-none">{e.customerName || "Customer"}</p>
+              </div>
+            )}
+            renderSecondary={(e) => {
+              const needsSupervision =
+                e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+              return (
+                <div className="text-right space-y-1">
+                  <StatusChip status={e.status} />
+                  {needsSupervision ? (
+                    <div>
+                      <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
+                    </div>
+                  ) : (
+                    <p className="text-micro text-ink-muted">
+                      {e.paymentSelection?.paymentMode?.name || "—"}
+                    </p>
+                  )}
+                </div>
+              );
+            }}
+            renderPreview={(e) => (
+              <div className="space-y-1.5 pt-1 text-ink-muted">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Customer:</span>
+                  <span className="text-ink font-medium">{e.customerName || "Customer"}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Category:</span>
+                  <span className="text-ink">{e.category || "General errand"}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Payment:</span>
+                  <span className="text-ink">{e.paymentSelection?.paymentMode?.name || "COD"}</span>
+                </div>
+              </div>
+            )}
+            renderRowActions={(e) => (
+              <div onClick={(ev) => ev.stopPropagation()}>
+                <DispatcherButton
+                  variant="secondary"
+                  size="sm"
+                  icon={<Eye size={14} />}
+                  onClick={() => onOpenChat(e.id)}
+                >
+                  Open
+                </DispatcherButton>
+              </div>
+            )}
+            inspectorTitle={(e) => formatErrandId(e.id)}
+            inspectorSubtitle={(e) => `${e.customerName || "Customer"} · ${e.category || "General errand"}`}
+            inspectorSections={(e) => {
+              const needsSupervision =
+                e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+              return [
+                {
+                  title: "Route Information",
+                  items: [
+                    { label: "Route ID", value: formatErrandId(e.id), copyable: true, copyValue: e.id },
+                    { label: "Customer Name", value: e.customerName || "Customer" },
+                    { label: "Category", value: e.category || "General errand" },
+                    { label: "Status", value: e.status },
+                  ],
+                },
+                {
+                  title: "Payment & Supervision",
+                  items: [
+                    { label: "Payment Mode", value: e.paymentSelection?.paymentMode?.name || "Cash on Delivery" },
+                    { label: "Supervision Flag", value: needsSupervision ? "Balance Due" : "Normal" },
+                  ],
+                },
+              ];
+            }}
+            inspectorActions={(e, onClose) => (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenChat(e.id);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-plate bg-signal text-board-plate font-semibold text-body hover:bg-signal-deep transition"
+              >
+                <Eye size={16} />
+                <span>Open Conversation</span>
+              </button>
+            )}
+            desktopView={
+              <div className="overflow-x-auto">
+                <table className="w-full table-fixed text-left">
+                  <colgroup>
+                    <col className="w-[16%]" />
+                    <col className="w-[24%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[14%]" />
+                  </colgroup>
+                  <thead className="border-b border-hairline bg-board-ground">
+                    <tr>
+                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Route</th>
+                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Customer</th>
+                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Category</th>
+                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Status</th>
+                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Payment</th>
+                      <th className="px-4 py-2.5 text-right text-micro uppercase text-ink-muted">
+                        <span className="sr-only">Open the conversation</span>
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {paginatedErrands.map((e) => {
+                      const needsSupervision =
+                        e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+                      return (
+                        <tr key={e.id} className="transition-colors hover:bg-board-ground">
+                          <td data-figure className="truncate px-4 py-3 font-mono text-label text-ink">
+                            {formatErrandId(e.id)}
+                          </td>
+                          <td className="truncate px-4 py-3 text-body text-ink">
+                            {e.customerName || "Customer"}
+                          </td>
+                          <td className="truncate px-4 py-3 text-body text-ink-muted">
+                            {e.category || "General errand"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusChip status={e.status} />
+                          </td>
+                          <td className="px-4 py-3">
+                            {needsSupervision ? (
+                              <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
+                            ) : (
+                              <span className="text-label text-ink-muted">
+                                {e.paymentSelection?.paymentMode?.name || "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <DispatcherButton
+                              variant="secondary"
+                              size="sm"
+                              icon={<Eye size={14} />}
+                              onClick={() => onOpenChat(e.id)}
+                            >
+                              Open
+                            </DispatcherButton>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            }
+          />
         </PanelState>
       </div>
     </PanelShell>

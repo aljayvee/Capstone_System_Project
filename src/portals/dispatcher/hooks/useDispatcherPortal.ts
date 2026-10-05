@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { postAccepted, postDeclined } from "../../../services/chatSystemMessages";
-import { getMemoryAccessToken } from "../../../services/apiClient";
+import { getMemoryAccessToken, onMemoryAccessTokenChange } from "../../../services/apiClient";
 import { Errand, ErrandStatus } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
 
@@ -150,6 +150,9 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
 
   // Read by socket handlers registered once per connection, which would
   // otherwise see the errand list and the router setter from their first render.
+  // Read by the socket handlers, which are registered once (see below).
+  const currentUserIdRef = useRef(currentUserId);
+  currentUserIdRef.current = currentUserId;
   const errandsRef = useRef<Errand[]>(errands);
   errandsRef.current = errands;
   const openErrandRef = useRef(setSelectedErrandId);
@@ -186,8 +189,23 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     // an ETA) to identified clients and joins staff into a role room on connect.
     // An anonymous socket still receives the legacy broadcast events, but would
     // silently miss everything scoped.
+    //
+    // Built once for the life of the screen, and connected only once there is
+    // a token. It used to be rebuilt when the signed-in user id arrived a
+    // moment after mount, and connected before the token was restored: the
+    // first socket was torn down mid-upgrade (logged by the browser as
+    // "WebSocket is closed before the connection is established") and, having
+    // no token, would have heard no scoped events anyway. The handlers read the
+    // user id through a ref, so they see it whenever it arrives.
     const socket: Socket = io(BACKEND_URL, {
-      auth: { token: getMemoryAccessToken() ?? undefined },
+      // Re-read at every handshake, so a reconnect after the 15-minute token
+      // has rotated is still authenticated.
+      auth: (cb) => cb({ token: getMemoryAccessToken() ?? undefined }),
+      autoConnect: false,
+    });
+    if (getMemoryAccessToken()) socket.connect();
+    const stopWaitingForToken = onMemoryAccessTokenChange((token) => {
+      if (token && !socket.active) socket.connect();
     });
 
     socket.on("order:new", (newOrder: any) => {
@@ -200,7 +218,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       console.log("[Socket.io] Received order:claimed:", claimedOrder);
       const errand = mapPrismaErrand(claimedOrder);
       setErrands((prev) =>
-        isVisibleToDispatcher(errand, currentUserId)
+        isVisibleToDispatcher(errand, currentUserIdRef.current)
           ? prev.map((e) => (e.id === errand.id ? errand : e))
           : prev.filter((e) => e.id !== errand.id)
       );
@@ -209,7 +227,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     socket.on("order:updated", (updatedOrder: any) => {
       const errand = mapPrismaErrand(updatedOrder);
       setErrands((prev) =>
-        isVisibleToDispatcher(errand, currentUserId)
+        isVisibleToDispatcher(errand, currentUserIdRef.current)
           ? prev.map((e) => (e.id === errand.id ? errand : e))
           : prev.filter((e) => e.id !== errand.id)
       );
@@ -284,7 +302,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     socket.on("errand:half_payment_requested", (payload: any) => {
       if (!payload?.errandId) return;
       const known = errandsRef.current.find((e) => e.id === payload.errandId);
-      if (known?.dispatcherId && currentUserId && String(known.dispatcherId) !== String(currentUserId)) {
+      if (known?.dispatcherId && currentUserIdRef.current && String(known.dispatcherId) !== String(currentUserIdRef.current)) {
         return;
       }
       const who = payload.customerName || "The customer";
@@ -320,9 +338,10 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     });
 
     return () => {
+      stopWaitingForToken();
       socket.disconnect();
     };
-  }, [fetchOrders, currentUserId]);
+  }, [fetchOrders]);
 
   const handleClaimOrder = async (orderId: string, currentUser: any) => {
     const dispatcherFirstName = currentUser?.name ? currentUser.name.split(" ")[0] : "Dispatcher";
@@ -386,13 +405,13 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     fetchOrders();
   };
 
-  const handleOpenChat = (orderId: string) => {
+  const handleOpenChat = useCallback((orderId: string) => {
     setSelectedErrandId(orderId);
-  };
+  }, []);
 
-  const handleCloseChat = () => {
+  const handleCloseChat = useCallback(() => {
     setSelectedErrandId(null);
-  };
+  }, []);
 
   const handleUpdateStatus = async (errandId: string, targetStatus: ErrandStatus) => {
     setActionError(null);

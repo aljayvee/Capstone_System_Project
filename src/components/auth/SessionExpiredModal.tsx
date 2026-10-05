@@ -44,7 +44,7 @@ export const SessionExpiredModal: React.FC<SessionExpiredModalProps> = ({
 
       const res = await apiClient.post("/auth/login", payload);
       if (res.data?.user && res.data?.token) {
-        login(res.data.user, res.data.token);
+        login(res.data.user, res.data.token, res.data.refreshToken);
         setPassword("");
         onSuccess?.();
       } else {

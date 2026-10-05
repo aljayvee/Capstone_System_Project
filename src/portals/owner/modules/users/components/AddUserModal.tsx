@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { UserRole } from "../../../../../types/auth";
 import { ASSIGNABLE_ROLES, AssignableRole } from "../../../../../constants/userRoles";
+import { ConfirmDialog } from "@/components/panel";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -106,6 +107,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
 
@@ -132,7 +134,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
     return errors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const errors = validateAll();
@@ -143,8 +145,11 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
     }
 
     setError("");
-    setIsSubmitting(true);
+    setShowConfirmModal(true);
+  };
 
+  const handleConfirmSave = async () => {
+    setIsSubmitting(true);
     try {
       const res = await onSave({
         firstName: firstName.trim(),
@@ -157,9 +162,11 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
         password,
       });
       if (res !== false) {
+        setShowConfirmModal(false);
         onClose();
       }
     } catch (err: any) {
+      setShowConfirmModal(false);
       setError(err.message || "Failed to create user. Please check server connectivity.");
     } finally {
       setIsSubmitting(false);
@@ -208,18 +215,18 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
           )}
 
           <form id="add-user-form" onSubmit={handleSubmit} noValidate className="space-y-6">
-            {/* 1. ROLE SELECTION */}
-            <div className="space-y-2">
+            {/* Operational Role Selection */}
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-micro uppercase text-ink">
-                  1. Operational Role <span className="text-signal">*</span>
+                <label className="text-label font-medium text-ink">
+                  Operational Role <span className="text-signal">*</span>
                 </label>
                 {fieldErrors.role && (
                   <span className="text-label text-status-act-ink">{fieldErrors.role}</span>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-board-ground border border-edge rounded-plate">
                 {ASSIGNABLE_ROLES.map((option) => {
                   const meta = ROLE_METADATA[option.value];
                   const Icon = meta.icon;
@@ -233,41 +240,23 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                         setRole(option.value);
                         clearFieldError("role");
                       }}
-                      className={`p-3 rounded-plate border border-edge text-left transition-all duration-150 relative flex flex-col justify-between ${
+                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded-trim text-label font-medium transition ${
                         isSelected
-                          ? `border-board-field ring-2 ring-board-field/20 bg-board-ground`
-                          : `border-edge hover:border-edge hover:bg-board-ground`
+                          ? "bg-board-plate text-ink shadow-sm border border-edge"
+                          : "text-ink-muted hover:text-ink"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div
-                          className={`w-7 h-7 rounded-trim flex items-center justify-center ${
-                            isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
-                          }`}
-                        >
-                          <Icon size={14} />
-                        </div>
-                        {isSelected && (
-                          <span className="w-4 h-4 rounded-full bg-board-field text-white flex items-center justify-center text-label">
-                            <Check size={10} strokeWidth={3} />
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-label text-ink">{meta.label}</p>
-                        <p className="text-body text-ink-muted leading-tight mt-0.5">
-                          {meta.description}
-                        </p>
-                      </div>
+                      <Icon size={14} className={isSelected ? "text-board-field" : "text-ink-muted"} />
+                      <span>{meta.label}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* 2. PERSONAL INFORMATION */}
+            {/* Personal Information */}
             <div className="space-y-3">
-              <label className="text-micro uppercase text-ink block">2. Personal Information</label>
+              <label className="text-label font-medium text-ink block">Personal Information</label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -341,10 +330,10 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
               </div>
             </div>
 
-            {/* 3. CONTACT & ACCOUNT CREDENTIALS */}
+            {/* Contact & Login Credentials */}
             <div className="space-y-3">
-              <label className="text-micro uppercase text-ink block">
-                3. Contact & Login Credentials
+              <label className="text-label font-medium text-ink block">
+                Contact & Login Credentials
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -359,6 +348,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                     />
                     <input
                       type="text"
+                      autoComplete="username"
                       value={username}
                       onChange={(e) => {
                         setUsername(e.target.value.replace(/\s/g, ""));
@@ -557,6 +547,50 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showConfirmModal}
+        onOpenChange={setShowConfirmModal}
+        title="Confirm Personnel Registration"
+        tone="info"
+        busy={isSubmitting}
+        confirmLabel="Register Personnel"
+        cancelLabel="Back to Form"
+        onConfirm={handleConfirmSave}
+        body={
+          <div className="space-y-3">
+            <p className="text-body text-ink">
+              Are you sure you want to register this new personnel account with the following details?
+            </p>
+            <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label">
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Full Name:</span>
+                <span className="font-semibold text-ink">
+                  {[firstName.trim(), middleName.trim(), lastName.trim()].filter(Boolean).join(" ")}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Username:</span>
+                <span className="font-semibold text-ink font-mono">{username.trim()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Operational Role:</span>
+                <span className="font-semibold text-ink">
+                  {role ? ROLE_METADATA[role as AssignableRole]?.label ?? role : "Unassigned"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Email:</span>
+                <span className="text-ink font-mono">{email.trim().toLowerCase()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-muted">Phone:</span>
+                <span className="text-ink font-mono">{phone.trim()}</span>
+              </div>
+            </div>
+          </div>
+        }
+      />
     </div>
   );
 };

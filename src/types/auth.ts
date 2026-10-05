@@ -45,6 +45,7 @@ export interface AccountLoginLog {
   deviceInfo: string | null;
   status: string;
   sessionId: string | null;
+  isOnline?: boolean;
   createdAt: string;
   revokedAt: string | null;
   revokedReason: string | null;
@@ -69,7 +70,7 @@ export interface AnotherDeviceActivePayload {
 export interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (user: User, token?: string) => void;
+  login: (user: User, token?: string, refreshToken?: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isInitializing: boolean;

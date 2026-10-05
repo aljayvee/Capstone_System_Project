@@ -9,7 +9,7 @@ import { ExceptionReportView } from "./components/ExceptionReportView";
 import { OwnerPanelShell } from "../../components/OwnerPanelShell";
 import { OwnerTabs, type OwnerTab } from "../../components/OwnerTabs";
 
-type ReportTab =
+export type ReportTab =
   "sales" | "rider-performance" | "commission" | "settlement" | "transactions" | "exceptions";
 
 const REPORT_TABS: ReadonlyArray<OwnerTab<ReportTab>> = [
@@ -19,11 +19,25 @@ const REPORT_TABS: ReadonlyArray<OwnerTab<ReportTab>> = [
   { id: "settlement", label: "Settlement", icon: Wallet },
   { id: "transactions", label: "Transaction Summary", icon: Receipt },
   // Last, because it is the one read after the numbers rather than instead of them.
-  { id: "exceptions", label: "Exceptions", icon: AlertTriangle },
+  { id: "exceptions", label: "Conflict Report", icon: AlertTriangle },
 ];
 
-export const FinancialReportsModule: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ReportTab>("sales");
+export interface FinancialReportsModuleProps {
+  initialTab?: ReportTab;
+  onTabChange?: (tab: ReportTab) => void;
+}
+
+export const FinancialReportsModule: React.FC<FinancialReportsModuleProps> = ({
+  initialTab = "sales",
+  onTabChange,
+}) => {
+  const [activeTab, setActiveTab] = useState<ReportTab>(initialTab);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   return (
     <OwnerPanelShell
@@ -39,7 +53,10 @@ export const FinancialReportsModule: React.FC = () => {
           // offering that as an inference site widens OwnerTabs' generic to
           // plain `string`, which loses the union the tab ids are checked
           // against.
-          onChange={(id) => setActiveTab(id)}
+          onChange={(id) => {
+            setActiveTab(id);
+            onTabChange?.(id);
+          }}
         />
       }
     >

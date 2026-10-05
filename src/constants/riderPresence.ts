@@ -12,11 +12,19 @@ export const PLOT_HIDE_AFTER_MS = 24 * 60 * 60 * 1000; // Keep available for his
 
 export const LOW_BATTERY_THRESHOLD = 0.2;
 
+/**
+ * The rider statuses on the dispatcher and owner screens (2026-09-23).
+ *
+ * Three come from the server (riderStatusOf in server/src/lib/riderAvailability.ts):
+ * Available Online, Available Signal Lost and Offline. ON_DELIVERY is not a
+ * fourth status: it is an Available Online rider who is carrying an errand,
+ * kept visually apart because dispatch reads that difference at a glance.
+ */
 export type RiderPresenceState =
-  | "AVAILABLE"      // State 1: 🟢 Online & Available (No task, ready for dispatch)
-  | "BUSY"           // State 2: 🟠 Online & On Active Mission (Doing errand)
-  | "DISCONNECTED"   // State 3: 🔴 Offline - Lost Internet / Stale GPS (>60s)
-  | "OFF_DUTY";      // State 4: ⚪ Offline - Shift Ended / Logged Out
+  | "AVAILABLE_ONLINE"
+  | "ON_DELIVERY"
+  | "AVAILABLE_SIGNAL_LOST"
+  | "OFFLINE";
 
 export interface RiderStatusTheme {
   label: string;
@@ -34,10 +42,10 @@ export interface RiderStatusTheme {
 }
 
 export const RIDER_STATUS_THEMES: Record<RiderPresenceState, RiderStatusTheme> = {
-  AVAILABLE: {
-    label: "Online & Ready",
-    shortLabel: "Ready",
-    badgeLabel: "Available",
+  AVAILABLE_ONLINE: {
+    label: "Available Online",
+    shortLabel: "Online",
+    badgeLabel: "Available Online",
     primaryColor: "#10B981", // Emerald 500
     secondaryColor: "#059669", // Emerald 600
     backgroundColor: "#ECFDF5", // Emerald 50
@@ -46,12 +54,13 @@ export const RIDER_STATUS_THEMES: Record<RiderPresenceState, RiderStatusTheme> =
     glowColor: "rgba(16, 185, 129, 0.4)",
     badgeClassName: "bg-emerald-50 text-emerald-700 border-emerald-300 ring-emerald-100",
     hasPulse: true,
-    description: "Online, on duty, and ready for immediate errand assignment",
+    description:
+      "Logged in with background location allowed, so the app keeps reporting even when closed. Can be assigned.",
   },
-  BUSY: {
-    label: "On Active Delivery",
-    shortLabel: "On Errand",
-    badgeLabel: "Delivering",
+  ON_DELIVERY: {
+    label: "Available Online, on delivery",
+    shortLabel: "On delivery",
+    badgeLabel: "On delivery",
     primaryColor: "#F59E0B", // Amber 500
     secondaryColor: "#D97706", // Amber 600
     backgroundColor: "#FFFBEB", // Amber 50
@@ -60,11 +69,11 @@ export const RIDER_STATUS_THEMES: Record<RiderPresenceState, RiderStatusTheme> =
     glowColor: "rgba(245, 158, 11, 0.4)",
     badgeClassName: "bg-amber-50 text-amber-800 border-amber-300 ring-amber-100",
     hasPulse: false,
-    description: "Currently handling an active errand (heading to store / out for delivery)",
+    description: "Online and currently working an errand.",
   },
-  DISCONNECTED: {
-    label: "Offline — Signal Lost",
-    shortLabel: "No Signal",
+  AVAILABLE_SIGNAL_LOST: {
+    label: "Available Signal Lost",
+    shortLabel: "Signal lost",
     badgeLabel: "Signal Lost",
     primaryColor: "#EF4444", // Red 500
     secondaryColor: "#DC2626", // Red 600
@@ -74,11 +83,12 @@ export const RIDER_STATUS_THEMES: Record<RiderPresenceState, RiderStatusTheme> =
     glowColor: "rgba(239, 68, 68, 0.3)",
     badgeClassName: "bg-red-50 text-red-700 border-red-300 ring-red-100",
     hasPulse: false,
-    description: "On-duty rider whose GPS/network heartbeat dropped (> 60s without update)",
+    description:
+      "On duty, but the phone has stopped reporting. Cannot be assigned until it reconnects. Consider calling the rider.",
   },
-  OFF_DUTY: {
-    label: "Offline — Shift Ended",
-    shortLabel: "Off Duty",
+  OFFLINE: {
+    label: "Offline",
+    shortLabel: "Offline",
     badgeLabel: "Offline",
     primaryColor: "#64748B", // Slate 500
     secondaryColor: "#475569", // Slate 600
@@ -88,6 +98,44 @@ export const RIDER_STATUS_THEMES: Record<RiderPresenceState, RiderStatusTheme> =
     glowColor: "rgba(100, 116, 139, 0.2)",
     badgeClassName: "bg-slate-100 text-slate-600 border-slate-300 ring-slate-100",
     hasPulse: false,
-    description: "Logged out or off duty (not actively accepting tasks)",
+    description:
+      "Logged out, went offline, background service stopped, or the shift ended at 12:00 AM.",
   },
 };
+
+/** "under a minute", "4 min", "2 h 5 min". */
+function formatAge(ms: number): string {
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
+/**
+ * The one line under a rider's status: why they have it. Shared by the
+ * dispatcher roster and the owner screens so both say the same thing.
+ */
+export function describeRiderStatus(
+  rider: {
+    presence: RiderPresenceState;
+    statusText?: string | null;
+    lastBeaconAt?: number | null;
+    activeOrdersCount: number;
+  },
+  now: number = Date.now()
+): string {
+  switch (rider.presence) {
+    case "AVAILABLE_ONLINE":
+      return "Can be assigned";
+    case "ON_DELIVERY":
+      return `${rider.activeOrdersCount} active errand${rider.activeOrdersCount === 1 ? "" : "s"}`;
+    case "AVAILABLE_SIGNAL_LOST":
+      return rider.lastBeaconAt
+        ? `No signal for ${formatAge(Math.max(0, now - rider.lastBeaconAt))}`
+        : rider.statusText || "No signal";
+    case "OFFLINE":
+      return rider.statusText || "Offline";
+  }
+}

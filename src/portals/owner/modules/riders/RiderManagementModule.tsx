@@ -1,4 +1,5 @@
 import React from "react";
+import { describeRiderStatus } from "../../../../constants/riderPresence";
 import { Phone } from "lucide-react";
 import { StandingFigures } from "../../components/StandingFigures";
 import {
@@ -28,11 +29,10 @@ export const RiderManagementModule: React.FC = () => {
   // which is how this board could report three Available riders while the map
   // showed the same three as signal-lost: two derivations of one fact, from a
   // hook that returns both.
-  const availableCount = riders.filter((r) => r.presence === "AVAILABLE").length;
-  const onErrandCount = riders.filter((r) => r.presence === "BUSY").length;
-  const offlineCount = riders.filter(
-    (r) => r.presence === "DISCONNECTED" || r.presence === "OFF_DUTY",
-  ).length;
+  const availableCount = riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length;
+  const onErrandCount = riders.filter((r) => r.presence === "ON_DELIVERY").length;
+  const signalLostCount = riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length;
+  const offlineCount = riders.filter((r) => r.presence === "OFFLINE").length;
 
   return (
     <OwnerPanelShell
@@ -46,9 +46,10 @@ export const RiderManagementModule: React.FC = () => {
         <StandingFigures
           label="The roster right now"
           figures={[
-            { label: "Available", value: count(availableCount), sub: "Waiting for a run" },
-            { label: "On errand", value: count(onErrandCount), sub: "Carrying an errand" },
-            { label: "Offline / off duty", value: count(offlineCount), sub: "Not on shift" },
+            { label: "Available Online", value: count(availableCount), sub: "Can be assigned" },
+            { label: "On delivery", value: count(onErrandCount), sub: "Online, carrying an errand" },
+            { label: "Available Signal Lost", value: count(signalLostCount), sub: "On duty, phone not reporting" },
+            { label: "Offline", value: count(offlineCount), sub: "Logged out, offline, or shift ended" },
           ]}
         />
       }
@@ -102,11 +103,7 @@ export const RiderManagementModule: React.FC = () => {
                       className={`shrink-0 rounded-full border border-edge px-2.5 py-0.5 text-micro uppercase ${
                         RIDER_STATUS_THEMES[r.presence].badgeClassName
                       }`}
-                      title={
-                        r.presence === "DISCONNECTED" && r.presumed
-                          ? "Presumed offline, no beacon received. A powered-off handset and one in a dead zone send identically nothing."
-                          : RIDER_STATUS_THEMES[r.presence].description
-                      }
+                      title={`${RIDER_STATUS_THEMES[r.presence].label}: ${describeRiderStatus(r)}`}
                     >
                       {RIDER_STATUS_THEMES[r.presence].badgeLabel}
                     </span>

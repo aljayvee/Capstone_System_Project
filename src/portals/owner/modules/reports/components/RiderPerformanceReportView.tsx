@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ReportState } from "./ReportState";
 import { Star, Bike, Timer, Target, Wallet, ChevronRight } from "lucide-react";
-import { MetricCard } from "../../dashboard/components/MetricCard";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
@@ -12,6 +12,7 @@ import type { DateRange } from "../../../../../components/DateRangePicker";
 import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatPeso } from "../../../../../utils/format";
+import { MobileResponsiveTable } from "../../../../../components/table";
 
 /**
  * An absent metric, with the reason attached.
@@ -185,7 +186,7 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
 };
 
 export const RiderPerformanceReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("TODAY");
+  const [preset, setPreset] = useState<RangePreset>("MONTH");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
@@ -265,48 +266,129 @@ export const RiderPerformanceReportView: React.FC = () => {
         <>
           <p className="text-label text-ink-muted">{data.rangeLabel}</p>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              title="Completed Errands"
-              value={String(data.fleet.completedCount)}
-              sub={`${data.fleet.riderCount} riders`}
-              icon={Bike}
-            />
-            <MetricCard
-              title="Avg Delivery Time"
-              value={
-                data.fleet.avgDeliveryMinutes === null
-                  ? "--"
-                  : `${data.fleet.avgDeliveryMinutes.toFixed(1)} min`
-              }
-              sub={
-                data.fleet.deliveryTimedCount > 0
-                  ? `over ${data.fleet.deliveryTimedCount} timed errands`
-                  : "no timed errands"
-              }
-              icon={Timer}
-            />
-            <MetricCard
-              title="On-Time Rate"
-              value={
-                data.fleet.onTimeRate === null
-                  ? "--"
-                  : `${(data.fleet.onTimeRate * 100).toFixed(1)}%`
-              }
-              sub={
-                data.fleet.onTimeDenominator > 0
-                  ? `over ${data.fleet.onTimeDenominator} with an ETA`
-                  : "no errand carried an ETA"
-              }
-              icon={Target}
-            />
-            <MetricCard
-              title="Rider Earnings"
-              value={formatPeso(data.fleet.riderShareEarned)}
-              sub={`${formatPeso(data.fleet.settlementVarianceTotal)} cash variance`}
-              icon={Wallet}
-            />
+          <div className="bg-board-plate border border-edge rounded-plate divide-y sm:divide-y-0 sm:divide-x divide-hairline grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="p-5 flex items-start gap-3.5">
+              <div className="p-2.5 rounded-lg bg-board-ground text-ink-muted shrink-0">
+                <Bike className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-body text-ink-muted">Completed Errands</div>
+                <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                  {data.fleet.completedCount}
+                </div>
+                <div className="text-xs text-ink-muted mt-0.5 truncate">
+                  {data.fleet.riderCount} riders
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 flex items-start gap-3.5">
+              <div className="p-2.5 rounded-lg bg-board-ground text-ink-muted shrink-0">
+                <Timer className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-body text-ink-muted">Avg Delivery Time</div>
+                <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                  {data.fleet.avgDeliveryMinutes === null
+                    ? "--"
+                    : `${data.fleet.avgDeliveryMinutes.toFixed(1)} min`}
+                </div>
+                <div className="text-xs text-ink-muted mt-0.5 truncate">
+                  {data.fleet.deliveryTimedCount > 0
+                    ? `over ${data.fleet.deliveryTimedCount} timed errands`
+                    : "no timed errands"}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 flex items-start gap-3.5">
+              <div className="p-2.5 rounded-lg bg-board-ground text-ink-muted shrink-0">
+                <Target className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-body text-ink-muted">On-Time Rate</div>
+                <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                  {data.fleet.onTimeRate === null
+                    ? "--"
+                    : `${(data.fleet.onTimeRate * 100).toFixed(1)}%`}
+                </div>
+                <div className="text-xs text-ink-muted mt-0.5 truncate">
+                  {data.fleet.onTimeDenominator > 0
+                    ? `over ${data.fleet.onTimeDenominator} with an ETA`
+                    : "no errand carried an ETA"}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 flex items-start gap-3.5">
+              <div className="p-2.5 rounded-lg bg-board-ground text-ink-muted shrink-0">
+                <Wallet className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-body text-ink-muted">Rider Earnings</div>
+                <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                  {formatPeso(data.fleet.riderShareEarned)}
+                </div>
+                <div className="text-xs text-ink-muted mt-0.5 truncate">
+                  {formatPeso(data.fleet.settlementVarianceTotal)} cash variance
+                </div>
+              </div>
+            </div>
           </div>
+
+          {data.riders.length > 0 && (
+            <div className="bg-board-plate border border-edge rounded-plate p-6">
+              <div className="text-body font-semibold text-ink mb-4">
+                Completed Errands & Rider Earnings by Rider
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart
+                  data={data.riders.map((r) => ({
+                    name: r.name ?? `Rider ${r.riderId}`,
+                    completed: r.throughput.completedCount,
+                    earned: r.earnings.riderShareEarned,
+                  }))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-hairline)" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }}
+                    interval={0}
+                    height={50}
+                    angle={-12}
+                    textAnchor="end"
+                  />
+                  <YAxis yAxisId="left" tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }} />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }}
+                  />
+                  <Tooltip
+                    formatter={(v: number, name: string) => [
+                      name === "Earnings (PHP)" ? formatPeso(v) : v,
+                      name,
+                    ]}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: "8px", fontSize: "12px" }} />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="completed"
+                    name="Completed Errands"
+                    fill="#2563EB"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    yAxisId="right"
+                    dataKey="earned"
+                    name="Earnings (PHP)"
+                    fill="#10B981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5 flex-wrap bg-board-ground p-1 rounded-plate w-fit">
             {GROUPS.map((g) => (
@@ -327,184 +409,274 @@ export const RiderPerformanceReportView: React.FC = () => {
               No riders on record.
             </div>
           ) : (
-            <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-label">
-                  <thead className="bg-board-ground text-ink-muted">
-                    <tr>
-                      <th scope="col" className="text-left px-5 py-2 font-semibold">
-                        Rider
-                      </th>
-                      {showThroughput && (
-                        <>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Completed
+            (() => {
+              const desktopTable = (
+                <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-label">
+                      <thead className="bg-board-ground text-ink-muted">
+                        <tr>
+                          <th scope="col" className="text-left px-5 py-2 font-semibold">
+                            Rider
                           </th>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Avg delivery
-                          </th>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Per active hr
-                          </th>
-                        </>
-                      )}
-                      {showReliability && (
-                        <>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            On time
-                          </th>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Cancelled
-                          </th>
-                        </>
-                      )}
-                      {showEarnings && (
-                        <>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Earned
-                          </th>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Cash variance
-                          </th>
-                        </>
-                      )}
-                      {showQuality && (
-                        <>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Rating
-                          </th>
-                          <th scope="col" className="text-right px-4 py-2 font-semibold">
-                            Exceptions
-                          </th>
-                        </>
-                      )}
-                      {/* Was an empty <th> with no content and no label. */}
-                      <th scope="col" className="w-8">
-                        <span className="sr-only">Show breakdown</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.riders.map((r) => {
-                      const isOpen = expanded === r.riderId;
-                      return (
-                        <React.Fragment key={r.riderId}>
-                          {/* The <tr> was the control: cursor-pointer and an
-                              onClick, with no tabIndex, role or key handler, so
-                              expanding a rider's detail was mouse-only. The
-                              chevron cell now holds a real button and the row
-                              is just a row. */}
-                          <tr className="border-t border-hairline hover:bg-board-ground">
-                            <td className="px-5 py-2.5 font-semibold text-ink">{r.name}</td>
-                            {showThroughput && (
-                              <>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {r.throughput.completedCount}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {mins(
-                                    r.throughput.avgDeliveryMinutes,
-                                    "No errand in this period recorded both an accept and a delivery time.",
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {r.throughput.errandsPerActiveHour === null ? (
-                                    <Absent why="This rider recorded no signed-in time in this period." />
-                                  ) : (
-                                    r.throughput.errandsPerActiveHour.toFixed(2)
-                                  )}
-                                </td>
-                              </>
-                            )}
-                            {showReliability && (
-                              <>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {pct(
-                                    r.reliability.onTimeRate,
-                                    "No errand in this period carried an ETA to measure against.",
-                                  )}
-                                  {r.reliability.onTimeDenominator > 0 && (
-                                    <span className="ml-1 text-label text-ink-muted">
-                                      ({r.reliability.onTimeDenominator})
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {pct(
-                                    r.reliability.cancellationRate,
-                                    "No errand reached this rider in this period.",
-                                  )}
-                                </td>
-                              </>
-                            )}
-                            {showEarnings && (
-                              <>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {formatPeso(r.earnings.riderShareEarned)}
-                                </td>
-                                <td
-                                  className={`px-4 py-2.5 text-right font-mono tabular-nums ${
-                                    r.earnings.settlementVarianceTotal < 0
-                                      ? "text-status-act-ink font-semibold"
-                                      : ""
-                                  }`}
-                                >
-                                  {formatPeso(r.earnings.settlementVarianceTotal)}
-                                </td>
-                              </>
-                            )}
-                            {showQuality && (
-                              <>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {r.quality.averageRatingAllTime === null ? (
-                                    <Absent why="No customer has rated this rider yet." />
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Star
-                                        size={11}
-                                        className="text-status-waiting-ink fill-amber-400"
-                                      />
-                                      {r.quality.averageRatingAllTime.toFixed(1)}
-                                      <span className="text-label text-ink-muted">
-                                        ({r.quality.ratingCountAllTime})
-                                      </span>
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono tabular-nums">
-                                  {r.quality.exceptionCount}
-                                </td>
-                              </>
-                            )}
-                            <td className="px-2 py-2.5 text-ink-muted">
-                              <button
-                                type="button"
-                                onClick={() => setExpanded(isOpen ? null : r.riderId)}
-                                aria-expanded={isOpen}
-                                aria-label={`${isOpen ? "Hide" : "Show"} the breakdown for ${r.name}`}
-                                className="grid size-7 place-items-center rounded-trim transition-colors hover:bg-board-ground"
-                              >
-                                <ChevronRight
-                                  size={14}
-                                  className={`transition-transform ${isOpen ? "rotate-90" : ""}`}
-                                />
-                              </button>
-                            </td>
-                          </tr>
-                          {isOpen && (
-                            <tr>
-                              <td colSpan={12} className="p-0">
-                                <RiderDetail rider={r} />
-                              </td>
-                            </tr>
+                          {showThroughput && (
+                            <>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Completed
+                              </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Avg delivery
+                              </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Per active hr
+                              </th>
+                            </>
                           )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                          {showReliability && (
+                            <>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                On time
+                              </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Cancelled
+                              </th>
+                            </>
+                          )}
+                          {showEarnings && (
+                            <>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Earned
+                              </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Cash variance
+                              </th>
+                            </>
+                          )}
+                          {showQuality && (
+                            <>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Rating
+                              </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Exceptions
+                              </th>
+                            </>
+                          )}
+                          {/* Was an empty <th> with no content and no label. */}
+                          <th scope="col" className="w-8">
+                            <span className="sr-only">Show breakdown</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.riders.map((r) => {
+                          const isOpen = expanded === r.riderId;
+                          return (
+                            <React.Fragment key={r.riderId}>
+                              {/* The <tr> was the control: cursor-pointer and an
+                                  onClick, with no tabIndex, role or key handler, so
+                                  expanding a rider's detail was mouse-only. The
+                                  chevron cell now holds a real button and the row
+                                  is just a row. */}
+                              <tr className="border-t border-hairline hover:bg-board-ground">
+                                <td className="px-5 py-2.5 font-semibold text-ink">{r.name}</td>
+                                {showThroughput && (
+                                  <>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {r.throughput.completedCount}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {mins(
+                                        r.throughput.avgDeliveryMinutes,
+                                        "No errand in this period recorded both an accept and a delivery time.",
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {r.throughput.errandsPerActiveHour === null ? (
+                                        <Absent why="This rider recorded no signed-in time in this period." />
+                                      ) : (
+                                        r.throughput.errandsPerActiveHour.toFixed(2)
+                                      )}
+                                    </td>
+                                  </>
+                                )}
+                                {showReliability && (
+                                  <>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {pct(
+                                        r.reliability.onTimeRate,
+                                        "No errand in this period carried an ETA to measure against.",
+                                      )}
+                                      {r.reliability.onTimeDenominator > 0 && (
+                                        <span className="ml-1 text-label text-ink-muted">
+                                          ({r.reliability.onTimeDenominator})
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {pct(
+                                        r.reliability.cancellationRate,
+                                        "No errand reached this rider in this period.",
+                                      )}
+                                    </td>
+                                  </>
+                                )}
+                                {showEarnings && (
+                                  <>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {formatPeso(r.earnings.riderShareEarned)}
+                                    </td>
+                                    <td
+                                      className={`px-4 py-2.5 text-right font-mono tabular-nums ${
+                                        r.earnings.settlementVarianceTotal < 0
+                                          ? "text-status-act-ink font-semibold"
+                                          : ""
+                                      }`}
+                                    >
+                                      {formatPeso(r.earnings.settlementVarianceTotal)}
+                                    </td>
+                                  </>
+                                )}
+                                {showQuality && (
+                                  <>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {r.quality.averageRatingAllTime === null ? (
+                                        <Absent why="No customer has rated this rider yet." />
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1">
+                                          <Star
+                                            size={11}
+                                            className="text-status-waiting-ink fill-amber-400"
+                                          />
+                                          {r.quality.averageRatingAllTime.toFixed(1)}
+                                          <span className="text-label text-ink-muted">
+                                            ({r.quality.ratingCountAllTime})
+                                          </span>
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {r.quality.exceptionCount}
+                                    </td>
+                                  </>
+                                )}
+                                <td className="px-2 py-2.5 text-ink-muted">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpanded(isOpen ? null : r.riderId)}
+                                    aria-expanded={isOpen}
+                                    aria-label={`${isOpen ? "Hide" : "Show"} the breakdown for ${r.name}`}
+                                    className="grid size-7 place-items-center rounded-trim transition-colors hover:bg-board-ground"
+                                  >
+                                    <ChevronRight
+                                      size={14}
+                                      className={`transition-transform ${isOpen ? "rotate-90" : ""}`}
+                                    />
+                                  </button>
+                                </td>
+                              </tr>
+                              {isOpen && (
+                                <tr>
+                                  <td colSpan={12} className="p-0">
+                                    <RiderDetail rider={r} />
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+
+              return (
+                <MobileResponsiveTable<ApiRiderMetrics>
+                  data={data.riders}
+                  keyExtractor={(r) => r.riderId}
+                  desktopView={desktopTable}
+                  primaryHeader="Rider"
+                  secondaryHeader="Completed & Earnings"
+                  renderPrimary={(r) => (
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink text-xs truncate">
+                        {r.name}
+                      </div>
+                      <div className="text-[10px] text-ink-muted">
+                        {r.throughput.completedCount} completed · {r.quality.averageRatingAllTime ? `${r.quality.averageRatingAllTime.toFixed(1)} ★` : "No rating"}
+                      </div>
+                    </div>
+                  )}
+                  renderSecondary={(r) => (
+                    <div className="text-right shrink-0">
+                      <div className="font-mono font-semibold text-ink text-xs tabular-nums">
+                        {formatPeso(r.earnings.riderShareEarned)}
+                      </div>
+                      <div className="text-[10px] text-ink-muted">
+                        {r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(0)}% on-time` : "No ETA"}
+                      </div>
+                    </div>
+                  )}
+                  renderPreview={(r) => (
+                    <div className="space-y-1.5 pt-1 text-ink-muted">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-ink-muted">Avg Delivery:</span>
+                        <span className="font-mono font-medium text-ink tabular-nums">
+                          {r.throughput.avgDeliveryMinutes !== null ? `${r.throughput.avgDeliveryMinutes.toFixed(1)} min` : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-ink-muted">Cancellation Rate:</span>
+                        <span className="font-mono font-medium text-ink tabular-nums">
+                          {r.reliability.cancellationRate !== null ? `${(r.reliability.cancellationRate * 100).toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-ink-muted">Cash Variance:</span>
+                        <span className={`font-mono font-medium tabular-nums ${r.earnings.settlementVarianceTotal < 0 ? "text-status-act-ink" : "text-ink"}`}>
+                          {formatPeso(r.earnings.settlementVarianceTotal)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  inspectorTitle={(r) => r.name}
+                  inspectorSubtitle={(r) => `Fleet Performance Telemetry`}
+                  inspectorStatusBadge={(r) => (
+                    <span className="font-mono font-bold text-xs text-ink">
+                      {r.throughput.completedCount} Runs
+                    </span>
+                  )}
+                  inspectorSections={(r) => [
+                    {
+                      title: "Throughput",
+                      items: [
+                        { label: "Completed Runs", value: `${r.throughput.completedCount}` },
+                        { label: "Avg Delivery Time", value: r.throughput.avgDeliveryMinutes !== null ? `${r.throughput.avgDeliveryMinutes.toFixed(1)} mins` : "—" },
+                        { label: "Avg Accept Time", value: r.throughput.avgAcceptMinutes !== null ? `${r.throughput.avgAcceptMinutes.toFixed(1)} mins` : "—" },
+                        { label: "Per Active Hour", value: r.throughput.errandsPerActiveHour !== null ? r.throughput.errandsPerActiveHour.toFixed(2) : "—" },
+                      ],
+                    },
+                    {
+                      title: "Reliability & Quality",
+                      items: [
+                        { label: "On-Time Delivery Rate", value: r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(1)}%` : "—" },
+                        { label: "Cancellation Rate", value: r.reliability.cancellationRate !== null ? `${(r.reliability.cancellationRate * 100).toFixed(1)}%` : "—" },
+                        { label: "Average Rating", value: r.quality.averageRatingAllTime !== null ? `${r.quality.averageRatingAllTime.toFixed(1)} ★ (${r.quality.ratingCountAllTime} ratings)` : "No ratings" },
+                        { label: "Disputes / Exceptions", value: `${r.quality.exceptionCount}` },
+                      ],
+                    },
+                    {
+                      title: "Earnings & Cash Balance",
+                      items: [
+                        { label: "Rider Net Share Earned", value: formatPeso(r.earnings.riderShareEarned) },
+                        { label: "Cash Variance Total", value: formatPeso(r.earnings.settlementVarianceTotal) },
+                      ],
+                    },
+                  ]}
+                />
+              );
+            })()
           )}
 
           <ReportNotes notes={data.notes} />

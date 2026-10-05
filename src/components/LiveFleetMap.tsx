@@ -13,7 +13,7 @@ import {
 import { createRoot, Root } from "react-dom/client";
 import { createMarkerTween, type MarkerTween } from "./markerTween";
 import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
-import type { RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
+import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES } from "../constants/riderPresence";
 import { decodePolyline } from "../utils/polyline";
 
@@ -69,6 +69,13 @@ interface LiveFleetMapProps {
   }>;
   /** Delivery destination for the selected errand. */
   routeDestination?: { latitude: number; longitude: number } | null;
+  /**
+   * ADDITIVE, 2026-09-23: state of the Socket.IO position feed, from
+   * useRiderFleetPresence. When it is down the pill says the map is
+   * reconnecting, since pins may then be moving on RTDB alone or not at all.
+   * Omitted, the pill is unchanged.
+   */
+  liveLink?: FleetLiveLink;
 }
 
 interface CustomMarkerContentProps {
@@ -82,11 +89,11 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
   isSelected,
   onClick,
 }) => {
-  const theme = RIDER_STATUS_THEMES[rider.presence] || RIDER_STATUS_THEMES.AVAILABLE;
-  const isStale = rider.presence === "DISCONNECTED";
-  const isOffDuty = rider.presence === "OFF_DUTY";
-  const isBusy = rider.presence === "BUSY";
-  const isAvailable = rider.presence === "AVAILABLE";
+  const theme = RIDER_STATUS_THEMES[rider.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
+  const isStale = rider.presence === "AVAILABLE_SIGNAL_LOST";
+  const isOffDuty = rider.presence === "OFFLINE";
+  const isBusy = rider.presence === "ON_DELIVERY";
+  const isAvailable = rider.presence === "AVAILABLE_ONLINE";
 
   const firstName = rider.name.split(" ")[0] || "Rider";
   const heading = rider.plottableLocation?.heading;
@@ -103,7 +110,7 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
       style={{
         opacity: isStale ? 0.75 : isOffDuty ? 0.6 : 1,
       }}
-      title={`${rider.name} — ${theme.label}`}
+      title={`${rider.name}: ${rider.statusText || theme.label}`}
     >
       {/* 1. Outer Live Pulsing Halo Ring (for AVAILABLE status) */}
       {isAvailable && (
@@ -188,6 +195,7 @@ export default function LiveFleetMap({
   routeGeometry = null,
   routeStops = [],
   routeDestination = null,
+  liveLink,
 }: LiveFleetMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<google.maps.Map | null>(null);
@@ -199,7 +207,8 @@ export default function LiveFleetMap({
     };
   }>({});
   const routePolylineRef = useRef<google.maps.Polyline | null>(null);
-  const routeMarkersRef = useRef<google.maps.Marker[]>([]);
+  const routeCasingRef = useRef<google.maps.Polyline | null>(null);
+  const routeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const routeCirclesRef = useRef<google.maps.Circle[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   // Without this the catch below only reached the console, isMapLoaded stayed
@@ -220,7 +229,11 @@ export default function LiveFleetMap({
 
     routePolylineRef.current?.setMap(null);
     routePolylineRef.current = null;
-    routeMarkersRef.current.forEach((marker) => marker.setMap(null));
+    routeCasingRef.current?.setMap(null);
+    routeCasingRef.current = null;
+    routeMarkersRef.current.forEach((marker) => {
+      marker.map = null;
+    });
     routeMarkersRef.current = [];
     routeCirclesRef.current.forEach((circle) => circle.setMap(null));
     routeCirclesRef.current = [];
@@ -230,12 +243,32 @@ export default function LiveFleetMap({
     const path = decodePolyline(routeGeometry);
     if (path.length < 2) return;
 
+    // Drawn like a road: a light casing under a solid line, both flat (not
+    // geodesic) so the path follows the stored road geometry point for point.
+    // The geometry itself arrives with its corners already filleted by the
+    // server (smoothPath.ts), inside half a lane of the centreline. The casing
+    // is what makes that line read as sitting ON the carriageway rather than
+    // floating over the base map's own road drawing, and keeps it legible
+    // where it crosses a road of a similar colour.
+    routeCasingRef.current = new g.maps.Polyline({
+      path,
+      map: mapInstance.current,
+      geodesic: false,
+      clickable: false,
+      strokeColor: "#FFFFFF",
+      strokeOpacity: 0.95,
+      strokeWeight: 8,
+      zIndex: 1,
+    });
     routePolylineRef.current = new g.maps.Polyline({
       path,
       map: mapInstance.current,
+      geodesic: false,
+      clickable: false,
       strokeColor: "#1E3A5F",
-      strokeOpacity: 0.85,
+      strokeOpacity: 1,
       strokeWeight: 4,
+      zIndex: 2,
     });
 
     // The circle each stop is reached inside. Dispatch reads these pins to
@@ -259,26 +292,47 @@ export default function LiveFleetMap({
       );
     });
 
+    // Advanced markers, like the rider pins. google.maps.Marker is deprecated
+    // and logged a console warning on every route drawn; this map always has
+    // a Map ID, which is all advanced markers need.
+    const markerLibrary = markerLibraryRef.current;
+    if (!markerLibrary) return;
+    const { AdvancedMarkerElement, PinElement } = markerLibrary;
+
     routeStops.forEach((stop, index) => {
+      const pin = new PinElement({
+        glyph: String(index + 1),
+        glyphColor: "#FFFFFF",
+        background: "#1E3A5F",
+        borderColor: "#0B132B",
+      });
       routeMarkersRef.current.push(
-        new g.maps.Marker({
+        new AdvancedMarkerElement({
           position: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
           map: mapInstance.current,
           title: `Stop ${index + 1}: ${stop.storeName}`,
-          label: { text: String(index + 1), color: "#FFFFFF", fontWeight: "700" },
+          content: pin.element,
+          zIndex: 5,
         })
       );
     });
 
     if (routeDestination) {
+      const pin = new PinElement({
+        background: "#E53935",
+        borderColor: "#B71C1C",
+        glyphColor: "#FFFFFF",
+      });
       routeMarkersRef.current.push(
-        new g.maps.Marker({
+        new AdvancedMarkerElement({
           position: {
             lat: Number(routeDestination.latitude),
             lng: Number(routeDestination.longitude),
           },
           map: mapInstance.current,
           title: "Delivery destination",
+          content: pin.element,
+          zIndex: 5,
         })
       );
     }
@@ -287,7 +341,7 @@ export default function LiveFleetMap({
   // Filter riders based on visibility criteria
   const visibleRiders = riders.filter((r) => {
     if (!r.plottableLocation) return false;
-    if (hideOffline && r.presence === "OFF_DUTY") return false;
+    if (hideOffline && r.presence === "OFFLINE") return false;
     if (filterStatus !== "ALL" && r.presence !== filterStatus) return false;
     return true;
   });
@@ -441,8 +495,12 @@ export default function LiveFleetMap({
     mapInstance.current.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
   }, [visibleRiders]);
 
-  const activeReadyCount = riders.filter((r) => r.presence === "AVAILABLE").length;
-  const activeBusyCount = riders.filter((r) => r.presence === "BUSY").length;
+  const activeReadyCount = riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length;
+  const activeBusyCount = riders.filter((r) => r.presence === "ON_DELIVERY").length;
+  const signalLostCount = riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length;
+  // "connecting" is the first second of every page load; only a link that was
+  // up and dropped is worth telling anyone about.
+  const liveLinkDown = liveLink === "offline";
 
   return (
     <div className="w-full h-full relative rounded-plate overflow-hidden border border-edge bg-slate-50">
@@ -513,7 +571,7 @@ export default function LiveFleetMap({
           <button
             type="button"
             onClick={onToggleHideOffline}
-            title={hideOffline ? "Show off-duty riders" : "Hide off-duty riders"}
+            title={hideOffline ? "Show offline riders" : "Hide offline riders"}
             data-elevate
             className={`h-9 px-3 text-xs font-bold rounded-plate shadow-plate border transition flex items-center gap-1.5 ${
               hideOffline
@@ -522,7 +580,7 @@ export default function LiveFleetMap({
             }`}
           >
             {hideOffline ? <EyeOff size={14} /> : <Eye size={14} />}
-            <span className="hidden sm:inline">{hideOffline ? "Off-Duty Hidden" : "Hide Off-Duty"}</span>
+            <span className="hidden sm:inline">{hideOffline ? "Offline Hidden" : "Hide Offline"}</span>
           </button>
         )}
 
@@ -548,7 +606,11 @@ export default function LiveFleetMap({
         <div className="bg-white/95 px-3 py-2 rounded-plate border border-slate-200/80 text-xs font-bold text-slate-800 flex items-center gap-2">
           <span
             className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
-              presenceUnknown ? "bg-slate-400" : "bg-emerald-500"
+              presenceUnknown
+                ? "bg-slate-400"
+                : liveLinkDown
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
             }`}
           />
           <span>
@@ -556,10 +618,16 @@ export default function LiveFleetMap({
               "Presence unknown"
             ) : (
               <>
-                {activeReadyCount} Ready • {activeBusyCount} Busy
+                {activeReadyCount} Online • {activeBusyCount} On delivery
+                {signalLostCount > 0 ? <> • <span className="text-red-700">{signalLostCount} Signal lost</span></> : null}
               </>
             )}
           </span>
+          {/* Said in words, not only by the dot's colour. Pins may still move
+              over RTDB while this shows; they are just not guaranteed to. */}
+          {!presenceUnknown && liveLinkDown ? (
+            <span className="font-semibold text-amber-700">Reconnecting</span>
+          ) : null}
         </div>
       </div>
       ) : null}

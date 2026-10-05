@@ -2,8 +2,10 @@ import React, { useState, useMemo } from "react";
 import { Bike, BatteryLow, Phone, Package, WifiOff, Moon, Eye, EyeOff, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LiveFleetMap from "../../../components/LiveFleetMap";
-import type { RiderFleetMember, RiderPresenceState } from "../../../hooks/useRiderFleetPresence";
-import { RIDER_STATUS_THEMES } from "../../../constants/riderPresence";
+import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../../../hooks/useRiderFleetPresence";
+import { useRiderActiveRoute } from "../../../hooks/useRiderActiveRoute";
+import type { Errand } from "../../../types/errand";
+import { RIDER_STATUS_THEMES, describeRiderStatus } from "../../../constants/riderPresence";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
@@ -17,6 +19,13 @@ interface RiderFleetRosterProps {
    * Optional so nothing that already renders this roster has to change.
    */
   telemetryError?: string | null;
+  /**
+   * ADDITIVE, 2026-09-23: the errands the portal already holds, so the map can
+   * draw the selected rider's route without fetching it again.
+   */
+  errands?: Errand[];
+  /** ADDITIVE, 2026-09-23: Socket.IO feed state, forwarded to the map. */
+  liveLink?: FleetLiveLink;
 }
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
@@ -32,10 +41,10 @@ const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
  */
 const FILTERS: { id: RiderPresenceState | "ALL"; label: string; icon: React.ReactNode }[] = [
   { id: "ALL", label: "All riders", icon: <Users size={14} /> },
-  { id: "AVAILABLE", label: "Ready", icon: <Bike size={14} /> },
-  { id: "BUSY", label: "Delivering", icon: <Package size={14} /> },
-  { id: "DISCONNECTED", label: "No signal", icon: <WifiOff size={14} /> },
-  { id: "OFF_DUTY", label: "Off duty", icon: <Moon size={14} /> },
+  { id: "AVAILABLE_ONLINE", label: "Available Online", icon: <Bike size={14} /> },
+  { id: "ON_DELIVERY", label: "On delivery", icon: <Package size={14} /> },
+  { id: "AVAILABLE_SIGNAL_LOST", label: "Available Signal Lost", icon: <WifiOff size={14} /> },
+  { id: "OFFLINE", label: "Offline", icon: <Moon size={14} /> },
 ];
 
 function batteryPercent(level: number | null | undefined): number | null {
@@ -43,7 +52,12 @@ function batteryPercent(level: number | null | undefined): number | null {
   return level <= 1 ? Math.round(level * 100) : Math.round(level);
 }
 
-export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, telemetryError = null }) => {
+export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
+  riders,
+  telemetryError = null,
+  errands,
+  liveLink,
+}) => {
   const [selectedRiderId, setSelectedRiderId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<RiderPresenceState | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -52,7 +66,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
   const filteredRiders = useMemo(() => {
     return riders.filter((r) => {
       if (statusFilter !== "ALL" && r.presence !== statusFilter) return false;
-      if (hideOffline && r.presence === "OFF_DUTY") return false;
+      if (hideOffline && r.presence === "OFFLINE") return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const matchName = r.name.toLowerCase().includes(query);
@@ -66,10 +80,10 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
 
   const counts: Record<string, number> = {
     ALL: riders.length,
-    AVAILABLE: riders.filter((r) => r.presence === "AVAILABLE").length,
-    BUSY: riders.filter((r) => r.presence === "BUSY").length,
-    DISCONNECTED: riders.filter((r) => r.presence === "DISCONNECTED").length,
-    OFF_DUTY: riders.filter((r) => r.presence === "OFF_DUTY").length,
+    AVAILABLE_ONLINE: riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length,
+    ON_DELIVERY: riders.filter((r) => r.presence === "ON_DELIVERY").length,
+    AVAILABLE_SIGNAL_LOST: riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length,
+    OFFLINE: riders.filter((r) => r.presence === "OFFLINE").length,
   };
 
   const hasFilters = statusFilter !== "ALL" || hideOffline || searchQuery.trim().length > 0;
@@ -81,9 +95,11 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
   const selectedRider =
     filteredRiders.find((r) => r.id === selectedRiderId) || filteredRiders[0] || null;
 
+  const selectedRoute = useRiderActiveRoute(selectedRider, errands);
+
   const selectedTheme = selectedRider
-    ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE
-    : RIDER_STATUS_THEMES.AVAILABLE;
+    ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE
+    : RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
 
   const resetFilters = () => {
     setStatusFilter("ALL");
@@ -93,12 +109,15 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
 
   return (
     <PanelShell
-      title="Fleet tracking"
+      title="Tracking"
       figure={{
-        label: "Ready",
-        value: `${counts.AVAILABLE}/${counts.ALL}`,
+        label: "Available Online",
+        value: `${counts.AVAILABLE_ONLINE}/${counts.ALL}`,
       }}
-      detail={`${counts.AVAILABLE} of ${counts.ALL} ready for dispatch`}
+      detail={
+        `${counts.AVAILABLE_ONLINE} of ${counts.ALL} can be assigned` +
+        (counts.AVAILABLE_SIGNAL_LOST > 0 ? `, ${counts.AVAILABLE_SIGNAL_LOST} with signal lost` : "")
+      }
       controls={
         <div className="flex flex-col gap-2 rounded-plate border border-edge bg-board-plate p-3 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -154,6 +173,10 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
           <LiveFleetMap
             riders={riders}
             telemetryError={telemetryError}
+            liveLink={liveLink}
+            routeGeometry={selectedRoute.routeGeometry}
+            routeStops={selectedRoute.routeStops}
+            routeDestination={selectedRoute.routeDestination}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRider?.id}
             onSelectRider={(riderId) => setSelectedRiderId(riderId)}
@@ -254,7 +277,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
               <div className="space-y-1.5">
                 {filteredRiders.map((r) => {
                   const isSelected = r.id === selectedRider?.id;
-                  const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE;
+                  const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
                   const pct = batteryPercent(r.batteryLevel);
 
                   return (
@@ -293,6 +316,19 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({ riders, tele
                           >
                             #{r.id}
                             {r.phone ? ` · ${r.phone}` : ""}
+                          </p>
+                          {/* Why: "No signal for 4 min", "Shift ended at 12:00 AM". */}
+                          <p
+                            className={cn(
+                              "truncate text-label",
+                              isSelected
+                                ? "text-board-trim"
+                                : r.presence === "AVAILABLE_SIGNAL_LOST"
+                                  ? "text-status-act-ink"
+                                  : "text-ink-muted"
+                            )}
+                          >
+                            {describeRiderStatus(r)}
                           </p>
                         </div>
                       </div>

@@ -14,6 +14,7 @@ interface DispatchManagementWorkspaceProps {
   onClaimOrder: (orderId: string, user: any) => Promise<void> | void;
   onOpenChat: (orderId: string) => void;
   onDeclineOrder?: (orderId: string, reason?: string) => Promise<void> | void;
+  unreadCounts?: Record<string, number>;
   /** Additive, all optional, so the existing call site keeps working. */
   isLoading?: boolean;
   loadError?: string | null;
@@ -39,6 +40,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   onClaimOrder,
   onOpenChat,
   onDeclineOrder,
+  unreadCounts,
   isLoading = false,
   loadError = null,
   onRetry,
@@ -213,6 +215,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
       onSegmentChange={setActiveSegment}
       incomingCount={availableErrands.length}
       activeCount={activeErrands.length}
+      unreadCounts={unreadCounts}
       isLoading={isLoading}
       loadError={loadError}
       onRetry={onRetry}

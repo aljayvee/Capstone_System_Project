@@ -10,6 +10,7 @@ import {
   Check,
   Circle,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import { apiClient } from "../../../services/apiClient";
@@ -23,6 +24,7 @@ import { PanelShell } from "@/components/panel/PanelShell";
 import { useDraft, forgetDrafts } from "../lib/useDraft";
 import { cn } from "@/lib/utils";
 import { AccountSecurityLogsView } from "@/components/account/AccountSecurityLogsView";
+import { useDispatcherAiSettings } from "../hooks/useDispatcherAiSettings";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -93,7 +95,8 @@ export function DispatcherProfilePanel() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState("");
-  const [activeSubTab, setActiveSubTab] = useState<"profile" | "security">("profile");
+  const [activeSubTab, setActiveSubTab] = useState<"profile" | "ai_settings" | "security">("profile");
+  const { aiSuggestionsEnabled, setAiSuggestionsEnabled } = useDispatcherAiSettings();
 
   /**
    * Drafted, keyed by user id: the portal unmounts this panel on every tab
@@ -332,6 +335,18 @@ export function DispatcherProfilePanel() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveSubTab("ai_settings")}
+          className={cn(
+            "px-3.5 py-1.5 text-label font-medium rounded-plate transition-colors cursor-pointer",
+            activeSubTab === "ai_settings"
+              ? "bg-board-field text-white"
+              : "text-ink-muted hover:text-ink hover:bg-board-ground"
+          )}
+        >
+          AI Settings
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveSubTab("security")}
           className={cn(
             "px-3.5 py-1.5 text-label font-medium rounded-plate transition-colors cursor-pointer",
@@ -344,7 +359,7 @@ export function DispatcherProfilePanel() {
         </button>
       </div>
 
-      {activeSubTab === "profile" ? (
+      {activeSubTab === "profile" && (
         <div className="grid max-w-6xl grid-cols-1 items-start gap-3 pb-2 xl:grid-cols-2">
         {/* who you are */}
         <DispatcherCard padding="md">
@@ -685,7 +700,69 @@ export function DispatcherProfilePanel() {
           </div>
         </DispatcherCard>
       </div>
-      ) : (
+      )}
+
+      {activeSubTab === "ai_settings" && (
+        <div className="max-w-3xl space-y-4 pb-4">
+          <DispatcherCard padding="md">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={18} className="text-board-field" />
+                  <h3 className="text-panel font-semibold text-ink">Conflict Management AI Assistance</h3>
+                </div>
+                <p className="text-body text-ink-muted">
+                  Configure automated intelligence and assisted suggestion tools for discrepancy resolution.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 border-t border-hairline pt-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-body font-medium text-ink">AI Conflict Suggestions</span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-micro font-medium",
+                        aiSuggestionsEnabled
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                      )}
+                    >
+                      {aiSuggestionsEnabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <p className="text-label text-ink-muted">
+                    Show the &ldquo;Generate suggestion&rdquo; button, Tab shortcut in the reason box, and AI disclaimer notes when resolving discrepant errands in Conflict Management.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={aiSuggestionsEnabled}
+                  aria-label="Toggle AI Conflict Suggestions"
+                  onClick={() => setAiSuggestionsEnabled(!aiSuggestionsEnabled)}
+                  className={cn(
+                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-board-field",
+                    aiSuggestionsEnabled ? "bg-board-field" : "bg-edge"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                      aiSuggestionsEnabled ? "translate-x-5" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+            </div>
+          </DispatcherCard>
+        </div>
+      )}
+
+      {activeSubTab === "security" && (
         <div className="max-w-6xl pb-4">
           <AccountSecurityLogsView showHeader={false} />
         </div>

@@ -6,6 +6,7 @@ export interface StaffAvatarProps {
   name: string;
   size?: number;
   className?: string;
+  isOnline?: boolean;
 }
 
 /**
@@ -13,7 +14,13 @@ export interface StaffAvatarProps {
  * otherwise. Shared so Owner's User Management, the Dispatcher Portal, and
  * anywhere else staff are listed all agree on one rendering.
  */
-export function StaffAvatar({ userId, name, size = 40, className = "" }: StaffAvatarProps) {
+export function StaffAvatar({
+  userId,
+  name,
+  size = 40,
+  className = "",
+  isOnline,
+}: StaffAvatarProps) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,11 +42,22 @@ export function StaffAvatar({ userId, name, size = 40, className = "" }: StaffAv
     .toUpperCase();
 
   return (
-    <div
-      className={`rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#162D4A] text-white font-extrabold flex items-center justify-center text-xs shadow-2xs shrink-0 overflow-hidden ${className}`}
-      style={{ width: size, height: size }}
-    >
-      {photoUri ? <img src={photoUri} alt="" className="w-full h-full object-cover" /> : initials}
+    <div className="relative inline-flex shrink-0">
+      <div
+        className={`rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#162D4A] text-white font-extrabold flex items-center justify-center text-xs shadow-2xs shrink-0 overflow-hidden ${className}`}
+        style={{ width: size, height: size }}
+      >
+        {photoUri ? <img src={photoUri} alt="" className="w-full h-full object-cover" /> : initials}
+      </div>
+      {isOnline !== undefined && (
+        <span
+          title={isOnline ? "Online" : "Offline"}
+          className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full ring-2 ring-board-plate transition-colors ${
+            isOnline ? "bg-emerald-500" : "bg-slate-400"
+          }`}
+          aria-label={isOnline ? "Online" : "Offline"}
+        />
+      )}
     </div>
   );
 }

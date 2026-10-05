@@ -18,6 +18,7 @@ interface DispatchMasterStreamProps {
   onSegmentChange: (seg: "INCOMING" | "ACTIVE") => void;
   incomingCount: number;
   activeCount: number;
+  unreadCounts?: Record<string, number>;
   /** Additive. The board's own load state, so the stream stops asserting empty. */
   isLoading?: boolean;
   loadError?: string | null;
@@ -58,11 +59,17 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
   onSegmentChange,
   incomingCount,
   activeCount,
+  unreadCounts,
   isLoading = false,
   loadError = null,
   onRetry,
 }) => {
   const hasFilters = searchQuery.trim().length > 0 || selectedCategory !== "ALL";
+
+  const activeUnreadTotal = React.useMemo(() => {
+    if (!unreadCounts) return 0;
+    return Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+  }, [unreadCounts]);
 
   const resetFilters = () => {
     onSearchChange("");
@@ -71,13 +78,14 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
 
   const segment = (id: "INCOMING" | "ACTIVE", label: string, count: number) => {
     const isActive = activeSegment === id;
+    const hasUnread = id === "ACTIVE" && activeUnreadTotal > 0;
     return (
       <button
         type="button"
         onClick={() => onSegmentChange(id)}
         aria-pressed={isActive}
         className={cn(
-          "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-trim px-3 text-micro uppercase transition-colors",
+          "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-trim px-3 text-micro uppercase transition-colors relative",
           isActive ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
         )}
       >
@@ -85,6 +93,12 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
         <span data-figure className="tabular-nums">
           {count}
         </span>
+        {hasUnread && (
+          <span
+            className="size-2 rounded-full bg-amber-400 animate-pulse"
+            title={`${activeUnreadTotal} unread customer messages`}
+          />
+        )}
       </button>
     );
   };
@@ -170,6 +184,7 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
                 errand={errand}
                 isSelected={selectedErrandId === errand.id}
                 onClick={() => onSelectErrand(errand)}
+                unreadChatCount={unreadCounts?.[errand.id] || 0}
               />
             ))}
           </div>

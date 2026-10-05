@@ -28,7 +28,7 @@ export function describeHandlingFeeMode(
     case "THRESHOLD":
       return `${flat} under ${threshold}, then ${percent}`;
     case "NONE":
-      return "No handling fee";
+      return "No service fee";
   }
 }
 

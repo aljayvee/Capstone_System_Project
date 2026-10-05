@@ -25,6 +25,7 @@ import {
 import { UserRole } from "../../../../../types/auth";
 import { UserRecord } from "../UserManagementModule";
 import { useAuth } from "../../../../../context/AuthContext";
+import { ConfirmDialog } from "@/components/panel";
 import {
   ASSIGNABLE_ROLES,
   AssignableRole,
@@ -133,6 +134,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
@@ -169,6 +171,46 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     }
 
     return errors;
+  };
+
+  const getModifiedFields = (): Array<{ label: string; from: string; to: string }> => {
+    const changes: Array<{ label: string; from: string; to: string }> = [];
+    const trimmedFirst = firstName.trim();
+    const trimmedMiddle = middleName.trim();
+    const trimmedLast = lastName.trim();
+    const trimmedUser = username.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPhone = phone.trim();
+
+    if (trimmedFirst !== user.firstName) {
+      changes.push({ label: "First Name", from: user.firstName, to: trimmedFirst });
+    }
+    if (trimmedMiddle !== (user.middleName || "")) {
+      changes.push({ label: "Middle Name", from: user.middleName || "(none)", to: trimmedMiddle || "(none)" });
+    }
+    if (trimmedLast !== user.lastName) {
+      changes.push({ label: "Last Name", from: user.lastName, to: trimmedLast });
+    }
+    if (trimmedUser !== user.username) {
+      changes.push({ label: "Username", from: user.username, to: trimmedUser });
+    }
+    if (trimmedEmail !== user.email) {
+      changes.push({ label: "Email", from: user.email, to: trimmedEmail });
+    }
+    if (trimmedPhone !== user.phone) {
+      changes.push({ label: "Phone", from: user.phone, to: trimmedPhone });
+    }
+    if (!isSelf && role !== user.role) {
+      changes.push({ label: "Operational Role", from: roleLabel(user.role), to: roleLabel(role) });
+    }
+    if (!isSelf && status !== user.status) {
+      changes.push({ label: "Account Status", from: user.status, to: status });
+    }
+    if (showPasswordSection && password) {
+      changes.push({ label: "Password", from: "••••••••", to: "Updated New Password" });
+    }
+
+    return changes;
   };
 
   const buildPayload = (): EditUserPayload => {
@@ -221,7 +263,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const errors = validateAll();
@@ -231,6 +273,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
       return;
     }
 
+    const modified = getModifiedFields();
+    if (modified.length === 0) {
+      setError("No profile changes detected.");
+      return;
+    }
+
+    setError("");
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSave = async () => {
+    setShowConfirmModal(false);
     if (roleChangeNeedsApproval) {
       setError("");
       setAdminPassword("");
@@ -398,11 +452,11 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
           )}
 
           <form id="edit-user-form" onSubmit={handleSubmit} noValidate className="space-y-6">
-            {/* 1. ROLE & STATUS */}
-            <div className="space-y-3">
+            {/* Operational Role & Status */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-micro uppercase text-ink">
-                  1. Operational Role & Status
+                <label className="text-label font-medium text-ink">
+                  Operational Role & Status
                 </label>
                 {/* Status Segmented Capsule */}
                 {isSelf ? (
@@ -414,13 +468,13 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     <span>Active (Current Admin)</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 bg-board-ground p-1 rounded-plate">
+                  <div className="flex items-center gap-1 bg-board-ground p-1 rounded-plate border border-edge">
                     <button
                       type="button"
                       onClick={() => setStatus("Active")}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-trim text-label transition ${
                         status === "Active"
-                          ? "bg-status-done-ink text-white"
+                          ? "bg-status-done-ink text-white font-medium shadow-sm"
                           : "text-ink-muted hover:text-ink"
                       }`}
                     >
@@ -432,7 +486,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                       onClick={() => setStatus("Inactive")}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-trim text-label transition ${
                         status === "Inactive"
-                          ? "bg-board-field text-white"
+                          ? "bg-board-field text-white font-medium shadow-sm"
                           : "text-ink-muted hover:text-ink"
                       }`}
                     >
@@ -445,15 +499,15 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
               {/* Role Display / Selection */}
               {isSelf ? (
-                <div className="p-3.5 rounded-plate border border-edge bg-board-ground flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-trim bg-board-field text-white flex items-center justify-center font-bold shrink-0">
-                      <ShieldCheck size={16} />
+                <div className="p-3 rounded-plate border border-edge bg-board-ground flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-trim bg-board-field text-white flex items-center justify-center font-bold shrink-0">
+                      <ShieldCheck size={14} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-label text-ink">{roleLabel(user.role)}</p>
-                        <span className="px-2 py-0.5 rounded-full text-label bg-board-ground text-ink-muted border border-edge ">
+                        <p className="text-label font-medium text-ink">{roleLabel(user.role)}</p>
+                        <span className="px-1.5 py-0.2 rounded text-micro bg-board-plate text-ink-muted border border-edge">
                           Current Admin
                         </span>
                       </div>
@@ -468,7 +522,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-board-ground border border-edge rounded-plate">
                   {ASSIGNABLE_ROLES.map((option) => {
                     const meta = ROLE_METADATA[option.value];
                     const Icon = meta.icon;
@@ -482,32 +536,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                           setRole(option.value);
                           clearFieldError("role");
                         }}
-                        className={`p-3 rounded-plate border border-edge text-left transition-all duration-150 relative flex flex-col justify-between ${
+                        className={`flex items-center justify-center gap-2 py-2 px-3 rounded-trim text-label font-medium transition ${
                           isSelected
-                            ? `border-board-field ring-2 ring-board-field/20 bg-board-ground`
-                            : `border-edge hover:border-edge hover:bg-board-ground`
+                            ? "bg-board-plate text-ink shadow-sm border border-edge"
+                            : "text-ink-muted hover:text-ink"
                         }`}
                       >
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div
-                            className={`w-7 h-7 rounded-trim flex items-center justify-center ${
-                              isSelected ? meta.activeBg : `${meta.bg} ${meta.color}`
-                            }`}
-                          >
-                            <Icon size={14} />
-                          </div>
-                          {isSelected && (
-                            <span className="w-4 h-4 rounded-full bg-board-field text-white flex items-center justify-center text-label">
-                              <Check size={10} strokeWidth={3} />
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-label text-ink">{meta.label}</p>
-                          <p className="text-body text-ink-muted leading-tight mt-0.5">
-                            {meta.description}
-                          </p>
-                        </div>
+                        <Icon size={14} className={isSelected ? "text-board-field" : "text-ink-muted"} />
+                        <span>{meta.label}</span>
                       </button>
                     );
                   })}
@@ -526,9 +562,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               )}
             </div>
 
-            {/* 2. PERSONAL INFORMATION */}
+            {/* Personal Information */}
             <div className="space-y-3">
-              <label className="text-micro uppercase text-ink block">2. Personal Information</label>
+              <label className="text-label font-medium text-ink block">Personal Information</label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -602,10 +638,10 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               </div>
             </div>
 
-            {/* 3. CONTACT & ACCOUNT CREDENTIALS */}
+            {/* Contact & Login Credentials */}
             <div className="space-y-3">
-              <label className="text-micro uppercase text-ink block">
-                3. Contact & Login Credentials
+              <label className="text-label font-medium text-ink block">
+                Contact & Login Credentials
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -620,6 +656,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                     />
                     <input
                       type="text"
+                      autoComplete="username"
                       value={username}
                       onChange={(e) => {
                         setUsername(e.target.value.replace(/\s/g, ""));
@@ -693,25 +730,37 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               </div>
             </div>
 
-            {/* 4. PASSWORD RESET ACCORDION */}
+            {/* Password Reset */}
             <div className="space-y-3 pt-3 border-t border-hairline">
               <div className="flex items-center justify-between">
-                <label className="text-micro uppercase text-ink flex items-center gap-1.5">
-                  <RotateCcw size={13} />
-                  <span>Password Reset</span>
-                </label>
+                <div>
+                  <label className="text-label font-medium text-ink flex items-center gap-1.5">
+                    <KeyRound size={14} className="text-ink-muted" />
+                    <span>Reset Account Password</span>
+                  </label>
+                  <p className="text-body text-ink-muted">Assign a new password to this account</p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setShowPasswordSection(!showPasswordSection);
-                    if (showPasswordSection) {
+                    const next = !showPasswordSection;
+                    setShowPasswordSection(next);
+                    if (!next) {
                       setPassword("");
                       setConfirmPassword("");
                     }
                   }}
-                  className="text-label text-board-field hover:underline"
+                  role="switch"
+                  aria-checked={showPasswordSection}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    showPasswordSection ? "bg-board-field" : "bg-edge"
+                  }`}
                 >
-                  {showPasswordSection ? "Cancel Password Reset" : "+ Reset User Password"}
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      showPasswordSection ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
                 </button>
               </div>
 
@@ -844,6 +893,40 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showConfirmModal}
+        onOpenChange={setShowConfirmModal}
+        title="Confirm Personnel Profile Updates"
+        tone="info"
+        busy={isSubmitting}
+        confirmLabel="Confirm & Save"
+        cancelLabel="Back to Form"
+        onConfirm={handleConfirmSave}
+        consequence={
+          roleChangeNeedsApproval
+            ? "Changing an operational role requires secondary administrator password authorization."
+            : undefined
+        }
+        body={
+          <div className="space-y-3">
+            <p className="text-body text-ink">
+              Are you sure you want to apply the following updates to <span className="font-semibold text-ink">{user.name}</span>?
+            </p>
+            <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label divide-y divide-hairline">
+              {getModifiedFields().map((change, idx) => (
+                <div key={idx} className={`flex items-start justify-between gap-3 ${idx > 0 ? "pt-2" : ""}`}>
+                  <span className="text-ink-muted shrink-0">{change.label}:</span>
+                  <span className="text-ink text-right font-medium">
+                    <span className="line-through text-ink-muted mr-1.5">{change.from}</span>
+                    <span className="text-board-field font-semibold">→ {change.to}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        }
+      />
     </div>
   );
 };

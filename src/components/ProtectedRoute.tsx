@@ -1,10 +1,13 @@
 import React from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
+import { useOptionalSysAdminAuth } from "../portals/sysadmin/context/SysAdminAuthContext";
+import { SessionConflictScreen } from "./modals/SessionConflictScreen";
 import { UserRole } from "../types/auth";
 import { ShieldAlert, LogOut } from "lucide-react";
+import { lazyWithRetry } from "../utils/lazyWithRetry";
 
-const MobileAppNoticeModal = React.lazy(() =>
+const MobileAppNoticeModal = lazyWithRetry(() =>
   import("./MobileAppNoticeModal").then((m) => ({ default: m.MobileAppNoticeModal }))
 );
 
@@ -15,7 +18,9 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
   const { user, isAuthenticated, logout, isInitializing } = useAuth();
+  const sysAdminAuth = useOptionalSysAdminAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   if (isInitializing) {
     return (
@@ -23,6 +28,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
         <div className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-slate-400 text-xs font-medium tracking-wider uppercase">Verifying Session...</p>
       </div>
+    );
+  }
+
+  // Strict cross-portal isolation: SysAdmin must not access operational staff portals
+  if (sysAdminAuth?.isAuthenticated && sysAdminAuth.admin) {
+    return (
+      <SessionConflictScreen
+        variant="sysadmin_active"
+        sysAdminUser={sysAdminAuth.admin}
+        onReturn={() => navigate("/sysadmin")}
+        onSignOutAndProceed={async () => {
+          await sysAdminAuth.logout();
+          navigate("/", { replace: true });
+        }}
+      />
     );
   }
 

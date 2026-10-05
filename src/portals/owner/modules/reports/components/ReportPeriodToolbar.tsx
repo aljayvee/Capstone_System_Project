@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Download, Loader2 } from "lucide-react";
+import { Printer, Download, Loader2 } from "lucide-react";
 import type { DateRange } from "../../../../../components/DateRangePicker";
 import { RangeSelector, type RangePreset } from "../../../../../components/RangeSelector";
 
@@ -65,9 +65,9 @@ export const ReportPeriodToolbar: React.FC<ReportPeriodToolbarProps> = ({
           {isGeneratingPdf ? (
             <Loader2 size={15} className="animate-spin" />
           ) : (
-            <FileText size={15} />
+            <Printer size={15} />
           )}
-          {isGeneratingPdf ? "Preparing PDF..." : "Export PDF"}
+          {isGeneratingPdf ? "Preparing..." : "Print"}
         </button>
 
         {SHOW_CSV_EXPORT && (

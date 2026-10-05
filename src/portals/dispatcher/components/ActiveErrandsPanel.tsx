@@ -15,6 +15,7 @@ import { RUN_PROGRESSION, progressIndexOf } from "@/lib/statusPresentation";
 interface ActiveErrandsPanelProps {
   errands: Errand[];
   onOpenChat: (orderId: string) => void;
+  unreadCounts?: Record<string, number>;
   /** Additive, all optional. */
   isLoading?: boolean;
   loadError?: string | null;
@@ -50,6 +51,7 @@ const upper = (s: unknown) => String(s ?? "").toUpperCase();
 export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
   errands,
   onOpenChat,
+  unreadCounts,
   isLoading = false,
   loadError = null,
   onRetry,
@@ -180,6 +182,8 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                   ? e.pabiliItemRequests
                   : [];
 
+            const unreadCount = unreadCounts?.[e.id] || 0;
+
             return (
               <DispatcherCard key={e.id} padding="sm">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
@@ -199,6 +203,12 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                       {/* Was the raw status in an ad-hoc blue pill with a
                           pulsing dot. */}
                       <StatusChip status={e.status} />
+                      {unreadCount > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                          <MessageSquare size={11} />
+                          <span>{unreadCount} new</span>
+                        </span>
+                      )}
                       {needsSupervision ? (
                         <DispatcherBadge variant="warning">
                           Balance outstanding
@@ -263,12 +273,12 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                     </div>
 
                     <DispatcherButton
-                      variant="field"
+                      variant={unreadCount > 0 ? "primary" : "field"}
                       size="md"
                       icon={<MessageSquare size={14} />}
                       onClick={() => onOpenChat(e.id)}
                     >
-                      Open chat
+                      {unreadCount > 0 ? `Open chat (${unreadCount})` : "Open chat"}
                     </DispatcherButton>
                   </div>
                 </div>
