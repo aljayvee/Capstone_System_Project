@@ -130,38 +130,48 @@ export function StageList({
   jumpReason,
   readOnly = false,
 }: StageListProps) {
-  const openStages = showAll ? stages : stages.filter((s) => s.id === openId);
+  const openStages = showAll
+    ? stages.filter((s) => s.state !== "todo" || s.id === openId)
+    : stages.filter((s) => s.id === openId);
 
   return (
     <div className="flex flex-col gap-3">
-      {/* The rail. One plate, five detents, trim between them. */}
+      {/* The rail. One plate, six detents, trim between them. */}
       <ol className="flex items-stretch overflow-hidden rounded-plate border border-edge bg-board-plate shadow-plate">
         {stages.map((stage) => {
           const isOpen = showAll || openId === stage.id;
           const isFlashed = flashId === stage.id;
+          const isLocked = !readOnly && stage.state === "todo";
+
           return (
             <li key={stage.id} id={`stage-${stage.id}`} className="flex min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => onToggle(stage.id)}
+                onClick={() => {
+                  if (isLocked) return;
+                  onToggle(stage.id);
+                }}
+                disabled={isLocked}
+                aria-disabled={isLocked}
                 aria-expanded={isOpen}
                 aria-controls={`stage-body-${stage.id}`}
                 aria-current={stage.state === "active" ? "step" : undefined}
                 data-on-field={isOpen && !showAll ? "" : undefined}
+                title={isLocked ? "Complete previous steps first" : undefined}
                 className={cn(
-                  "flex min-w-0 flex-1 cursor-pointer flex-col items-center gap-1 border-l border-hairline px-1 py-2.5 transition-colors first:border-l-0",
+                  "flex min-w-0 flex-1 flex-col items-center gap-1 border-l border-hairline px-1 py-2.5 transition-colors first:border-l-0",
+                  isLocked
+                    ? "cursor-not-allowed opacity-40 bg-board-ground/50"
+                    : "cursor-pointer hover:bg-board-ground",
                   isOpen && !showAll
-                    ? "bg-board-field"
+                    ? "bg-board-field hover:bg-board-field"
                     : isFlashed
                       ? "bg-status-act-fill"
-                      : "hover:bg-board-ground"
+                      : ""
                 )}
               >
                 <Detent stage={stage} onField={isOpen && !showAll} />
-                {/* Hidden below sm: five labels in 390px gives each one 78px,
-                    which is not enough for "Confirm the items". The open
-                    panel's header carries the full label at every width, so
-                    nothing is lost. */}
+                {/* Hidden below sm: compact detents fit on mobile viewports. */}
                 <span
                   className={cn(
                     "hidden w-full truncate text-center text-micro uppercase sm:block",

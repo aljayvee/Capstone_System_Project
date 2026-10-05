@@ -37,13 +37,17 @@ export function formatAgo(mins: number): string {
   return days === 1 ? "yesterday" : `${days} days ago`;
 }
 
-/** The five stages, in order. The numbering here is the numbering everywhere. */
+/**
+ * The three stages, in order. The numbering here is the numbering everywhere.
+ *
+ * There were six. Accepting now happens when the order is opened, the address
+ * check lives in the store map, and the item list and the payment question go
+ * to the customer in one send, so they are one stage.
+ */
 export const STAGE_LABELS = [
-  "Check the order",
   "Pin the stores",
-  "Confirm the items",
-  "Set up payment",
-  "Send a rider",
+  "Confirm items and payment",
+  "Assign a rider",
 ] as const;
 
 export const copy = {
@@ -51,7 +55,12 @@ export const copy = {
   backToQueue: "Back to queue",
   moreActions: "More actions",
   closeWithoutOrder: "Close without an order",
+  declineOrder: "Decline this order",
   dropOff: "Drop-off",
+
+  /** Opening an order accepts it. Shown only when that write fails. */
+  acceptFailed: "This order could not be accepted, so the customer has not been told who you are yet.",
+  acceptRetry: "Try again",
 
   // ── conversation ────────────────────────────────────────────────────────
   activeNow: "Active now",
@@ -76,39 +85,36 @@ export const copy = {
 
   // ── now bar ─────────────────────────────────────────────────────────────
   now: {
-    checkOrder: (who: string) => `Check what ${who} ordered, then accept it.`,
-    waitingOnRevision: (who: string) => `Waiting for ${who} to answer your changes`,
     pinStores: (who: string) => `Pin the shops ${who} needs, then send them over.`,
     pinStoresNoMap: (who: string) => `Search for the shops ${who} needs. The map is down.`,
-    sendItems: (who: string) => `Put ${who}'s list together and send it for approval.`,
+    noDropOffPin: (who: string) => `${who}'s order has no drop-off pin. Ask them for it before pinning stores.`,
+    outsideArea: (who: string) => `${who}'s drop-off is outside Tacurong. Ask them, or decline the order.`,
+    sendItems: (who: string) =>
+      `Check ${who}'s list and send it. They approve it and pick how to pay in one go.`,
     waitingOnItems: (who: string) => `Waiting for ${who} to approve the item list`,
-    askPayment: (who: string) => `Ask ${who} how they will pay.`,
     waitingOnPayment: (who: string) => `Waiting for ${who} to choose how to pay`,
-    ready: "Everything's confirmed. Send a rider.",
+    ready: "Everything's confirmed. Assign a rider.",
     dispatched: (rider: string) => `${rider} is on the way.`,
     closed: "This order is closed. You're reading the history.",
     sentAgo: (mins: number) => ` · sent ${formatAgo(mins)}`,
   },
 
   nowActions: {
-    accept: "Accept",
-    decline: "Decline",
     nudge: (who: string) => `Nudge ${who}`,
-    changeList: "Change list",
-    sendRider: "Send a rider",
+    sendRider: "Assign a rider",
   },
 
   // ── stage status lines ──────────────────────────────────────────────────
   status: {
     notStarted: "Not started yet",
-    accepted: "Accepted",
     awaitingReply: (who: string) => `${who} hasn't replied yet`,
     storesPinned: (n: number) => (n === 1 ? "1 store pinned" : `${n} stores pinned`),
     storesSent: (n: number) => (n === 1 ? "1 store sent" : `${n} stores sent`),
     noStoresYet: "No stores pinned yet",
     itemCount: (n: number) => (n === 1 ? "1 item" : `${n} items`),
-    approvedBy: (who: string) => `${who} approved it`,
-    paidBy: (mode: string) => mode,
+    /** Approved the list, still on the payment question. */
+    approvedChoosingPayment: (who: string) => `${who} approved, choosing payment`,
+    approvedAndPaid: (mode: string) => `Approved · ${mode}`,
     riderAssigned: (rider: string) => `${rider} is on it`,
     readyWhenYouAre: "Ready when you are",
   },
@@ -116,42 +122,45 @@ export const copy = {
   showAllSteps: "Show all steps",
   showOneStep: "Show one step at a time",
 
-  // ── stage 1 — check the order ───────────────────────────────────────────
-  stage1: {
-    reassurance:
-      "Accepting means you handle this order start to finish. You can still change the items afterwards.",
-    deliverTo: "Deliver to",
-    customerNote: "Their note",
-    noItems: "This order arrived with no items listed. Ask them what they need before accepting.",
-    accept: "Accept the order",
-    /** Past tense, on the greyed-out button, so it reads as a state not a dud. */
-    accepted: "Order accepted",
-    addItem: "Add an item",
-    release: "Put back in queue",
-    decline: "Decline",
-    sendChanges: (who: string) => `Send these changes to ${who}`,
-    changeNotePlaceholder: "Tell them why, in a sentence (optional)",
-    blockedAccepted: "You already accepted this order.",
-    blockedEmptyItem: "Name every item before sending the changes.",
-    blockedUnsent: (who: string) => `Send your changes to ${who} first.`,
-    blockedAwaiting: (who: string) => `Waiting for ${who} to answer your changes.`,
-    wasRejected: (who: string) => `${who} turned down your changes. Try again or decline the order.`,
-    declineTitle: "Why are you declining?",
-    declineConfirm: "Decline this order",
-    cancel: "Cancel",
-  },
-
-  /** Kept verbatim from the screen this replaces — dispatchers already know these. */
+  /**
+   * Reasons for declining, offered in the header menu's dialog. Kept verbatim
+   * from the screen this replaces, since dispatchers already know them, plus the
+   * one the address step used to offer.
+   */
   declineReasons: [
     "All stores for this order are closed",
     "The items aren't available anywhere nearby",
     "The drop-off is outside our service area",
+    "The customer's location is wrong or unreachable",
     "No riders available for this run",
     "The customer isn't reachable",
     "Other operational reason",
   ],
+  decline: {
+    title: "Decline this order?",
+    body: (who: string) => `${who} is told the order was cancelled and why. Nothing is charged.`,
+    otherPlaceholder: "What happened?",
+    confirm: "Decline this order",
+    cancel: "Cancel",
+    failed: "This order could not be declined. The customer has not been told anything, so it is safe to try again.",
+  },
 
-  // ── stage 2 — pin the stores ────────────────────────────────────────────
+  // ── the drop-off, shown at the top of the store map ─────────────────────
+  // This was a stage of its own ("Check delivery address"). What it checked
+  // still blocks sending the stores; it just no longer needs its own step.
+  stageAddress: {
+    deliverTo: "Deliver to",
+    map: "Map",
+    missingGpsTitle: "Missing GPS coordinates",
+    missingGpsDetail:
+      "This order has no pinned delivery coordinates. Ask the customer in chat to provide their delivery address and pinpoint before sending the stores.",
+    outOfAreaTitle: "Outside service area",
+    outOfAreaDetail:
+      "This delivery location is outside Tacurong City limits. Decline the order or contact the customer.",
+    askInChat: (who: string) => `Ask ${who} in chat`,
+  },
+
+  // ── stage 1: pin the stores ─────────────────────────────────────────────
   stage2: {
     hint: "Click the map to drop a pin, or search for a store.",
     searchPlaceholder: "Search for a store in Tacurong…",
@@ -172,11 +181,29 @@ export const copy = {
     /**
      * The handover. Pinning no longer finishes this stage on its own, so the
      * dispatcher needs somewhere to say "I'm done here" - pinning the first of
-     * three shops used to complete the stage and throw them into stage 3.
+     * three shops used to complete the stage and throw them into stage 4.
      */
     continueTitle: (who: string) => `${who} has the stores.`,
     continueBody: "Add more shops if you need to, or move on to the item list.",
-    continueAction: "Continue to step 3",
+    continueAction: "Continue to step 2",
+
+    /**
+     * The live fee. Priced by the server as pins change (quotePinpoints), so the
+     * dispatcher sees what the stores cost before anything reaches the customer.
+     */
+    liveFeeTitle: "What the delivery costs",
+    pricing: "Working out the delivery fee",
+    priceFailed: "Couldn't work out the delivery fee just now.",
+    priceRetry: "Try again",
+    priceEstimated: "Distance measured in a straight line: no road route was available.",
+    fareAgreed: (who: string) => `${who} already agreed this fare, so the stores do not change it.`,
+    /** Under "Continue to step 2": what pressing it does. `fee` arrives formatted. */
+    continueSends: (who: string, fee: string) => `Sends these stores and the ${fee} delivery fee to ${who}.`,
+    continueSendsNoFee: (who: string) =>
+      `Sends these stores to ${who}. The fee is worked out as they are saved.`,
+    continueUpToDate: (who: string) => `${who} has these stores.`,
+    /** Pressing Continue while the drop-off is not usable: it explains instead of sending. */
+    blockedDropOff: (who: string) => `Sort out ${who}'s drop-off first. The stores can't be priced to a place we can't deliver to.`,
 
     /** How sure we are about a pin's category. */
     categoryGuessed: "guessed, check it",
@@ -220,15 +247,33 @@ export const copy = {
     mapLoading: "Loading the map",
   },
 
-  // ── stage 3 — confirm the items ─────────────────────────────────────────
+  // ── stage 2: confirm items and payment ──────────────────────────────────
   stage3: {
-    intro: (who: string) => `Build the list, then send it to ${who} to approve.`,
+    /** "Store needed": no pinned store is this kind, and the store to pin for it. */
+    noPinnedKind: (category: string) => `No pinned store is ${category}.`,
+    noStoreToSuggest: "No store to suggest yet. Search for one in step 1.",
+    pinStoreNamed: (store: string) => `Pin ${store} in step 1`,
+    pinAStore: "Pin a store in step 1",
+    pinnedFor: (store: string, item: string) =>
+      `Pinned ${store} for ${item}. Check it on the map, then continue.`,
+    intro: (who: string) =>
+      `Check the list, then send it. ${who} approves it and picks how to pay in the same message.`,
     addItem: "Add an item",
     itemPlaceholder: "What is it?",
     qty: "Qty",
     removeItem: "Remove",
-    edit: "Change the list",
     send: (who: string) => `Send the list to ${who}`,
+    resend: (who: string) => `Send the updated list to ${who}`,
+    resendNote: (who: string) => `You changed the list since sending it. ${who} approves it again.`,
+    undoChanges: "Undo changes",
+    approved: (who: string) => `${who} approved this list.`,
+    /** Rider-reported only. An unchecked line before shopping is not a warning. */
+    outOfStock: "Out of stock",
+    outOfStockBanner: (n: number) =>
+      n === 1 ? "1 item reported out of stock by the rider" : `${n} items reported out of stock by the rider`,
+    suggestSubstitutes: "Suggest substitutes",
+    checkingSubstitutes: "Checking",
+    declineSubstitute: "Decline substitute",
     sending: "Sending",
     sent: (who: string) => `Sent. ${who} will see it in the chat.`,
     failed: "Couldn't save the list. Try again.",
@@ -280,21 +325,21 @@ export const copy = {
     placementModelled: "read from the name",
   },
 
-  // ── stage 4 — payment ───────────────────────────────────────────────────
+  // ── stage 2, the payment half ───────────────────────────────────────────
   stage4: {
     intro: (who: string) =>
       `${who} chooses how they pay. Anything other than cash is arranged with you directly.`,
+    heading: "Payment",
+    /** Before the list goes out: the send asks for payment too. */
+    asksWithList: (who: string) => `${who} picks how to pay when you send the list.`,
+    /** The list went out but the payment question did not (it failed, or an older order). */
+    notAsked: (who: string) => `The payment question has not reached ${who} yet.`,
+    answersEitherOrder: "They can choose before or after approving the list.",
     ask: (who: string) => `Ask ${who} how they will pay`,
     asking: "Asking",
     asked: (who: string) => `Asked. ${who} will see it in the chat.`,
     settled: (mode: string) => `Settled by ${mode}.`,
     failed: "Couldn't set up payment. Try again.",
-    /**
-     * Payment cannot be arranged over a basket the customer hasn't agreed to —
-     * they'd be committing to pay for a list they never saw.
-     */
-    blockedUnconfirmed: (who: string) =>
-      `${who} has to approve the item list before you ask about payment.`,
   },
 
   // ── errands the customer does not pay in cash at the door ───────────────
@@ -356,7 +401,7 @@ export const copy = {
     // ── the standalone half-payment panel, beside the chat rather than
     // inside the stage accordion ────────────────────────────────────────
     halfPaymentPanelTitle: "Half-payment",
-    halfPaymentWaitingUpfront: "Waiting on the upfront payment first — see the Payment stage.",
+    halfPaymentWaitingUpfront: "Waiting on the upfront payment first. See the payment section of step 2.",
 
     // ── the 50%, collected mid-way ────────────────────────────────────────
     halfNotYet: (rider: string) =>
@@ -379,7 +424,7 @@ export const copy = {
     halfConfirmedBy: (who: string, rider: string) => `Confirmed by ${who}. ${rider} was told to head to the customer.`,
     halfManualTitle: "Received it another way?",
     halfPaymentOveragePending:
-      "Goods are held on a receipt overage. Resolve that in the Payment stage before the balance applies.",
+      "Goods are held on a receipt overage. Resolve that in the payment section of step 2 before the balance applies.",
     halfPaymentRefunded: "This errand was refunded — there's no balance to collect.",
     proofPhotoTitle: "Photo evidence",
     proofPhotoNone: "No photo uploaded yet.",
@@ -389,10 +434,10 @@ export const copy = {
     proofPhotoCapturedAt: (when: string) => `Captured ${when}`,
   },
 
-  // ── stage 5 — send a rider ──────────────────────────────────────────────
+  // ── stage 3: assign a rider ─────────────────────────────────────────────
   stage5: {
-    intro: "The nearest free rider gets this. You don't pick one.",
-    send: "Send a rider",
+    intro: "The system gives this to the nearest free rider. This is who is around right now.",
+    send: "Assign a rider",
     sending: "Finding the nearest rider",
     assigned: (rider: string, ref: string) => `${rider} is assigned to order #${ref}.`,
     failed: "Could not send a rider right now. Try again in a moment.",
@@ -402,7 +447,26 @@ export const copy = {
     missingUpfront: "Payment confirmed",
     missingPayment: "Payment settled",
     /** Shown when the CTA is pressed while blocked — it navigates instead of doing nothing. */
-    redirect: (stage: string) => `${stage} first, then you can send a rider.`,
+    redirect: (stage: string) => `${stage} first, then you can assign a rider.`,
+    /** The live roster under the button. Information only: the server picks. */
+    rosterTitle: (n: number) => (n === 1 ? "1 rider around" : `${n} riders around`),
+    rosterAvailable: "Available",
+    rosterOnDelivery: "On delivery",
+    rosterLoad: (n: number, cap: number) => `${n} of ${cap} errands`,
+    rosterFull: "Full",
+    rosterEmpty: "No riders are available or on an errand right now. Assigning will say why.",
+    rosterFailed: "Could not load the riders just now.",
+    rosterRetry: "Try again",
+  },
+
+  // ── moving on by itself when the customer answers ──────────────────────
+  /** The sentence shown on the stage the screen moved to, and why it moved. */
+  advance: {
+    /** Both answers are in, whichever came last. Assigning needs the pair. */
+    readyToAssign: (who: string, mode: string | null) =>
+      mode
+        ? `${who} approved the list and chose ${mode}. Next, assign a rider.`
+        : `${who} approved the list and chose how to pay. Next, assign a rider.`,
   },
 
   // ── close-without-order dialog ──────────────────────────────────────────

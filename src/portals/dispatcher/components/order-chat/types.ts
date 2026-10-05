@@ -72,6 +72,13 @@ export interface EditableItem {
   itemName: string;
   storeCategory?: string;
   quantity: number;
+  /**
+   * Carried from the saved row so the always-open list can show what the rider
+   * reported (out of stock) on the line itself. Absent on rows added here, and
+   * never sent: sendToCustomer keeps only name, store and quantity.
+   */
+  id?: number;
+  fulfillmentStatus?: string;
 }
 
 export interface MerchantCategory {
@@ -86,7 +93,8 @@ export interface PanelError {
   reason?: string;
 }
 
-export type StageId = 1 | 2 | 3 | 4 | 5;
+/** Pin the stores, confirm items and payment, assign a rider. */
+export type StageId = 1 | 2 | 3;
 
 /** Who the screen is waiting on. The one question dispatch work turns on. */
 export type Turn = "you" | "customer" | "rider" | "done";
@@ -108,7 +116,7 @@ export interface NowAction {
   label: string;
   kind: "primary" | "secondary";
   /** What pressing it does. Resolved by the screen, not the model. */
-  action: "accept" | "decline" | "nudge" | "changeList" | "sendRider" | "openStage";
+  action: "nudge" | "sendRider" | "openStage";
   stage?: StageId;
 }
 

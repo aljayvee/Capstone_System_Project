@@ -1,14 +1,24 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { apiClient } from "../../../../../services/apiClient";
-import { apiService } from "../../../../../services/apiService";
+import {
+  apiService,
+  type ApiPinQuote,
+  type ApiPredictedStore,
+  type ApiStoreLocationVerdict,
+} from "../../../../../services/apiService";
 import {
   loadGoogleMapsScript,
   importGoogleMapsLibrary,
   onGoogleMapsStatus,
   type GoogleMapsStatus,
 } from "../../../../../utils/loadGoogleMaps";
-import { SERVICE_AREA_BOUNDS } from "../../../../../constants/serviceArea";
+import {
+  SERVICE_AREA_BOUNDS,
+  TACURONG_CENTER,
+  TACURONG_MASK_PATHS,
+  isWithinTacurong,
+} from "../../../../../constants/serviceArea";
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { metresBetween } from "../../../../../utils/geo";
 import { GOOGLE_MAP_ID, canUseAdvancedMarkers } from "../../../../../utils/googleMapId";
@@ -27,7 +37,6 @@ import type {
 } from "../types";
 
 export const MAX_PINPOINTS = 3;
-const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
 
 /** Illegal Firebase RTDB key characters: . # $ / [ ] */
 const cleanName = (s: string) => (s || "").replace(/[.#$/[\]]/g, " ").replace(/\s+/g, " ").trim();
@@ -138,6 +147,31 @@ interface UseStorePinsArgs {
   pushMessage: (payload: Record<string, any>) => void;
   /** Only mount the map when stage 2 is actually open. */
   mapVisible: boolean;
+  /**
+   * Price the pins on screen as they change (POST /pinpoints/quote). Off for
+   * a closed, read-only order, where nothing can be re-pinned.
+   */
+  liveQuote?: boolean;
+}
+
+export type PinQuoteStatus = "idle" | "pricing" | "ready" | "error";
+
+/** Held back so placing three pins in a row costs one quote, not three. */
+const QUOTE_DEBOUNCE_MS = 600;
+
+/** What the server stores for a stop, reduced to what decides its price and route. */
+function stopSignature(
+  pins: Array<{ storeName?: string | null; latitude: number | string; longitude: number | string; placeId?: string | null; categoryId?: number | null }>
+): string {
+  return JSON.stringify(
+    pins.map((p) => [
+      String(p.storeName || "").trim(),
+      Number(p.latitude).toFixed(6),
+      Number(p.longitude).toFixed(6),
+      p.placeId ?? null,
+      p.categoryId ?? null,
+    ])
+  );
 }
 
 export function useStorePins({
@@ -150,6 +184,7 @@ export function useStorePins({
   onOrderUpdated,
   pushMessage,
   mapVisible,
+  liveQuote = true,
 }: UseStorePinsArgs) {
   const [pinpoints, setPinpoints] = useState<StorePinpoint[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -283,6 +318,42 @@ export function useStorePins({
    * to the dispatcher with the cost stated, because two real shops can share a
    * building.
    */
+  /** The last pin refused outright, with the reason, until dismissed. */
+  const [blockedPin, setBlockedPin] = useState<{ storeName: string; message: string } | null>(null);
+  const [isCheckingLocation, setIsCheckingLocation] = useState(false);
+
+  /**
+   * The location half of the gate: is this spot inside Tacurong?
+   * Evaluated client-side against the official 649-point Tacurong polygon and verified by the server.
+   * Any store pin > 100m outside Tacurong City is strictly blocked outright with an instant notification.
+   */
+  const guardLocation = useCallback(
+    async (pin: StorePinpoint) => {
+      // Instant client-side check against official 649-point Tacurong boundary
+      if (!isWithinTacurong(pin.latitude, pin.longitude, 0.1)) {
+        const message = `${pin.storeName} is outside Tacurong City. SUGO Express currently operates exclusively within Tacurong City.`;
+        setBlockedPin({ storeName: pin.storeName, message });
+        toast.error(`Outside Service Area: ${pin.storeName} is outside Tacurong City.`);
+        return;
+      }
+
+      setIsCheckingLocation(true);
+      const verdict = await apiService.checkStoreLocation(pin.latitude, pin.longitude);
+      setIsCheckingLocation(false);
+
+      if (!verdict || verdict.status === "inside") {
+        setBlockedPin(null);
+        forceAddPin(pin);
+        return;
+      }
+
+      // Hard block: outside border or off road map
+      setBlockedPin({ storeName: pin.storeName, message: verdict.message });
+      toast.error(`Cannot pin store: ${verdict.message}`);
+    },
+    [forceAddPin]
+  );
+
   const addPin = useCallback(
     (pin: StorePinpoint): boolean => {
       const verdict = findDuplicatePin(pin, pinsRef.current);
@@ -295,17 +366,76 @@ export function useStorePins({
         setPendingDuplicate({ pin, verdict });
         return false;
       }
-      return forceAddPin(pin);
+      void guardLocation(pin);
+      return true;
     },
-    [forceAddPin]
+    [guardLocation]
   );
 
   const confirmPendingDuplicate = useCallback(() => {
     setPendingDuplicate((pending) => {
-      if (pending) forceAddPin(pending.pin);
+      // Still has to pass the location check: "same shop twice" and "outside
+      // Tacurong" are separate questions.
+      if (pending) void guardLocation(pending.pin);
       return null;
     });
-  }, [forceAddPin]);
+  }, [guardLocation]);
+
+  const dismissBlockedPin = useCallback(() => setBlockedPin(null), []);
+
+  /**
+   * Pins the stores the predictor proposed, after the dispatcher answered
+   * "yes, accurate". Each was already location-checked server-side and any
+   * border warning was on the card they said yes to, so that answer is the
+   * confirmation; only a blocked store (never proposed) or an exact duplicate
+   * is skipped. Returns how many were pinned.
+   */
+  const addPredictedStores = useCallback(
+    (stores: ApiPredictedStore[]): number => {
+      // Decided up front against the pins as they stand. forceAddPin's own
+      // return value is computed inside a state updater and cannot be counted
+      // on synchronously; its updater still enforces the limit either way.
+      const batch: StorePinpoint[] = [];
+      for (const store of stores) {
+        if (
+          store.alreadyPinned ||
+          store.location.status === "blocked" ||
+          !isWithinTacurong(store.latitude, store.longitude, 0.1)
+        ) {
+          continue;
+        }
+        const pin: StorePinpoint = {
+          storeName: store.storeName.slice(0, 60),
+          latitude: store.latitude,
+          longitude: store.longitude,
+          placeId: store.placeId,
+          categoryId: store.categoryId,
+          // From the catalogue when it came with a place id; otherwise it is
+          // what past pins of this shop were filed as, which is still a guess
+          // and is shown as one until the dispatcher confirms it.
+          categorySource: (store.categoryId == null
+            ? null
+            : store.placeId
+              ? "catalogue"
+              : "name") as CategorySource,
+        };
+        if (findDuplicatePin(pin, [...pinsRef.current, ...batch]).kind === "exact") continue;
+        if (pinsRef.current.length + batch.length >= MAX_PINPOINTS) {
+          notifyAtLimit();
+          break;
+        }
+        batch.push(pin);
+      }
+      batch.forEach((pin) => forceAddPin(pin));
+      // Show where it landed: the map follows the pin just placed.
+      const last = batch[batch.length - 1];
+      if (last) panTo(last.latitude, last.longitude);
+      return batch.length;
+    },
+    // panTo is declared further down; it is stable (useCallback with no deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [forceAddPin, notifyAtLimit]
+  );
 
   const dismissPendingDuplicate = useCallback(() => setPendingDuplicate(null), []);
 
@@ -388,6 +518,22 @@ export function useStorePins({
         if (googleMapId) mapOptions.mapId = googleMapId;
 
         const map = new MapClass(mapRef.current, mapOptions);
+
+        // Inverted polygon mask: dims out everything outside Tacurong City at 35% navy opacity.
+        // Tacurong City is completely transparent and bright; outside areas are dimmed.
+        const PolygonClass = (window as any).google?.maps?.Polygon;
+        if (PolygonClass) {
+          new PolygonClass({
+            map,
+            paths: TACURONG_MASK_PATHS,
+            strokeColor: "#1E3A5F",
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: "#0B132B",
+            fillOpacity: 0.35,
+            clickable: false,
+          });
+        }
 
         map.addListener("click", async (e: any) => {
           const lat = e.latLng.lat();
@@ -685,7 +831,11 @@ export function useStorePins({
       // ── TIER 1: our catalogue ─────────────────────────────────────────
       try {
         const dbRes = await apiClient.get(`/places?search=${encodeURIComponent(trimmed)}`);
-        const dbPlaces: any[] = dbRes.data || [];
+        const dbPlaces: any[] = (dbRes.data || []).filter((p: any) => {
+          const lat = Number(p.latitude);
+          const lng = Number(p.longitude);
+          return isWithinTacurong(lat, lng, 0.1);
+        });
         catalogueHits = dbPlaces;
 
         if (dbPlaces.length > 1) {
@@ -777,19 +927,11 @@ export function useStorePins({
                 ) {
                   return false;
                 }
-                const isTacurong = addr.includes("tacurong") || addr.includes("sultan kudarat");
-                if (!isTacurong && p.geometry?.location) {
-                  const lat =
-                    typeof p.geometry.location.lat === "function"
-                      ? p.geometry.location.lat()
-                      : p.geometry.location.lat;
-                  const lng =
-                    typeof p.geometry.location.lng === "function"
-                      ? p.geometry.location.lng()
-                      : p.geometry.location.lng;
-                  return bounds.contains(new g.maps.LatLng(lat, lng));
-                }
-                return isTacurong;
+                const loc = p.geometry?.location;
+                if (!loc) return false;
+                const pLat = typeof loc.lat === "function" ? loc.lat() : loc.lat;
+                const pLng = typeof loc.lng === "function" ? loc.lng() : loc.lng;
+                return isWithinTacurong(pLat, pLng, 0.1);
               });
 
               if (local.length > 1) {
@@ -891,7 +1033,78 @@ export function useStorePins({
     );
   }, [messages]);
 
-  const sendToCustomer = useCallback(async () => {
+  // ── the live fee ──────────────────────────────────────────────────────────
+  /**
+   * The fee for the pins on screen, priced by the server as they change.
+   *
+   * The fee used to appear only after "send these stores to the customer",
+   * because pricing was part of saving, so the dispatcher committed the stops
+   * before seeing what they cost. This asks for a quote instead: the same
+   * calculation, nothing saved, nobody notified (errandService.quotePinpoints).
+   */
+  const pinsSignature = useMemo(() => stopSignature(pinpoints), [pinpoints]);
+  const [quote, setQuote] = useState<ApiPinQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<PinQuoteStatus>("idle");
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteAttempt, setQuoteAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!liveQuote || pinpoints.length === 0) {
+      setQuote(null);
+      setQuoteStatus("idle");
+      setQuoteError(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteStatus("pricing");
+    const timer = setTimeout(async () => {
+      try {
+        const next = await apiService.quotePinpoints(
+          orderId,
+          pinpoints
+            .map((p) => ({
+              storeName: p.storeName || "Store",
+              latitude: Number(p.latitude),
+              longitude: Number(p.longitude),
+              placeId: p.placeId ?? null,
+              categoryId: p.categoryId ?? null,
+            }))
+            .filter((p) => !isNaN(p.latitude) && !isNaN(p.longitude))
+        );
+        if (cancelled) return;
+        setQuote(next);
+        setQuoteError(null);
+        setQuoteStatus("ready");
+      } catch (err) {
+        if (cancelled) return;
+        // A 422 names the stop that cannot be routed to; anything else is ours.
+        const serverMessage = (err as any)?.response?.data?.error;
+        setQuoteError(typeof serverMessage === "string" ? serverMessage : null);
+        setQuoteStatus("error");
+      }
+    }, QUOTE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // pinpoints is represented by pinsSignature.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, pinsSignature, liveQuote, quoteAttempt]);
+
+  const retryQuote = useCallback(() => setQuoteAttempt((n) => n + 1), []);
+
+  /**
+   * The customer already has exactly these stores: sent, and nothing changed
+   * since. Compared with what the server saved, so a reload knows it too.
+   */
+  const savedSignature = useMemo(
+    () => stopSignature(Array.isArray(orderDetails?.pinpoints) ? orderDetails.pinpoints : []),
+    [orderDetails?.pinpoints]
+  );
+  const storesUpToDate =
+    Boolean(storesSentAt) && pinpoints.length > 0 && savedSignature === pinsSignature;
+
+  const sendToCustomer = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     feedback.dismiss();
     try {
@@ -930,9 +1143,16 @@ export function useStorePins({
       setStoresSentAt(Date.now());
       setSentThisSession(true);
       feedback.showSuccess(copy.stage2.sent(customerDisplayName));
+      return true;
     } catch (err) {
       console.error("Failed to save store pinpoints:", err);
-      feedback.showError(copy.stage2.failed);
+      // A 422 is the server refusing a stop it cannot route to (see
+      // storeLocationGuard). Its own sentence names the store and says why,
+      // which is the only useful thing to show; anything else is a generic fault.
+      const status = (err as any)?.response?.status;
+      const serverMessage = (err as any)?.response?.data?.error;
+      feedback.showError(status === 422 && serverMessage ? serverMessage : copy.stage2.failed);
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -962,8 +1182,17 @@ export function useStorePins({
     sendToCustomer,
     storesSentAt,
     sentThisSession,
+    storesUpToDate,
+    quote,
+    quoteStatus,
+    quoteError,
+    retryQuote,
     pendingDuplicate,
     confirmPendingDuplicate,
     dismissPendingDuplicate,
+    blockedPin,
+    dismissBlockedPin,
+    isCheckingLocation,
+    addPredictedStores,
   };
 }

@@ -123,13 +123,17 @@ export function postUnderReview(errandId: string, dispatcherName?: string): Prom
 }
 
 /** Posted when a dispatcher accepts. Written in the dispatcher's own voice,
- *  because from here on the customer is talking to a person, not a system. */
+ *  because from here on the customer is talking to a person, not a system.
+ *
+ *  Accepting now happens the moment the dispatcher opens the order, before any
+ *  store has been checked, so it says what is happening rather than claiming a
+ *  review that has not taken place yet. */
 export function postAccepted(errandId: string, dispatcherName: string): Promise<void> {
   return postSystemMessage(errandId, {
     systemKind: 'accepted',
     text:
-      `Hi! I'm ${dispatcherName}, your dispatcher. I've reviewed your order and it's good to go. ` +
-      `I'll confirm what's available at the store and the final total before anything is bought, ` +
+      `Hi! I'm ${dispatcherName}, your dispatcher. I'm checking the stores for your order now. ` +
+      `I'll send you the item list and the final total to approve before anything is bought, ` +
       `then assign a rider. Message me here if you need to change anything.`,
     dispatcherName,
   });

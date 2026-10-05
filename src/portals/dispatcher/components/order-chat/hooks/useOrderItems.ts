@@ -70,6 +70,9 @@ export function splitStoreCategory(
     : { store: rawCategory, category: defaultCategory, assigned: true };
 }
 
+/** How long the list must sit still before its suggestions are re-read and shown. */
+const RECOMMEND_AFTER_MS = 1200;
+
 interface UseOrderItemsArgs {
   orderId: string;
   orderDetails: any;
@@ -222,10 +225,14 @@ export function useOrderItems({
     [guessCategories]
   );
   const startEditing = useCallback(() => {
-    const rows = savedItems.map((d: any) => ({
+    const rows: EditableItem[] = savedItems.map((d: any) => ({
       itemName: d.itemName,
       storeCategory: d.storeCategory || undefined,
       quantity: d.quantity || 1,
+      // What the rider reported, so the always-open list can show an out of
+      // stock line where it is edited. Never sent back: see sendToCustomer.
+      id: d.id != null ? Number(d.id) : undefined,
+      fulfillmentStatus: d.fulfillmentStatus || undefined,
     }));
     setEditableItems(rows);
     setCategoryGuesses({});
@@ -264,6 +271,46 @@ export function useOrderItems({
       });
     },
     [pinpoints, merchantCategories, parseStoreAndCat]
+  );
+
+  /**
+   * Adds an item picked in the Catalog Helper, filed under the right pinned stop.
+   *
+   * The stop is the pin with the same shop name when the suggestion names a
+   * shop (a crawled menu, a past errand), else the only pin of the item's
+   * category. Otherwise the row gets the category and no shop, the unassigned
+   * state stage 3 already asks about, rather than a guessed shop. Returns the
+   * stop's label, or null when the dispatcher still has to pick one.
+   *
+   * Replaces an addItem-then-setTimeout-updateItem sequence that read the row
+   * count from before editing opened: from a closed list it overwrote the
+   * FIRST saved item's name with the pick instead of adding a row.
+   */
+  const addCatalogItem = useCallback(
+    (pick: { itemName: string; storeName: string; categoryName: string }): string | null => {
+      const wanted = clean(pick.storeName).toLowerCase();
+      let stop = wanted
+        ? pinpoints.findIndex((pin) => {
+            const name = clean(pin.storeName || "").toLowerCase();
+            return Boolean(name) && (name === wanted || name.includes(wanted) || wanted.includes(name));
+          })
+        : -1;
+      if (stop < 0) {
+        const sameKind = pinpoints
+          .map((pin, i) => ({ i, category: categoryNameForPin(pin) }))
+          .filter((p) => p.category === pick.categoryName);
+        if (sameKind.length === 1) stop = sameKind[0].i;
+      }
+      const store = stop >= 0 ? storeLabelFor(stop) : "";
+      // A pin keeps its own category (see categoryNameForPin): the row follows it.
+      const category = (stop >= 0 && categoryNameForPin(pinpoints[stop])) || pick.categoryName;
+      setEditableItems((prev) => [
+        ...prev,
+        { itemName: pick.itemName, quantity: 1, storeCategory: `${store} | ${category}` },
+      ]);
+      return stop >= 0 ? store : null;
+    },
+    [pinpoints, merchantCategories]
   );
 
   /**
@@ -314,6 +361,38 @@ export function useOrderItems({
     },
     [categoryGuesses, parseStoreAndCat, stopIndexFor]
   );
+  // ── recommendations that keep up with the list ──────────────────────────
+  /**
+   * Whether the store suggestions on screen belong to the list as it is now.
+   *
+   * The list is re-read a moment after it stops changing (a name typed, a row
+   * added or removed, a store pinned in step 3), and stage 4 keeps every
+   * suggestion hidden until that answer is in. Before this, suggestions were
+   * asked for on blur only, so they described the list as it was a few edits
+   * ago, and a "store needed" warning flashed on rows whose answer had not
+   * arrived yet. The countdown is invisible on purpose: it is the time a
+   * dispatcher takes to finish typing, not something to wait for.
+   */
+  const [recommendationsReady, setRecommendationsReady] = useState(false);
+  const rowsSignature = editableItems.map((row) => (row.itemName || "").trim().toLowerCase()).join("\u0001");
+  const pinsSignature = pinpoints.map((p) => `${p.storeName}#${p.categoryId ?? ""}`).join("\u0001");
+
+  useEffect(() => {
+    setRecommendationsReady(false);
+    if (!isEditing) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      await guessCategories(editableItems.map((row, index) => ({ index, name: row.itemName || "" })));
+      if (!cancelled) setRecommendationsReady(true);
+    }, RECOMMEND_AFTER_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // editableItems is represented by rowsSignature: a quantity change does not re-ask.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, rowsSignature, pinsSignature, guessCategories]);
+
   const updateItem = useCallback((index: number, patch: Partial<EditableItem>) => {
     setEditableItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   }, []);
@@ -359,8 +438,27 @@ export function useOrderItems({
     [editableItems, orderId, parseStoreAndCat, pushMessage, feedback]
   );
 
+  /**
+   * The working list differs from the one saved on the order.
+   *
+   * The list is always open for editing now, so "editing" no longer means
+   * "changed". This is what decides whether there is anything to send: a list
+   * the customer already has, untouched, needs no button.
+   */
+  const rowKey = (it: any) =>
+    [
+      (it?.itemName || "").trim().toLowerCase(),
+      Math.max(1, Number(it?.quantity) || 1),
+      clean(it?.storeCategory || ""),
+    ].join(" || ");
+  const hasUnsentChanges =
+    isEditing &&
+    (editableItems.length !== savedItems.length ||
+      editableItems.some((row, i) => rowKey(row) !== rowKey(savedItems[i])));
+
   // ── send ────────────────────────────────────────────────────────────────
-  const sendToCustomer = useCallback(async () => {
+  /** Resolves true once the list is saved and the card is in the chat. */
+  const sendToCustomer = useCallback(async (): Promise<boolean> => {
     const rawItems = isEditing && editableItems.length > 0 ? editableItems : savedItems;
 
     const sanitized = rawItems
@@ -373,7 +471,7 @@ export function useOrderItems({
 
     if (sanitized.length === 0) {
       toast.error(copy.stage3.needsOne);
-      return;
+      return false;
     }
 
     setIsSaving(true);
@@ -462,11 +560,13 @@ export function useOrderItems({
       setIsCustomerConfirmed(false);
       setSentAt(Date.now());
       feedback.showSuccess(copy.stage3.sent(customerDisplayName));
+      return true;
     } catch (err: any) {
       console.error("Failed to save updated items:", err);
       feedback.showError(
         err.response?.data?.message || err.response?.data?.error || copy.stage3.failed
       );
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -488,6 +588,7 @@ export function useOrderItems({
     savedItems,
     isEditing,
     editableItems,
+    hasUnsentChanges,
     isSaving,
     feedback,
     hasSentConfirmationCard,
@@ -497,17 +598,21 @@ export function useOrderItems({
     startEditing,
     cancelEditing,
     addItem,
+    addCatalogItem,
     updateItem,
     removeItem,
     categoryGuesses,
     stopIndexFor,
     guessCategoryFor,
     applyCategoryGuess,
+    recommendationsReady,
     sendToCustomer,
     parseStoreAndCat,
     storeLabelFor,
     storeOptions,
     unassignedCount,
     categoryNameForPin,
+    pushMessage,
+    onOrderUpdated,
   };
 }

@@ -326,16 +326,6 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 <h3 className="text-micro uppercase text-ink">
                   Requested items ({items.length})
                 </h3>
-                {/* Named as an estimate. It comes from errand.estimatedCost,
-                    not from summing the lines below, and presenting it bare
-                    beside a column of line amounts read as a subtotal the
-                    rows were supposed to reconcile to. */}
-                <span className="shrink-0 text-label text-ink-muted">
-                  est.{" "}
-                  <span data-figure className="font-mono">
-                    {formatPeso(subtotal)}
-                  </span>
-                </span>
               </div>
 
               {items.length === 0 ? (
@@ -415,12 +405,14 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
             <DispatcherCard.Region padding="sm">
               <DispatcherCard.Label as="h3">What it comes to</DispatcherCard.Label>
               <dl className="space-y-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
-                  <dt>Items</dt>
-                  <dd data-figure className="font-mono text-ink">
-                    {formatPeso(subtotal)}
-                  </dd>
-                </div>
+                {subtotal > 0 ? (
+                  <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
+                    <dt>Items</dt>
+                    <dd data-figure className="font-mono text-ink">
+                      {formatPeso(subtotal)}
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
                   <dt>Delivery</dt>
                   <dd data-figure className="font-mono text-ink">
@@ -430,12 +422,18 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 <div className="flex items-baseline justify-between gap-3 border-t border-hairline pt-2 text-body text-ink">
                   <dt>Total</dt>
                   <dd data-figure className="font-mono text-data text-ink">
-                    {formatPeso(totalDisplay)}
+                    {formatPeso(subtotal > 0 ? totalDisplay : fee)}
                   </dd>
                 </div>
               </dl>
 
-              {Math.abs(unreconciled) > 0.01 ? (
+              {subtotal === 0 ? (
+                <p className="mt-2 text-label text-ink-muted">
+                  Excludes item cost — settled upon rider purchase receipt.
+                </p>
+              ) : null}
+
+              {subtotal > 0 && Math.abs(unreconciled) > 0.01 ? (
                 <p role="status" className="mt-2 text-label text-status-act-ink">
                   These lines do not add up to the recorded total. The difference is{" "}
                   {formatPeso(Math.abs(unreconciled))}, so check the figure with the customer
@@ -486,11 +484,13 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               className="flex-1"
               disabled={isClaiming}
               loading={isClaiming}
-              loadingText="Claiming this run"
+              loadingText="Accepting"
               icon={<ShieldCheck size={18} />}
               onClick={() => onClaimAndReview(errand)}
             >
-              Check the order and start review
+              {/* Opening the order accepts it now (no "Check the order" step
+                  to accept it in), so the button says what it commits to. */}
+              Accept and open the order
             </DispatcherButton>
 
             {/* Decline is secondary, not act-red. A red-ink Decline sat

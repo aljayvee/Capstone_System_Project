@@ -1,4 +1,4 @@
-import { CreditCard, CheckCircle2 } from "lucide-react";
+import { CreditCard, CheckCircle2, Receipt } from "lucide-react";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { WaitingCard } from "../WaitingCard";
@@ -6,7 +6,13 @@ import { PaymentLedgerPanel } from "../PaymentLedgerPanel";
 import { copy, formatAgo } from "../copy";
 
 /**
- * Stage 4 — payment.
+ * The payment half of step 2, "Confirm items and payment".
+ *
+ * Asking is no longer a step of its own: sending the item list asks too (see
+ * OrderChatScreen's onListSent), so this section mostly reports. The one
+ * button left is a recovery: shown only when the list is out but the question
+ * never reached the customer, because the ask failed or the order predates the
+ * merge.
  *
  * One button. The screen this replaces had "1. Enable Payment" and
  * "2. Prompt Customer in Chat" as separately numbered controls the dispatcher
@@ -23,11 +29,20 @@ interface Stage4Props {
   actualBasket?: number | null;
   agreedBasket?: number | null;
   customerFirstName: string;
-  /** True once the customer has approved the item list in stage 3. */
-  isCustomerConfirmed: boolean;
+  /** The item list is in the customer's chat. */
+  hasSentList: boolean;
+  /**
+   * The customer has been asked, in this session or before it
+   * (`paymentEnabledAt`), so the question is not offered again.
+   */
+  isPrompted: boolean;
+  /**
+   * The customer has approved the list. Until then the list's own waiting card
+   * carries the nudge, and a second identical card here would only repeat it.
+   */
+  isListApproved: boolean;
   onNudge: () => void;
-  /** Takes the dispatcher back to stage 3 when the list isn't approved yet. */
-  onNeedConfirmation: (reason: string) => void;
+  onOpenProof?: () => void;
   readOnly?: boolean;
 }
 
@@ -37,22 +52,36 @@ export function Stage4Payment({
   actualBasket,
   agreedBasket,
   customerFirstName,
-  isCustomerConfirmed,
+  hasSentList,
+  isPrompted,
+  isListApproved,
   onNudge,
-  onNeedConfirmation,
+  onOpenProof,
   readOnly = false,
 }: Stage4Props) {
   const { confirmedPaymentMode, isPaymentConfirmed, isAsking, askedAt, feedback, askCustomer } =
     payment;
 
   const ledgerPanel = (
-    <PaymentLedgerPanel
-      payments={payments}
-      customerFirstName={customerFirstName}
-      actualBasket={actualBasket}
-      agreedBasket={agreedBasket}
-      readOnly={readOnly}
-    />
+    <div className="space-y-2">
+      <PaymentLedgerPanel
+        payments={payments}
+        customerFirstName={customerFirstName}
+        actualBasket={actualBasket}
+        agreedBasket={agreedBasket}
+        readOnly={readOnly}
+      />
+      {payments.ledger?.hasLedger && onOpenProof && (
+        <button
+          type="button"
+          onClick={onOpenProof}
+          className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-edge bg-board-plate px-3 py-2 text-micro uppercase text-ink transition-colors hover:bg-board-ground"
+        >
+          <Receipt size={14} />
+          View Uploaded Proof & Attestation
+        </button>
+      )}
+    </div>
   );
 
   if (readOnly) {
@@ -84,50 +113,43 @@ export function Stage4Payment({
 
   const minsAgo = askedAt ? Math.max(0, Math.floor((Date.now() - askedAt) / 60000)) : 0;
 
-  /**
-   * Payment cannot be arranged over a basket the customer has not agreed to —
-   * they would be committing to pay for a list they never approved, and the
-   * total can still change while it is unconfirmed.
-   *
-   * The screen this replaced enforced the same rule by disabling the button
-   * (`disabled={isEnablingPayment || !step2Done}`), which told a dispatcher
-   * nothing about why. Here the press is honoured as navigation: it opens the
-   * stage that is actually blocking and says what is needed.
-   */
-  const handleAsk = () => {
-    if (!isCustomerConfirmed) {
-      // Carried to stage 3 rather than shown here - this stage is about to close.
-      onNeedConfirmation(copy.stage4.blockedUnconfirmed(customerFirstName));
-      return;
-    }
-    askCustomer();
-  };
-
   return (
     <div className="space-y-3">
-      <p className="m-0 text-body text-ink-muted">{copy.stage4.intro(customerFirstName)}</p>
-
-      {askedAt && (
+      {!hasSentList ? (
+        <p className="m-0 text-body text-ink-muted">{copy.stage4.asksWithList(customerFirstName)}</p>
+      ) : isPrompted && !isListApproved ? (
+        <p className="m-0 text-body text-ink-muted">
+          {askedAt ? `You asked how they will pay ${formatAgo(minsAgo)}. ` : ""}
+          {copy.stage4.answersEitherOrder}
+        </p>
+      ) : isPrompted ? (
         <WaitingCard
           title={`Waiting for ${customerFirstName}`}
-          detail={`You asked how they will pay ${formatAgo(minsAgo)}.`}
+          detail={
+            askedAt
+              ? `You asked how they will pay ${formatAgo(minsAgo)}.`
+              : copy.stage4.intro(customerFirstName)
+          }
           actions={[{ label: copy.nowActions.nudge(customerFirstName), onClick: onNudge }]}
         />
+      ) : (
+        // The list is out and the question is not: say so, and offer it.
+        <div className="space-y-2 rounded-plate bg-status-waiting-fill px-3 py-2.5">
+          <p className="m-0 text-label text-status-waiting-ink">{copy.stage4.notAsked(customerFirstName)}</p>
+          <DispatcherButton
+            variant="secondary"
+            size="sm"
+            loading={isAsking}
+            loadingText={copy.stage4.asking}
+            icon={<CreditCard size={14} />}
+            onClick={() => void askCustomer()}
+          >
+            {copy.stage4.ask(customerFirstName)}
+          </DispatcherButton>
+        </div>
       )}
 
       <DispatcherInlineBanner message={feedback.message} onDismiss={feedback.dismiss} />
-
-      <DispatcherButton
-        variant="primary"
-        size="lg"
-        loading={isAsking}
-        loadingText={copy.stage4.asking}
-        icon={<CreditCard size={16} />}
-        onClick={handleAsk}
-        className="w-full justify-center"
-      >
-        {copy.stage4.ask(customerFirstName)}
-      </DispatcherButton>
     </div>
   );
 }

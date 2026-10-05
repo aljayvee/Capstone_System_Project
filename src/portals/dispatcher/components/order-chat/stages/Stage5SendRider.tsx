@@ -1,12 +1,14 @@
 import { Bike, Check, Circle } from "lucide-react";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { copy } from "../copy";
+import { RiderAvailabilityList } from "../RiderAvailabilityList";
 
 /**
- * Stage 5 — send a rider.
+ * Step 3, assign a rider.
  *
  * The button is ALWAYS enabled and always says what the dispatcher wants
- * ("Send a rider"), never what is stopping them ("Locked").
+ * ("Assign a rider"), never what is stopping them ("Locked"). The server picks
+ * the rider; the list under it shows who is around, for reference.
  *
  * A disabled primary is the most common dead end in a wizard: it is
  * low-contrast, gives no feedback when pressed, and on touch cannot show a
@@ -106,6 +108,8 @@ export function Stage5SendRider({
           </ul>
         </div>
       )}
+
+      <RiderAvailabilityList />
     </div>
   );
 }

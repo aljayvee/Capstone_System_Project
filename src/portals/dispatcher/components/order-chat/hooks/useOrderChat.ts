@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ref, push, onValue, set, onDisconnect } from "firebase/database";
 import { database } from "../../../../../firebase/config";
+import { apiClient } from "../../../../../services/apiClient";
 import type { OrderChatMessage } from "../types";
 
 interface UseOrderChatArgs {
@@ -206,6 +207,28 @@ export function useOrderChat({
         timestamp: Date.now(),
         ...payload,
       });
+
+      // Fire push notification to customer's device
+      if (orderId) {
+        const notifText =
+          payload.text ||
+          (payload.type === 'pinpoints'
+            ? '📍 Updated store pinpoints for your errand'
+            : payload.type === 'revision'
+            ? '📋 Sent an order breakdown for your review'
+            : payload.type === 'payment_enabled'
+            ? '💳 Enabled GCash / Maya payment for your errand'
+            : null);
+
+        if (notifText) {
+          void apiClient
+            .post(`/errands/${orderId}/chat-notify`, {
+              text: notifText,
+              senderName: dispatcherFirstName,
+            })
+            .catch(() => {});
+        }
+      }
     },
     [orderId, dispatcher, dispatcherFirstName]
   );

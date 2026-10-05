@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/AuthContext";
+import { useMaintenanceCheck } from "../../hooks/useMaintenanceCheck";
+import { MaintenanceOverlay } from "../../components/MaintenanceOverlay";
+import { MaintenanceWarningBanner } from "../../components/MaintenanceWarningBanner";
 import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
+
 // Straight to the workspace. `ErrandQueueTable` was a 21-line file whose entire
 // body was `return <DispatchManagementWorkspace {...props} />`, so it added a
 // second props interface to keep in sync and a name that promised a table this
@@ -20,8 +24,17 @@ import {
 } from "lucide-react";
 import { NotificationBell } from "../../components/NotificationBell";
 import { HeaderClock } from "../../components/HeaderClock";
+import { HeaderAudioStatus } from "../../components/HeaderAudioStatus";
+import { useCustomerChatAlerts } from "./hooks/useCustomerChatAlerts";
+import { CustomerChatToastContainer } from "./components/CustomerChatToastContainer";
+import { useRiderChatAlerts } from "./hooks/useRiderChatAlerts";
+import { RiderChatToastContainer } from "./components/RiderChatToastContainer";
 import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
 import { fetchStaffPhoto } from "../../services/staffPhotoService";
+import { useDeviceTier } from "../../hooks/useDeviceTier";
+import { MobileHeader } from "../../components/navigation/MobileHeader";
+import { MobileBottomNav, type MobileNavTab } from "../../components/navigation/MobileBottomNav";
+import { ScrollToTopButton } from "../../components/common/ScrollToTopButton";
 import {
   Sidebar,
   SidebarContent,
@@ -74,8 +87,11 @@ export default function DispatcherPortal() {
     handleOpenChat,
     handleCloseChat,
   } = useDispatcherPortal(user?.id, user?.name);
-  const { riders, telemetryError: fleetTelemetryError } = useRiderFleetPresence();
+  const { riders, telemetryError: fleetTelemetryError, liveLink: fleetLiveLink } = useRiderFleetPresence({
+    alertOnSignalLost: true,
+  });
   const exceptionQueue = useOpenExceptions();
+  const maintenance = useMaintenanceCheck("dispatcher");
 
   const [sidebarPhotoUri, setSidebarPhotoUri] = useState<string | null>(null);
   useEffect(() => {
@@ -91,6 +107,50 @@ export default function DispatcherPortal() {
       cancelled = true;
     };
   }, [user?.id]);
+
+  const {
+    unreadCounts,
+    totalUnreadCount,
+    activeToasts,
+    dismissToast,
+    markErrandAsRead,
+  } = useCustomerChatAlerts({
+    errands,
+    activeErrandId: selectedErrandId,
+    onOpenChat: handleOpenChat,
+  });
+
+  const [selectedRiderIdForChat, setSelectedRiderIdForChat] = useState<string | null>(null);
+
+  const handleOpenRiderChat = useCallback((riderId: string) => {
+    setSelectedRiderIdForChat(riderId);
+    setActiveTab("messages");
+  }, [setActiveTab]);
+
+  const {
+    unreadCounts: riderUnreadCounts,
+    totalUnreadCount: totalRiderUnreadCount,
+    activeToasts: riderToasts,
+    dismissToast: dismissRiderToast,
+    markRiderAsRead,
+  } = useRiderChatAlerts({
+    riders,
+    activeRiderId: activeTab === "messages" ? selectedRiderIdForChat : null,
+    onOpenRiderChat: handleOpenRiderChat,
+  });
+
+  useEffect(() => {
+    const handleOpenErrandEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ errandId?: string }>;
+      const errandId = customEvent.detail?.errandId;
+      if (errandId) {
+        markErrandAsRead(errandId);
+        handleOpenChat(errandId);
+      }
+    };
+    window.addEventListener("sugo:open-errand", handleOpenErrandEvent);
+    return () => window.removeEventListener("sugo:open-errand", handleOpenErrandEvent);
+  }, [handleOpenChat, markErrandAsRead]);
 
   const availableCount = errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length;
   const activeCount = errands.filter((e) => {
@@ -110,9 +170,97 @@ export default function DispatcherPortal() {
   const exceptionCount = exceptionQueue.openCount;
   const onlineRidersCount = riders.filter((r) => r.online).length;
 
+  const { isMobile } = useDeviceTier();
+
+  const mobilePrimaryTabs: MobileNavTab[] = [
+    {
+      id: "queue",
+      label: "Queue",
+      icon: <ClipboardList className="w-5 h-5" />,
+      badge: availableCount > 0 ? availableCount : undefined,
+      isActive: activeTab === "queue",
+      onClick: () => setActiveTab("queue"),
+    },
+    {
+      id: "active_errands",
+      label: "Active",
+      icon: <Bike className="w-5 h-5" />,
+      badge: totalUnreadCount > 0 ? `${totalUnreadCount} new` : activeCount > 0 ? activeCount : undefined,
+      isActive: activeTab === "active_errands",
+      onClick: () => setActiveTab("active_errands"),
+    },
+    {
+      id: "exceptions",
+      label: "Conflict",
+      icon: <AlertTriangle className="w-5 h-5" />,
+      badge: exceptionCount > 0 ? exceptionCount : undefined,
+      isActive: activeTab === "exceptions",
+      onClick: () => setActiveTab("exceptions"),
+    },
+    {
+      id: "riders",
+      label: "Tracking",
+      icon: <Activity className="w-5 h-5" />,
+      badge: onlineRidersCount > 0 ? onlineRidersCount : undefined,
+      isActive: activeTab === "riders",
+      onClick: () => setActiveTab("riders"),
+    },
+  ];
+
+  const mobileMoreTabs: MobileNavTab[] = [
+    {
+      id: "messages",
+      label: "Rider Messages",
+      icon: <MessageSquare className="w-5 h-5" />,
+      badge: totalRiderUnreadCount > 0 ? totalRiderUnreadCount : undefined,
+      isActive: activeTab === "messages",
+      onClick: () => setActiveTab("messages"),
+      description: "Internal communication with on-duty riders",
+    },
+    {
+      id: "recent_chats",
+      label: "Customer Chats",
+      icon: <MessageCircle className="w-5 h-5" />,
+      badge: totalUnreadCount > 0 ? totalUnreadCount : undefined,
+      isActive: activeTab === "recent_chats",
+      onClick: () => setActiveTab("recent_chats"),
+      description: "Customer support inquiry logs & active chats",
+    },
+    {
+      id: "profile",
+      label: "Profile & Settings",
+      icon: <BikeIcon className="w-5 h-5" />,
+      isActive: activeTab === "profile",
+      onClick: () => setActiveTab("profile"),
+      description: "Dispatcher account, security logs & active sessions",
+    },
+  ];
+
   return (
-    <TooltipProvider>
+    <>
+      {maintenance.showWarningBanner && (
+        <MaintenanceWarningBanner
+          portal="dispatcher"
+          maintenanceType={maintenance.maintenanceType}
+          countdownSeconds={maintenance.countdownSeconds}
+          header={maintenance.header}
+          customColor={maintenance.customColor}
+        />
+      )}
+      {maintenance.showFullScreenOverlay && (
+        <MaintenanceOverlay
+          portal="dispatcher"
+          header={maintenance.header}
+          message={maintenance.message}
+          notice={maintenance.notice}
+          maintenanceType={maintenance.maintenanceType}
+          supportContact={maintenance.supportContact}
+          customColor={maintenance.customColor}
+        />
+      )}
+      <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
+
         {/* data-portal marks the whole dispatcher shell, rail included. It
             carries nothing but the icon stroke: the navigation rail sits an
             inch from the console and a 2px nav icon beside a 1.5px console icon
@@ -150,6 +298,7 @@ export default function DispatcherPortal() {
               #0F2035, so on a #0F2035 rail it would be an invisible outline.
               This flips it to the ground. Styling only: no geometry rides on
               it, so the alignment contract is untouched. */}
+          {!isMobile && (
           <Sidebar
             data-on-field
             collapsible="icon"
@@ -173,53 +322,53 @@ export default function DispatcherPortal() {
               <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:gap-0 overflow-hidden w-full">
                 {/* Expanded Text Branding (Hidden when collapsed) */}
                 <div className="min-w-0 px-3 group-data-[collapsible=icon]:px-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <h2 className="font-black text-white text-sm tracking-wider leading-tight truncate">
+                  <p className="truncate text-panel leading-tight text-board-plate">
                     SUGO ON THE GO
-                  </h2>
-                  <p className="text-[10px] text-slate-300/90 font-semibold tracking-wider truncate mt-0.5">
+                  </p>
+                  <p className="mt-0.5 truncate text-label text-board-trim">
                     Dispatcher Console • Tacurong
                   </p>
                 </div>
 
                 {/* Collapsed Brand Icon Logo (Shown ONLY when collapsed) */}
-                <div className="size-9 rounded-lg bg-red-600 hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 shadow-xs mx-auto">
-                  <BikeIcon size={20} className="text-white" />
+                <div className="size-9 rounded-trim bg-signal hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 mx-auto">
+                  <BikeIcon size={20} className="text-board-plate" />
                 </div>
 
                 {/* Sidebar Trigger Button */}
-                <SidebarTrigger className="text-slate-400 hover:text-white hover:bg-white/10 size-8 rounded-lg shrink-0 group-data-[collapsible=icon]:hidden focus-visible:ring-2 focus-visible:ring-white/70" />
+                <SidebarTrigger className="text-board-trim hover:text-board-plate hover:bg-white/10 size-8 rounded-trim shrink-0 group-data-[collapsible=icon]:hidden" />
               </div>
-              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-slate-400 hover:text-white hover:bg-white/10 size-9 rounded-lg mx-auto mt-2 focus-visible:ring-2 focus-visible:ring-white/70" />
+              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-board-trim hover:text-board-plate hover:bg-white/10 size-9 rounded-trim mx-auto mt-2" />
             </SidebarHeader>
 
             {/* Structured Navigation Groups */}
             <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-2.5 space-y-4 transition-all duration-300">
               {/* Operations Group */}
               <SidebarGroup className="p-0 space-y-1">
-                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-3 group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel className="px-3 text-micro uppercase text-board-trim group-data-[collapsible=icon]:hidden">
                   Operations
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-1">
-                    {/* Order Queue */}
+                    {/* Dispatcher Management (formerly Order Queue) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("queue")}
                         isActive={activeTab === "queue"}
-                        tooltip={availableCount > 0 ? `Order Queue (${availableCount} available)` : "Order Queue"}
+                        tooltip={availableCount > 0 ? `Dispatcher Management (${availableCount} available)` : "Dispatcher Management"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "queue"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <ClipboardList
-                              size={17}
+                              size={16}
                               className={`shrink-0 transition-colors ${
-                                activeTab === "queue" ? "text-white" : "text-slate-400 group-hover:text-white"
+                                activeTab === "queue" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
                               }`}
                             />
                             {availableCount > 0 && (
@@ -227,14 +376,14 @@ export default function DispatcherPortal() {
                             )}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Order Queue
+                            Dispatcher Management
                           </span>
                         </div>
                         {availableCount > 0 && (
                           <span
-                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
                               activeTab === "queue"
-                                ? "bg-white/20 text-white"
+                                ? "bg-white/20 text-board-plate"
                                 : "bg-amber-400/20 text-amber-300 border border-amber-400/30"
                             }`}
                           >
@@ -251,61 +400,72 @@ export default function DispatcherPortal() {
                         isActive={activeTab === "active_errands"}
                         tooltip={activeCount > 0 ? `Active Errands (${activeCount} in progress)` : "Active Errands"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "active_errands"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <Activity
-                              size={17}
+                              size={16}
                               className={`shrink-0 transition-colors ${
-                                activeTab === "active_errands" ? "text-white" : "text-slate-400 group-hover:text-white"
+                                activeTab === "active_errands" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
                               }`}
                             />
-                            {activeCount > 0 && (
+                            {totalUnreadCount > 0 ? (
+                              <span className="hidden group-data-[collapsible=icon]:block absolute -top-1 -right-1 size-2 rounded-full bg-amber-400 ring-2 ring-[#0F2035] animate-pulse" />
+                            ) : activeCount > 0 ? (
                               <span className="hidden group-data-[collapsible=icon]:block absolute -top-1 -right-1 size-2 rounded-full bg-emerald-400 ring-2 ring-[#0F2035]" />
-                            )}
+                            ) : null}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
                             Active Errands
                           </span>
                         </div>
-                        {activeCount > 0 && (
-                          <span
-                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                              activeTab === "active_errands"
-                                ? "bg-white/20 text-white"
-                                : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
-                            }`}
-                          >
-                            {activeCount}
-                          </span>
+                        {(activeCount > 0 || totalUnreadCount > 0) && (
+                          <div className="group-data-[collapsible=icon]:hidden flex items-center gap-1.5 shrink-0">
+                            {totalUnreadCount > 0 && (
+                              <span className="font-mono text-micro px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                                {totalUnreadCount} new
+                              </span>
+                            )}
+                            {activeCount > 0 && (
+                              <span
+                                className={`font-mono text-micro px-2 py-0.5 rounded-full ${
+                                  activeTab === "active_errands"
+                                    ? "bg-white/20 text-board-plate"
+                                    : "bg-emerald-400/20 text-emerald-300 border border-emerald-400/30"
+                                }`}
+                              >
+                                {activeCount}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Needs a Decision (Exceptions) */}
+                    {/* Conflict Management (formerly Needs a Decision) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("exceptions")}
                         isActive={activeTab === "exceptions"}
-                        tooltip={exceptionCount > 0 ? `Needs a Decision (${exceptionCount} urgent)` : "Needs a Decision"}
+                        tooltip={exceptionCount > 0 ? `Conflict Management (${exceptionCount} urgent)` : "Conflict Management"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "exceptions"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <AlertTriangle
-                              size={17}
+                              size={16}
                               className={`shrink-0 transition-colors ${
-                                activeTab === "exceptions" ? "text-white" : "text-slate-400 group-hover:text-white"
+                                activeTab === "exceptions" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
                               }`}
                             />
                             {exceptionCount > 0 && (
@@ -313,14 +473,14 @@ export default function DispatcherPortal() {
                             )}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Needs a Decision
+                            Conflict Management
                           </span>
                         </div>
                         {exceptionCount > 0 && (
                           <span
-                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
                               activeTab === "exceptions"
-                                ? "bg-white/20 text-white"
+                                ? "bg-white/20 text-board-plate"
                                 : "bg-red-500/20 text-red-300 border border-red-500/30"
                             }`}
                           >
@@ -330,25 +490,25 @@ export default function DispatcherPortal() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Fleet Tracking */}
+                    {/* Tracking (formerly Fleet Tracking) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("riders")}
                         isActive={activeTab === "riders"}
                         tooltip={riders.length > 0 ? `Tracking (${onlineRidersCount}/${riders.length} online)` : "Tracking"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "riders"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
                           <div className="relative flex items-center justify-center shrink-0">
                             <Bike
-                              size={17}
+                              size={16}
                               className={`shrink-0 transition-colors ${
-                                activeTab === "riders" ? "text-white" : "text-slate-400 group-hover:text-white"
+                                activeTab === "riders" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
                               }`}
                             />
                             {onlineRidersCount > 0 && (
@@ -356,14 +516,14 @@ export default function DispatcherPortal() {
                             )}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Fleet Tracking
+                            Tracking
                           </span>
                         </div>
                         {riders.length > 0 && (
                           <span
-                            className={`group-data-[collapsible=icon]:hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
                               activeTab === "riders"
-                                ? "bg-white/20 text-white"
+                                ? "bg-white/20 text-board-plate"
                                 : "bg-blue-400/20 text-blue-300 border border-blue-400/30"
                             }`}
                           >
@@ -378,7 +538,7 @@ export default function DispatcherPortal() {
 
               {/* Communications Group */}
               <SidebarGroup className="p-0 space-y-1">
-                <SidebarGroupLabel className="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 px-3 group-data-[collapsible=icon]:hidden">
+                <SidebarGroupLabel className="px-3 text-micro uppercase text-board-trim group-data-[collapsible=icon]:hidden">
                   Communications
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -388,52 +548,84 @@ export default function DispatcherPortal() {
                       <SidebarMenuButton
                         onClick={() => setActiveTab("messages")}
                         isActive={activeTab === "messages"}
-                        tooltip="Rider Messages"
+                        tooltip={totalRiderUnreadCount > 0 ? `Rider Messages (${totalRiderUnreadCount} unread)` : "Rider Messages"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "messages"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
-                          <MessageSquare
-                            size={17}
-                            className={`shrink-0 transition-colors ${
-                              activeTab === "messages" ? "text-white" : "text-slate-400 group-hover:text-white"
-                            }`}
-                          />
+                          <div className="relative flex items-center justify-center shrink-0">
+                            <MessageSquare
+                              size={16}
+                              className={`shrink-0 transition-colors ${
+                                activeTab === "messages" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
+                              }`}
+                            />
+                            {totalRiderUnreadCount > 0 && (
+                              <span className="hidden group-data-[collapsible=icon]:block absolute -top-1 -right-1 size-2 rounded-full bg-sky-400 ring-2 ring-[#0F2035] animate-pulse" />
+                            )}
+                          </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
                             Rider Messages
                           </span>
                         </div>
+                        {totalRiderUnreadCount > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
+                              activeTab === "messages"
+                                ? "bg-white/20 text-board-plate"
+                                : "bg-sky-400/20 text-sky-300 border border-sky-400/30 animate-pulse"
+                            }`}
+                          >
+                            {totalRiderUnreadCount}
+                          </span>
+                        )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Customer Chats */}
+                    {/* Customer Chat History (formerly Customer Chats) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("recent_chats")}
                         isActive={activeTab === "recent_chats"}
-                        tooltip="Customer Chats History"
+                        tooltip={totalUnreadCount > 0 ? `Customer Chat History (${totalUnreadCount} unread)` : "Customer Chat History"}
                         size="default"
-                        className={`w-full flex items-center justify-between px-3 h-10 rounded-xl text-xs font-bold transition-all duration-200 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "recent_chats"
-                            ? "bg-red-600 text-white font-semibold shadow-xs"
-                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
-                          <MessageCircle
-                            size={17}
-                            className={`shrink-0 transition-colors ${
-                              activeTab === "recent_chats" ? "text-white" : "text-slate-400 group-hover:text-white"
-                            }`}
-                          />
+                          <div className="relative flex items-center justify-center shrink-0">
+                            <MessageCircle
+                              size={16}
+                              className={`shrink-0 transition-colors ${
+                                activeTab === "recent_chats" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
+                              }`}
+                            />
+                            {totalUnreadCount > 0 && (
+                              <span className="hidden group-data-[collapsible=icon]:block absolute -top-1 -right-1 size-2 rounded-full bg-amber-400 ring-2 ring-[#0F2035] animate-pulse" />
+                            )}
+                          </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Customer Chats
+                            Customer Chat History
                           </span>
                         </div>
+                        {totalUnreadCount > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
+                              activeTab === "recent_chats"
+                                ? "bg-white/20 text-board-plate"
+                                : "bg-amber-400/20 text-amber-300 border border-amber-400/30 animate-pulse"
+                            }`}
+                          >
+                            {totalUnreadCount}
+                          </span>
+                        )}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   </SidebarMenu>
@@ -441,17 +633,20 @@ export default function DispatcherPortal() {
               </SidebarGroup>
             </SidebarContent>
 
-            {/* Sidebar User & Logout Footer */}
+            {/* Sidebar User Profile & Sign Out Footer */}
             <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2.5 transition-all duration-300 gap-2">
               <button
                 type="button"
                 onClick={() => setActiveTab("profile")}
                 title="Profile & Settings"
-                className={`w-full flex items-center gap-2.5 px-3 py-1 rounded-xl transition-colors group-data-[collapsible=icon]:hidden ${
-                  activeTab === "profile" ? "bg-white/10" : "hover:bg-white/10"
-                } focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none`}
+                className={`flex items-center gap-2.5 px-3 py-1 min-w-0 group-data-[collapsible=icon]:hidden text-left rounded-plate ${
+                  activeTab === "profile" ? "bg-white/10" : "hover:bg-white/5"
+                } transition-colors cursor-pointer w-full`}
               >
-                <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center text-white text-xs font-black shrink-0 shadow-xs ring-1 ring-white/10 overflow-hidden">
+                <div
+                  className="w-9 h-9 rounded-plate bg-signal flex items-center justify-center text-board-plate text-micro shrink-0 ring-1 ring-white/10 overflow-hidden"
+                  title={user?.name || "Duty Dispatcher"}
+                >
                   {sidebarPhotoUri ? (
                     <img src={sidebarPhotoUri} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -463,11 +658,11 @@ export default function DispatcherPortal() {
                       .toUpperCase()
                   )}
                 </div>
-                <div className="min-w-0 text-left opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="text-xs font-bold text-white truncate">
+                <div className="min-w-0 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  <p className="truncate text-label text-board-plate">
                     {user?.name || "Duty Dispatcher"}
                   </p>
-                  <p className="text-[10px] text-slate-300/80 truncate font-mono">
+                  <p className="truncate font-mono text-micro text-board-trim">
                     {user?.email || "dispatcher@sugo.ph"}
                   </p>
                 </div>
@@ -475,7 +670,7 @@ export default function DispatcherPortal() {
 
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-xl bg-red-600/90 hover:bg-red-600 text-white text-xs font-bold transition-colors shadow-xs group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-lg group-data-[collapsible=icon]:mx-auto focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+                className="w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-plate bg-signal hover:bg-signal-deep text-board-plate text-label transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:mx-auto"
                 title="Sign Out"
               >
                 <LogOut size={16} className="shrink-0" />
@@ -485,13 +680,14 @@ export default function DispatcherPortal() {
               </button>
 
               <div className="pt-1 px-3 text-left group-data-[collapsible=icon]:hidden">
-                <p className="text-[10px] text-slate-400 font-medium">
+                <p className="text-micro text-board-trim">
                   &copy; {new Date().getFullYear()} Sugo on the Go
                 </p>
               </div>
             </SidebarFooter>
             <SidebarRail />
           </Sidebar>
+          )}
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
             {/* data-surface because DialogContent portals to document.body,
@@ -545,13 +741,38 @@ export default function DispatcherPortal() {
           </Dialog>
 
           {/* Main Operations Console */}
-          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full relative">
+          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full relative flex flex-col h-full min-h-0 overflow-hidden">
+            {isMobile && (
+              <MobileHeader
+                title="SUGO Dispatch"
+                subtitle={signedRun ? formatErrandId(signedRun.id) : `${(user?.name || "Duty Dispatcher").split(" ")[0]} • Tacurong`}
+                rightElement={
+                  <div className="flex items-center gap-1.5">
+                    <HeaderAudioStatus />
+                    <HeaderClock />
+                    <NotificationBell />
+                    <button
+                      type="button"
+                      onClick={() => setShowSignOutConfirm(true)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Sign Out"
+                      aria-label="Sign Out"
+                    >
+                      <LogOut className="w-4 h-4 text-rose-400" />
+                    </button>
+                  </div>
+                }
+              />
+            )}
             {/* The console's own surface. Every token and browser-surface rule
                 in src/styles/surfaces.css is scoped to this attribute, which is
                 what keeps the route board out of the Owner portal. */}
             <main
               data-surface="dispatch"
-              className="flex h-screen w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4"
+              className={cn(
+                "flex h-screen w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4",
+                isMobile && "pb-20 pt-1"
+              )}
             >
               {/* ───────────────────────────────────────────────────────────── */}
               {/* 1. THE DESTINATION BAND (pinned)                              */}
@@ -581,8 +802,8 @@ export default function DispatcherPortal() {
                       {signedRun
                         ? signedRun.pinpoints?.[0]?.storeName ||
                           signedRun.category ||
-                          "Dispatch board"
-                        : "Dispatch board"}
+                          "Dispatch Management"
+                        : "Dispatch Management"}
                     </h1>
                     {signedRun ? (
                       <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-label text-board-trim">
@@ -606,7 +827,7 @@ export default function DispatcherPortal() {
                         something is actually owed: on this surface red means
                         "you must act" and nothing else. */}
                     <div className="text-right">
-                      <p className="text-micro uppercase text-board-trim">Needs a decision</p>
+                      <p className="text-micro uppercase text-board-trim">Conflict Management</p>
                       <p
                         data-figure
                         className={cn(
@@ -620,6 +841,7 @@ export default function DispatcherPortal() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
+                      <HeaderAudioStatus />
                       <HeaderClock />
                       <NotificationBell />
                     </div>
@@ -679,6 +901,7 @@ export default function DispatcherPortal() {
                     onClaimOrder={handleClaimOrder}
                     onDeclineOrder={handleDeclineOrder}
                     onOpenChat={handleOpenChat}
+                    unreadCounts={unreadCounts}
                     isLoading={isLoading}
                     loadError={loadError}
                     onRetry={fetchOrders}
@@ -689,6 +912,7 @@ export default function DispatcherPortal() {
                   <ActiveErrandsPanel
                     errands={errands}
                     onOpenChat={handleOpenChat}
+                    unreadCounts={unreadCounts}
                     isLoading={isLoading}
                     loadError={loadError}
                     onRetry={fetchOrders}
@@ -696,13 +920,24 @@ export default function DispatcherPortal() {
                 )}
                 {activeTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
                 {activeTab === "riders" && (
-                  <RiderFleetRoster riders={riders} telemetryError={fleetTelemetryError} />
+                  <RiderFleetRoster
+                    riders={riders}
+                    telemetryError={fleetTelemetryError}
+                    errands={errands}
+                    liveLink={fleetLiveLink}
+                  />
                 )}
                 {activeTab === "messages" && (
                   <DispatcherRiderMessagesPanel
                     errands={errands}
                     riders={riders}
                     dispatcher={user}
+                    selectedRiderId={selectedRiderIdForChat}
+                    onSelectRiderId={(rId) => {
+                      setSelectedRiderIdForChat(rId);
+                      markRiderAsRead(rId);
+                    }}
+                    unreadCounts={riderUnreadCounts}
                   />
                 )}
                 {activeTab === "recent_chats" && (
@@ -718,7 +953,9 @@ export default function DispatcherPortal() {
               </div>
             </main>
           
-          {/* Full-screen order chat: the conversation and the five dispatch stages */}
+          {/* Full-screen order chat: the conversation and the three dispatch
+              steps. Opening it accepts the order (onVerify), so there is no
+              return-to-queue from inside it any more. */}
           {selectedErrandId && (
             <OrderChatScreen
               orderId={selectedErrandId}
@@ -727,16 +964,34 @@ export default function DispatcherPortal() {
               onRefreshOrders={fetchOrders}
               readOnly={activeTab === "recent_chats"}
               onVerify={(id) => handleVerifyErrand(id, user)}
-              onRelease={handleReleaseErrand}
               onDecline={async (id, reason) => {
                 await handleDeclineOrder(id, reason);
                 handleCloseChat();
               }}
             />
           )}
+
+          {isMobile && (
+            <MobileBottomNav primaryTabs={mobilePrimaryTabs} moreTabs={mobileMoreTabs} />
+          )}
+          <ScrollToTopButton />
+          <CustomerChatToastContainer
+            toasts={activeToasts}
+            onDismiss={dismissToast}
+            onOpenChat={(id) => {
+              markErrandAsRead(id);
+              handleOpenChat(id);
+            }}
+          />
+          <RiderChatToastContainer
+            toasts={riderToasts}
+            onDismiss={dismissRiderToast}
+            onOpenRiderChat={handleOpenRiderChat}
+          />
         </SidebarInset>
       </div>
     </SidebarProvider>
       </TooltipProvider>
+    </>
   );
 }
