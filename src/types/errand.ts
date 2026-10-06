@@ -20,6 +20,8 @@ export interface ErrandPinpoint {
   latitude: number;
   longitude: number;
   sequence: number;
+  /** The merchant category the stop was filed under, added by the server. */
+  storeCategory?: string | null;
 }
 
 export interface ErrandItem {
@@ -28,10 +30,15 @@ export interface ErrandItem {
   itemName: string;
   storeCategory?: string;
   quantity?: number;
+  /** How big one of them is ("5 kg"); show it with formatItemLabel. */
+  size?: string | null;
   unitPrice?: number;
   estimatedSubtotal?: number;
   fulfillmentStatus?: "PENDING" | "PURCHASED" | "OUT_OF_STOCK";
-  notes?: string;
+  /** What the customer asked the rider to mind about this item. */
+  notes?: string | null;
+  /** The stop this item is bought at. Null when it was never pinned to one. */
+  pinpointId?: number | null;
 }
 
 export interface Errand {
@@ -55,11 +62,42 @@ export interface Errand {
       | "SETTLED"
       | "REFUNDED";
   } | null;
+  /**
+   * What the customer pays, server-derived (buildFeeBreakdown). `isFinal` is
+   * false while the fee is still the default and has not been routed.
+   */
+  feeBreakdown?: {
+    fees: {
+      baseFee: number;
+      distanceFee: number;
+      multiStoreFee: number;
+      groceryFee: number;
+      nonCodFee: number;
+      subtotal: number;
+    };
+    itemsSubtotal: number;
+    tip: number;
+    grandTotal: number;
+    isFinal: boolean;
+  } | null;
+  /**
+   * What the rider takes home, server-derived (buildRiderEarnings). `isFinal`
+   * is true once a commission row has been written for the errand.
+   */
+  riderEarnings?: {
+    riderShare: number;
+    deliveryFee: number;
+    tip: number;
+    commissionRate: number;
+    isFinal: boolean;
+  } | null;
   /** The basket the customer agreed to; the handling fee is never billed above it. */
   quotedHandlingBasket?: number | null;
   id: string;
   customerName: string;
   customerPhone: string;
+  customerPhoneVerified?: boolean;
+  customerPhoneVerifiedAt?: string | null;
   category: string;
   description: string;
   pickupAddress: string;

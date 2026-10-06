@@ -20,6 +20,7 @@ type DispatcherTab =
   | "riders"
   | "recent_chats"
   | "messages"
+  | "history"
   | "profile";
 const TAB_IDS: DispatcherTab[] = [
   "queue",
@@ -28,6 +29,7 @@ const TAB_IDS: DispatcherTab[] = [
   "riders",
   "recent_chats",
   "messages",
+  "history",
   "profile",
 ];
 
@@ -42,6 +44,8 @@ function mapPrismaErrand(prismaErrand: any): Errand {
     // defeated every display-level fallback downstream, since the field was
     // always truthy by the time a panel saw it.
     customerPhone: prismaErrand.customer?.phone || "",
+    customerPhoneVerified: Boolean(prismaErrand.customer?.phoneVerified),
+    customerPhoneVerifiedAt: prismaErrand.customer?.phoneVerifiedAt || null,
     category: prismaErrand.category,
     description: prismaErrand.description,
     pickupAddress: prismaErrand.pickupAddress,
@@ -83,6 +87,14 @@ function mapPrismaErrand(prismaErrand: any): Errand {
     paymentPlan: prismaErrand.paymentPlan ?? null,
     quotedHandlingBasket:
       prismaErrand.quotedHandlingBasket != null ? Number(prismaErrand.quotedHandlingBasket) : null,
+    // Read by My History: when a run ended, what the customer paid, and what
+    // the rider took home. All four were sent by the server and dropped here.
+    assignedAt: prismaErrand.assignedAt ?? null,
+    acceptedAt: prismaErrand.acceptedAt ?? null,
+    deliveredAt: prismaErrand.deliveredAt ?? null,
+    completedAt: prismaErrand.completedAt ?? null,
+    feeBreakdown: prismaErrand.feeBreakdown ?? null,
+    riderEarnings: prismaErrand.riderEarnings ?? null,
     createdAt: prismaErrand.createdAt,
     updatedAt: prismaErrand.updatedAt,
   };

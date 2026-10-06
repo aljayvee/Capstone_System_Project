@@ -417,6 +417,16 @@ export interface ApiProofImage {
   } | null;
 }
 
+/** One recorded reason a dispatcher gave for declining an order. */
+export interface ApiDeclineReason {
+  id: number;
+  reason: string;
+  /** True when the dispatcher typed it rather than picking a listed reason. */
+  isCustom: boolean;
+  createdAt: string;
+  dispatcher?: { firstName: string | null; lastName: string | null } | null;
+}
+
 export interface ApiExceptionReport {
   meta?: { period: ReportPeriod | "CUSTOM"; rangeLabel: string; start: string; end: string };
   exceptions: ApiErrandException[];
@@ -1135,6 +1145,20 @@ export const apiService = {
         `/errands/${errandId}/proof-images/${imageId}`
       );
       return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * Why an order was declined, most recent first. An empty array means none
+   * was recorded (an order closed without one); null means the request failed.
+   */
+  async getDeclineReasons(errandId: string): Promise<ApiDeclineReason[] | null> {
+    try {
+      const response = await apiClient.get<ApiDeclineReason[]>(`/errands/${errandId}/decline-reasons`);
+      return Array.isArray(response.data) ? response.data : [];
     } catch (err) {
       console.warn("API unavailable", err);
       return null;

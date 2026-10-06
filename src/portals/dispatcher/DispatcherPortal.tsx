@@ -20,8 +20,9 @@ import { ExceptionQueuePanel } from "./components/ExceptionQueuePanel";
 import { DispatcherProfilePanel } from "./components/DispatcherProfilePanel";
 import { useOpenExceptions } from "./hooks/useOpenExceptions";
 import {
-  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle
+  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle, History
 } from "lucide-react";
+import { DispatcherHistoryPanel } from "./components/history/DispatcherHistoryPanel";
 import { NotificationBell } from "../../components/NotificationBell";
 import { HeaderClock } from "../../components/HeaderClock";
 import { HeaderAudioStatus } from "../../components/HeaderAudioStatus";
@@ -225,6 +226,14 @@ export default function DispatcherPortal() {
       isActive: activeTab === "recent_chats",
       onClick: () => setActiveTab("recent_chats"),
       description: "Customer support inquiry logs & active chats",
+    },
+    {
+      id: "history",
+      label: "Customer Transaction",
+      icon: <History className="w-5 h-5" />,
+      isActive: activeTab === "history",
+      onClick: () => setActiveTab("history"),
+      description: "Orders you handled that were delivered or cancelled",
     },
     {
       id: "profile",
@@ -530,6 +539,35 @@ export default function DispatcherPortal() {
                             {onlineRidersCount}/{riders.length}
                           </span>
                         )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    {/* Customer Transaction (formerly My History): this dispatcher's delivered and cancelled orders */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setActiveTab("history")}
+                        isActive={activeTab === "history"}
+                        tooltip="Customer Transaction"
+                        size="default"
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                          activeTab === "history"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
+                          <div className="relative flex items-center justify-center shrink-0">
+                            <History
+                              size={16}
+                              className={`shrink-0 transition-colors ${
+                                activeTab === "history" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
+                              }`}
+                            />
+                          </div>
+                          <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                            Customer Transaction
+                          </span>
+                        </div>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   </SidebarMenu>
@@ -949,6 +987,16 @@ export default function DispatcherPortal() {
                     onRetry={fetchOrders}
                   />
                 )}
+                {activeTab === "history" && (
+                  <DispatcherHistoryPanel
+                    errands={errands}
+                    currentUserId={user?.id}
+                    onOpenChat={handleOpenChat}
+                    isLoading={isLoading}
+                    loadError={loadError}
+                    onRetry={fetchOrders}
+                  />
+                )}
                 {activeTab === "profile" && <DispatcherProfilePanel />}
               </div>
             </main>
@@ -962,7 +1010,10 @@ export default function DispatcherPortal() {
               dispatcher={user}
               onClose={handleCloseChat}
               onRefreshOrders={fetchOrders}
-              readOnly={activeTab === "recent_chats"}
+              // History opens finished orders only. Read-only also keeps
+              // accept-on-open away from an order declined before it was
+              // ever verified, which would otherwise look unaccepted.
+              readOnly={activeTab === "recent_chats" || activeTab === "history"}
               onVerify={(id) => handleVerifyErrand(id, user)}
               onDecline={async (id, reason) => {
                 await handleDeclineOrder(id, reason);
