@@ -287,6 +287,94 @@
   - **Deployed**: backend (backup `/root/deploy-backups/server-20260924-003954`), web (rollback
     `/root/deploy-backups/web-20260924-004356`). Needs the new Sugo Rider APK on phones to take effect.
 
+* **`size` column on pabili items (2026-10-05, Claude, status: APPROVED BY USER OVERRIDE)**:
+  - **Touches a `[LOCKED]` contract** (Prisma schema). **Approved 2026-10-05 on the user's direct instruction**
+    ("I override, proceed now"), not joint consensus, same as the VPS and portal-domain amendments above.
+    Gemini may still record an objection below. Plan: `C:\Users\Capstone\.claude\plans\just-a-question-how-clever-clock.md`.
+  - **Problem**: customers type `5 Kilo of Chicken 2qty` into one name. Size, count and product share
+    `itemName` while `quantity` stays 1, so the rider reads noise, `totalItemUnits` undercounts the handling
+    fee, and `itemNameKey` learned memory and the category model train on polluted names.
+  - **Change (additive only)**: `size String? @db.VarChar(40)` on `PabiliDetail` (schema.prisma:538,
+    `pabili_details_tbl`) and `PabiliItemRequest` (schema.prisma:573, `pabili_item_requests_tbl`).
+    No rename, no drop, no type change, no new relation. `itemName` and `quantity Int` are untouched.
+    - Migration `20261006120000_add_pabili_item_size`, written by hand (`migrate dev` is broken):
+      `ALTER TABLE pabili_details_tbl ADD COLUMN size VARCHAR(40) NULL;` and the same for
+      `pabili_item_requests_tbl`.
+    - Rollback: `ALTER TABLE ... DROP COLUMN size` on both tables. No data depends on it in `fold` mode.
+  - **Production apply**: back up, then `prisma db execute --file` with only those two statements,
+    then `prisma migrate resolve --applied`, build on the VPS, `pm2 restart`. Deliberately neither `db push`
+    nor `migrate deploy`: line 56 says database deploys use `db push`, line 136 says never `db push` in
+    `/var/www/server` (it holds an uncommitted `schema.prisma`, so a push would sync that file's drift too).
+    **The user ruled 2026-10-05**: additive schema changes go to production as hand-written statements
+    through `prisma db execute`, after a backup. Line 56 still describes how the tables were first created.
+  - **Carry-over rule** (`pabiliDetailRepository.replaceForErrand`): that function deletes and recreates every
+    row from name, category and quantity, so a dispatcher save would null every size. The PATCH carries
+    `size`; when a row omits it, `prev.size` is kept; `isUnmodified` compares size too.
+  - **Fold switch** `ITEM_SIZE_STORAGE=fold|column` (default `fold`): in `fold` the server stores
+    `formatItemLabel(name, size)` ("Chicken · 5 kg") in `itemName` and leaves `size` NULL, so riders on an old
+    APK still see the size. Flip to `column` once every rider phone has the build that renders `size`.
+    Rollout order: server, web, rider APK, CustomerApp, then the flip.
+  - **Countersign line for Gemini** (Model B section): `size column on pabili items: AGREED | OBJECTION <reason>`.
+  - **Deployed to production 2026-10-06 (backend + sidecar only)**:
+    - Backup: `/root/deploy-backups/server-20261005-221040` (VPS clock): the 17 touched files, `dist`, a dump of
+      `pabili_details_tbl` (77 rows) and `pabili_item_requests_tbl` (68 rows), and the sidecar's two pre-deploy files.
+    - Shipped as "VPS copy + this change's hunks"; the patched copies equal the local tree except one import order.
+      The two ALTERs ran via `prisma db execute`. No `migrate resolve` (production has no `_prisma_migrations`).
+    - `ITEM_SIZE_STORAGE` is unset on production, so the server runs in `fold` mode.
+    - **Sidecar was hot-patched, not rebuilt**: `ml/app.py` and `ml/sugo_category/gemma.py` were copied into
+      `capstone-category` with `docker cp` and the container restarted (models kept, 7 item / 7 store classes).
+      The same files are on disk in `/var/www/server/ml`, so the next image build includes them.
+      `docker compose up` recreating the container from the current image would drop `/normalize-items`
+      until that rebuild. The API then answers `available: false`, and lists go out as typed.
+    - Verified live: Gemini 3.8 Flash read "isang kilong bigas" as bigas, 1 kg, and split "chicken 2, rice 5kg".
+      Sizes are normalized to "5 kg", "1.5 L" in `gemma.canonical_size`, because the model echoed "5 Kilo".
+    - **Web portal deployed 2026-10-06 04:18 (+08)** after checking the tree: the previous deploy
+      (2026-10-05 15:44) was built from this same tree (identical bundle hash), and only this change's 8 files had
+      changed since, so no other session's work shipped with it. Rollback:
+      `rsync -rlpt /root/deploy-backups/web-20261006-041852/ /var/www/web/dist/`.
+    - **Not deployed**: Sugo Rider and CustomerApp (need new builds; rider first). Then set `ITEM_SIZE_STORAGE=column`.
+
+* **`notes` column on pabili items (2026-10-06, Claude, status: APPROVED BY USER OVERRIDE, DEPLOYED)**:
+  - **Touches a `[LOCKED]` contract** (Prisma schema). Approved on the user's direct instruction (chose "Per-item
+    note field", which named the [LOCKED] change), not joint consensus, like `size` above.
+  - **Change (additive only)**: `notes String? @db.VarChar(200)` on `PabiliDetail` and `PabiliItemRequest`, migration
+    `20261006180000_add_pabili_item_notes`. Named `notes` to match the web `ErrandItem.notes` the dispatcher inspector
+    already rendered. Same rules as `size`: folded into itemName in fold mode ("Sibuyas · 1/2 kg · Note: walang bulok",
+    cut to 191 chars), carried over when a PATCH omits it, counted as a change for the rider's checkbox.
+    Rollback: `ALTER TABLE ... DROP COLUMN notes` on both tables.
+  - **Why**: an age-group edge-case review (teen shorthand, seniors' sentences and dictation) showed requests such as
+    "paki pili yung walang bulok" or "if out of stock buy 150g x 2" had nowhere to go but the item name.
+  - **Also shipped the same day**: `POST /api/errands/item-stores` (customer store-mismatch check, own limiter), the
+    sidecar's Filipino filler words, Spanish-Filipino numbers ("singkwenta"), "₱50 worth" budget sizes, and prompt v3
+    with every item field required (optional, Gemini 3.8 Flash dropped `note` every time).
+  - **Deployed**: backend + both ALTERs (backup `/root/deploy-backups/server-20261006-004135`, VPS clock), sidecar
+    hot-patched again via `docker cp` (same caveat as above), web portal (rollback `web-20261006-065731`).
+    Verified live: all 8 report lines read correctly, instructions land in `note`.
+
+* **Tidy-up time budget, pieces and store names (2026-10-06, Claude, status: DEPLOYED server + sidecar; app unreleased)**:
+  - **No `[LOCKED]` contract touched.** No schema or route change.
+  - **Root cause of "the AI did not recognize" lines**: not the model. The API server halved its 6 s budget per model,
+    so Gemini 3.8 Flash got 2.75 s; it needs 2.6 s for one line, 2.9 s for four, 5.2 s for eight (measured on
+    production). Lists of three or more came back `available:false` and went as typed (nginx: 31-byte answers at
+    01:22 and 01:27). Gemma 4 (~14 s a line) got the other half and never answered either.
+  - **Fix**: `CATEGORY_NORMALIZE_TIMEOUT_MS` default 6000 -> 10000; the server sends the whole budget less 750 ms;
+    the sidecar treats `timeout_ms` as one deadline for the chain (first model gets all, the next what is left,
+    none under 1.5 s). CustomerApp waits 12 s and re-asks `unread` lines on the next Review visit.
+  - **Sidecar prompt v4** + `pieces_as_quantity`: "Siopao 5 pcs" is quantity 5, not size "5 pcs" (Flash answered
+    both ways). With its own count ("10 pcs x2") the pieces stay the size.
+  - **CustomerApp (not released)**: "Size" is labelled "Unit" (Review table, edit sheet). Rules settle
+    "Siopao 5 pcs" / "Delight, 5pcs" on the phone. A store's name at either end of a line ("Rose Pharmacy Lozartan
+    5mg", "Biogesic from Mercury Drug x2") is taken out of the item; the editor warns, and "Ask for <store>" puts
+    "Buy at <store> if possible" in the note. Lexicon + store-noun pattern in `utils/itemEntryParser.ts`.
+  - **Deployed**: backup `/root/deploy-backups/server-20261006-091648` (VPS clock; files, dist, the container's
+    gemma.py/app.py). Sidecar hot-patched again via `docker cp` + `docker restart`. Verified live: the four reported
+    lines in 4.1 s and an eight-line list in 5.6 s, all read; route still 401 without login.
+  - **Web, same day (15:47 +08)**: the dispatcher's step-3 editor field is labelled "Unit" too (`copy.ts`
+    `sizeLabel`/`sizePlaceholder`; the data field stays `size`). Tree checked first: live `index.html` matched the
+    local 06:55 build byte for byte and `copy.ts` was the only newer file, its whole diff ours. Deployed with
+    `scripts/deploy-web.sh`, rollback `/root/deploy-backups/web-20261006-154721`; live entry `index-eFChC1MC.js`
+    loads `DispatcherPortal-Bx1KKwrJ.js`, which reads `sizeLabel:"Unit"`.
+
 ---
 
 ## 🛠️ Model B (Gemini / Antigravity) Execution & Verification
@@ -1544,3 +1632,93 @@
   - **Commits pushed**: web `c8ea2e3` (order chat in three steps), `3e83a26` (portal domain), `d8374e2` (ignore rules), `c532ea3` (working-tree snapshot); server `a167523` (sysadmin password; note: this file-level commit also carries the other session's undeployed maintenance push broadcast in `sysAdminDevOpsService.ts`), `56a75f9` (emailed-link fallback), `6a2c60f` (working-tree snapshot). `FigmaPrototype` left uncommitted (quarantined).
   - **Noted, not changed**: `scratch/extracted_doc_text.txt` (tracked since July) contains the owner's email; `public/` serves database design diagrams on the live portal; seed `owner123` remains in dev seeds.
 
+---
+
+* **Session Log (2026-10-06 16:30 | Dispatcher Order Chat: Inverted Service Area Mask Reversed)**:
+  - **Driver**: Antigravity 2.0 (Gemini 3.7 Flash High), following 6-stage Claude Cognitive Alignment.
+  - **User Request**: Fix the Google Map on the Dispatcher Side in Order Chat (`OrderChatScreen` / Stage 2 `Stage2PinStores`): make Tacurong City completely clear and unshaded (no gray), and shade everything outside Tacurong City with the muted gray mask.
+  - **Root Cause**: `TACURONG_MASK_PATHS` in `src/constants/serviceArea.ts` previously defined the outer world ring using `{ lng: -180 }` and `{ lng: 180 }` without intermediate points crossing the prime meridian. Google Maps Web Mercator collapsed the outer bounding box along the antimeridian, discarding the outer ring and rendering only the inner `TACURONG_POLYGON_COORDINATES` ring. Consequently, Tacurong City was shaded gray, while the world outside was left clear.
+  - **Surgical Fix**: In `src/constants/serviceArea.ts`, anchored the outer world ring across both hemispheres with intermediate points (`lng: 0` and `[-179.9999, 179.9999]`) and clockwise winding (`Shoelace: -61236.75`). With `TACURONG_POLYGON_COORDINATES` wound counter-clockwise (`Shoelace: +0.0112`), Google Maps non-zero winding punches out Tacurong City as a 100% transparent hole, shading only the areas outside Tacurong with `#0B132B` at 35% opacity and crisp `#1E3A5F` boundary outline.
+  - **Verification**: `npx tsc --noEmit` exited 0 (clean, 0 errors).
+  - **Production Deployment (2026-10-06 16:31 | Contabo VPS 109.123.239.182)**:
+    - Executed `scripts/deploy-web.sh --no-build` via Git Bash.
+    - 80 build files uploaded to staging, synced into `/var/www/web/dist` with `--delete-after`.
+    - Rollback snapshot preserved at `/root/deploy-backups/web-20261006-163114`.
+    - Chunk integrity verified: all referenced chunks resolve.
+    - Live direct nginx check: `https://portal.sugo-express.org -> HTTP 200` (Passed).
+
+
+* **Session Log (2026-10-07 05:05 | Dispatcher "My History", DEPLOYED web only)**:
+  - **Driver**: Claude (Opus 5.5). Plan: `C:\Users\Capstone\.claude\plans\objective-redesigning-the-dispatcher-drifting-yeti.md`.
+  - **Request**: the rider app's My History (`RiderMobileApp/src/modules/history/`) on the dispatcher side, same
+    functions, different design. User chose: list delivered AND cancelled orders; show delivery fees and what the
+    customer paid (plus the rider's share and earnings) instead of "your share". Later: add ETA and distance (km).
+  - **No `[LOCKED]` contract touched.** No schema, route or server change. Web only.
+  - **New** `src/portals/dispatcher/components/history/`: `historyModel.ts` (pure rules), `DispatcherHistoryPanel.tsx`
+    (38/62 list and detail, All/Delivered/Cancelled chips, 7 sorts, 10 per page, all five states),
+    `HistoryErrandDetail.tsx` (overview with distance and last ETA, items per store, decline reason, money),
+    `HistoryProofPhotos.tsx` (receipts and handover photos, bytes fetched on open).
+  - **Edited (additive)**: `useDispatcherPortal.ts` (tab `history`; mapper keeps `assignedAt`, `acceptedAt`,
+    `deliveredAt`, `completedAt`, `feeBreakdown`, `riderEarnings`), `types/errand.ts` (those two shapes,
+    `ErrandItem.pinpointId`, `ErrandPinpoint.storeCategory`), `apiService.ts` (`getDeclineReasons`, null on failure),
+    `DispatcherPortal.tsx` (sidebar item after Tracking, More-sheet entry, render branch, and
+    `readOnly` for the history tab so accept-on-open never fires on an order declined before verification).
+  - **Rules worth keeping**: ownership is `dispatchLogs[0].dispatcherId === user.id`, because `GET /errands` also returns
+    every dispatcher's CANCELLED orders (server scoping gap, not fixed). Dates use `deliveredAt`, not `updatedAt`.
+    Unpriced orders are "Not priced", never summed or sorted as 0. The ETA on a finished order is the LAST window the
+    server computed (it is never cleared), so the screen labels it "Last estimate shown" and does not score lateness
+    against a first promise, which is not stored.
+  - **Verified**: `tsc --noEmit` clean; a throwaway harness page (deleted) with fake orders covered every state,
+    sort, filter, paging reset, search, the ETA verdicts, 375 px, and the photo and reason failure paths (GET only).
+    Not yet checked against live data signed in.
+  - **Deployed** with `scripts/deploy-web.sh` after checking the tree: live `index.html` matched the local 2026-10-06
+    16:31 build, and only this change's files were newer. Rollback:
+    `rsync -rlpt /root/deploy-backups/web-20261007-050456/ /var/www/web/dist/`. Live chunk `DispatcherPortal-BqmgGyt_.js`
+    contains "My History".
+  - **Renamed 2026-10-07 05:12**: on the user's request the screen is labelled "Customer Transaction" (sidebar, tooltip,
+    More sheet, panel title; "Transactions" on the narrow toggle). Tab id stays `history`, folder stays `history/`.
+    Deployed, rollback `rsync -rlpt /root/deploy-backups/web-20261007-051214/ /var/www/web/dist/`.
+
+* **Cancelled status shown in red (2026-10-07, Claude, status: APPROVED BY USER OVERRIDE, DEPLOYED)**:
+  - **Overrides part of a `[LOCKED]` rule**: the Impeccable invariant's "SUGO red = act only". The user asked for red on
+    cancelled orders and chose "Everywhere in the portal" when told of the conflict (AskUserQuestion). Not joint consensus.
+  - **Change**: `src/lib/statusPresentation.ts` `STATUS_TABLE.CANCELLED` tone `closed` -> `act`. Mark stays `struck`
+    (a dash) so it still reads apart from DISPUTED's `alert` ring; `needsDispatcher` stays false, so no ordering or
+    counting changes. Every `StatusChip` in the dispatcher portal follows (Customer Transaction, Customer Chat History,
+    Active Errands, rider messages, queue card and inspector, order chat).
+  - **Rollback**: set the tone back to `closed`.
+  - **Deployed 2026-10-07 05:18** (tree checked: live matched the 05:12 build, only this file newer). Live chunk
+    `DispatcherPortal-C2oY-sjK.js` reads `CANCELLED:{label:"Cancelled",tone:"act"`. Rollback:
+    `rsync -rlpt /root/deploy-backups/web-20261007-051825/ /var/www/web/dist/`.
+
+* **Requested items: Qty column, no row numbers (2026-10-07, Claude, DEPLOYED 05:33, rollback `web-20261007-053355`)**:
+  - `workspace/DispatchDetailInspector.tsx` (Dispatcher Management inspector): the 1, 2, 3 index left of each item is
+    gone; a "Qty" column head sits over the quantities, which are now the row's main figure. Per-line prices
+    (amount and "at ₱unit") were removed from this list on the user's request; the "What it comes to" totals below
+    are unchanged. No data change.
+
+* **Forward actions in green (2026-10-07, Claude, status: APPROVED BY USER OVERRIDE, DEPLOYED 05:45, rollback `web-20261007-054547`)**:
+  - **Overrides part of a `[LOCKED]` rule** (Impeccable "primary action law", DESIGN.md "`primary` is `bg-signal`"):
+    the user asked for "Accept and open the order" and the order chat's "Continue to step 2", "Assign a rider" and so
+    on to be green instead of red. Not joint consensus.
+  - **Tokens** (`src/styles/tailwind.css`): `--color-go #15803D` (white 5.01:1) and `--color-go-deep #166534` (7.13:1).
+  - **`DispatcherButton` `success` variant** now `bg-go hover:bg-go-deep` (no button used it before; the old recipe
+    hovered to navy).
+  - **Switched to `success`**: inspector "Accept and open the order"; order chat NowBar primary actions, Pin Stores
+    Continue / suggestions toggle / search, Confirm Items "Send the list" / "Use it" / catalog toggle, payment ledger
+    confirms, payment-proof asks, store prediction "yes", "Assign a rider"; the chat composer's Send (raw `bg-go`).
+  - **Kept red on purpose** (they end or refuse an order): the decline dialog's confirm, the inspector's "Decline it",
+    "Close without an order". Unread-count badges stay red too.
+  - **Rollback**: change those `success` variants back to `primary` and the Send button back to `bg-signal`.
+
+* **Commits (2026-10-07 06:00, Claude)**: web `0648454` (Customer Transaction), `f2ff1ec` (green forward actions, red
+  cancelled, Qty column), `914ba5f` (other sessions' deployed work: legal and phone pages, service-area mask, item
+  size/notes UI, `public/dispatch_simulation.html`). Server `78e68bc` (item size/notes, tidy-up, store check) and
+  `7f85e63` (Google sign-in, Firebase phone verification, phone password reset).
+  - **Personal data swap before committing (user's choice)**: `src/pages/PhoneVerificationPage.tsx`,
+    `TestPhoneVerificationPage.tsx` and the server's `tests/firebasePhoneAuth.test.ts` held two real-looking mobile
+    numbers. They are now `+639171234567` and `+639181234567`. The live portal still shows the old text until the next
+    web deploy. If the old ones were Firebase console test numbers, register the new ones there or the /test-sms
+    presets will not receive a code. One of them was already in git history inside a July document.
+  - **Server tests at `7f85e63`**: 1171 pass, 9 fail in categoryWarm, exceptionAccess, exceptionReasonSuggestion,
+    exceptionSecondOpinion, firebaseUid and passwordReset (all other sessions' areas, none touched here).
