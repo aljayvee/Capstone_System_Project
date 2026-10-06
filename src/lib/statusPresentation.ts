@@ -100,7 +100,11 @@ const STATUS_TABLE: Record<string, StatusPresentation> = {
 
   // Ended without completing. Never rendered in the same tone as DELIVERED,
   // which is the bug this table exists to make impossible.
-  CANCELLED: { label: "Cancelled", tone: "closed", mark: "struck", needsDispatcher: false },
+  //
+  // Red by the user's override (2026-10-07) of the "red = act only" rule. The
+  // struck mark is kept so it still reads apart from DISPUTED's alert mark,
+  // and needsDispatcher stays false: a cancelled run asks nothing of anyone.
+  CANCELLED: { label: "Cancelled", tone: "act", mark: "struck", needsDispatcher: false },
 
   // The dispatcher is the blocker.
   DISPUTED: { label: "Needs a decision", tone: "act", mark: "alert", needsDispatcher: true },

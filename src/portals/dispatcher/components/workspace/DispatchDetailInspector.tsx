@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Errand } from "../../../../types/errand";
 import { formatErrandId } from "../../../../utils/formatErrandId";
-import { formatPeso } from "../../../../utils/format";
+import { formatPeso, formatItemLabel } from "../../../../utils/format";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -133,6 +133,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
     if (item?.unitPrice) return Number(item.unitPrice) * Number(item.quantity || 1);
     return null;
   };
+  const anyLinePriced = items.some((item: any) => lineAmount(item) !== null);
   const fee = Number(errand.deliveryFee || 0);
   const lineSum = subtotal + fee;
   const totalDisplay = errand.totalCost || lineSum;
@@ -235,16 +236,34 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
             {errand.customerName || "Customer"}
           </span>
           {errand.customerPhone ? (
-            <button
-              type="button"
-              onClick={handleCopyPhone}
-              aria-label={`Copy ${errand.customerName || "the customer"}'s phone number`}
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label text-board-trim transition-colors hover:text-board-plate"
-            >
-              <Phone size={12} />
-              <span data-figure>{errand.customerPhone}</span>
-              {copiedPhone ? <Check size={12} /> : null}
-            </button>
+            <div className="inline-flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyPhone}
+                aria-label={`Copy ${errand.customerName || "the customer"}'s phone number`}
+                className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label text-board-trim transition-colors hover:text-board-plate"
+              >
+                <Phone size={12} />
+                <span data-figure>{errand.customerPhone}</span>
+                {copiedPhone ? <Check size={12} /> : null}
+              </button>
+              {errand.customerPhoneVerified ? (
+                <span
+                  title={errand.customerPhoneVerifiedAt ? `Verified on ${new Date(errand.customerPhoneVerifiedAt).toLocaleDateString()}` : "Phone number verified via SMS OTP"}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none"
+                >
+                  <ShieldCheck size={10} className="text-emerald-400" />
+                  <span>Verified</span>
+                </span>
+              ) : (
+                <span
+                  title="Phone number unverified"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 select-none"
+                >
+                  <span>Unverified</span>
+                </span>
+              )}
+            </div>
           ) : (
             <span className="text-label text-board-trim">No number on file</span>
           )}
@@ -326,6 +345,11 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 <h3 className="text-micro uppercase text-ink">
                   Requested items ({items.length})
                 </h3>
+                {/* A column head, so the figure on the right reads as a count
+                    and not as a price. Prices are not shown on this list. */}
+                {items.length > 0 ? (
+                  <span className="w-10 shrink-0 text-right text-micro uppercase text-ink-muted">Qty</span>
+                ) : null}
               </div>
 
               {items.length === 0 ? (
@@ -340,38 +364,22 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                       key={item.id || idx}
                       className="flex items-start justify-between gap-3 py-2 first:pt-2"
                     >
-                      <div className="flex min-w-0 items-baseline gap-2">
-                        <span
-                          data-figure
-                          className="shrink-0 font-mono text-label text-ink-muted"
-                        >
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-body text-ink">{item.itemName}</p>
-                          {item.notes ? (
-                            <p className="mt-0.5 text-label text-ink-muted">Note: {item.notes}</p>
-                          ) : null}
-                        </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-body text-ink">{formatItemLabel(item.itemName, item.size)}</p>
+                        {item.notes ? (
+                          <p className="mt-0.5 text-label text-ink-muted">Note: {item.notes}</p>
+                        ) : null}
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        {lineAmount(item) !== null ? (
-                          <span data-figure className="font-mono text-data text-ink">
-                            {formatPeso(lineAmount(item) as number)}
-                          </span>
-                        ) : null}
-                        <p data-figure className="text-label text-ink-muted">
-                          {item.quantity || 1}
-                          {item.unitPrice ? ` at ${formatPeso(item.unitPrice)}` : ""}
-                        </p>
-                      </div>
+                      <span data-figure className="w-10 shrink-0 text-right font-mono text-data text-ink">
+                        {item.quantity || 1}
+                      </span>
                     </li>
                   ))}
                 </ul>
               )}
 
-              {items.length > 0 && items.every((i: any) => lineAmount(i) === null) ? (
+              {items.length > 0 && !anyLinePriced ? (
                 <p className="mt-2 border-t border-hairline pt-2 text-label text-ink-muted">
                   No prices yet. They are settled against the receipt the rider files, not
                   against this list.
@@ -479,7 +487,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
         {isAvailable ? (
           <>
             <DispatcherButton
-              variant="primary"
+              variant="success"
               size="lg"
               className="flex-1"
               disabled={isClaiming}

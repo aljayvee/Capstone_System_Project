@@ -80,7 +80,7 @@ export function Stage5SendRider({
       <p className="m-0 text-body text-ink-muted">{copy.stage5.intro}</p>
 
       <DispatcherButton
-        variant="primary"
+        variant="success"
         size="lg"
         loading={isAssigning}
         loadingText={copy.stage5.sending}

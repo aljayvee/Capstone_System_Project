@@ -412,7 +412,7 @@ export function AttestationForm({
 
       <div className="flex items-center gap-2">
         <DispatcherButton
-          variant="primary"
+          variant="success"
           size="md"
           loading={loading}
           loadingText={loadingLabel}

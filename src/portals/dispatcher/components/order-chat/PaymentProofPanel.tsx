@@ -309,7 +309,7 @@ function HalfPaymentSteps({
       {!readOnly && (
         <div className="flex flex-col gap-2">
           <DispatcherButton
-            variant={asked ? "secondary" : "primary"}
+            variant={asked ? "secondary" : "success"}
             icon={asked ? <CheckCircle2 size={15} /> : <MessageSquare size={15} />}
             className="w-full justify-center"
             data-testid="half-payment-ask"
@@ -325,7 +325,7 @@ function HalfPaymentSteps({
             {asked ? c.halfAsked(customerFirstName) : c.halfAsk(customerFirstName, amount)}
           </DispatcherButton>
           <DispatcherButton
-            variant={asked && !showedUpload ? "primary" : "secondary"}
+            variant={asked && !showedUpload ? "success" : "secondary"}
             icon={showedUpload ? <CheckCircle2 size={15} /> : <ReceiptText size={15} />}
             className="w-full justify-center"
             data-testid="half-payment-show-upload"

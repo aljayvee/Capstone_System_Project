@@ -16,6 +16,7 @@ import {
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { apiService, type ApiPredictedStore } from "../../../../../services/apiService";
 import { cn } from "@/lib/utils";
+import { formatItemLabel } from "../../../../../utils/format";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { WaitingCard } from "../WaitingCard";
@@ -324,13 +325,20 @@ export function Stage3ConfirmItems({
               <span data-figure className="shrink-0 font-mono text-label text-ink-muted">
                 {it.quantity}&times;
               </span>
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate text-body",
-                  oos ? "line-through text-status-waiting-ink" : "text-ink"
-                )}
-              >
-                {it.itemName}
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    "block truncate text-body",
+                    oos ? "line-through text-status-waiting-ink" : "text-ink"
+                  )}
+                >
+                  {formatItemLabel(it.itemName, it.size)}
+                </span>
+                {it.notes ? (
+                  <span className="block truncate text-label text-ink-muted" title={it.notes}>
+                    Note: {it.notes}
+                  </span>
+                ) : null}
               </span>
               {oos && outOfStockChip}
               <span className="max-w-[128px] shrink-0 truncate text-label text-ink-muted">
@@ -444,7 +452,7 @@ export function Stage3ConfirmItems({
           <DispatcherButton
             type="button"
             size="sm"
-            variant={isCatalogOpen ? "primary" : "secondary"}
+            variant={isCatalogOpen ? "success" : "secondary"}
             icon={<Package size={14} />}
             onClick={() => setIsCatalogOpen((prev) => !prev)}
           >
@@ -573,6 +581,18 @@ export function Stage3ConfirmItems({
                     }}
                     onBlur={(e) => guessCategoryFor(index, e.target.value)}
                     placeholder={copy.stage3.itemPlaceholder}
+                  />
+
+                  {/* how big one of them is: "5 kg", "1.5 L". Its own field so
+                      the name the category guess reads stays "Chicken". */}
+                  <input
+                    type="text"
+                    value={item.size ?? ""}
+                    onChange={(e) => updateItem(index, { size: e.target.value })}
+                    maxLength={40}
+                    aria-label={copy.stage3.sizeLabel}
+                    placeholder={copy.stage3.sizePlaceholder}
+                    className="min-h-9 w-20 shrink-0 rounded-trim border border-edge bg-board-plate px-2 text-label text-ink placeholder:text-ink-muted"
                   />
 
                   <div className="flex shrink-0 items-center rounded-trim border border-edge bg-board-plate">
@@ -824,7 +844,7 @@ export function Stage3ConfirmItems({
                       <DispatcherButton
                         type="button"
                         size="sm"
-                        variant="primary"
+                        variant="success"
                         icon={<ArrowRight size={13} />}
                         onClick={() => {
                           if (predicted) {
@@ -899,7 +919,7 @@ export function Stage3ConfirmItems({
           )}
           <div className="flex flex-wrap gap-2">
             <DispatcherButton
-              variant="primary"
+              variant="success"
               size="md"
               loading={isSaving}
               loadingText={copy.stage3.sending}

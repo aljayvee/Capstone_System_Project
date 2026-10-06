@@ -91,7 +91,7 @@ export function NowBar({ model, onAction, isPinStage = false }: NowBarProps) {
               key={action.label}
               type="button"
               size="sm"
-              variant={action.kind === "primary" ? "primary" : "secondary"}
+              variant={action.kind === "primary" ? "success" : "secondary"}
               onClick={() => onAction(action)}
             >
               {action.label}

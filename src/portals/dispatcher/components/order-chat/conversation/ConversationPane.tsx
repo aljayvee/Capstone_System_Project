@@ -174,7 +174,7 @@ export function ConversationPane({
               type="submit"
               disabled={!inputText.trim()}
               aria-label={copy.send}
-              className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-plate bg-signal px-3 text-label text-white transition-colors hover:bg-signal-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
+              className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-plate bg-go px-3 text-label text-white transition-colors hover:bg-go-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
             >
               <span className="hidden sm:inline">{copy.send}</span>
               <Send size={15} />

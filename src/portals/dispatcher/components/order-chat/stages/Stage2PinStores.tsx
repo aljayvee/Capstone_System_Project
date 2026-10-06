@@ -380,7 +380,7 @@ export function Stage2PinStores({
           <DispatcherButton
             type="button"
             size="sm"
-            variant={isSuggestionsOpen ? "primary" : "secondary"}
+            variant={isSuggestionsOpen ? "success" : "secondary"}
             icon={<Store size={14} />}
             onClick={() => {
               setIsSuggestionsOpen((prev) => !prev);
@@ -434,7 +434,7 @@ export function Stage2PinStores({
         <DispatcherButton
           type="submit"
           size="md"
-          variant={mapUnavailable ? "primary" : "secondary"}
+          variant={mapUnavailable ? "success" : "secondary"}
           loading={isSearching}
           loadingText={copy.stage2.searching}
           disabled={atLimit}
@@ -683,7 +683,7 @@ export function Stage2PinStores({
           </p>
           <DispatcherButton
             type="button"
-            variant={quoteStatus === "ready" ? "primary" : "secondary"}
+            variant={quoteStatus === "ready" ? "success" : "secondary"}
             size="md"
             className="mt-2.5 w-full justify-center"
             loading={isSaving}

@@ -153,6 +153,14 @@
   --color-signal-deep: #C62828;
   --color-signal-on-field: #FF8A85;
 
+  /* Go green: the forward action in dispatch (accept, continue, send, assign),
+     by the user's override of 2026-10-07. Red stays on the acts that end or
+     refuse an order. White on #15803D is 5.01:1 and on the hover #166534 is
+     7.13:1, so both clear AA at button-label size, which #16A34A (3.3:1)
+     would not. */
+  --color-go: #15803D;
+  --color-go-deep: #166534;
+
   /* Two ink levels, both clearing 4.5:1 on bone and on white. Tinted with
      the field's own hue; never dead gray. */
   --color-ink: #16202E;

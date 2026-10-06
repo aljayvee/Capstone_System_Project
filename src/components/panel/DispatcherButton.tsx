@@ -34,7 +34,9 @@ const VARIANT_CLASSES = {
   field: `bg-board-field hover:bg-board-field-deep text-white ${DISABLED}`,
   secondary: `bg-board-plate hover:bg-board-ground text-ink border border-edge ${DISABLED} disabled:border-transparent`,
   subtle: `bg-board-ground hover:bg-board-trim/25 text-ink ${DISABLED}`,
-  success: `bg-status-done-ink hover:bg-board-field text-white ${DISABLED}`,
+  // The go-forward action (accept, continue, send, assign). Green by the
+  // user's override of 2026-10-07; `primary` red is kept for declining.
+  success: `bg-go hover:bg-go-deep text-white ${DISABLED}`,
   "danger-ghost": `text-status-act-ink hover:bg-status-act-fill ${DISABLED} disabled:bg-transparent`,
 } as const;
 

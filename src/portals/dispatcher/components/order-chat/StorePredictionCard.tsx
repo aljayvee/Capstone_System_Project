@@ -249,7 +249,7 @@ export function StorePredictionCard({
         <DispatcherButton type="button" size="sm" variant="secondary" onClick={onReject}>
           {text.no}
         </DispatcherButton>
-        <DispatcherButton type="button" size="sm" variant="primary" onClick={() => onAccept(proposable)}>
+        <DispatcherButton type="button" size="sm" variant="success" onClick={() => onAccept(proposable)}>
           {text.yes}
         </DispatcherButton>
       </footer>
