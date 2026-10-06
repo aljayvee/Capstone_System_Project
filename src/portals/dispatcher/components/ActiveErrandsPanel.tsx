@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Errand } from "../../../types/errand";
 import { formatErrandId } from "../../../utils/formatErrandId";
+import { formatItemLabel } from "../../../utils/format";
 import { summarizeEta } from "../../../utils/eta";
-import { MapPin, Phone, Bike, Clock, MessageSquare, Copy, Check, ShoppingBag } from "lucide-react";
+import { MapPin, Phone, Bike, Clock, MessageSquare, Copy, Check, ShoppingBag, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
@@ -234,6 +235,15 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                       <span className="inline-flex items-center gap-1.5 text-label text-ink-muted">
                         <Phone size={12} />
                         <span data-figure>{e.customerPhone || "No number on file"}</span>
+                        {e.customerPhone && e.customerPhoneVerified ? (
+                          <span
+                            title="Phone number verified via SMS OTP"
+                            className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          >
+                            <ShieldCheck size={9} />
+                            <span>Verified</span>
+                          </span>
+                        ) : null}
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-label text-ink-muted">
                         <Bike size={13} />
@@ -257,7 +267,7 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                         </span>
                         <span className="min-w-0 truncate text-label text-ink">
                           {items
-                            .map((it) => `${it.itemName}${it.quantity ? ` x${it.quantity}` : ""}`)
+                            .map((it) => `${formatItemLabel(it.itemName, it.size)}${it.quantity ? ` x${it.quantity}` : ""}`)
                             .join(", ")}
                         </span>
                       </DispatcherCard.Region>

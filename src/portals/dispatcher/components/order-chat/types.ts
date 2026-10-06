@@ -72,10 +72,14 @@ export interface EditableItem {
   itemName: string;
   storeCategory?: string;
   quantity: number;
+  /** How big one of them is ("5 kg"). Null or absent when the customer gave none. */
+  size?: string | null;
+  /** The customer's instruction for the rider ("walang bulok"). Carried through an edit. */
+  notes?: string | null;
   /**
    * Carried from the saved row so the always-open list can show what the rider
    * reported (out of stock) on the line itself. Absent on rows added here, and
-   * never sent: sendToCustomer keeps only name, store and quantity.
+   * never sent: sendToCustomer keeps only name, store, quantity, size and notes.
    */
   id?: number;
   fulfillmentStatus?: string;

@@ -16,6 +16,7 @@ import {
   Loader2,
   Navigation,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { importGoogleMapsLibrary } from "../../../utils/loadGoogleMaps";
@@ -54,6 +55,7 @@ interface CustomerLocationModalProps {
   onClose: () => void;
   customerName?: string;
   customerPhone?: string;
+  customerPhoneVerified?: boolean;
   deliveryAddress?: string;
   deliveryLatitude?: number | string | null;
   deliveryLongitude?: number | string | null;
@@ -65,6 +67,7 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
   onClose,
   customerName = "Customer",
   customerPhone,
+  customerPhoneVerified,
   deliveryAddress = "Tacurong City, Sultan Kudarat",
   deliveryLatitude,
   deliveryLongitude,
@@ -327,6 +330,15 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
                       >
                         {customerPhone}
                       </span>
+                      {customerPhoneVerified ? (
+                        <span
+                          title="Phone number verified via SMS OTP"
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none"
+                        >
+                          <ShieldCheck size={10} />
+                          <span>Verified</span>
+                        </span>
+                      ) : null}
                       {copyButton(customerPhone, "phone number", "Phone number")}
                     </>
                   ) : (

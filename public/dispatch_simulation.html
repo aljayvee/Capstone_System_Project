@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Capstone Dispatch Algorithm Simulation</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-pin {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.85; }
+    }
+    .pulse-pin {
+      animation: pulse-pin 2s ease-in-out infinite;
+    }
+    .road-dash {
+      stroke-dasharray: 8 6;
+      animation: dash-flow 1.2s linear infinite;
+    }
+    @keyframes dash-flow {
+      from { stroke-dashoffset: 28; }
+      to { stroke-dashoffset: 0; }
+    }
+    .glow-amber {
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+    }
+    .glow-blue {
+      filter: drop-shadow(0 0 8px rgba(2, 132, 199, 0.6));
+    }
+    .glow-red {
+      filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.6));
+    }
+  </style>
+</head>
+<body class="bg-[#0B132B] text-slate-100 min-h-screen font-sans antialiased p-4 md:p-8">
+
+  <!-- Header -->
+  <header class="max-w-6xl mx-auto mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-0.5 rounded text-xs font-semibold tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">
+          LOGISTICS ALGORITHM VISUALIZER
+        </span>
+        <span class="text-xs text-slate-400">Tacurong City Service Area</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white mt-1">
+        Predictive Earliest-Available Dispatch Simulation
+      </h1>
+      <p class="text-sm text-slate-400 mt-1 max-w-2xl">
+        Visualizing how our algorithm evaluates real road travel time, active errands, and store locations to eliminate customer wait times.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="btnSmart" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-md active:scale-95 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Run Smart Dispatch
+      </button>
+      <button id="btnNaive" class="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all active:scale-95">
+        Run Naive Closest
+      </button>
+      <button id="btnReset" class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 transition-all">
+        Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Left: Interactive Street Map (7 cols) -->
+    <div class="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col">
+      <div class="p-3 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Store #1 (Pickup)</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block"></span> Customer Home</span>
+          <span class="inline-flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> Active Riders</span>
+        </div>
+        <span id="mapStatusBadge" class="font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">READY</span>
+      </div>
+
+      <!-- SVG Map Canvas -->
+      <div class="relative flex-1 min-h-[380px] md:min-h-[460px] bg-[#0c162d] flex items-center justify-center p-2">
+        <svg id="mapCanvas" viewBox="0 0 600 450" class="w-full h-full select-none">
+          <!-- Background Grid / Streets -->
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="450" fill="url(#grid)" />
+
+          <!-- Street Network Lines -->
+          <!-- Horizontal Main Avenues -->
+          <line x1="40" y1="90" x2="560" y2="90" stroke="#1e293b" stroke-width="12" stroke-linecap="round"/>
+          <line x1="40" y1="210" x2="560" y2="210" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+          <line x1="40" y1="330" x2="560" y2="330" stroke="#1e293b" stroke-width="12" stroke-linecap="round"/>
+          <!-- Vertical Streets -->
+          <line x1="120" y1="40" x2="120" y2="400" stroke="#1e293b" stroke-width="12" stroke-linecap="round"/>
+          <line x1="280" y1="40" x2="280" y2="400" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>
+          <line x1="460" y1="40" x2="460" y2="400" stroke="#1e293b" stroke-width="12" stroke-linecap="round"/>
+
+          <!-- River / Natural Barrier -->
+          <path d="M 370 40 Q 350 200 400 400" fill="none" stroke="#0369a1" stroke-width="10" opacity="0.4"/>
+          <text x="350" y="55" fill="#38bdf8" font-size="9" opacity="0.6">RIVER BARRIER</text>
+          <!-- Bridge over river -->
+          <rect x="360" y="204" width="26" height="12" fill="#334155" rx="2"/>
+
+          <!-- Dynamic Route Layer (Drawn by JS) -->
+          <path id="routeLine" d="" fill="none" stroke-width="5" stroke-linecap="round" class=""/>
+
+          <!-- Animated Moving Courier Marker -->
+          <g id="courierAnim" transform="translate(-100, -100)" style="transition: transform 0.05s linear;">
+            <circle r="12" fill="#059669" filter="drop-shadow(0 0 6px #10b981)"/>
+            <circle r="6" fill="#ffffff"/>
+          </g>
+
+          <!-- Store Pin #1 (Tacurong Supermarket) at (280, 90) -->
+          <g transform="translate(280, 90)" class="glow-amber cursor-pointer">
+            <circle r="18" fill="#f59e0b" opacity="0.2" class="pulse-pin"/>
+            <circle r="11" fill="#f59e0b"/>
+            <path d="M -5 -3 L 5 -3 L 3 5 L -3 5 Z" fill="#ffffff"/>
+            <text x="0" y="-18" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="bold">STORE #1 (Pickup)</text>
+            <text x="0" y="28" text-anchor="middle" fill="#94a3b8" font-size="9">Poblacion Supermarket</text>
+          </g>
+
+          <!-- Customer House at (120, 330) -->
+          <g transform="translate(120, 330)" class="glow-blue cursor-pointer">
+            <circle r="18" fill="#0284c7" opacity="0.2" class="pulse-pin"/>
+            <circle r="11" fill="#0284c7"/>
+            <path d="M -4 4 L -4 -1 L 0 -5 L 4 -1 L 4 4 Z" fill="#ffffff"/>
+            <text x="0" y="-18" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold">CUSTOMER</text>
+            <text x="0" y="28" text-anchor="middle" fill="#94a3b8" font-size="9">Delivery Destination</text>
+          </g>
+
+          <!-- Rider A (Parked near Customer: 120, 260) -->
+          <g id="pinRiderA" transform="translate(120, 260)" class="cursor-pointer">
+            <circle r="10" fill="#ef4444" opacity="0.9"/>
+            <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="bold">A</text>
+            <rect x="18" y="-14" width="130" height="34" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+            <text x="24" y="-2" fill="#f87171" font-size="10" font-weight="bold">Rider A (Busy)</text>
+            <text x="24" y="12" fill="#94a3b8" font-size="9">In 15m store checkout</text>
+          </g>
+
+          <!-- Rider B (Finishing drop-off at 460, 90) -->
+          <g id="pinRiderB" transform="translate(460, 90)" class="cursor-pointer">
+            <circle r="10" fill="#10b981" opacity="0.9"/>
+            <text x="0" y="4" text-anchor="middle" fill="#ffffff" font-size="9" font-weight="bold">B</text>
+            <rect x="-145" y="-14" width="130" height="34" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+            <text x="-139" y="-2" fill="#34d399" font-size="10" font-weight="bold">Rider B (Free in 1m)</text>
+            <text x="-139" y="12" fill="#94a3b8" font-size="9">Only 3m road ride to Store</text>
+          </g>
+
+          <!-- Rider C (Signal Lost: 280, 330) -->
+          <g id="pinRiderC" transform="translate(280, 330)" opacity="0.45" class="cursor-pointer">
+            <circle r="9" fill="#64748b"/>
+            <text x="0" y="3" text-anchor="middle" fill="#ffffff" font-size="8">C</text>
+            <rect x="16" y="-12" width="120" height="28" rx="4" fill="#0f172a" stroke="#1e293b"/>
+            <text x="22" y="0" fill="#94a3b8" font-size="9 font-semibold">Rider C (Signal Lost)</text>
+            <text x="22" y="10" fill="#64748b" font-size="8">No beacon > 75s</text>
+          </g>
+        </svg>
+      </div>
+
+      <!-- Explanatory Caption -->
+      <div class="p-3 bg-slate-950/90 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+        <span id="explanationText">Click "Run Smart Dispatch" to see how our algorithm chooses the optimal courier.</span>
+        <span class="font-mono text-slate-500">Scale: 1cm = 500m</span>
+      </div>
+    </div>
+
+    <!-- Right: Calculation Inspector & Decision Cards (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-4">
+
+      <!-- Mathematical Formula Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-mono uppercase tracking-wider text-amber-400 font-semibold">Optimization Target</span>
+          <span class="text-xs text-slate-400">dispatchCostSeconds()</span>
+        </div>
+        <div class="p-3 bg-slate-950 rounded-lg border border-slate-800 text-center font-mono text-sm text-slate-200">
+          <span class="text-sky-400 font-semibold">Cost</span> = 
+          <span class="text-amber-400">Road Travel Time</span> + 
+          <span class="text-emerald-400">Remaining Wait</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-2">
+          Lowest total seconds wins the errand. A courier who is 3 minutes away and ready now beats one who is next door but trapped for 15 minutes.
+        </p>
+      </div>
+
+      <!-- Candidate Comparison Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex-1 flex flex-col">
+        <h3 class="text-sm font-semibold text-white mb-3 flex items-center justify-between">
+          <span>Candidate Evaluation</span>
+          <span class="text-xs text-slate-500 font-normal">3 Couriers on Grid</span>
+        </h3>
+
+        <!-- Rider B Card -->
+        <div id="cardRiderB" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition-all mb-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-xs flex items-center justify-center border border-emerald-500/30">B</span>
+              <span class="text-sm font-medium text-white">Rider B (Leo)</span>
+            </div>
+            <span id="badgeB" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">Evaluating</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800/60 text-xs">
+            <div>
+              <span class="text-slate-500 block">Road Travel</span>
+              <span class="font-mono text-amber-300 font-semibold">180s (3m)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">Wait Time</span>
+              <span class="font-mono text-emerald-300 font-semibold">60s (1m)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">Total Cost</span>
+              <span class="font-mono text-white font-bold">240s (4m)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rider A Card -->
+        <div id="cardRiderA" class="p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition-all mb-2.5">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-red-500/20 text-red-400 font-bold text-xs flex items-center justify-center border border-red-500/30">A</span>
+              <span class="text-sm font-medium text-white">Rider A (Ana)</span>
+            </div>
+            <span id="badgeA" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">Evaluating</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-800/60 text-xs">
+            <div>
+              <span class="text-slate-500 block">Road Travel</span>
+              <span class="font-mono text-amber-300 font-semibold">360s (6m)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">Wait Time</span>
+              <span class="font-mono text-red-400 font-semibold">900s (15m)</span>
+            </div>
+            <div>
+              <span class="text-slate-500 block">Total Cost</span>
+              <span class="font-mono text-white font-bold">1,260s (21m)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rider C Card -->
+        <div id="cardRiderC" class="p-3 rounded-lg border border-slate-800 bg-slate-950/40 opacity-50 mb-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-slate-700 text-slate-300 font-bold text-xs flex items-center justify-center">C</span>
+              <span class="text-sm font-medium text-slate-300">Rider C (Marco)</span>
+            </div>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-rose-400">FILTERED OUT</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Skipped at Step 1: Hardware beacon silence exceeded 75 seconds.</p>
+        </div>
+
+        <!-- Live Server Log Terminal -->
+        <div class="mt-auto bg-slate-950 rounded-lg p-2.5 border border-slate-800 font-mono text-[11px] text-slate-400 max-h-36 overflow-y-auto" id="logBox">
+          <p class="text-slate-500">> System standby. Awaiting dispatch trigger...</p>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <script>
+    const btnSmart = document.getElementById('btnSmart');
+    const btnNaive = document.getElementById('btnNaive');
+    const btnReset = document.getElementById('btnReset');
+    const routeLine = document.getElementById('routeLine');
+    const courierAnim = document.getElementById('courierAnim');
+    const mapStatusBadge = document.getElementById('mapStatusBadge');
+    const explanationText = document.getElementById('explanationText');
+    const logBox = document.getElementById('logBox');
+
+    const cardA = document.getElementById('cardRiderA');
+    const cardB = document.getElementById('cardRiderB');
+    const badgeA = document.getElementById('badgeA');
+    const badgeB = document.getElementById('badgeB');
+
+    function log(msg, color = 'text-slate-400') {
+      const p = document.createElement('p');
+      p.className = color;
+      p.textContent = `> ${msg}`;
+      logBox.appendChild(p);
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function resetSimulation() {
+      routeLine.setAttribute('d', '');
+      routeLine.className = '';
+      courierAnim.style.transform = 'translate(-100px, -100px)';
+      mapStatusBadge.textContent = 'READY';
+      mapStatusBadge.className = 'font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40';
+      badgeA.textContent = 'Evaluating';
+      badgeA.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300';
+      badgeB.textContent = 'Evaluating';
+      badgeB.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300';
+      cardA.className = 'p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition-all mb-2.5';
+      cardB.className = 'p-3 rounded-lg border border-slate-800 bg-slate-950/60 transition-all mb-2.5';
+      explanationText.textContent = 'Click "Run Smart Dispatch" to see how our algorithm chooses the optimal courier.';
+      logBox.innerHTML = '<p class="text-slate-500">> System reset. Ready for next run.</p>';
+    }
+
+    btnReset.addEventListener('click', resetSimulation);
+
+    // Smart Algorithm: Recommends Rider B
+    btnSmart.addEventListener('click', () => {
+      resetSimulation();
+      mapStatusBadge.textContent = 'ROUTING';
+      mapStatusBadge.className = 'font-mono text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40';
+
+      log('Errand initialized: 1 store pinpoint at Poblacion Supermarket (280, 90)', 'text-slate-300');
+      log('Step 1: Inspecting hardware beacons... Rider C excluded (beacon age: 82s)', 'text-slate-400');
+      log('Step 2: Calculating whereRiderBecomesFree():', 'text-slate-300');
+      log('   Rider A: availableInSeconds = 900s (at active checkout)', 'text-red-400');
+      log('   Rider B: availableInSeconds = 60s (at final drop-off)', 'text-emerald-400');
+      log('Step 3: Querying road matrix to Store #1...', 'text-slate-300');
+      log('   Rider A total cost: 360s + 900s = 1,260s (21 mins)', 'text-red-400');
+      log('   Rider B total cost: 180s + 60s = 240s (4 mins)', 'text-emerald-400');
+
+      setTimeout(() => {
+        // Draw route for Rider B: From (460, 90) west along avenue to (280, 90)
+        routeLine.setAttribute('d', 'M 460 90 L 280 90');
+        routeLine.setAttribute('stroke', '#10b981');
+        routeLine.setAttribute('class', 'road-dash glow-amber');
+
+        badgeB.textContent = 'ASSIGNED (WINNER)';
+        badgeB.className = 'text-xs font-mono px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-600';
+        cardB.className = 'p-3 rounded-lg border border-emerald-500/50 bg-emerald-950/30 transition-all mb-2.5 shadow-md';
+
+        badgeA.textContent = 'RUNNER-UP (21m)';
+        badgeA.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+
+        mapStatusBadge.textContent = 'DISPATCHED TO RIDER B';
+        mapStatusBadge.className = 'font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40';
+        explanationText.textContent = 'Optimal Decision: Rider B arrives at Store #1 in 4 minutes total. Customer receives items in record time.';
+        log('Step 4: Serializable TX claim successful -> Errand status ASSIGNED to Rider B', 'text-emerald-300 font-bold');
+
+        // Animate courier moving
+        animateCourier([
+          { x: 460, y: 90 },
+          { x: 280, y: 90 }
+        ]);
+      }, 600);
+    });
+
+    // Naive Algorithm: The Trap (Picks Rider A who is closest to Customer)
+    btnNaive.addEventListener('click', () => {
+      resetSimulation();
+      mapStatusBadge.textContent = 'NAIVE SIMULATION';
+      mapStatusBadge.className = 'font-mono text-red-400 bg-red-950/60 px-2 py-0.5 rounded border border-red-800/40';
+
+      log('Running naive algorithm: Only checking straight-line distance to customer...', 'text-amber-400');
+      log('Rider A is only 150m from Customer! Old app picks Rider A blindly.', 'text-red-400');
+      log('TRAP TRIGGERED: Rider A is trapped in a 15-minute supermarket line.', 'text-red-400');
+      log('Rider A must then drive 3km out to Store #1 and 3km back!', 'text-red-400');
+
+      setTimeout(() => {
+        // Draw convoluted detour: From customer (120, 260) -> Store (280, 90) -> Customer (120, 330)
+        routeLine.setAttribute('d', 'M 120 260 L 120 90 L 280 90 L 280 210 L 120 210 L 120 330');
+        routeLine.setAttribute('stroke', '#ef4444');
+        routeLine.setAttribute('class', 'road-dash glow-red');
+
+        badgeA.textContent = 'PICKED BY MISTAKE';
+        badgeA.className = 'text-xs font-mono px-2 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-600';
+        cardA.className = 'p-3 rounded-lg border border-red-500/50 bg-red-950/30 transition-all mb-2.5 shadow-md';
+
+        badgeB.textContent = 'SKIPPED (IGNORED)';
+        badgeB.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-500';
+
+        explanationText.textContent = 'Naive Flaw: Rider A causes a 35-minute delay and 6km extra driving back and forth across town.';
+        log('Result: Customer waits 35 minutes instead of 12 minutes. Fuel wasted.', 'text-red-300 font-bold');
+
+        animateCourier([
+          { x: 120, y: 260 },
+          { x: 120, y: 90 },
+          { x: 280, y: 90 },
+          { x: 280, y: 210 },
+          { x: 120, y: 210 },
+          { x: 120, y: 330 }
+        ]);
+      }, 600);
+    });
+
+    function animateCourier(waypoints) {
+      if (!waypoints || waypoints.length === 0) return;
+      let currentIndex = 0;
+      let progress = 0;
+      courierAnim.style.transform = `translate(${waypoints[0].x}px, ${waypoints[0].y}px)`;
+
+      function step() {
+        if (currentIndex >= waypoints.length - 1) return;
+        progress += 0.04;
+        const p1 = waypoints[currentIndex];
+        const p2 = waypoints[currentIndex + 1];
+        const currentX = p1.x + (p2.x - p1.x) * progress;
+        const currentY = p1.y + (p2.y - p1.y) * progress;
+        courierAnim.style.transform = `translate(${currentX}px, ${currentY}px)`;
+
+        if (progress >= 1) {
+          progress = 0;
+          currentIndex++;
+        }
+        if (currentIndex < waypoints.length - 1) {
+          requestAnimationFrame(step);
+        }
+      }
+      requestAnimationFrame(step);
+    }
+  </script>
+</body>
+</html>

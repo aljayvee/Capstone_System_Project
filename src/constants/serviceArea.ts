@@ -2618,17 +2618,23 @@ export const TACURONG_POLYGON_COORDINATES: Array<{ lat: number; lng: number }> =
 
 /**
  * Inverted mask paths for Google Maps.
- * Outer ring encompasses world bounds.
- * Inner hole is the exact Tacurong City polygon.
- * When drawn as a google.maps.Polygon, areas outside Tacurong are dimmed at 35% opacity.
+ * Outer ring encompasses world bounds across both hemispheres (anchored via lng: 0
+ * to prevent 0-length antimeridian collapse).
+ * Inner ring is the Tacurong City polygon (wound opposite to outer, punching a transparent hole).
+ *
+ * Result:
+ * - Tacurong City is completely unshaded and clear (no gray overlay).
+ * - The entire world outside Tacurong City is shaded with the muted translucent gray mask.
  */
 export const TACURONG_MASK_PATHS: Array<Array<{ lat: number; lng: number }>> = [
   [
-    { lat: 85, lng: -180 },
-    { lat: 85, lng: 180 },
-    { lat: -85, lng: 180 },
-    { lat: -85, lng: -180 },
-    { lat: 85, lng: -180 },
+    { lat: 85.0511, lng: -179.9999 },
+    { lat: 85.0511, lng: 0 },
+    { lat: 85.0511, lng: 179.9999 },
+    { lat: -85.0511, lng: 179.9999 },
+    { lat: -85.0511, lng: 0 },
+    { lat: -85.0511, lng: -179.9999 },
+    { lat: 85.0511, lng: -179.9999 },
   ],
   TACURONG_POLYGON_COORDINATES,
 ];

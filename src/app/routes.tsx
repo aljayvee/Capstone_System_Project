@@ -21,6 +21,18 @@ const SysAdminMagicLinkVerificationPage = lazyWithRetry(() =>
     default: m.SysAdminMagicLinkVerificationPage,
   }))
 );
+const PrivacyPolicyPage = lazyWithRetry(() =>
+  import("../pages/PrivacyPolicyPage").then((m) => ({ default: m.PrivacyPolicyPage }))
+);
+const TermsOfServicePage = lazyWithRetry(() =>
+  import("../pages/TermsOfServicePage").then((m) => ({ default: m.TermsOfServicePage }))
+);
+const TestPhoneVerificationPage = lazyWithRetry(() =>
+  import("../pages/TestPhoneVerificationPage").then((m) => ({ default: m.TestPhoneVerificationPage }))
+);
+const PhoneVerificationPage = lazyWithRetry(() =>
+  import("../pages/PhoneVerificationPage").then((m) => ({ default: m.PhoneVerificationPage }))
+);
 
 const RouteLoadingFallback: React.FC = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white">
@@ -104,6 +116,42 @@ export const router = createBrowserRouter([
     element: (
       <Suspense fallback={<RouteLoadingFallback />}>
         <SysAdminMagicLinkVerificationPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/privacy",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <PrivacyPolicyPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/terms",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <TermsOfServicePage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/test-sms",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <TestPhoneVerificationPage />
+      </Suspense>
+    ),
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/verify-phone",
+    element: (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <PhoneVerificationPage />
       </Suspense>
     ),
     errorElement: <RouteErrorBoundary />,

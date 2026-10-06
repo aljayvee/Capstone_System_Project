@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 
 /**
  * `apiKey` and `authDomain` are additive, and Firebase Authentication does not
@@ -31,3 +32,4 @@ export const isFirebaseAuthConfigured = Boolean(firebaseConfig.apiKey);
 
 export const firebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const database = getDatabase(firebaseApp);
+export const auth = getAuth(firebaseApp);

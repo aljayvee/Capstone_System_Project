@@ -4,6 +4,10 @@ import { toast } from "sonner";
 import { database } from "../../../../../firebase/config";
 import { apiClient } from "../../../../../services/apiClient";
 import { apiService, type ApiItemPlacement } from "../../../../../services/apiService";
+import { formatItemLabel } from "../../../../../utils/format";
+
+/** "Sibuyas · 1/2 kg · Note: walang bulok": how the server and the customer app fold a note for display. */
+const withNote = (label: string, notes?: string | null) => (notes?.trim() ? `${label} · Note: ${notes.trim()}` : label);
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 import type { EditableItem, StorePinpoint, MerchantCategory, OrderChatMessage } from "../types";
@@ -229,6 +233,8 @@ export function useOrderItems({
       itemName: d.itemName,
       storeCategory: d.storeCategory || undefined,
       quantity: d.quantity || 1,
+      size: d.size ?? null,
+      notes: d.notes ?? null,
       // What the rider reported, so the always-open list can show an out of
       // stock line where it is edited. Never sent back: see sendToCustomer.
       id: d.id != null ? Number(d.id) : undefined,
@@ -262,6 +268,7 @@ export function useOrderItems({
           {
             itemName: "",
             quantity: 1,
+            size: null,
             storeCategory: formatStoreAndCat(
               storeName || inherited?.store || defaultStore(),
               catName || inherited?.category || defaultCategory()
@@ -306,7 +313,7 @@ export function useOrderItems({
       const category = (stop >= 0 && categoryNameForPin(pinpoints[stop])) || pick.categoryName;
       setEditableItems((prev) => [
         ...prev,
-        { itemName: pick.itemName, quantity: 1, storeCategory: `${store} | ${category}` },
+        { itemName: pick.itemName, quantity: 1, size: null, storeCategory: `${store} | ${category}` },
       ]);
       return stop >= 0 ? store : null;
     },
@@ -400,7 +407,7 @@ export function useOrderItems({
   const removeItem = useCallback(
     (index: number) => {
       const item = editableItems[index];
-      const itemName = (item?.itemName || "").trim();
+      const itemName = formatItemLabel(item?.itemName, item?.size);
       const qty = item?.quantity || 1;
       const { store, category } = parseStoreAndCat(item?.storeCategory);
 
@@ -450,6 +457,8 @@ export function useOrderItems({
       (it?.itemName || "").trim().toLowerCase(),
       Math.max(1, Number(it?.quantity) || 1),
       clean(it?.storeCategory || ""),
+      (it?.size || "").trim().toLowerCase(),
+      (it?.notes || "").trim().toLowerCase(),
     ].join(" || ");
   const hasUnsentChanges =
     isEditing &&
@@ -466,6 +475,10 @@ export function useOrderItems({
         itemName: (it.itemName || "").trim(),
         storeCategory: clean(it.storeCategory || defaultStore()) || "Store 1",
         quantity: Math.max(1, Number(it.quantity) || 1),
+        // Always sent, null when cleared: a row that omits size keeps the
+        // stored one on the server (pabiliDetailRepository.replaceForErrand).
+        size: (it.size || "").trim() || null,
+        notes: (it.notes || "").trim() || null,
       }))
       .filter((it: any) => it.itemName.length > 0);
 
@@ -491,7 +504,7 @@ export function useOrderItems({
         if (!nestedGrouped[s]) nestedGrouped[s] = {};
         if (!nestedGrouped[s][c]) nestedGrouped[s][c] = [];
         nestedGrouped[s][c].push({
-          itemName: it.itemName,
+          itemName: withNote(formatItemLabel(it.itemName, it.size), it.notes),
           quantity: it.quantity,
           priceNote: "Actual store receipt upon purchase",
         });
@@ -536,7 +549,9 @@ export function useOrderItems({
         type: "order_confirmation",
         text: "Here is your order breakdown and delivery fee. Please review and approve.",
         pinpoints: sanitizedPinpoints,
-        items: sanitized,
+        // The chat card is a display snapshot no client parses back, so the
+        // label goes in itemName and every app version shows the size.
+        items: sanitized.map((it: any) => ({ ...it, itemName: withNote(formatItemLabel(it.itemName, it.size), it.notes) })),
         groupedItems: nestedGrouped,
         storeGroups: flatStoreGroups,
         deliveryFee,

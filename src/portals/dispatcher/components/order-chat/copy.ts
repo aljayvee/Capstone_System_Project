@@ -260,6 +260,13 @@ export const copy = {
       `Check the list, then send it. ${who} approves it and picks how to pay in the same message.`,
     addItem: "Add an item",
     itemPlaceholder: "What is it?",
+    /**
+     * How big one of them is ("5 kg", "₱50 worth"), stored as `size`. Called
+     * "Unit", as the customer app calls it (2026-10-06), so both sides of the
+     * order chat name it the same. Optional: most items have none worth saying.
+     */
+    sizeLabel: "Unit",
+    sizePlaceholder: "Unit",
     qty: "Qty",
     removeItem: "Remove",
     send: (who: string) => `Send the list to ${who}`,
