@@ -150,6 +150,8 @@ export function PlanBadge({ state }: { state: string }) {
       return <DispatcherBadge variant="success">Paid in full</DispatcherBadge>;
     case "REFUNDED":
       return <DispatcherBadge variant="neutral">Refunded</DispatcherBadge>;
+    case "CANCELLED":
+      return <DispatcherBadge variant="neutral">Cancelled, unpaid</DispatcherBadge>;
     default:
       return null;
   }

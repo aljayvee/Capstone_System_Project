@@ -60,7 +60,8 @@ export interface Errand {
       | "OVERAGE_PENDING"
       | "AWAITING_BALANCE"
       | "SETTLED"
-      | "REFUNDED";
+      | "REFUNDED"
+      | "CANCELLED";
   } | null;
   /**
    * What the customer pays, server-derived (buildFeeBreakdown). `isFinal` is

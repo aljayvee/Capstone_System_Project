@@ -37,7 +37,7 @@ export interface PaymentLedger {
   amountPaid: number;
   /** What the rider collects at the door. */
   balanceDue: number;
-  state: "AWAITING_BALANCE" | "SETTLED" | "REFUNDED";
+  state: "AWAITING_BALANCE" | "SETTLED" | "REFUNDED" | "CANCELLED";
   entries: PaymentLedgerEntry[];
 }
 

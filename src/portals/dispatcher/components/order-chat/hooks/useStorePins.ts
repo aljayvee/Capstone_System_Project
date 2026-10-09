@@ -1170,11 +1170,13 @@ export function useStorePins({
     } catch (err) {
       console.error("Failed to save store pinpoints:", err);
       // A 422 is the server refusing a stop it cannot route to (see
-      // storeLocationGuard). Its own sentence names the store and says why,
-      // which is the only useful thing to show; anything else is a generic fault.
+      // storeLocationGuard); a 409 is it refusing to drop a stop the rider has
+      // already filed a receipt against (errandService.savePinpoints). Either
+      // sentence names the store and says why, which is the only useful thing to
+      // show; anything else is a generic fault.
       const status = (err as any)?.response?.status;
       const serverMessage = (err as any)?.response?.data?.error;
-      feedback.showError(status === 422 && serverMessage ? serverMessage : copy.stage2.failed);
+      feedback.showError((status === 422 || status === 409) && serverMessage ? serverMessage : copy.stage2.failed);
       return false;
     } finally {
       setIsSaving(false);
