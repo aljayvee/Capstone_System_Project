@@ -21,9 +21,9 @@ import {
   withItemKeys,
   type OwnershipContext,
 } from "../itemOwnership";
-
-/** Illegal Firebase RTDB key characters: . # $ / [ ] */
-const clean = (s: string) => (s || "").replace(/[.#$/[\]]/g, " ").replace(/\s+/g, " ").trim();
+// clean: illegal Firebase RTDB key characters . # $ / [ ] become spaces.
+import { clean, resolveStoreIndex } from "../storeLabel";
+import type { PostCardOptions } from "./useOrderChat";
 
 export interface SplitStoreCategory {
   store: string;
@@ -96,7 +96,14 @@ interface UseOrderItemsArgs {
   messages: OrderChatMessage[];
   onOrderUpdated: (errand: any) => void;
   pushMessage: (payload: Record<string, any>) => void;
+  /** One order summary in the chat, updated or moved (useOrderChat.postCard). */
+  postCard: UseOrderChatPostCard;
 }
+
+type UseOrderChatPostCard = (
+  card: Record<string, any> & { type: string },
+  opts: PostCardOptions
+) => Promise<{ moved: boolean }>;
 
 export function useOrderItems({
   orderId,
@@ -107,6 +114,7 @@ export function useOrderItems({
   messages,
   onOrderUpdated,
   pushMessage,
+  postCard,
 }: UseOrderItemsArgs) {
   const [isEditing, setIsEditing] = useState(false);
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
@@ -133,18 +141,53 @@ export function useOrderItems({
   const savedItems: any[] =
     (orderDetails?.pabiliDetails?.length ? orderDetails.pabiliDetails : orderDetails?.pabiliItemRequests) || [];
 
+  /**
+   * The list card the customer has now: the latest one. An earlier card was
+   * replaced by it, so neither its time nor its approval says anything about
+   * the list in front of them. This read the first card for both, so a
+   * customer who approved an old list read as having approved the new one.
+   */
+  const latestCard = useMemo(
+    () => [...messages].reverse().find((m: any) => m.type === "order_confirmation") ?? null,
+    [messages]
+  );
+
   // The customer's approval arrives two ways: a socket event, and the card
   // itself flipping `confirmed` in RTDB. Watch the messages for the latter.
   useEffect(() => {
-    const card = messages.find((m: any) => m.type === "order_confirmation");
-    if (card) {
-      setHasSentConfirmationCard(true);
-      if (typeof card.timestamp === "number") setSentAt(card.timestamp);
-    }
-    if (messages.some((m: any) => m.type === "order_confirmation" && m.confirmed === true)) {
-      setIsCustomerConfirmed(true);
-    }
-  }, [messages]);
+    if (!latestCard) return;
+    setHasSentConfirmationCard(true);
+    // Updated in place keeps its first timestamp; the update is when it was last sent.
+    const at = latestCard.updatedAt ?? latestCard.timestamp;
+    if (typeof at === "number") setSentAt(at);
+    if (latestCard.confirmed === true) setIsCustomerConfirmed(true);
+  }, [latestCard]);
+
+  /**
+   * The stores were changed and sent again after the customer saw the list.
+   *
+   * Step 2 used to stay "sent", or "approved", across a change to step 1: the
+   * customer approved a list for stores that were no longer the plan, and the
+   * dispatcher was let through to send a rider on it (2026-10-10). The card
+   * records the stores it was built for, so compare them with the stores saved
+   * now. Saved, not the pins on screen: re-pinning in step 1 only changes what
+   * the customer was told once the new stores are sent.
+   */
+  const savedPins: any[] = Array.isArray(orderDetails?.pinpoints) ? orderDetails.pinpoints : [];
+  const pinsKey = (pins: any[]) =>
+    pins
+      .filter((p) => Number.isFinite(Number(p?.latitude)) && Number.isFinite(Number(p?.longitude)))
+      .map(
+        (p) =>
+          `${clean(p?.storeName || "Store").toLowerCase()}@${Number(p.latitude).toFixed(5)},${Number(p.longitude).toFixed(5)}`
+      )
+      .join("|");
+  const storesChangedSinceSent = Boolean(
+    latestCard &&
+      Array.isArray(latestCard.pinpoints) &&
+      savedPins.length > 0 &&
+      pinsKey(latestCard.pinpoints) !== pinsKey(savedPins)
+  );
 
   // ── 4-tier helpers: Store > Merchant Category > Item > Qty ──────────────
   // A pin categorised in stage 2 IS that category: a Jollibee pinned as Fast
@@ -180,23 +223,15 @@ export function useOrderItems({
   /**
    * Which pinned store a line is filed under, by position, or null when none.
    *
-   * By the "Store N" number first, as the server files items
-   * (itemStopAssignment.ts): it survives a store name the label had to clean,
-   * such as "St. Joseph Drug". Then by name. A label naming no pinned store is
-   * no store at all, so its item waits under "Not assigned yet".
+   * By the store's name, not its "Store N" number (resolveStoreIndex): the
+   * number goes stale the moment step 1's stores change. A label naming no
+   * pinned store is no store at all, so its item waits under "Not assigned yet".
    */
   const storeIndexOf = useCallback(
     (row: Pick<EditableItem, "storeCategory">): number | null => {
       const { store, assigned } = parseStoreAndCat(row.storeCategory);
       if (!assigned || pinpoints.length === 0) return null;
-      const ordinal = /^store\s*(\d+)\b/i.exec(store.trim());
-      if (ordinal) {
-        const index = Number(ordinal[1]) - 1;
-        if (index >= 0 && index < pinpoints.length) return index;
-      }
-      const wanted = clean(store.replace(/^store\s*\d+\s*[-:]\s*/i, "")).toLowerCase();
-      const byName = pinpoints.findIndex((pin) => clean(pin.storeName || "").toLowerCase() === wanted);
-      return byName >= 0 ? byName : null;
+      return resolveStoreIndex(store, pinpoints.map((pin) => pin.storeName || ""));
     },
     [parseStoreAndCat, pinpoints]
   );
@@ -551,7 +586,18 @@ export function useOrderItems({
     const sanitized = rawItems
       .map((it: any) => ({
         itemName: (it.itemName || "").trim(),
-        storeCategory: clean(it.storeCategory || defaultStore()) || "Store 1",
+        // Rewritten from the stores pinned now, not copied from the saved label.
+        // A label keeps the number and name of the store it was filed under;
+        // once step 1's stores change, an untouched item's label named a store
+        // that was gone or had moved, and the card the customer approved showed
+        // it as a fourth store (2026-10-10). Resolving by name and writing the
+        // label afresh keeps every saved label in step with the pins.
+        storeCategory: (() => {
+          const at = storeIndexOf(it);
+          return at === null
+            ? clean(it.storeCategory || defaultStore()) || "Store 1"
+            : ownership.fileUnder(it, at);
+        })(),
         quantity: Math.max(1, Number(it.quantity) || 1),
         // Always sent, null when cleared: a row that omits size keeps the
         // stored one on the server (pabiliDetailRepository.replaceForErrand).
@@ -573,9 +619,11 @@ export function useOrderItems({
       onOrderUpdated(updatedErrand);
       setIsEditing(false);
 
-      // Store > Category > Items, for the card the customer approves.
+      // Store > Category > Items, for the card the customer approves. In the
+      // pins' visit order, so the card numbers its stores as step 1 does.
       const nestedGrouped: Record<string, Record<string, any[]>> = {};
-      sanitized.forEach((it: any) => {
+      const storeOrder = (it: any) => storeIndexOf(it) ?? Number.MAX_SAFE_INTEGER;
+      [...sanitized].sort((a: any, b: any) => storeOrder(a) - storeOrder(b)).forEach((it: any) => {
         const { store, category } = parseStoreAndCat(it.storeCategory);
         const s = clean(store) || "Store 1";
         const c = clean(category) || "General";
@@ -623,21 +671,28 @@ export function useOrderItems({
           grandTotal: totalCost || deliveryFee,
         };
 
-      pushMessage({
-        type: "order_confirmation",
-        text: "Here is your order breakdown and delivery fee. Please review and approve.",
-        pinpoints: sanitizedPinpoints,
-        // The chat card is a display snapshot no client parses back, so the
-        // label goes in itemName and every app version shows the size.
-        items: sanitized.map((it: any) => ({ ...it, itemName: withNote(formatItemLabel(it.itemName, it.size), it.notes) })),
-        groupedItems: nestedGrouped,
-        storeGroups: flatStoreGroups,
-        deliveryFee,
-        totalCost,
-        feeBreakdown,
-        confirmed: false,
-        status: "pending",
-      });
+      // One order summary in the chat: updated where it stands, or moved to the
+      // bottom when buried, with the payment card following it down. The
+      // approval is reset either way (confirmed: false): a changed list is a
+      // new question, and the customer's Approve button comes back for it.
+      await postCard(
+        {
+          type: "order_confirmation",
+          text: "Here is your order breakdown and delivery fee. Please review and approve.",
+          pinpoints: sanitizedPinpoints,
+          // The chat card is a display snapshot no client parses back, so the
+          // label goes in itemName and every app version shows the size.
+          items: sanitized.map((it: any) => ({ ...it, itemName: withNote(formatItemLabel(it.itemName, it.size), it.notes) })),
+          groupedItems: nestedGrouped,
+          storeGroups: flatStoreGroups,
+          deliveryFee,
+          totalCost,
+          feeBreakdown,
+          confirmed: false,
+          status: "pending",
+        },
+        { updatedNotice: copy.chatCards.listUpdated, followers: ["payment_prompt"] }
+      );
 
       try {
         update(ref(database, `chats/${orderId}/meta`), {
@@ -671,8 +726,10 @@ export function useOrderItems({
     orderDetails,
     pinpoints,
     parseStoreAndCat,
+    storeIndexOf,
+    ownership,
     onOrderUpdated,
-    pushMessage,
+    postCard,
     feedback,
     customerDisplayName,
   ]);
@@ -684,8 +741,11 @@ export function useOrderItems({
     hasUnsentChanges,
     isSaving,
     feedback,
-    hasSentConfirmationCard,
-    isCustomerConfirmed,
+    // A card built for other stores is no longer the list: step 2 asks for it
+    // again, and an approval of it does not count (storesChangedSinceSent).
+    hasSentConfirmationCard: hasSentConfirmationCard && !storesChangedSinceSent,
+    isCustomerConfirmed: isCustomerConfirmed && !storesChangedSinceSent,
+    storesChangedSinceSent,
     setIsCustomerConfirmed,
     sentAt,
     startEditing,

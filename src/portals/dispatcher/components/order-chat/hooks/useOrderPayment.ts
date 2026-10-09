@@ -3,6 +3,13 @@ import { io, Socket } from "socket.io-client";
 import { apiClient } from "../../../../../services/apiClient";
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
+import type { PostCardOptions } from "./useOrderChat";
+
+/** The payment question's card, as the customer's app renders it. */
+const PAYMENT_CARD = {
+  type: "payment_prompt",
+  text: "Please choose your payment method so I can confirm it. No payment is being taken right now.",
+} as const;
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
@@ -12,19 +19,31 @@ interface UseOrderPaymentArgs {
   orderId: string;
   customerDisplayName: string;
   onOrderUpdated: (errand: any) => void;
-  pushMessage: (payload: Record<string, any>) => void;
+  /** One payment card in the chat, updated or moved (useOrderChat.postCard). */
+  postCard: (card: Record<string, any> & { type: string }, opts: PostCardOptions) => Promise<{ moved: boolean }>;
   onCustomerConfirmed: () => void;
 }
+
+/**
+ * The payment card sits below the order summary it asks about. Updated in
+ * place, it costs the customer a push and nothing in the chat; buried, or above
+ * the list, it moves to the bottom and the old one goes.
+ */
+const PAYMENT_CARD_PLACEMENT: PostCardOptions = {
+  updatedNotice: copy.chatCards.paymentReminder,
+  follows: "order_confirmation",
+};
 
 export function useOrderPayment({
   orderId,
   customerDisplayName,
   onOrderUpdated,
-  pushMessage,
+  postCard,
   onCustomerConfirmed,
 }: UseOrderPaymentArgs) {
   const [confirmedPaymentMode, setConfirmedPaymentMode] = useState<string | null>(null);
   const [isAsking, setIsAsking] = useState(false);
+  const [isReminding, setIsReminding] = useState(false);
   const [askedAt, setAskedAt] = useState<number | null>(null);
   const feedback = useInlineMessage();
 
@@ -75,10 +94,7 @@ export function useOrderPayment({
       const res = await apiClient.post(`/errands/${orderId}/enable-payment`);
       onOrderUpdated(res.data?.errand || res.data);
 
-      pushMessage({
-        type: "payment_prompt",
-        text: "Please choose your payment method so I can confirm it. No payment is being taken right now.",
-      });
+      await postCard({ ...PAYMENT_CARD }, PAYMENT_CARD_PLACEMENT);
 
       setAskedAt(Date.now());
       feedback.showSuccess(copy.stage4.asked(customerDisplayName));
@@ -88,7 +104,29 @@ export function useOrderPayment({
     } finally {
       setIsAsking(false);
     }
-  }, [orderId, onOrderUpdated, pushMessage, feedback, customerDisplayName]);
+  }, [orderId, onOrderUpdated, postCard, feedback, customerDisplayName]);
+
+  /**
+   * "Resend Payment Method": a reminder for a customer who has not found the
+   * button, not a second question (2026-10-10). The card already in the chat
+   * stays the one; they get a push pointing at it. Only a card buried under
+   * newer messages is posted again at the bottom, with the old one removed.
+   */
+  const remindCustomer = useCallback(async () => {
+    setIsReminding(true);
+    feedback.dismiss();
+    try {
+      const { moved } = await postCard({ ...PAYMENT_CARD }, PAYMENT_CARD_PLACEMENT);
+      feedback.showSuccess(
+        moved ? copy.stage4.remindedMoved(customerDisplayName) : copy.stage4.reminded(customerDisplayName)
+      );
+    } catch (err) {
+      console.error("Failed to remind about the payment method:", err);
+      feedback.showError(copy.stage4.remindFailed);
+    } finally {
+      setIsReminding(false);
+    }
+  }, [postCard, feedback, customerDisplayName]);
 
   return {
     confirmedPaymentMode,
@@ -97,5 +135,7 @@ export function useOrderPayment({
     askedAt,
     feedback,
     askCustomer,
+    isReminding,
+    remindCustomer,
   };
 }

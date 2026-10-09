@@ -1,4 +1,4 @@
-import { CreditCard, CheckCircle2, Receipt } from "lucide-react";
+import { CreditCard, CheckCircle2, Receipt, BellRing } from "lucide-react";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { WaitingCard } from "../WaitingCard";
@@ -59,8 +59,35 @@ export function Stage4Payment({
   onOpenProof,
   readOnly = false,
 }: Stage4Props) {
-  const { confirmedPaymentMode, isPaymentConfirmed, isAsking, askedAt, feedback, askCustomer } =
-    payment;
+  const {
+    confirmedPaymentMode,
+    isPaymentConfirmed,
+    isAsking,
+    askedAt,
+    feedback,
+    askCustomer,
+    isReminding,
+    remindCustomer,
+  } = payment;
+
+  /**
+   * For a customer who has not found where to choose (2026-10-10). A reminder
+   * pointing at the card they already have, not a second card: only a card
+   * buried under newer messages is posted again, and the old one removed.
+   */
+  const resendButton = (
+    <DispatcherButton
+      variant="secondary"
+      size="sm"
+      className="font-semibold"
+      loading={isReminding}
+      loadingText={copy.stage4.resending}
+      icon={<BellRing size={14} />}
+      onClick={() => void remindCustomer()}
+    >
+      {copy.stage4.resend}
+    </DispatcherButton>
+  );
 
   const ledgerPanel = (
     <div className="space-y-2">
@@ -118,20 +145,26 @@ export function Stage4Payment({
       {!hasSentList ? (
         <p className="m-0 text-body text-ink-muted">{copy.stage4.asksWithList(customerFirstName)}</p>
       ) : isPrompted && !isListApproved ? (
-        <p className="m-0 text-body text-ink-muted">
-          {askedAt ? `You asked how they will pay ${formatAgo(minsAgo)}. ` : ""}
-          {copy.stage4.answersEitherOrder}
-        </p>
+        <div className="space-y-2">
+          <p className="m-0 text-body text-ink-muted">
+            {askedAt ? `You asked how they will pay ${formatAgo(minsAgo)}. ` : ""}
+            {copy.stage4.answersEitherOrder}
+          </p>
+          {resendButton}
+        </div>
       ) : isPrompted ? (
-        <WaitingCard
-          title={`Waiting for ${customerFirstName}`}
-          detail={
-            askedAt
-              ? `You asked how they will pay ${formatAgo(minsAgo)}.`
-              : copy.stage4.intro(customerFirstName)
-          }
-          actions={[{ label: copy.nowActions.nudge(customerFirstName), onClick: onNudge }]}
-        />
+        <div className="space-y-2">
+          <WaitingCard
+            title={`Waiting for ${customerFirstName}`}
+            detail={
+              askedAt
+                ? `You asked how they will pay ${formatAgo(minsAgo)}.`
+                : copy.stage4.intro(customerFirstName)
+            }
+            actions={[{ label: copy.nowActions.nudge(customerFirstName), onClick: onNudge }]}
+          />
+          {resendButton}
+        </div>
       ) : (
         // The list is out and the question is not: say so, and offer it.
         <div className="space-y-2 rounded-plate border border-status-waiting-ink/30 bg-status-waiting-fill px-3.5 py-2.5">

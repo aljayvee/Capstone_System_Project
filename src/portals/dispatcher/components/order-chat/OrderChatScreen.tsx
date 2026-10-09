@@ -173,7 +173,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     // completes step 1 and must survive a reload.
     messages: chat.messages,
     onOrderUpdated: setOrderDetails,
-    pushMessage: chat.pushMessage,
+    postCard: chat.postCard,
     mapVisible: showAll || openStageId === 1,
     // The fee is priced live as pins change, except on a closed order.
     liveQuote: !isReadOnly,
@@ -188,6 +188,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     messages: chat.messages,
     onOrderUpdated: setOrderDetails,
     pushMessage: chat.pushMessage,
+    postCard: chat.postCard,
   });
 
   const markCustomerConfirmed = useCallback(
@@ -199,7 +200,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     orderId,
     customerDisplayName: customerFirstName,
     onOrderUpdated: setOrderDetails,
-    pushMessage: chat.pushMessage,
+    postCard: chat.postCard,
     onCustomerConfirmed: markCustomerConfirmed,
   });
 

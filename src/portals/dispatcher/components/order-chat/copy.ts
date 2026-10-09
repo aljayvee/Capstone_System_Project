@@ -276,6 +276,9 @@ export const copy = {
     send: (who: string) => `Send the list to ${who}`,
     resend: (who: string) => `Send the updated list to ${who}`,
     resendNote: (who: string) => `You changed the list since sending it. ${who} approves it again.`,
+    /** Step 1's stores were changed and sent after the customer saw this list. */
+    storesChangedNote: (who: string) =>
+      `The stores changed after ${who} saw this list. Send it again so ${who} approves the stores you pinned.`,
     undoChanges: "Undo changes",
     approved: (who: string) => `${who} approved this list.`,
     /** Rider-reported only. An unchecked line before shopping is not a warning. */
@@ -367,6 +370,24 @@ export const copy = {
     asked: (who: string) => `Asked. ${who} will see it in the chat.`,
     settled: (mode: string) => `Settled by ${mode}.`,
     failed: "Couldn't set up payment. Try again.",
+    /** A reminder, not a second question: the payment card stays the one in the chat. */
+    resend: "Resend Payment Method",
+    resending: "Reminding",
+    reminded: (who: string) => `Reminded ${who} to choose how to pay.`,
+    remindedMoved: (who: string) =>
+      `The payment card was buried in the chat, so it is at the bottom again. ${who} was reminded.`,
+    remindFailed: "Couldn't send the reminder. Try again.",
+  },
+
+  // ── push notifications for a card updated where it stands ───────────────
+  //
+  // Addressed to the customer. Sent instead of a new chat message when the
+  // order summary, the payment card or the store locations are updated in
+  // place (useOrderChat.postCard), so they know to look again.
+  chatCards: {
+    listUpdated: "Your item list was updated. Please check it again and approve it in our chat.",
+    paymentReminder: "Please choose how you will pay. Tap Choose Payment Mode on the payment card in our chat.",
+    storesUpdated: "The store locations for your errand were updated. You can see them in our chat.",
   },
 
   // ── errands the customer does not pay in cash at the door ───────────────

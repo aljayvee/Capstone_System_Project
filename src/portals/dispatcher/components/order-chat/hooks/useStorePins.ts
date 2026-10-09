@@ -31,6 +31,7 @@ import {
   type DuplicateVerdict,
 } from "./storeCategoryInference";
 import { normalizeStoreName } from "../../../../../utils/storeName";
+import type { PostCardOptions } from "./useOrderChat";
 import type {
   StorePinpoint,
   MerchantCategory,
@@ -146,7 +147,8 @@ interface UseStorePinsArgs {
    */
   messages: OrderChatMessage[];
   onOrderUpdated: (errand: any) => void;
-  pushMessage: (payload: Record<string, any>) => void;
+  /** One store-locations card in the chat, updated or moved (useOrderChat.postCard). */
+  postCard: (card: Record<string, any> & { type: string }, opts: PostCardOptions) => Promise<{ moved: boolean }>;
   /** Only mount the map when stage 2 is actually open. */
   mapVisible: boolean;
   /**
@@ -184,7 +186,7 @@ export function useStorePins({
   initialPinpoints,
   messages,
   onOrderUpdated,
-  pushMessage,
+  postCard,
   mapVisible,
   liveQuote = true,
 }: UseStorePinsArgs) {
@@ -1154,11 +1156,17 @@ export function useStorePins({
       });
       onOrderUpdated(res.data?.errand || res.data);
 
-      pushMessage({
-        type: "pinpoints",
-        text: `I've set the store locations for your errand: ${storesList || "stores updated"}. You can see them on the map in your app.`,
-        pinpoints: sanitized,
-      });
+      // One store-locations card in the chat (2026-10-10): re-sending updates
+      // it where it stands and the customer gets a push; buried under newer
+      // messages it moves to the bottom and the old one is deleted.
+      await postCard(
+        {
+          type: "pinpoints",
+          text: `I've set the store locations for your errand: ${storesList || "stores updated"}. You can see them on the map in your app.`,
+          pinpoints: sanitized,
+        },
+        { updatedNotice: copy.chatCards.storesUpdated }
+      );
 
       // What actually completes stage 2. Pinning used to, which meant placing
       // the first of three pins finished the stage and threw the dispatcher
@@ -1181,7 +1189,7 @@ export function useStorePins({
     } finally {
       setIsSaving(false);
     }
-  }, [pinpoints, orderId, onOrderUpdated, pushMessage, feedback, customerDisplayName]);
+  }, [pinpoints, orderId, onOrderUpdated, postCard, feedback, customerDisplayName]);
 
   return {
     pinpoints,

@@ -74,6 +74,7 @@ export function Stage3ConfirmItems({
     feedback,
     hasSentConfirmationCard,
     isCustomerConfirmed,
+    storesChangedSinceSent,
     sentAt,
     startEditing,
     cancelEditing,
@@ -772,6 +773,9 @@ export function Stage3ConfirmItems({
           {hasSentConfirmationCard && hasUnsentChanges && (
             <p className="m-0 text-body text-ink-muted">{copy.stage3.resendNote(customerFirstName)}</p>
           )}
+          {storesChangedSinceSent && (
+            <p className="m-0 text-body text-ink-muted">{copy.stage3.storesChangedNote(customerFirstName)}</p>
+          )}
           <div className="flex flex-wrap gap-2">
             <DispatcherButton
               variant="success"
@@ -782,7 +786,7 @@ export function Stage3ConfirmItems({
               onClick={() => void handleSend()}
               className="flex-1 justify-center font-semibold"
             >
-              {hasSentConfirmationCard
+              {hasSentConfirmationCard || storesChangedSinceSent
                 ? copy.stage3.resend(customerFirstName)
                 : copy.stage3.send(customerFirstName)}
             </DispatcherButton>

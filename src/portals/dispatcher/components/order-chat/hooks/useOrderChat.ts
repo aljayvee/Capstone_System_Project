@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ref, push, onValue, set, onDisconnect } from "firebase/database";
+import { ref, push, onValue, set, update, onDisconnect } from "firebase/database";
 import { database } from "../../../../../firebase/config";
 import { apiClient } from "../../../../../services/apiClient";
 import type { OrderChatMessage } from "../types";
+import { planCard, type FeedMessage, type PostCardOptions } from "../chatCards";
+
+export type { PostCardOptions };
 
 interface UseOrderChatArgs {
   orderId: string;
@@ -29,6 +32,14 @@ interface UseOrderChatResult {
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   /** Pushes a typed card (pinpoints, order_confirmation, …) into the thread. */
   pushMessage: (payload: Record<string, any>) => void;
+  /**
+   * Posts a card the customer should only ever have one of: the order summary,
+   * the payment question, the store locations. Resolves `moved: true` when it
+   * went to the bottom as a new message, false when updated in place.
+   */
+  postCard: (card: Record<string, any> & { type: string }, opts: PostCardOptions) => Promise<{ moved: boolean }>;
+  /** A push notification to the customer, with no message in the chat. */
+  notifyCustomer: (text: string) => void;
 }
 
 /**
@@ -55,6 +66,8 @@ export function useOrderChat({
   const [customerTypingName, setCustomerTypingName] = useState("Customer");
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  /** The feed as last delivered, for postCard, which runs between renders. */
+  const feedRef = useRef<OrderChatMessage[]>([]);
   const dispatcherTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const customerTypingCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCustomerTypingTimestampRef = useRef<number>(0);
@@ -71,8 +84,10 @@ export function useOrderChat({
           ...data[key],
         }));
         parsed.sort((a, b) => a.timestamp - b.timestamp);
+        feedRef.current = parsed;
         setMessages(parsed);
       } else {
+        feedRef.current = [];
         setMessages([]);
       }
       setIsLoading(false);
@@ -198,39 +213,95 @@ export function useOrderChat({
     [readOnly, broadcastTyping]
   );
 
-  const pushMessage = useCallback(
-    (payload: Record<string, any>) => {
+  const notifyCustomer = useCallback(
+    (text: string) => {
+      if (!orderId || !text) return;
+      void apiClient
+        .post(`/errands/${orderId}/chat-notify`, { text, senderName: dispatcherFirstName })
+        .catch(() => {});
+    },
+    [orderId, dispatcherFirstName]
+  );
+
+  /** The write itself. `timestamp` in the payload wins, for ordering cards. */
+  const writeMessage = useCallback(
+    (payload: Record<string, any>) =>
       push(ref(database, `chats/${orderId}/messages`), {
         senderId: String(dispatcher?.id || "dispatcher-1"),
         senderName: dispatcherFirstName,
         role: "dispatcher",
         timestamp: Date.now(),
         ...payload,
-      });
+      }),
+    [orderId, dispatcher, dispatcherFirstName]
+  );
+
+  const pushMessage = useCallback(
+    (payload: Record<string, any>) => {
+      void writeMessage(payload);
 
       // Fire push notification to customer's device
-      if (orderId) {
-        const notifText =
-          payload.text ||
-          (payload.type === 'pinpoints'
-            ? 'Updated store pinpoints for your errand'
-            : payload.type === 'revision'
-            ? 'Sent an order breakdown for your review'
-            : payload.type === 'payment_enabled'
-            ? 'Enabled GCash / Maya payment for your errand'
-            : null);
-
-        if (notifText) {
-          void apiClient
-            .post(`/errands/${orderId}/chat-notify`, {
-              text: notifText,
-              senderName: dispatcherFirstName,
-            })
-            .catch(() => {});
-        }
-      }
+      const notifText =
+        payload.text ||
+        (payload.type === 'pinpoints'
+          ? 'Updated store pinpoints for your errand'
+          : payload.type === 'revision'
+          ? 'Sent an order breakdown for your review'
+          : payload.type === 'payment_enabled'
+          ? 'Enabled GCash / Maya payment for your errand'
+          : null);
+      if (notifText) notifyCustomer(notifText);
     },
-    [orderId, dispatcher, dispatcherFirstName]
+    [writeMessage, notifyCustomer]
+  );
+
+  const removeMessages = useCallback(
+    (ids: string[]) =>
+      ids.length === 0
+        ? Promise.resolve()
+        : update(
+            ref(database, `chats/${orderId}/messages`),
+            Object.fromEntries(ids.map((id) => [id, null]))
+          ),
+    [orderId]
+  );
+
+  /**
+   * One card of each kind in the customer's chat, never a stack of them
+   * (chatCards.ts decides where; this writes it).
+   *
+   * Updated in place, the card keeps its place in the thread and the customer
+   * gets a push instead of a new message. Moved, the new card is written
+   * first and the old copies deleted after, so the chat is never without one;
+   * its followers go below it with consecutive timestamps (both apps sort by
+   * timestamp) and no second push, since they were already asked.
+   */
+  const postCard = useCallback(
+    async (card: Record<string, any> & { type: string }, opts: PostCardOptions) => {
+      const plan = planCard(feedRef.current as FeedMessage[], card.type, opts);
+
+      if (!plan.moved && plan.updateId) {
+        await update(ref(database, `chats/${orderId}/messages/${plan.updateId}`), {
+          ...card,
+          updatedAt: Date.now(),
+        });
+        await removeMessages(plan.deleteIds);
+        notifyCustomer(opts.updatedNotice);
+        return { moved: false };
+      }
+
+      const at = Date.now();
+      await writeMessage({ ...card, timestamp: at });
+      if (card.text) notifyCustomer(card.text);
+      let next = at + 1;
+      for (const follower of plan.followers) {
+        await writeMessage({ ...follower.content, timestamp: next++ });
+        await removeMessages(follower.deleteIds);
+      }
+      await removeMessages(plan.deleteIds);
+      return { moved: true };
+    },
+    [orderId, writeMessage, removeMessages, notifyCustomer]
   );
 
   const sendMessage = useCallback(
@@ -264,5 +335,7 @@ export function useOrderChat({
     stopTyping: () => broadcastTyping(false),
     messagesEndRef,
     pushMessage,
+    postCard,
+    notifyCustomer,
   };
 }
