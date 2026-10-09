@@ -42,6 +42,9 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
   // ring the customer.
   OVERAGE_PENDING: "Goods held, call the customer",
   UNPAID_BALANCE: "Balance never collected",
+  // An instruction too: the rider is holding goods nobody will pay for, and
+  // someone here has to decide whether they go back to the store.
+  CANCELLED_AFTER_PURCHASE: "Cancelled after purchase, decide on the goods",
 };
 
 /**

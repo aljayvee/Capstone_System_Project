@@ -25,6 +25,7 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
   // waiting; "Balance never collected" says the money is simply gone.
   OVERAGE_PENDING: "Goods held, overage unapproved",
   UNPAID_BALANCE: "Balance never collected",
+  CANCELLED_AFTER_PURCHASE: "Cancelled after purchase",
 };
 
 /**

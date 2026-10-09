@@ -244,7 +244,8 @@ export type ExceptionKind =
   | "MISSING_RECEIPT"
   | "STALLED_STOP"
   | "OVERAGE_PENDING"
-  | "UNPAID_BALANCE";
+  | "UNPAID_BALANCE"
+  | "CANCELLED_AFTER_PURCHASE";
 
 /**
  * A suggested reason for clearing an exception, from the server's trained
