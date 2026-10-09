@@ -1,11 +1,8 @@
 import {
   Plus,
-  Minus,
-  Trash2,
   Send,
   Package,
   Sparkles,
-  MapPinOff,
   BrainCircuit,
   Search,
   AlertTriangle,
@@ -22,8 +19,9 @@ import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanne
 import { WaitingCard } from "../WaitingCard";
 import { copy, formatAgo } from "../copy";
 import type { MerchantCategory, StorePinpoint } from "../types";
-import { ItemAutocompleteInput } from "../ItemAutocompleteInput";
 import { describeSuggestionSource, useCatalogAutocomplete } from "../hooks/useCatalogAutocomplete";
+import { ItemsByStore, StoreItemsDialog, type StoreColumn } from "../ItemsByStore";
+import { newItemKey, type ItemLine } from "../itemOwnership";
 
 /*
  * A hard-coded getTacurongStoreSuggestion lived here, naming "Pan de Manila",
@@ -55,9 +53,6 @@ interface Stage3Props {
   readOnly?: boolean;
 }
 
-const SELECT_CLASSES =
-  "min-h-9 shrink-0 cursor-pointer rounded-trim border px-2 text-label transition-colors";
-
 export function Stage3ConfirmItems({
   orderId,
   orderDetails,
@@ -88,7 +83,6 @@ export function Stage3ConfirmItems({
     removeItem,
     sendToCustomer,
     parseStoreAndCat,
-    storeOptions,
     unassignedCount,
     categoryGuesses,
     stopIndexFor,
@@ -96,9 +90,26 @@ export function Stage3ConfirmItems({
     applyCategoryGuess,
     recommendationsReady,
     categoryNameForPin,
+    storeIndexOf,
+    lines,
+    setItemOwned,
+    setStoreOwnsAll,
+    editItemFields,
     pushMessage,
     onOrderUpdated,
   } = items;
+
+  /** The pinned stores as the list's groups: each pin's own name and category. */
+  const stores: StoreColumn[] = useMemo(
+    () =>
+      pinpoints.map((pin, i) => ({
+        name: (pin.storeName || "").trim() || `Store ${i + 1}`,
+        category: categoryNameForPin(pin),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pinpoints, merchantCategories]
+  );
+  const [openStoreIndex, setOpenStoreIndex] = useState<number | null>(null);
 
   // When the status in the Rider App is "On the Way to the Customer" (itemsPurchasedAt is set),
   // no modification of items order is allowed.
@@ -177,8 +188,9 @@ export function Stage3ConfirmItems({
   const handleApplySubstitute = async (itemIndex: number, itemId: number, newItemName: string) => {
     if (!canModifyItems) return;
     // The list is always open, and `itemIndex` is the editable row's own
-    // index, so the swap lands on the row the button sits in.
-    updateItem(itemIndex, { itemName: newItemName });
+    // index, so the swap lands on the row the button sits in. Only this
+    // store's copy changes, so it becomes an item of its own.
+    updateItem(itemIndex, { itemName: newItemName, itemKey: newItemKey() });
     if (itemId) {
       const res = await apiService.updateItemFulfillmentStatus(orderId, itemId, "PENDING");
       if (res?.errand) onOrderUpdated(res.errand);
@@ -207,16 +219,20 @@ export function Stage3ConfirmItems({
   };
 
   /**
-   * The kind of shop each named row needs, when no pinned store is that kind.
-   * The row's own category, or the suggestion's when there is one.
+   * The kind of shop each item no store buys needs, when no pinned store is
+   * that kind. The item's own category, or the suggestion's when there is one.
+   * An item ticked at a store is that store's kind by definition.
    */
   const unservedRows = isEditing && recommendationsReady
-    ? editableItems
-        .map((item, index) => {
-          const name = (item.itemName || "").trim();
-          const category = categoryGuesses[index]?.categoryName || parseStoreAndCat(item.storeCategory).category;
+    ? lines
+        .filter((line) => line.unassignedRow !== null)
+        .map((line) => {
+          const name = line.itemName.trim();
+          const category =
+            categoryGuesses[line.key]?.categoryName ||
+            parseStoreAndCat(editableItems[line.unassignedRow!]?.storeCategory).category;
           const served = pinpoints.some((pin) => categoryNameForPin(pin) === category);
-          return { index, name, category, served };
+          return { key: line.key, name, category, served };
         })
         .filter((r) => r.name.length >= 2 && r.category && !r.served)
     : [];
@@ -304,50 +320,71 @@ export function Stage3ConfirmItems({
    * already bought. A tick for what the rider bought, the out-of-stock chip for
    * what they could not; nothing for a line not reached, which is not a fault.
    */
+  /** One saved line, for reading. */
+  const savedLine = (it: any, i: number) => {
+    const isPurchased = String(it.fulfillmentStatus || "").toUpperCase() === "PURCHASED";
+    const oos = isOutOfStock(it.fulfillmentStatus);
+    return (
+      <li key={i} className="flex items-center gap-2.5 py-2">
+        {isPurchased && (
+          <span
+            title="Bought by the rider"
+            className="grid size-5 shrink-0 place-items-center rounded-sm border border-status-done-ink bg-status-done-fill text-status-done-ink"
+          >
+            <Check size={12} strokeWidth={3} />
+          </span>
+        )}
+        <span data-figure className="shrink-0 font-mono text-label tabular-nums text-ink-muted">
+          {it.quantity}&times;
+        </span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate text-body",
+              oos ? "line-through text-status-waiting-ink" : "text-ink"
+            )}
+          >
+            {formatItemLabel(it.itemName, it.size)}
+          </span>
+          {it.notes ? (
+            <span className="block truncate text-label text-ink-muted" title={it.notes}>
+              Note: {it.notes}
+            </span>
+          ) : null}
+        </span>
+        {oos && outOfStockChip}
+      </li>
+    );
+  };
+
+  /**
+   * The list as saved, for reading: a closed order, or one whose items are
+   * already bought. Grouped by store like the list being edited. A tick for
+   * what the rider bought, the out-of-stock chip for what they could not;
+   * nothing for a line not reached, which is not a fault.
+   */
+  const savedGroups = [
+    ...stores.map((store, at) => ({
+      title: `${at + 1}. ${store.name}`,
+      rows: savedItems.filter((it: any) => storeIndexOf(it) === at),
+    })),
+    { title: copy.stage3.notAssignedTitle, rows: savedItems.filter((it: any) => storeIndexOf(it) === null) },
+  ].filter((group) => group.rows.length > 0);
+
   const savedList =
     savedItems.length === 0 ? (
       <p className="m-0 text-body text-ink-muted">No items on this order.</p>
     ) : (
-      <ul className="m-0 list-none divide-y divide-hairline p-0">
-        {savedItems.map((it: any, i: number) => {
-          const isPurchased = String(it.fulfillmentStatus || "").toUpperCase() === "PURCHASED";
-          const oos = isOutOfStock(it.fulfillmentStatus);
-          return (
-            <li key={i} className="flex items-center gap-2.5 py-2">
-              {isPurchased && (
-                <span
-                  title="Bought by the rider"
-                  className="grid size-5 shrink-0 place-items-center rounded-sm border border-status-done-ink bg-status-done-fill text-status-done-ink"
-                >
-                  <Check size={12} strokeWidth={3} />
-                </span>
-              )}
-              <span data-figure className="shrink-0 font-mono text-label text-ink-muted">
-                {it.quantity}&times;
-              </span>
-              <span className="min-w-0 flex-1">
-                <span
-                  className={cn(
-                    "block truncate text-body",
-                    oos ? "line-through text-status-waiting-ink" : "text-ink"
-                  )}
-                >
-                  {formatItemLabel(it.itemName, it.size)}
-                </span>
-                {it.notes ? (
-                  <span className="block truncate text-label text-ink-muted" title={it.notes}>
-                    Note: {it.notes}
-                  </span>
-                ) : null}
-              </span>
-              {oos && outOfStockChip}
-              <span className="max-w-[128px] shrink-0 truncate text-label text-ink-muted">
-                {parseStoreAndCat(it.storeCategory).store}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="space-y-2">
+        {savedGroups.map((group) => (
+          <div key={group.title}>
+            <h4 className="m-0 truncate text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
+              {group.title}
+            </h4>
+            <ul className="m-0 list-none divide-y divide-hairline p-0">{group.rows.map(savedLine)}</ul>
+          </div>
+        ))}
+      </div>
     );
 
   /** Substitute options for an out-of-stock line, swapped into that row. */
@@ -422,6 +459,112 @@ export function Stage3ConfirmItems({
       </div>
     ) : null;
 
+  /** What the rider reported on one store's line, under it, and only when it is out of stock. */
+  const renderOutOfStock = (rowIndex: number) => {
+    const item = editableItems[rowIndex];
+    const itemId = Number(item?.id || 0);
+    if (!item || !isOutOfStock(item.fulfillmentStatus) || itemId <= 0) return null;
+    const subInfo = substituteState[itemId];
+    return (
+      <div className="mt-1.5 space-y-2 pl-11">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {outOfStockChip}
+          <button
+            type="button"
+            onClick={() => void handleFetchSubstitutes(itemId)}
+            disabled={subInfo?.loading}
+            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-ink transition-colors hover:bg-board-plate"
+          >
+            <Sparkles size={11} />
+            <span>{subInfo?.loading ? copy.stage3.checkingSubstitutes : copy.stage3.suggestSubstitutes}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleDeclineSubstitute(itemId)}
+            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-status-waiting-ink transition-colors hover:bg-board-plate"
+            title="Customer declined substitute - notify rider to proceed"
+          >
+            <X size={11} />
+            <span>{copy.stage3.declineSubstitute}</span>
+          </button>
+        </div>
+        {subInfo?.data && renderSubstitutes(rowIndex, itemId, subInfo)}
+      </div>
+    );
+  };
+
+  /**
+   * Under an item no store buys: where dispatchers have bought it before, and,
+   * when no pinned store is its kind, the store to pin for it.
+   */
+  const renderUnassignedExtras = (line: ItemLine) => {
+    const p = recommendationsReady ? categoryGuesses[line.key] : undefined;
+    const stopIndex = p ? stopIndexFor(p) : -1;
+    const suggestion = p?.categoryName ? (
+      <div className="mt-2 flex flex-wrap items-center gap-2" title={p.reason}>
+        <span
+          className={cn(
+            "flex min-w-0 items-center gap-1.5 text-label",
+            p.source === "learned" ? "text-status-done-ink" : "text-status-waiting-ink"
+          )}
+        >
+          {p.source === "learned" ? (
+            <BrainCircuit size={13} className="shrink-0" />
+          ) : (
+            <Sparkles size={13} className="shrink-0" />
+          )}
+          <span className="truncate">
+            {copy.stage3.placementSuggestion(p.categoryName, stopIndex >= 0 ? stores[stopIndex]?.name ?? null : null)}
+          </span>
+        </span>
+        <DispatcherButton type="button" size="sm" variant="secondary" onClick={() => applyCategoryGuess(line.key)}>
+          {copy.stage3.placementApply}
+        </DispatcherButton>
+      </div>
+    ) : null;
+
+    // Store needed: no pinned store is the kind of shop this item is bought at.
+    // The store it offers comes from the server's predictor, and pressing it
+    // pins that store.
+    const need = unservedRows.find((r) => r.key === line.key);
+    const predicted = need ? neededStores[need.name.toLowerCase()] ?? null : null;
+    const needCard = need ? (
+      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-plate border border-status-waiting-ink/40 bg-status-waiting-fill p-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="m-0 flex items-center gap-1.5 text-label font-medium text-status-waiting-ink">
+            <AlertTriangle size={14} className="shrink-0 text-status-waiting-ink" />
+            <span>Store needed for &ldquo;{line.itemName}&rdquo;</span>
+          </p>
+          <p className="mb-0 mt-0.5 text-micro text-status-waiting-ink/85">
+            {copy.stage3.noPinnedKind(need.category)} {predicted ? predicted.reason : copy.stage3.noStoreToSuggest}
+          </p>
+        </div>
+        <DispatcherButton
+          type="button"
+          size="sm"
+          variant="success"
+          icon={<ArrowRight size={13} />}
+          onClick={() => {
+            if (predicted) {
+              onNeedStores(copy.stage3.pinnedFor(predicted.storeName, need.name), undefined, predicted);
+            } else {
+              onNeedStores(copy.stage3.needsNewStore(need.name), need.category);
+            }
+          }}
+        >
+          {predicted ? copy.stage3.pinStoreNamed(predicted.storeName) : copy.stage3.pinAStore}
+        </DispatcherButton>
+      </div>
+    ) : null;
+
+    return (
+      <>
+        {suggestion}
+        {needCard}
+      </>
+    );
+  };
+
   if (readOnly) {
     return (
       <div className="space-y-2">
@@ -463,9 +606,9 @@ export function Stage3ConfirmItems({
 
       {/* Crawled Catalog & Menu Helper Drawer / Tray */}
       {isCatalogOpen && (
-        <div className="space-y-2 rounded-plate border border-edge bg-board-plate p-3 shadow-sm">
+        <div className="space-y-2.5 rounded-plate border border-edge bg-board-plate p-3.5 shadow-plate">
           <div className="flex items-center justify-between">
-            <h4 className="m-0 flex items-center gap-1.5 text-label font-medium text-ink">
+            <h4 className="m-0 flex items-center gap-1.5 text-micro font-bold uppercase tracking-[0.06em] text-ink">
               <Package size={14} className="text-ink-muted" />
               <span>Tacurong Item Catalog</span>
             </h4>
@@ -500,7 +643,7 @@ export function Stage3ConfirmItems({
                   className="flex items-center justify-between gap-2 px-3 py-2 transition-colors hover:bg-board-plate"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="m-0 truncate text-body font-medium text-ink">{catItem.itemName}</p>
+                    <p className="m-0 truncate text-body font-semibold text-ink">{catItem.itemName}</p>
                     <p className="m-0 truncate text-micro text-ink-muted">
                       {describeSuggestionSource(catItem)} &bull; {catItem.categoryName}
                     </p>
@@ -509,17 +652,17 @@ export function Stage3ConfirmItems({
                     type="button"
                     size="sm"
                     variant="secondary"
+                    className="font-semibold"
                     icon={<Plus size={13} />}
                     onClick={() => {
-                      // The new row's index: editing starts from the saved list.
-                      const index = isEditing ? editableItems.length : savedItems.length;
                       if (!isEditing) startEditing();
+                      // An item with no store is read again with the rest of the
+                      // list a moment later, and its suggestion shows then.
                       const placedAt = addCatalogItem({
                         itemName: catItem.itemName,
                         storeName: catItem.rawStoreName,
                         categoryName: catItem.categoryName,
                       });
-                      if (!placedAt) guessCategoryFor(index, catItem.itemName);
                       feedback.showSuccess(
                         placedAt
                           ? `Added "${catItem.itemName}" to ${placedAt}.`
@@ -554,337 +697,49 @@ export function Stage3ConfirmItems({
         </p>
       )}
 
-      {/* the list */}
+      {/* the list, grouped by store */}
       {isEditing ? (
-        <div className="space-y-2">
-          <div className="overflow-hidden rounded-plate border border-edge bg-board-plate divide-y divide-hairline">
-            {editableItems.map((item, index) => {
-              const { store, category, assigned } = parseStoreAndCat(item.storeCategory);
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "p-2.5 transition-colors",
-                    assigned
-                      ? "hover:bg-board-ground/40"
-                      : "bg-status-waiting-fill"
-                  )}
-                >
-                {/* what it is, how many, and gone */}
-                <div className="flex items-center gap-2">
-                  <ItemAutocompleteInput
-                    value={item.itemName}
-                    onChange={(val) => updateItem(index, { itemName: val })}
-                    onSelectSuggestion={(s) => {
-                      updateItem(index, { itemName: s.itemName });
-                      guessCategoryFor(index, s.itemName);
-                    }}
-                    onBlur={(e) => guessCategoryFor(index, e.target.value)}
-                    placeholder={copy.stage3.itemPlaceholder}
-                  />
-
-                  {/* how big one of them is: "5 kg", "1.5 L". Its own field so
-                      the name the category guess reads stays "Chicken". */}
-                  <input
-                    type="text"
-                    value={item.size ?? ""}
-                    onChange={(e) => updateItem(index, { size: e.target.value })}
-                    maxLength={40}
-                    aria-label={copy.stage3.sizeLabel}
-                    placeholder={copy.stage3.sizePlaceholder}
-                    className="min-h-9 w-20 shrink-0 rounded-trim border border-edge bg-board-plate px-2 text-label text-ink placeholder:text-ink-muted"
-                  />
-
-                  <div className="flex shrink-0 items-center rounded-trim border border-edge bg-board-plate">
-                    <button
-                      type="button"
-                      aria-label="One fewer"
-                      onClick={() =>
-                        updateItem(index, { quantity: Math.max(1, item.quantity - 1) })
-                      }
-                      className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:text-ink"
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <span
-                      data-figure
-                      className="w-6 text-center font-mono text-label tabular-nums text-ink"
-                    >
-                      {item.quantity}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label="One more"
-                      onClick={() => updateItem(index, { quantity: item.quantity + 1 })}
-                      className="grid size-9 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:text-ink"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    aria-label={`${copy.stage3.removeItem} ${item.itemName || "item"}`}
-                    onClick={() => removeItem(index)}
-                    className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-status-act-fill hover:text-status-act-ink"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-
-                {/* where it is bought. Without the store half of
-                    `storeCategory` set, every item silently landed on the
-                    first pin. */}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <select
-                    value={assigned ? store : ""}
-                    onChange={(e) =>
-                      updateItem(index, { storeCategory: `${e.target.value} | ${category}` })
-                    }
-                    aria-label={copy.stage3.storeLabel}
-                    className={cn(
-                      SELECT_CLASSES,
-                      "max-w-[168px]",
-                      assigned
-                        ? "border-edge bg-board-ground text-ink"
-                        : "border-status-act-ink/50 bg-board-plate text-status-act-ink"
-                    )}
-                  >
-                    {!assigned && <option value="">{copy.stage3.pickStore}</option>}
-                    {storeOptions.length === 0 ? (
-                      <option value={store}>{store}</option>
-                    ) : (
-                      storeOptions.map((s: string) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))
-                    )}
-                  </select>
-
-                  <select
-                    value={category}
-                    onChange={(e) =>
-                      updateItem(index, {
-                        storeCategory: `${assigned ? store : ""} | ${e.target.value}`,
-                      })
-                    }
-                    aria-label="Store type"
-                    className={cn(
-                      SELECT_CLASSES,
-                      "max-w-[136px] border-edge bg-board-ground text-ink"
-                    )}
-                  >
-                    {merchantCategories.map((c) => (
-                      <option key={c.id} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* The shop that is not pinned yet. This stage could file an
-                      item under any PINNED shop and no further, so a dispatcher
-                      who discovered a second shop was needed had to work out
-                      for themselves that the answer lived back in step 1. This
-                      says so, and takes them there with the reason attached.
-                      Only on a line with no shop: on one already filed under a
-                      pinned shop it offered to solve a problem it did not have. */}
-                  {!assigned && (
-                    <DispatcherButton
-                      type="button"
-                      size="sm"
-                      variant="field"
-                      icon={<MapPinOff size={13} />}
-                      onClick={() => onNeedStores(copy.stage3.needsNewStore(item.itemName.trim()))}
-                    >
-                      {copy.stage3.storeNotPinned}
-                    </DispatcherButton>
-                  )}
-                </div>
-
-                {/* What the rider reported, on the line it is about, and only
-                    when it is out of stock. */}
-                {(() => {
-                  const itemId = Number(item.id || 0);
-                  if (!isOutOfStock(item.fulfillmentStatus) || itemId <= 0) return null;
-                  const subInfo = substituteState[itemId];
-                  return (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {outOfStockChip}
-                        <button
-                          type="button"
-                          onClick={() => void handleFetchSubstitutes(itemId)}
-                          disabled={subInfo?.loading}
-                          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-ink transition-colors hover:bg-board-plate"
-                        >
-                          <Sparkles size={11} />
-                          <span>
-                            {subInfo?.loading ? copy.stage3.checkingSubstitutes : copy.stage3.suggestSubstitutes}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeclineSubstitute(itemId)}
-                          className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-status-waiting-ink transition-colors hover:bg-board-plate"
-                          title="Customer declined substitute - notify rider to proceed"
-                        >
-                          <X size={11} />
-                          <span>{copy.stage3.declineSubstitute}</span>
-                        </button>
-                      </div>
-                      {subInfo?.data && renderSubstitutes(index, itemId, subInfo)}
-                    </div>
-                  );
-                })()}
-
-                {/* Which shop this line belongs to, asked rather than assumed.
-                    A new row inherits the shop of the one above it, which is
-                    right most of the time and silently wrong the rest — and the
-                    wrong version is only discovered by a rider standing at the
-                    wrong counter. Shown only where there is a real choice to
-                    make: with one shop pinned there is no ambiguity to raise. */}
-                {assigned && storeOptions.length > 1 && (
-                  <p className="mb-0 mt-2 text-label text-ink-muted">
-                    {copy.stage3.sameStoreAsk(store)}
-                  </p>
-                )}
-
-                {/* Where this line should be bought, from what dispatchers have
-                    already decided. Appears as soon as the row has a name, and
-                    applies the shop AND the category in one press - the two
-                    halves are one decision, and a category with no shop is
-                    exactly the unassigned state that blocks sending.
-
-                    Shown whenever it would CHANGE the row, not only when the
-                    category differs: a row already on the right category but
-                    the wrong shop is precisely the mistake a rider discovers
-                    at the counter. */}
-                {recommendationsReady && (() => {
-                  const p = categoryGuesses[index];
-                  if (!p?.categoryName) return null;
-
-                  const stopIndex = stopIndexFor(p);
-                  const suggestedStore = stopIndex >= 0 ? storeOptions[stopIndex] : null;
-                  const changesCategory = p.categoryName !== category;
-                  // Against the shop actually CHOSEN, not the fallback. An
-                  // unassigned row reports the first pin as its store, so a
-                  // suggestion of that same pin read as "no change" and was
-                  // hidden - on exactly the rows that most needed it.
-                  const currentStore = assigned ? store : null;
-                  const changesStore = Boolean(suggestedStore) && suggestedStore !== currentStore;
-                  if (!changesCategory && !changesStore) return null;
-
-                  const learned = p.source === 'learned';
-                  return (
-                    <div className="mt-2 flex flex-wrap items-center gap-2" title={p.reason}>
-                      <span
-                        className={cn(
-                          'flex min-w-0 items-center gap-1.5 text-label',
-                          learned ? 'text-status-done-ink' : 'text-status-waiting-ink'
-                        )}
-                      >
-                        {learned ? (
-                          <BrainCircuit size={13} className="shrink-0" />
-                        ) : (
-                          <Sparkles size={13} className="shrink-0" />
-                        )}
-                        <span className="truncate">
-                          {copy.stage3.placementSuggestion(
-                            p.categoryName,
-                            suggestedStore ? parseStoreAndCat(`${suggestedStore} | x`).store : null
-                          )}
-                        </span>
-                      </span>
-                      {/* Provenance, stated plainly. "Filed here 9 of the last
-                          10 times" and "the name was read" deserve different
-                          amounts of trust, and the dispatcher is the one who
-                          has to decide how much to give it. */}
-                      <span className="text-micro uppercase text-ink-muted">
-                        {learned
-                          ? copy.stage3.placementLearned(p.learnedFrom)
-                          : copy.stage3.placementModelled}
-                      </span>
-                      <DispatcherButton
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => applyCategoryGuess(index)}
-                      >
-                        {copy.stage3.placementApply}
-                      </DispatcherButton>
-                    </div>
-                  );
-                })()}
-
-                {/* Store needed: no pinned store is the kind of shop this item
-                    is bought at. Shown once the list has settled (above), and
-                    only then: it used to appear on every row whose suggestion
-                    had not arrived yet, including rows already filed under the
-                    right pinned store. The store it offers comes from the
-                    server's predictor, and pressing it pins that store. */}
-                {(() => {
-                  const need = unservedRows.find((r) => r.index === index);
-                  if (!need) return null;
-                  const predicted = neededStores[need.name.toLowerCase()] ?? null;
-                  const proposedStore = predicted?.storeName ?? null;
-
-                  return (
-                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-plate border border-status-waiting-ink/40 bg-status-waiting-fill p-2.5">
-                      <div className="min-w-0 flex-1">
-                        <p className="m-0 flex items-center gap-1.5 text-label font-medium text-status-waiting-ink">
-                          <AlertTriangle size={14} className="shrink-0 text-status-waiting-ink" />
-                          <span>Store needed for &ldquo;{item.itemName}&rdquo;</span>
-                        </p>
-                        <p className="mb-0 mt-0.5 text-micro text-status-waiting-ink/85">
-                          {copy.stage3.noPinnedKind(need.category)}{" "}
-                          {predicted ? predicted.reason : copy.stage3.noStoreToSuggest}
-                        </p>
-                      </div>
-                      <DispatcherButton
-                        type="button"
-                        size="sm"
-                        variant="success"
-                        icon={<ArrowRight size={13} />}
-                        onClick={() => {
-                          if (predicted) {
-                            onNeedStores(
-                              copy.stage3.pinnedFor(predicted.storeName, need.name),
-                              undefined,
-                              predicted
-                            );
-                          } else {
-                            onNeedStores(copy.stage3.needsNewStore(need.name), need.category);
-                          }
-                        }}
-                      >
-                        {proposedStore ? copy.stage3.pinStoreNamed(proposedStore) : copy.stage3.pinAStore}
-                      </DispatcherButton>
-                    </div>
-                  );
-                })()}
-              </div>
-            );
-          })}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => addItem()}
-            className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-dashed border-edge bg-board-ground/40 text-micro uppercase text-ink-muted transition-colors hover:bg-board-ground hover:text-ink"
-          >
-            <Plus size={14} /> {copy.stage3.addItem}
-          </button>
-        </div>
+        <>
+          <ItemsByStore
+            stores={stores}
+            lines={lines}
+            rows={editableItems}
+            onTick={setItemOwned}
+            onTickAll={setStoreOwnsAll}
+            onEditItem={editItemFields}
+            onQuantity={(rowIndex, quantity) => updateItem(rowIndex, { quantity })}
+            onRemove={removeItem}
+            onAdd={addItem}
+            onOpenStore={setOpenStoreIndex}
+            onNameSettled={guessCategoryFor}
+            renderLineExtras={renderOutOfStock}
+            renderUnassignedExtras={renderUnassignedExtras}
+          />
+          <StoreItemsDialog
+            open={openStoreIndex !== null}
+            onOpenChange={(open) => !open && setOpenStoreIndex(null)}
+            store={openStoreIndex !== null ? stores[openStoreIndex] ?? null : null}
+            storeIndex={openStoreIndex ?? 0}
+            stores={stores}
+            lines={lines}
+            rows={editableItems}
+            onTick={setItemOwned}
+            onTickAll={setStoreOwnsAll}
+          />
+        </>
       ) : (
         // Not open for editing: the items are already bought, so the list is
         // read here as the rider reported it.
         savedList
       )}
 
-      {canModifyItems && unassignedCount > 0 && (
-        <div className="rounded-plate bg-status-waiting-fill px-3 py-2.5">
-          <p className="m-0 text-label text-status-waiting-ink">
+      {/* Items no store buys are listed first, under "Not assigned yet"
+          (ItemsByStore), so no second warning repeats them here. Send still
+          stops on them and says why (handleSend). Shown only when the list is
+          not open, where that group does not exist. */}
+      {canModifyItems && !isEditing && unassignedCount > 0 && (
+        <div className="rounded-plate border border-status-waiting-ink/30 bg-status-waiting-fill px-3 py-2.5">
+          <p className="m-0 text-label font-bold text-status-waiting-ink">
             {copy.stage3.unassignedTitle(unassignedCount)}
           </p>
           <p className="mb-0 mt-1 text-body text-status-waiting-ink/85">
@@ -902,7 +757,7 @@ export function Stage3ConfirmItems({
         />
       )}
       {canModifyItems && hasSentConfirmationCard && !hasUnsentChanges && isCustomerConfirmed && (
-        <p className="m-0 flex items-center gap-2 rounded-plate bg-status-done-fill px-3 py-2.5 text-label text-status-done-ink">
+        <p className="m-0 flex items-center gap-2 rounded-plate border border-status-done-ink/20 bg-status-done-fill px-3.5 py-2.5 text-label font-semibold text-status-done-ink">
           <Check size={15} className="shrink-0" />
           {copy.stage3.approved(customerFirstName)}
         </p>
@@ -925,14 +780,14 @@ export function Stage3ConfirmItems({
               loadingText={copy.stage3.sending}
               icon={<Send size={15} />}
               onClick={() => void handleSend()}
-              className="flex-1 justify-center"
+              className="flex-1 justify-center font-semibold"
             >
               {hasSentConfirmationCard
                 ? copy.stage3.resend(customerFirstName)
                 : copy.stage3.send(customerFirstName)}
             </DispatcherButton>
             {hasUnsentChanges && (
-              <DispatcherButton variant="secondary" size="md" onClick={cancelEditing}>
+              <DispatcherButton variant="secondary" size="md" className="font-semibold" onClick={cancelEditing}>
                 {copy.stage3.undoChanges}
               </DispatcherButton>
             )}

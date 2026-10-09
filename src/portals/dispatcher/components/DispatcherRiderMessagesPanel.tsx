@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { ref, push, onValue, set } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { apiClient } from "../../../services/apiClient";
 import { formatErrandId } from "../../../utils/formatErrandId";
+import { cn } from "@/lib/utils";
 import {
   Send,
   MessageCircle,
@@ -15,9 +16,12 @@ import {
   Maximize2,
   X,
   Phone,
+  Check,
+  Copy,
 } from "lucide-react";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
 import { StatusChip } from "@/components/panel/DispatcherBadge";
+import { inboxSource, messagesPath, sendToRider, useRiderChatMode } from "../riderChat";
 
 export interface RiderChatMessage {
   id: string;
@@ -71,8 +75,12 @@ export function DispatcherRiderMessagesPanel({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [chatMetaMap, setChatMetaMap] = useState<Record<string, any>>({});
+  const [copiedErrandId, setCopiedErrandId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Shared thread or this dispatcher's own threads: see riderChat.ts.
+  const chatMode = useRiderChatMode();
+  const dispatcherId = dispatcher?.id;
 
   const selectedRiderId = controlledSelectedRiderId !== undefined
     ? controlledSelectedRiderId
@@ -87,22 +95,18 @@ export function DispatcherRiderMessagesPanel({
     setSelectedErrandIndex(0);
   };
 
-  // Listen to all rider chat metadata for snippet & timestamps
+  // This dispatcher's conversations, for snippets and ordering. In threads
+  // mode only their own; the shared node was every dispatcher's.
   useEffect(() => {
-    const metaRef = ref(database, "rider_chats");
-    const unsubscribe = onValue(metaRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data || typeof data !== "object") return;
-      const metaObj: Record<string, any> = {};
-      for (const [rId, val] of Object.entries<any>(data)) {
-        if (val?.meta) {
-          metaObj[rId] = val.meta;
-        }
-      }
-      setChatMetaMap(metaObj);
-    });
+    if (dispatcherId == null) return;
+    const source = inboxSource(chatMode, dispatcherId);
+    const unsubscribe = onValue(
+      ref(database, source.path),
+      (snapshot) => setChatMetaMap(source.read(snapshot.val())),
+      () => setChatMetaMap({})
+    );
     return () => unsubscribe();
-  }, []);
+  }, [chatMode, dispatcherId]);
 
   // Consolidate fleet riders with any riders assigned in errands
   const consolidatedRiders = useMemo(() => {
@@ -202,7 +206,12 @@ export function DispatcherRiderMessagesPanel({
       return;
     }
 
-    const messagesRef = ref(database, `rider_chats/${selectedRiderId}/messages`);
+    if (dispatcherId == null) {
+      setMessages([]);
+      return;
+    }
+
+    const messagesRef = ref(database, messagesPath(chatMode, selectedRiderId, dispatcherId));
     const unsubscribe = onValue(messagesRef, (snapshot) => {
       const data = snapshot.val();
       if (!data) {
@@ -220,7 +229,7 @@ export function DispatcherRiderMessagesPanel({
     });
 
     return () => unsubscribe();
-  }, [selectedRiderId]);
+  }, [selectedRiderId, chatMode, dispatcherId]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -234,28 +243,18 @@ export function DispatcherRiderMessagesPanel({
     const dispatcherName = dispatcher?.name || "Dispatcher";
     setSendError(null);
 
+    if (dispatcherId == null) {
+      setSendError("Your session has no dispatcher id. Sign in again to message riders.");
+      return;
+    }
+
     try {
-      const messagesRef = ref(database, `rider_chats/${selectedRiderId}/messages`);
-      await push(messagesRef, {
-        senderId: String(dispatcher?.id || "dispatcher-1"),
-        senderName: dispatcherName,
-        role: "dispatcher",
-        text,
-        timestamp: Date.now(),
-      });
-
-      const metaRef = ref(database, `rider_chats/${selectedRiderId}/meta`);
-      await set(metaRef, {
-        lastMessage: text,
-        lastSender: "dispatcher",
-        senderName: activeRider?.name || "Rider",
-        updatedAt: Date.now(),
-      });
-
-      const dispatcherMetaRef = ref(database, `rider_chats/${selectedRiderId}/dispatcherMeta`);
-      await set(dispatcherMetaRef, {
-        dispatcherId: dispatcher?.id ?? null,
+      await sendToRider(chatMode, {
+        riderId: selectedRiderId,
+        riderName: activeRider?.name || "Rider",
+        dispatcherId,
         dispatcherName,
+        text,
       });
 
       setInputText("");
@@ -293,8 +292,8 @@ export function DispatcherRiderMessagesPanel({
         {/* Panel Header */}
         <div className="border-b border-hairline bg-board-plate p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-panel text-ink">Rider Messages</h2>
-            <span data-figure className="text-label tabular-nums text-ink-muted">
+            <h2 className="text-panel font-bold text-ink">Rider Messages</h2>
+            <span data-figure className="font-mono text-label font-bold tabular-nums text-ink-muted">
               {filteredRiders.length}
             </span>
           </div>
@@ -314,22 +313,24 @@ export function DispatcherRiderMessagesPanel({
             <button
               onClick={() => setFilterTab("ACTIVE")}
               aria-pressed={filterTab === "ACTIVE"}
-              className={`min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors ${
+              className={cn(
+                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] border transition-colors",
                 filterTab === "ACTIVE"
-                  ? "bg-board-field text-board-plate"
-                  : "bg-board-plate text-ink-muted hover:text-ink"
-              }`}
+                  ? "border-board-field bg-board-field text-board-plate shadow-sm"
+                  : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink"
+              )}
             >
               Active / On Duty
             </button>
             <button
               onClick={() => setFilterTab("ALL")}
               aria-pressed={filterTab === "ALL"}
-              className={`min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors ${
+              className={cn(
+                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] border transition-colors",
                 filterTab === "ALL"
-                  ? "bg-board-field text-board-plate"
-                  : "bg-board-plate text-ink-muted hover:text-ink"
-              }`}
+                  ? "border-board-field bg-board-field text-board-plate shadow-sm"
+                  : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink"
+              )}
             >
               All Fleet
             </button>
@@ -341,7 +342,7 @@ export function DispatcherRiderMessagesPanel({
           {filteredRiders.length === 0 ? (
             <div className="space-y-1.5 p-8 text-center">
               <Bike className="mx-auto text-board-trim" size={28} />
-              <p className="text-body text-ink">
+              <p className="text-body font-semibold text-ink">
                 {search.trim() || filterTab === "ACTIVE"
                   ? "No riders match this filter"
                   : "No riders in fleet"}
@@ -371,15 +372,23 @@ export function DispatcherRiderMessagesPanel({
                 <button
                   key={r.id}
                   onClick={() => handleSelectRider(r.id)}
-                  className={`w-full text-left p-3.5 flex items-start gap-3 transition cursor-pointer ${
+                  className={cn(
+                    "w-full text-left p-3.5 flex items-start gap-3 transition cursor-pointer border-b border-hairline",
                     isSelected
-                      ? "bg-board-field"
-                      : "bg-transparent hover:bg-board-plate"
-                  }`}
+                      ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field text-board-plate shadow-sm"
+                      : "border-l-4 border-l-transparent bg-transparent hover:bg-board-plate"
+                  )}
                 >
                   {/* Rider Avatar with Status Dot */}
                   <div className="relative shrink-0">
-                    <div className="grid size-10 place-items-center rounded-full bg-board-field text-label font-bold text-board-plate">
+                    <div
+                      className={cn(
+                        "grid size-10 place-items-center rounded-full text-label font-bold",
+                        isSelected
+                          ? "bg-board-plate text-board-field border border-board-field/20"
+                          : "bg-board-field text-board-plate"
+                      )}
+                    >
                       {(r.name || "Rider")
                         .split(" ")
                         .map((n: string) => n[0])
@@ -388,9 +397,11 @@ export function DispatcherRiderMessagesPanel({
                         .toUpperCase()}
                     </div>
                     <span
-                      className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-white ${
+                      className={cn(
+                        "absolute bottom-0 right-0 size-3 rounded-full border-2",
+                        isSelected ? "border-board-field" : "border-white",
                         isOnline ? "bg-emerald-500" : "bg-slate-400"
-                      }`}
+                      )}
                       title={isOnline ? "Online" : "Offline"}
                     />
                   </div>
@@ -398,11 +409,11 @@ export function DispatcherRiderMessagesPanel({
                   {/* Rider Details & Snippet */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <p className={`truncate text-sm font-semibold ${isSelected ? "text-board-plate" : "text-ink"}`}>
+                      <p className={cn("truncate text-body font-semibold", isSelected ? "text-board-plate" : "text-ink")}>
                         {r.name}
                       </p>
                       {timeFormatted && (
-                        <span className={`shrink-0 text-[11px] ${isSelected ? "text-board-plate/80" : "text-ink-muted"}`}>
+                        <span className={cn("shrink-0 font-mono text-micro tabular-nums", isSelected ? "text-board-plate/80" : "text-ink-muted")}>
                           {timeFormatted}
                         </span>
                       )}
@@ -411,13 +422,20 @@ export function DispatcherRiderMessagesPanel({
                     {/* Duty Status Badge & Task Pill */}
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                        className={cn(
+                          "inline-flex items-center px-1.5 py-0.5 rounded-trim text-micro font-bold uppercase tracking-[0.06em]",
                           hasActiveErrand
-                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                            ? isSelected
+                              ? "bg-amber-400/20 text-amber-200 border border-amber-300/30"
+                              : "bg-status-waiting-fill text-status-waiting-ink border border-status-waiting-ink/20"
                             : isOnline
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : "bg-white/10 text-slate-400"
-                        }`}
+                            ? isSelected
+                              ? "bg-emerald-400/20 text-emerald-200 border border-emerald-300/30"
+                              : "bg-status-done-fill text-status-done-ink border border-status-done-ink/20"
+                            : isSelected
+                            ? "bg-white/10 text-board-plate/70 border border-white/15"
+                            : "bg-board-ground text-ink-muted border border-edge"
+                        )}
                       >
                         {hasActiveErrand
                           ? `${activeErrandsList.length} Active`
@@ -430,18 +448,21 @@ export function DispatcherRiderMessagesPanel({
                     {/* Latest Message Preview */}
                     <div className="flex items-center justify-between gap-1">
                       <p
-                        className={`truncate text-xs ${
+                        className={cn(
+                          "truncate text-label",
                           unread > 0
-                            ? "font-bold text-sky-400"
+                            ? isSelected
+                              ? "font-bold text-signal-light"
+                              : "font-bold text-signal"
                             : isSelected
                             ? "text-board-plate/80"
                             : "text-ink-muted"
-                        }`}
+                        )}
                       >
                         {meta?.lastMessage || (hasActiveErrand ? "Tap to open chat" : "Start a conversation")}
                       </p>
                       {unread > 0 && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-500 text-white font-mono text-[10px] font-bold">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-trim bg-signal text-white font-mono text-micro font-bold tabular-nums">
                           {unread}
                         </span>
                       )}
@@ -474,22 +495,23 @@ export function DispatcherRiderMessagesPanel({
                         .toUpperCase()}
                     </div>
                     <span
-                      className={`absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-white ${
+                      className={cn(
+                        "absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-white",
                         activeRider.online ? "bg-emerald-500" : "bg-slate-400"
-                      }`}
+                      )}
                     />
                   </div>
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="truncate text-panel text-ink">{activeRider.name}</h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-board-field text-board-plate">
+                      <h3 className="truncate text-panel font-bold text-ink">{activeRider.name}</h3>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-trim text-micro font-bold uppercase tracking-[0.06em] bg-board-ground text-ink border border-edge">
                         {activeRider.online ? "On Duty" : "Offline"}
                       </span>
                     </div>
                     <p className="mt-0.5 flex items-center gap-2 text-label text-ink-muted">
                       {activeRider.phone && (
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 font-mono tabular-nums">
                           <Phone size={12} /> {activeRider.phone}
                         </span>
                       )}
@@ -501,19 +523,20 @@ export function DispatcherRiderMessagesPanel({
                 {/* Multiple Errand Switcher Chips if applicable */}
                 {activeRiderErrands.length > 1 && (
                   <div className="flex items-center gap-1.5 overflow-x-auto max-w-full">
-                    <span className="text-[11px] text-ink-muted shrink-0">Errand:</span>
+                    <span className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted shrink-0">Errand:</span>
                     {activeRiderErrands.map((e, idx) => (
                       <button
                         key={e.id}
                         type="button"
                         onClick={() => setSelectedErrandIndex(idx)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors ${
+                        className={cn(
+                          "px-2.5 py-1 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] cursor-pointer transition-colors border",
                           selectedErrandIndex === idx
-                            ? "bg-signal text-white"
-                            : "bg-board-field text-ink hover:bg-board-plate"
-                        }`}
+                            ? "border-signal bg-signal text-white shadow-sm"
+                            : "border-edge bg-board-ground text-ink hover:border-board-trim hover:bg-board-plate"
+                        )}
                       >
-                        {e.customerName || `Task #${idx + 1}`}
+                        {e.customerName || formatErrandId(e.id)}
                       </button>
                     ))}
                   </div>
@@ -522,13 +545,35 @@ export function DispatcherRiderMessagesPanel({
 
               {/* 2. Active Errand Progress Breadcrumbs Banner */}
               {currentErrand ? (
-                <div className="rounded-xl border border-edge bg-board-ground p-3">
+                <div className="rounded-plate border border-edge bg-board-ground p-3">
                   <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-semibold text-xs text-ink truncate">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(formatErrandId(currentErrand.id)).catch(() => {});
+                          setCopiedErrandId(currentErrand.id);
+                          setTimeout(() => setCopiedErrandId(null), 1500);
+                        }}
+                        className="group/copy inline-flex items-center gap-1.5 rounded-trim bg-board-plate px-2 py-0.5 border border-edge text-ink hover:border-board-trim transition-colors cursor-pointer"
+                        title="Click to copy Errand ID"
+                      >
+                        <span className="font-mono text-data font-bold tabular-nums tracking-wide">
+                          {formatErrandId(currentErrand.id)}
+                        </span>
+                        {copiedErrandId === currentErrand.id ? (
+                          <span className="inline-flex items-center gap-0.5 text-micro font-semibold text-emerald-600 uppercase tracking-wider">
+                            <Check size={11} strokeWidth={2.5} />
+                            <span>Copied</span>
+                          </span>
+                        ) : (
+                          <Copy size={11} className="text-ink-muted opacity-0 group-hover/copy:opacity-100 transition-opacity" />
+                        )}
+                      </button>
+                      <span className="font-semibold text-label text-ink truncate">
                         Drop-off: {currentErrand.customerName || currentErrand.customer || "Customer"}
                       </span>
-                      <span className="text-xs text-ink-muted truncate">
+                      <span className="text-label text-ink-muted truncate">
                         • {currentErrand.category || "Errand delivery"}
                       </span>
                     </div>
@@ -536,7 +581,7 @@ export function DispatcherRiderMessagesPanel({
                   </div>
 
                   {/* Progress Breadcrumbs Stepper */}
-                  <div className="flex items-center gap-1 overflow-x-auto pt-1">
+                  <div className="flex items-center gap-1.5 overflow-x-auto pt-1">
                     {STEP_STAGES.map((st, idx) => {
                       const Icon = st.icon;
                       const isCompleted = idx < currentStepIdx;
@@ -545,19 +590,20 @@ export function DispatcherRiderMessagesPanel({
                       return (
                         <React.Fragment key={st.key}>
                           <div
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium shrink-0 transition-colors ${
+                            className={cn(
+                              "flex items-center gap-1.5 px-2.5 py-1 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] shrink-0 border transition-colors",
                               isCurrent
-                                ? "bg-sky-500/20 text-sky-400 border border-sky-500/40"
+                                ? "bg-board-field text-board-plate border-board-field shadow-sm"
                                 : isCompleted
-                                ? "bg-emerald-500/15 text-emerald-400"
-                                : "bg-white/5 text-slate-400"
-                            }`}
+                                ? "bg-status-done-fill text-status-done-ink border-status-done-ink/20"
+                                : "bg-board-ground text-ink-muted border-edge"
+                            )}
                           >
                             <Icon size={13} className={isCurrent ? "animate-pulse" : ""} />
                             <span>{st.label}</span>
                           </div>
                           {idx < STEP_STAGES.length - 1 && (
-                            <ChevronRight size={14} className="text-slate-500 shrink-0" />
+                            <ChevronRight size={13} className="text-ink-muted/50 shrink-0" />
                           )}
                         </React.Fragment>
                       );
@@ -565,8 +611,8 @@ export function DispatcherRiderMessagesPanel({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-edge bg-board-ground/50 p-2.5 text-center">
-                  <p className="text-xs text-ink-muted">
+                <div className="rounded-plate border border-dashed border-edge bg-board-ground/50 p-3 text-center">
+                  <p className="text-label text-ink-muted">
                     Rider is currently on standby with no active errands on the road.
                   </p>
                 </div>
@@ -577,11 +623,11 @@ export function DispatcherRiderMessagesPanel({
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-board-ground p-4">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
-                  <div className="grid size-12 place-items-center rounded-plate bg-board-plate text-ink-muted">
+                  <div className="grid size-12 place-items-center rounded-plate bg-board-plate text-ink-muted border border-edge shadow-sm">
                     <MessageCircle size={24} />
                   </div>
                   <div>
-                    <h4 className="text-panel text-ink">No messages yet</h4>
+                    <h4 className="text-panel font-bold text-ink">No messages yet</h4>
                     <p className="mt-1 max-w-xs text-body text-ink-muted">
                       Start a direct messenger conversation with {activeRider.name}.
                     </p>
@@ -612,7 +658,7 @@ export function DispatcherRiderMessagesPanel({
                         <div>
                           {/* Image Attachment Preview if present */}
                           {msg.imageUrl && (
-                            <div className="mb-1.5 overflow-hidden rounded-xl border border-edge bg-board-plate">
+                            <div className="mb-1.5 overflow-hidden rounded-trim border border-edge bg-board-plate">
                               <button
                                 type="button"
                                 onClick={() => setPreviewImage(msg.imageUrl || null)}
@@ -621,9 +667,9 @@ export function DispatcherRiderMessagesPanel({
                                 <img
                                   src={msg.imageUrl}
                                   alt="Attachment"
-                                  className="max-h-60 w-auto rounded-lg object-contain transition-transform group-hover:scale-[1.02]"
+                                  className="max-h-60 w-auto rounded-trim object-contain transition-transform group-hover:scale-[1.02]"
                                 />
-                                <span className="absolute bottom-2 right-2 grid size-7 place-items-center rounded-md bg-black/60 text-white backdrop-blur-sm">
+                                <span className="absolute bottom-2 right-2 grid size-7 place-items-center rounded-trim bg-black/60 text-white backdrop-blur-sm">
                                   <Maximize2 size={14} />
                                 </span>
                               </button>
@@ -633,20 +679,22 @@ export function DispatcherRiderMessagesPanel({
                           {/* Message Text Bubble */}
                           {msg.text ? (
                             <div
-                              className={`overflow-hidden rounded-plate px-3.5 py-2 text-body break-words [overflow-wrap:anywhere] ${
+                              className={cn(
+                                "overflow-hidden rounded-plate px-3.5 py-2 text-body break-words [overflow-wrap:anywhere] font-medium shadow-sm",
                                 isDispatcher
                                   ? "bg-board-field text-board-plate"
                                   : "border border-edge bg-board-plate text-ink"
-                              }`}
+                              )}
                             >
                               {msg.text}
                             </div>
                           ) : null}
 
                           <span
-                            className={`mt-1 inline-block px-1 text-label text-ink-muted ${
+                            className={cn(
+                              "mt-1 inline-block px-1 font-mono text-micro tabular-nums text-ink-muted",
                               isDispatcher ? "text-right float-right" : "text-left"
-                            }`}
+                            )}
                           >
                             {timeFormatted}
                           </span>
@@ -664,7 +712,7 @@ export function DispatcherRiderMessagesPanel({
               {sendError && (
                 <p
                   role="alert"
-                  className="mb-2 rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink"
+                  className="mb-2 rounded-trim bg-status-act-fill px-3 py-2 text-label font-medium text-status-act-ink"
                 >
                   {sendError}
                 </p>
@@ -677,14 +725,14 @@ export function DispatcherRiderMessagesPanel({
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   aria-label={`Message ${activeRider.name}`}
-                  className="min-h-10 flex-1 rounded-plate border border-edge bg-board-ground px-3 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
+                  className="min-h-10 flex-1 rounded-trim border border-edge bg-board-ground px-3 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
                 />
                 <button
                   type="button"
                   onClick={handleSendMessage}
                   disabled={!inputText.trim()}
                   aria-label="Send message"
-                  className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-plate bg-signal text-white transition-colors hover:bg-signal-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
+                  className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-trim bg-signal text-white transition-colors hover:bg-signal-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink font-semibold"
                 >
                   <Send size={16} />
                 </button>
@@ -694,7 +742,7 @@ export function DispatcherRiderMessagesPanel({
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center">
             <Bike size={32} className="text-board-trim" />
-            <h3 className="text-panel text-ink">Select a rider</h3>
+            <h3 className="text-panel font-bold text-ink">Select a rider</h3>
             <p className="max-w-sm text-body text-ink-muted">
               Choose a rider from the left panel to open your persistent conversation and monitor their active errand progress.
             </p>
@@ -715,14 +763,14 @@ export function DispatcherRiderMessagesPanel({
               type="button"
               onClick={() => setPreviewImage(null)}
               aria-label="Close image preview"
-              className="absolute -top-10 right-0 grid size-8 place-items-center rounded-full bg-white/20 text-white hover:bg-white/40 cursor-pointer"
+              className="absolute -top-10 right-0 grid size-9 place-items-center rounded-trim bg-white/20 text-white hover:bg-white/40 cursor-pointer transition"
             >
               <X size={18} />
             </button>
             <img
               src={previewImage}
               alt="Full resolution preview"
-              className="max-h-[85vh] max-w-[85vw] rounded-lg object-contain shadow-2xl"
+              className="max-h-[85vh] max-w-[85vw] rounded-plate object-contain shadow-2xl border border-white/10"
             />
           </div>
         </div>

@@ -89,7 +89,9 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
   });
 
   const handleCopyId = (id: string) => {
-    navigator.clipboard.writeText(formatErrandId(id));
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(formatErrandId(id)).catch(() => {});
+    }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
@@ -129,14 +131,14 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                 onClick={() => setStatusFilter(f.id)}
                 aria-pressed={isActive}
                 className={cn(
-                  "flex min-h-9 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-trim px-3 text-micro uppercase transition-colors",
+                  "flex min-h-9 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-trim border px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
                   isActive
-                    ? "bg-board-field text-board-plate"
-                    : "bg-board-plate text-ink-muted hover:text-ink"
+                    ? "border-board-field bg-board-field text-board-plate"
+                    : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink"
                 )}
               >
                 <span>{f.label}</span>
-                <span data-figure className="tabular-nums">
+                <span data-figure className="font-mono tabular-nums font-bold">
                   {count}
                 </span>
               </button>
@@ -186,11 +188,18 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
             const unreadCount = unreadCounts?.[e.id] || 0;
 
             return (
-              <DispatcherCard key={e.id} padding="sm">
+              <DispatcherCard
+                key={e.id}
+                padding="sm"
+                className="border-edge transition-colors hover:border-board-trim"
+              >
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-                  <div className="min-w-0 space-y-2">
+                  <div className="min-w-0 flex-1 space-y-2.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span data-figure className="font-mono text-data text-ink">
+                      <span
+                        data-figure
+                        className="font-mono text-data font-bold tabular-nums tracking-wide text-ink"
+                      >
                         {formatErrandId(e.id)}
                       </span>
                       <DispatcherButton
@@ -198,16 +207,18 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                         size="sm"
                         iconOnly
                         aria-label="Copy this run's number"
-                        icon={copiedId === e.id ? <Check size={14} /> : <Copy size={14} />}
+                        icon={copiedId === e.id ? <Check size={14} className="text-go" /> : <Copy size={14} />}
                         onClick={() => handleCopyId(e.id)}
                       />
                       {/* Was the raw status in an ad-hoc blue pill with a
                           pulsing dot. */}
                       <StatusChip status={e.status} />
                       {unreadCount > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-micro font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 animate-pulse">
-                          <MessageSquare size={11} />
-                          <span>{unreadCount} new</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-trim bg-signal px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.06em] text-white">
+                          <MessageSquare size={11} className="shrink-0" />
+                          <span data-figure className="font-mono tabular-nums">
+                            {unreadCount} new
+                          </span>
                         </span>
                       )}
                       {needsSupervision ? (
@@ -218,67 +229,91 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                       {eta ? (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-micro uppercase",
+                            "inline-flex items-center gap-1.5 rounded-trim border px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.06em]",
                             eta.isLate
-                              ? "bg-status-act-fill text-status-act-ink"
-                              : "bg-board-ground text-ink-muted"
+                              ? "border-status-act-ink/30 bg-status-act-fill text-status-act-ink"
+                              : "border-hairline bg-board-ground text-ink-muted"
                           )}
                         >
-                          <Clock size={11} />
-                          <span data-figure>{eta.label}</span>
+                          <Clock size={11} className="shrink-0" />
+                          <span data-figure className="font-mono tabular-nums">
+                            {eta.label}
+                          </span>
                         </span>
                       ) : null}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="text-body text-ink">{e.customerName || "Customer"}</span>
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
+                      <span className="text-body font-semibold text-ink">
+                        {e.customerName || "Customer"}
+                      </span>
                       <span className="inline-flex items-center gap-1.5 text-label text-ink-muted">
-                        <Phone size={12} />
-                        <span data-figure>{e.customerPhone || "No number on file"}</span>
+                        <Phone size={12} className="shrink-0 text-ink-muted" />
+                        {e.customerPhone ? (
+                          <span data-figure className="font-mono tabular-nums">
+                            {e.customerPhone}
+                          </span>
+                        ) : (
+                          <span>No number on file</span>
+                        )}
                         {e.customerPhone && e.customerPhoneVerified ? (
                           <span
                             title="Phone number verified via SMS OTP"
-                            className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            className="inline-flex items-center gap-1 rounded-trim border border-status-done-ink/20 bg-status-done-fill px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.06em] text-status-done-ink"
                           >
-                            <ShieldCheck size={9} />
+                            <ShieldCheck size={10} className="shrink-0" />
                             <span>Verified</span>
                           </span>
                         ) : null}
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-label text-ink-muted">
-                        <Bike size={13} />
-                        {e.riderName || "No rider assigned yet"}
+                        <Bike size={13} className="shrink-0 text-ink-muted" />
+                        <span>{e.riderName || "No rider assigned yet"}</span>
                       </span>
                     </div>
 
                     <div className="flex items-start gap-1.5">
-                      <MapPin size={13} className="mt-0.5 shrink-0 text-ink-muted" />
-                      <span className="min-w-0 text-label text-ink">
+                      <MapPin size={13} className="mt-1 shrink-0 text-ink-muted" />
+                      <span
+                        className="min-w-0 break-words text-label text-ink"
+                        title={`${e.deliveryAddress || "Tacurong City"}${e.description ? `: "${e.description}"` : ""}`}
+                      >
                         {e.deliveryAddress || "Tacurong City"}
                         {e.description ? `: "${e.description}"` : ""}
                       </span>
                     </div>
 
                     {items.length > 0 ? (
-                      <DispatcherCard.Region padding="none" className="flex items-center gap-2 px-3 py-2">
+                      <div className="flex items-center gap-2.5 rounded-trim border border-hairline bg-board-ground/60 px-3 py-2">
                         <ShoppingBag size={13} className="shrink-0 text-ink-muted" />
-                        <span className="shrink-0 text-micro uppercase text-ink-muted">
-                          {items.length} item{items.length === 1 ? "" : "s"}
+                        <span className="shrink-0 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                          <span data-figure className="font-mono tabular-nums">{items.length}</span> item{items.length === 1 ? "" : "s"}
                         </span>
-                        <span className="min-w-0 truncate text-label text-ink">
+                        <span
+                          className="min-w-0 truncate text-label text-ink"
+                          title={items
+                            .map((it) => `${formatItemLabel(it.itemName, it.size)}${it.quantity ? ` x${it.quantity}` : ""}`)
+                            .join(", ")}
+                        >
                           {items
                             .map((it) => `${formatItemLabel(it.itemName, it.size)}${it.quantity ? ` x${it.quantity}` : ""}`)
                             .join(", ")}
                         </span>
-                      </DispatcherCard.Region>
+                      </div>
                     ) : null}
                   </div>
 
                   <div className="flex shrink-0 items-center justify-between gap-3 md:flex-col md:items-end">
                     <div className="text-right">
-                      <p className="text-micro uppercase text-ink-muted">Delivery fee</p>
-                      <p data-figure className="font-mono text-data text-ink">
-                        {e.deliveryFee ? `₱${Math.round(e.deliveryFee)}` : "Not set"}
+                      <p className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                        Delivery fee
+                      </p>
+                      <p data-figure className="font-mono text-data font-bold tabular-nums text-ink">
+                        {typeof e.deliveryFee === "number" && !isNaN(e.deliveryFee)
+                          ? `₱${Math.round(e.deliveryFee)}`
+                          : e.deliveryFee != null && !isNaN(Number(e.deliveryFee))
+                            ? `₱${Math.round(Number(e.deliveryFee))}`
+                            : "Not set"}
                       </p>
                     </div>
 
@@ -302,51 +337,75 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
                     inset by 24px on each side, so at 100% the line overshot the
                     track it was meant to fill. */}
                 {progressIndex >= 0 ? (
-                  <ol className="mt-4 flex items-stretch border-t border-hairline pt-3">
-                    {RUN_PROGRESSION.map((stage, idx) => {
-                      const isDone = idx <= progressIndex;
-                      const isCurrent = idx === progressIndex;
-                      return (
-                        <li
-                          key={stage.label}
-                          aria-current={isCurrent ? "step" : undefined}
-                          className="flex min-w-0 flex-1 flex-col items-center gap-1.5 px-1"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              "size-2.5 rounded-full",
-                              isCurrent
-                                ? "bg-signal"
-                                : isDone
-                                  ? "bg-board-field"
-                                  : "border-[1.5px] border-board-trim"
-                            )}
-                          />
-                          <span
-                            className={cn(
-                              "w-full truncate text-center text-micro uppercase",
-                              isCurrent ? "text-ink" : isDone ? "text-ink-muted" : "text-board-trim"
-                            )}
+                  <div className="mt-3.5 rounded-trim border border-hairline bg-board-ground/40 p-2.5">
+                    <ol className="relative flex items-center justify-between">
+                      <div
+                        aria-hidden="true"
+                        className="absolute left-[10%] right-[10%] top-[5px] h-[1.5px] -translate-y-1/2 bg-hairline"
+                      >
+                        <div
+                          className="h-full bg-board-field transition-all duration-300"
+                          style={{
+                            width: `${(Math.min(progressIndex, RUN_PROGRESSION.length - 1) / (RUN_PROGRESSION.length - 1)) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      {RUN_PROGRESSION.map((stage, idx) => {
+                        const isDone = idx <= progressIndex;
+                        const isCurrent = idx === progressIndex;
+                        return (
+                          <li
+                            key={stage.label}
+                            aria-current={isCurrent ? "step" : undefined}
+                            title={stage.label}
+                            className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-1.5 px-0.5"
                           >
-                            {stage.label}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                            <span
+                              aria-hidden="true"
+                              className={cn(
+                                "size-2.5 rounded-full transition-colors",
+                                isCurrent
+                                  ? "bg-signal"
+                                  : isDone
+                                    ? "bg-board-field"
+                                    : "border-[1.5px] border-board-trim bg-board-plate"
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "w-full truncate text-center text-micro font-semibold uppercase tracking-[0.06em]",
+                                isCurrent ? "font-bold text-ink" : isDone ? "text-ink-muted" : "text-board-trim"
+                              )}
+                            >
+                              {stage.label}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
                 ) : null}
 
                 <div className="mt-3 flex items-center justify-between gap-3 border-t border-hairline pt-2.5">
                   <span className="text-label text-ink-muted">
-                    Dispatcher: <span className="text-ink">{e.dispatcherName || "Unassigned"}</span>
+                    Dispatcher: <span className="font-semibold text-ink">{e.dispatcherName || "Unassigned"}</span>
                   </span>
-                  <span data-figure className="font-mono text-label text-ink-muted">
+                  <span data-figure className="font-mono text-label tabular-nums text-ink-muted">
                     Updated{" "}
-                    {new Date(e.updatedAt || e.createdAt || Date.now()).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {(() => {
+                      try {
+                        const raw = e.updatedAt || e.createdAt;
+                        if (!raw) return "--:--";
+                        const d = new Date(raw);
+                        if (isNaN(d.getTime())) return "--:--";
+                        return d.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                      } catch {
+                        return "--:--";
+                      }
+                    })()}
                   </span>
                 </div>
               </DispatcherCard>

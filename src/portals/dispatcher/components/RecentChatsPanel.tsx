@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { formatErrandId } from "../../../utils/formatErrandId";
-import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
@@ -42,6 +42,14 @@ export function RecentChatsPanel({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyErrandId = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(formatErrandId(id));
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
 
   const closedErrands = useMemo(() => {
     return errands.filter((e) => {
@@ -150,10 +158,10 @@ export function RecentChatsPanel({
                 onClick={() => handleStatusFilterChange(f.id)}
                 aria-pressed={isActive}
                 className={cn(
-                  "min-h-9 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
+                  "min-h-9 cursor-pointer rounded-trim px-3.5 py-1.5 text-micro font-semibold uppercase tracking-[0.06em] transition-all",
                   isActive
-                    ? "bg-board-field text-board-plate"
-                    : "bg-board-plate text-ink-muted hover:text-ink"
+                    ? "bg-board-field text-board-plate border border-board-field shadow-sm"
+                    : "bg-board-plate text-ink-muted hover:text-ink border border-edge hover:border-board-trim"
                 )}
               >
                 {f.label}
@@ -164,16 +172,16 @@ export function RecentChatsPanel({
       }
       footer={
         filteredErrands.length > 0 ? (
-          <div className="flex flex-col items-center justify-between gap-2 rounded-plate border border-edge bg-board-plate px-4 py-2.5 sm:flex-row">
+          <div className="flex flex-col items-center justify-between gap-2 rounded-plate border border-edge bg-board-plate px-4 py-3 sm:flex-row">
             <p data-figure className="text-label text-ink-muted">
-              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, filteredErrands.length)} of{" "}
-              {filteredErrands.length}
+              Showing <span className="font-mono tabular-nums font-semibold text-ink">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+              <span className="font-mono tabular-nums font-semibold text-ink">{Math.min(currentPage * ITEMS_PER_PAGE, filteredErrands.length)}</span> of{" "}
+              <span className="font-mono tabular-nums font-semibold text-ink">{filteredErrands.length}</span>
             </p>
             <div className="flex items-center gap-2">
               {pageButton("prev")}
-              <span data-figure className="px-1 text-label text-ink">
-                Page {currentPage} of {totalPages}
+              <span data-figure className="px-2 text-label text-ink font-medium">
+                Page <span className="font-mono tabular-nums font-bold text-ink">{currentPage}</span> of <span className="font-mono tabular-nums font-bold text-ink">{totalPages}</span>
               </span>
               {pageButton("next")}
             </div>
@@ -199,12 +207,33 @@ export function RecentChatsPanel({
             keyExtractor={(e) => e.id}
             primaryHeader="Route & Customer"
             secondaryHeader="Status & Payment"
-            renderPrimary={(e) => (
-              <div>
-                <p className="font-mono text-body font-semibold text-ink">{formatErrandId(e.id)}</p>
-                <p className="text-micro text-ink-muted truncate max-w-[180px] sm:max-w-none">{e.customerName || "Customer"}</p>
-              </div>
-            )}
+            renderPrimary={(e) => {
+              const isCopied = copiedId === e.id;
+              return (
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-mono text-body font-bold text-ink tabular-nums tracking-wide">
+                      {formatErrandId(e.id)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(ev) => copyErrandId(e.id, ev)}
+                      aria-label={`Copy Route ID ${formatErrandId(e.id)}`}
+                      className="inline-flex items-center justify-center rounded p-1 text-ink-muted hover:bg-board-ground hover:text-ink transition-colors"
+                    >
+                      {isCopied ? (
+                        <Check size={12} className="text-signal-success" />
+                      ) : (
+                        <Copy size={12} />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-micro font-medium text-ink-muted truncate max-w-[180px] sm:max-w-none">
+                    {e.customerName || "Customer"}
+                  </p>
+                </div>
+              );
+            }}
             renderSecondary={(e) => {
               const needsSupervision =
                 e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
@@ -282,7 +311,7 @@ export function RecentChatsPanel({
                   onClose();
                   onOpenChat(e.id);
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-plate bg-signal text-board-plate font-semibold text-body hover:bg-signal-deep transition"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-trim bg-signal text-board-plate font-semibold text-body hover:bg-signal-deep transition"
               >
                 <Eye size={16} />
                 <span>Open Conversation</span>
@@ -301,12 +330,12 @@ export function RecentChatsPanel({
                   </colgroup>
                   <thead className="border-b border-hairline bg-board-ground">
                     <tr>
-                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Route</th>
-                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Customer</th>
-                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Category</th>
-                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Status</th>
-                      <th className="px-4 py-2.5 text-micro uppercase text-ink-muted">Payment</th>
-                      <th className="px-4 py-2.5 text-right text-micro uppercase text-ink-muted">
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Route</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Customer</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Category</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Status</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Payment</th>
+                      <th className="px-4 py-3 text-right text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">
                         <span className="sr-only">Open the conversation</span>
                       </th>
                     </tr>
@@ -315,21 +344,38 @@ export function RecentChatsPanel({
                     {paginatedErrands.map((e) => {
                       const needsSupervision =
                         e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+                      const isCopied = copiedId === e.id;
                       return (
-                        <tr key={e.id} className="transition-colors hover:bg-board-ground">
-                          <td data-figure className="truncate px-4 py-3 font-mono text-label text-ink">
-                            {formatErrandId(e.id)}
+                        <tr key={e.id} className="transition-colors hover:bg-board-ground/60">
+                          <td data-figure className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-label font-bold tabular-nums tracking-wide text-ink">
+                                {formatErrandId(e.id)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(ev) => copyErrandId(e.id, ev)}
+                                aria-label={`Copy Route ID ${formatErrandId(e.id)}`}
+                                className="inline-flex items-center justify-center rounded p-1 text-ink-muted hover:bg-board-ground hover:text-ink transition-colors"
+                              >
+                                {isCopied ? (
+                                  <Check size={13} className="text-signal-success" />
+                                ) : (
+                                  <Copy size={13} />
+                                )}
+                              </button>
+                            </div>
                           </td>
-                          <td className="truncate px-4 py-3 text-body text-ink">
+                          <td className="truncate px-4 py-3.5 text-body font-medium text-ink">
                             {e.customerName || "Customer"}
                           </td>
-                          <td className="truncate px-4 py-3 text-body text-ink-muted">
+                          <td className="truncate px-4 py-3.5 text-body text-ink-muted">
                             {e.category || "General errand"}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3.5">
                             <StatusChip status={e.status} />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3.5">
                             {needsSupervision ? (
                               <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
                             ) : (
@@ -338,7 +384,7 @@ export function RecentChatsPanel({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3.5 text-right">
                             <DispatcherButton
                               variant="secondary"
                               size="sm"

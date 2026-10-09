@@ -83,6 +83,13 @@ export interface EditableItem {
    */
   id?: number;
   fulfillmentStatus?: string;
+  /**
+   * Which item this line is a copy of. One item can be bought at more than one
+   * store (2026-10-08), and each store's copy is its own line with its own
+   * quantity; this keeps them together on screen. Client-only, never sent:
+   * see itemOwnership.ts.
+   */
+  itemKey?: string;
 }
 
 export interface MerchantCategory {

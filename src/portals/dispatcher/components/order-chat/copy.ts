@@ -245,6 +245,10 @@ export const copy = {
     mapDownAdmin: "Tell your admin: map key rejected",
     mapNoKeyAdmin: "Tell your admin: map key missing",
     mapLoading: "Loading the map",
+
+    /** Pins the customer picked in the app's "Location" step, before any were sent. */
+    customerPicked: (count: number) =>
+      `The customer chose ${count === 1 ? "this store" : `these ${count} stores`}. Check ${count === 1 ? "it" : "them"}, then continue.`,
   },
 
   // ── stage 2: confirm items and payment ──────────────────────────────────
@@ -295,9 +299,29 @@ export const copy = {
     unassignedTitle: (n: number) =>
       n === 1 ? "One item has no shop yet" : `${n} items have no shop yet`,
     unassignedBody:
-      "They came in with a category but no shop, because the customer picks what they want, not where it comes from. Choose a shop for each so the rider knows where to buy it.",
+      "They came in with a category but no shop, or were unselected from every store. Select a store for each so the rider knows where to buy it.",
     blockedNoStores: "Pin the shops first. Every item is bought at one of them.",
-    blockedUnassigned: "Give every item a shop first. The rider needs to know where to go.",
+    blockedUnassigned: "Select a store for every item first. The rider needs to know where to go.",
+
+    /** The list grouped by store (ItemsByStore.tsx, 2026-10-08). */
+    notAssignedTitle: "Not assigned yet",
+    buyAt: "Buy at:",
+    unnamedItem: "New item",
+    openStore: (store: string) => `Open the items bought at ${store}`,
+    storeCount: (owned: number, total: number) => `${owned} of ${total} ${total === 1 ? "item" : "items"}`,
+    tickAt: (item: string, store: string) => `Buy ${item} at ${store}`,
+    untickAt: (item: string, store: string) => `Stop buying ${item} at ${store}`,
+    tickAllAt: (store: string) => `Buy every item at ${store}`,
+    clearAllAt: (store: string) => `Buy nothing at ${store}`,
+    addItemTo: (store: string) => `Add an item to ${store}`,
+    removeFromOrder: (item: string) => `Remove ${item} from the order`,
+    noItemsYet: "No items on this order yet.",
+    dialogTitle: (store: string) => `Items bought at ${store}`,
+    alsoAt: (stores: string) => `Also at ${stores}`,
+    boughtAt: (stores: string) => `Bought at ${stores}`,
+    tickAll: "Select every item",
+    clearAll: "Unselect every item",
+    dialogDone: "Done",
 
     /**
      * The shop question, asked per line.
@@ -326,10 +350,6 @@ export const copy = {
     placementSuggestion: (category: string, store: string | null) =>
       store ? `Buy at ${store} (${category})` : `Looks like ${category}`,
     placementApply: "Use it",
-    /** Provenance. A remembered decision and a read name are not the same claim. */
-    placementLearned: (n: number) =>
-      n === 1 ? "filed once before" : `filed this way ${n}x`,
-    placementModelled: "read from the name",
   },
 
   // ── stage 2, the payment half ───────────────────────────────────────────
@@ -357,37 +377,26 @@ export const copy = {
   // here is addressed to the dispatcher looking at that page — the one person
   // who can say whether it actually landed.
   payments: {
-    title: "Payment plan",
+    /**
+     * GCash / PayMaya and Bank Transfer since 2026-10-08: the whole bill is paid
+     * at the door, like cash on delivery. The rider photographs a transfer and
+     * the system records it, or takes cash. Nothing here asks a dispatcher to
+     * confirm anything; the panels only show what happened.
+     */
+    title: "Payment",
+    doorPanelTitle: "Payment at the door",
 
-    paidUpFront: "Half-payment",
-    paidUpFrontOf: (due: string) => `of ${due}, half of what the rider paid`,
-    downpaymentHint: (who: string, amount: string) =>
-      `${who} sends ${amount}, half the item cost, once the rider has bought everything. A receipt that checks out confirms itself; confirm here only if you received it another way.`,
-    proofTitle: "Customer's receipt",
-    proofNone: "No receipt uploaded yet. They can send one from their app.",
+    paid: "Paid",
+    paidCaption: (n: number) => (n === 0 ? "nothing recorded yet" : "recorded so far"),
+    balance: "To collect",
+    balanceCaption: "at the door",
+    atDoorHint: (who: string, amount: string) =>
+      `${who} pays ${amount} when the items arrive. A GCash, PayMaya or bank transfer the rider photographs is recorded on its own. If it can't be, the rider takes cash.`,
+
     proofRef: "Reference",
     proofTxn: "Transaction ID",
     proofAmount: "Amount",
     proofDate: "Dated",
-    proofRead: (engine: string) => `Read automatically by ${engine}. Check it against the Facebook Page before confirming.`,
-    confirmUpfront: "Payment received",
-    confirmingUpfront: "Recording",
-    upfrontConfirmed: (amount: string) => `${amount} confirmed.`,
-
-    balance: "Balance",
-    balanceHint: "The rider collects this in cash when the items arrive, unless the customer already sent it through the Facebook Page.",
-    balanceProofTitle: "Customer's balance receipt",
-    confirmBalance: "Balance received",
-    confirmingBalance: "Recording",
-    balanceConfirmed: (amount: string) => `${amount} balance confirmed. The rider no longer needs to collect it.`,
-
-    overageTitle: "Goods held, receipt came in higher",
-    overageHint: (agreed: string, actual: string, gap: string) =>
-      `The receipt is ${actual} against the ${agreed} agreed, so ${gap} of it nobody has approved. ` +
-      `Call the customer. The rider cannot hand the items over until this clears.`,
-    confirmTopUp: "Top-up received",
-    confirmingTopUp: "Recording",
-    topUpConfirmed: (amount: string) => `${amount} top-up confirmed. Goods released.`,
 
     refund: "Record a refund",
     refunding: "Recording",
@@ -400,41 +409,13 @@ export const copy = {
     cancel: "Cancel",
 
     settled: "Paid in full.",
+    refunded: "This errand was refunded. There's nothing to collect.",
     attestedBy: (who: string, when: string) => `Confirmed by ${who}, ${when}`,
+    recordedFromPhoto: (when: string) => `Recorded from the rider's photo, ${when}`,
     failed: "Couldn't record that. Check the amount and try again.",
-    /** The server compares against what is due and refuses a mismatch. */
-    mismatch: (due: string) => `That doesn't match the ${due} due.`,
 
-    // ── the standalone half-payment panel, beside the chat rather than
-    // inside the stage accordion ────────────────────────────────────────
-    halfPaymentPanelTitle: "Half-payment",
-    halfPaymentWaitingUpfront: "Waiting on the upfront payment first. See the payment section of step 2.",
-
-    // ── the 50%, collected mid-way ────────────────────────────────────────
-    halfNotYet: (rider: string) =>
-      `${rider} asks for this after buying everything, so it is half of what they actually paid. Nothing to do yet.`,
-    halfRequestedTitle: (rider: string) => `${rider} has every item and is waiting`,
-    halfRequestedBody: (who: string, amount: string, goods: string, since: string) =>
-      `${who} owes ${amount}, half of the ${goods} spent. Waiting ${since}.`,
-    halfAsk: (who: string, amount: string) => `Ask ${who} for ${amount}`,
-    halfAsked: (who: string) => `Asked ${who} for the half-payment`,
-    halfShowUpload: (who: string) => `Show ${who} where to send the receipt`,
-    halfShowedUpload: (who: string) => `${who} was shown where to send the receipt`,
-    halfRequestMessage: (amount: string, goods: string) =>
-      `Your rider has bought all your items (${goods}). Please send the half-payment of ${amount} through GCash or PayMaya so they can bring them to you.`,
-    halfUploadMessage: (amount: string) =>
-      `Once you've sent the ${amount}, upload a screenshot of your GCash or PayMaya receipt here. Tap "Send my receipt".`,
-    halfReceiptWaiting: "No receipt yet.",
-    halfReceiptReview: "Receipt received, but its reference number already paid for another order. Check it before confirming.",
-    halfAutoConfirmed: (rider: string) =>
-      `Confirmed automatically from the customer's receipt. ${rider} was told to head to the customer.`,
-    halfConfirmedBy: (who: string, rider: string) => `Confirmed by ${who}. ${rider} was told to head to the customer.`,
-    halfManualTitle: "Received it another way?",
-    halfPaymentOveragePending:
-      "Goods are held on a receipt overage. Resolve that in the payment section of step 2 before the balance applies.",
-    halfPaymentRefunded: "This errand was refunded — there's no balance to collect.",
     proofPhotoTitle: "Photo evidence",
-    proofPhotoNone: "No photo uploaded yet.",
+    proofPhotoNone: "No photo yet. The rider takes one at the door when the customer pays by transfer.",
     proofPhotoCustomer: "Uploaded by the customer",
     proofPhotoRider: "Photographed by the rider at the door",
     proofPhotoSuperseded: "Replaced by a later upload",
@@ -451,7 +432,6 @@ export const copy = {
     missingTitle: "Before a rider can go:",
     missingStores: "Stores pinned",
     missingApproval: (who: string) => `${who} approved the list`,
-    missingUpfront: "Payment confirmed",
     missingPayment: "Payment settled",
     /** Shown when the CTA is pressed while blocked — it navigates instead of doing nothing. */
     redirect: (stage: string) => `${stage} first, then you can assign a rider.`,

@@ -8,6 +8,7 @@ import {
   Terminal,
   Bell,
   Activity,
+  Smartphone,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
@@ -17,8 +18,9 @@ import { ServiceControlsTab } from "./ServiceControlsTab";
 import { BackupsTab } from "./BackupsTab";
 import { LogsTab } from "./LogsTab";
 import { TelegramAlertsTab } from "./TelegramAlertsTab";
+import { AppReleasesTab } from "./AppReleasesTab";
 
-type DevOpsSubTab = "telemetry" | "services" | "backups" | "logs" | "alerts";
+type DevOpsSubTab = "telemetry" | "services" | "backups" | "logs" | "alerts" | "releases";
 
 export const DevOpsModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
@@ -131,6 +133,18 @@ export const DevOpsModule: React.FC = () => {
           <Bell className="w-4 h-4" />
           <span>{t("devopsTabAlerts")}</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab("releases")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
+            activeTab === "releases"
+              ? "bg-red-600 text-white font-semibold shadow-sm"
+              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+          }`}
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>{t("devopsTabReleases")}</span>
+        </button>
       </div>
 
       {/* Global Error Banner */}
@@ -167,6 +181,8 @@ export const DevOpsModule: React.FC = () => {
       {activeTab === "logs" && <LogsTab />}
 
       {activeTab === "alerts" && <TelegramAlertsTab />}
+
+      {activeTab === "releases" && <AppReleasesTab />}
     </div>
   );
 };

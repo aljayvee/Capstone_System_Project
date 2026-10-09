@@ -1,58 +1,72 @@
-import { useCallback, useEffect, useState } from "react";
-
-const STORAGE_KEY = "sugo_dispatcher_ai_suggestions";
-const CHANGE_EVENT = "sugo-ai-settings-change";
+import { useEffect, useSyncExternalStore } from "react";
+import { apiService } from "../../../services/apiService";
 
 /**
- * Returns whether AI suggestions are enabled for Conflict Management.
- * Defaults to true if no preference is stored.
+ * Whether the Help Desk shows the AI reason suggestions: the "Generate
+ * suggestion" button, the Tab shortcut and the AI notes beside them.
+ *
+ * A sysadmin decides this for every dispatcher at once, in the SysAdmin
+ * portal's Service Controls. It used to be a switch in each dispatcher's own
+ * profile, kept in that browser's localStorage, which no sysadmin could reach.
+ *
+ * The value lives in this module rather than in each hook, so one request
+ * serves every open reason box instead of one request per row.
+ *
+ * Off until the server says otherwise, and off when it cannot be read: a failed
+ * read must not show a button the server would refuse.
  */
-export function getAiSuggestionsEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  const val = localStorage.getItem(STORAGE_KEY);
-  return val === null ? true : val === "true";
+const STALE_AFTER_MS = 60_000;
+
+let enabled = false;
+let lastReadAt = 0;
+let inFlight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function refresh(): Promise<void> {
+  if (inFlight) return inFlight;
+  inFlight = apiService
+    .getDispatcherAiSuggestionsEnabled()
+    .then((value) => {
+      lastReadAt = Date.now();
+      const next = value === true;
+      if (next !== enabled) {
+        enabled = next;
+        listeners.forEach((notify) => notify());
+      }
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
+}
+
+function refreshIfStale() {
+  if (Date.now() - lastReadAt > STALE_AFTER_MS) void refresh();
+}
+
+function subscribe(notify: () => void) {
+  listeners.add(notify);
+  return () => {
+    listeners.delete(notify);
+  };
 }
 
 /**
- * Persists the AI suggestions preference and notifies all listeners.
- */
-export function setAiSuggestionsEnabledStorage(enabled: boolean): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, enabled ? "true" : "false");
-  window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { enabled } }));
-}
-
-/**
- * Hook to read and toggle the Dispatcher Conflict Management AI assistance setting.
+ * Hook to read the sysadmin's Help Desk AI suggestions setting. Re-reads it
+ * when a reason box opens or the window regains focus, at most once a minute.
  */
 export function useDispatcherAiSettings() {
-  const [aiSuggestionsEnabled, setEnabledState] = useState<boolean>(getAiSuggestionsEnabled);
+  const aiSuggestionsEnabled = useSyncExternalStore(
+    subscribe,
+    () => enabled,
+    () => false
+  );
 
   useEffect(() => {
-    const handler = (e: Event) => {
-      const custom = e as CustomEvent<{ enabled?: boolean }>;
-      if (custom.detail && typeof custom.detail.enabled === "boolean") {
-        setEnabledState(custom.detail.enabled);
-      } else {
-        setEnabledState(getAiSuggestionsEnabled());
-      }
-    };
-
-    window.addEventListener(CHANGE_EVENT, handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener(CHANGE_EVENT, handler);
-      window.removeEventListener("storage", handler);
-    };
+    refreshIfStale();
+    window.addEventListener("focus", refreshIfStale);
+    return () => window.removeEventListener("focus", refreshIfStale);
   }, []);
 
-  const setAiSuggestionsEnabled = useCallback((enabled: boolean) => {
-    setEnabledState(enabled);
-    setAiSuggestionsEnabledStorage(enabled);
-  }, []);
-
-  return {
-    aiSuggestionsEnabled,
-    setAiSuggestionsEnabled,
-  };
+  return { aiSuggestionsEnabled };
 }

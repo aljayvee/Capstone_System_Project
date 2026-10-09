@@ -242,7 +242,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
             </div>
           </div>
 
-          {/* 6. Conflict Report */}
+          {/* 6. Help Desk Report */}
           <div className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-board-ground/40 transition-colors">
             <div className="flex items-center gap-3">
               <span
@@ -256,7 +256,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
               </span>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-label font-semibold text-ink">Conflict Report</span>
+                  <span className="text-label font-semibold text-ink">Help Desk Report</span>
                   {metrics.conflicts && metrics.conflicts.openCount > 0 && (
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-status-act-fill text-status-act-ink">
                       Needs Review

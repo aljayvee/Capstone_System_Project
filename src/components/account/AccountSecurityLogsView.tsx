@@ -161,7 +161,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
           {otherSessions.length > 0 && (
             <button
               onClick={() => setConfirmRevokeOthersOpen(true)}
-              className="text-xs font-medium text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 px-3 py-1.5 rounded-plate border border-rose-500/30 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 px-3 py-1.5 rounded-trim border border-rose-500/30 hover:bg-rose-500/10 transition-colors cursor-pointer"
             >
               Sign Out All Other Devices
             </button>
@@ -250,7 +250,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
           <button
             onClick={fetchLogs}
             disabled={loadingLogs}
-            className="text-xs flex items-center gap-1.5 text-ink-muted hover:text-ink px-2.5 py-1 rounded-plate hover:bg-board-ground border border-edge transition-colors cursor-pointer"
+            className="text-xs flex items-center gap-1.5 text-ink-muted hover:text-ink px-2.5 py-1 rounded-trim hover:bg-board-ground border border-edge transition-colors cursor-pointer"
           >
             <RefreshCw size={13} className={loadingLogs ? "animate-spin" : ""} />
             Refresh
@@ -267,7 +267,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
           <div className="rounded-plate border border-edge bg-board-plate overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-board-ground border-b border-edge text-ink-muted font-semibold uppercase tracking-wider text-[10px]">
+                <thead className="bg-board-ground border-b border-edge text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">
                   <tr>
                     <th className="px-4 py-3">Date &amp; Time</th>
                     <th className="px-4 py-3">Device / Browser</th>
@@ -331,7 +331,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
               <button
                 type="button"
                 onClick={() => setConfirmRevokeOthersOpen(false)}
-                className="w-full sm:w-1/2 px-4 py-2.5 rounded-plate border border-edge hover:bg-board-ground text-ink font-medium text-sm transition-colors cursor-pointer"
+                className="w-full sm:w-1/2 px-4 py-2.5 rounded-trim border border-edge hover:bg-board-ground text-ink font-semibold text-sm transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -339,7 +339,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
                 type="button"
                 onClick={handleRevokeOthers}
                 disabled={isRevokingOthers}
-                className="w-full sm:w-1/2 px-4 py-2.5 rounded-plate bg-signal hover:bg-signal-deep text-white font-medium text-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
+                className="w-full sm:w-1/2 px-4 py-2.5 rounded-trim bg-signal hover:bg-signal-deep text-white font-semibold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
                 {isRevokingOthers ? "Signing out..." : "Confirm Sign Out"}
               </button>

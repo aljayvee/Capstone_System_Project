@@ -253,16 +253,16 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
       />
 
       {/* Narrow: one pane at a time, switched here. */}
-      <div className="flex shrink-0 items-center gap-1 rounded-plate bg-board-plate p-1 lg:hidden">
+      <div className="flex shrink-0 items-center gap-1 rounded-plate border border-edge bg-board-plate p-1 lg:hidden">
         <button
           type="button"
           onClick={() => setNarrowPane("board")}
           aria-pressed={narrowPane === "board"}
           className={cn(
-            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
+            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
             narrowPane === "board"
               ? "bg-board-field text-board-plate"
-              : "text-ink-muted hover:text-ink"
+              : "text-ink-muted hover:text-ink hover:bg-board-ground/60"
           )}
         >
           The board
@@ -273,10 +273,10 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
           aria-pressed={narrowPane === "run"}
           disabled={!selectedErrand}
           className={cn(
-            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors disabled:cursor-not-allowed disabled:text-board-trim",
+            "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors disabled:cursor-not-allowed disabled:text-board-trim",
             narrowPane === "run"
               ? "bg-board-field text-board-plate"
-              : "text-ink-muted hover:text-ink"
+              : "text-ink-muted hover:text-ink hover:bg-board-ground/60"
           )}
         >
           The run

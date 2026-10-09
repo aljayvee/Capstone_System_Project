@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ref, onValue } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { playNotificationChime } from "../../../utils/notificationAudio";
+import { inboxSource, useRiderChatMode, type RiderChatMode } from "../riderChat";
 
 export interface RiderChatAlertToast {
   id: string;
@@ -13,6 +14,8 @@ export interface RiderChatAlertToast {
 
 interface UseRiderChatAlertsProps {
   riders: any[];
+  /** Whose conversations: in threads mode a dispatcher hears only their own. */
+  dispatcherId?: number | string | null;
   activeRiderId?: string | null;
   onOpenRiderChat: (riderId: string) => void;
 }
@@ -38,8 +41,51 @@ function setLastReadTimestamp(riderId: string, timestamp: number): void {
   }
 }
 
+/** One rider's conversation, as the alerts need it, from either chat layout. */
+interface RiderChatSummary {
+  riderId: string;
+  riderName: string | null;
+  unreadCount: number;
+  latest: { text: string; timestamp: number } | null;
+}
+
+function summarize(mode: RiderChatMode, data: unknown, lastRead: (riderId: string) => number): RiderChatSummary[] {
+  if (!data || typeof data !== "object") return [];
+  if (mode === "threads") {
+    // dispatcher_inbox/staff_<id>: { riderId: meta }. The summary row says who
+    // spoke last, which is enough to light the badge and raise one toast.
+    return Object.entries<any>(data).map(([riderId, meta]) => {
+      const fromRider = meta?.lastSender === "rider" && Number(meta?.updatedAt) > 0;
+      const timestamp = Number(meta?.updatedAt) || 0;
+      return {
+        riderId,
+        riderName: meta?.riderName || null,
+        unreadCount: fromRider && timestamp > lastRead(riderId) ? 1 : 0,
+        latest: fromRider ? { text: String(meta?.lastMessage || "New message"), timestamp } : null,
+      };
+    });
+  }
+  // rider_chats: { riderId: { meta, messages } }, every dispatcher's.
+  return Object.entries<any>(data).map(([riderId, chatData]) => {
+    let unreadCount = 0;
+    let latest: RiderChatSummary["latest"] = null;
+    const messages = chatData?.messages;
+    if (messages && typeof messages === "object") {
+      for (const msg of Object.values<any>(messages)) {
+        if (msg?.role !== "rider") continue;
+        if (msg.timestamp && msg.timestamp > lastRead(riderId)) unreadCount++;
+        if (!latest || (msg.timestamp || 0) > latest.timestamp) {
+          latest = { text: msg.text || (msg.imageUrl ? "Sent a photo" : "New message"), timestamp: msg.timestamp || 0 };
+        }
+      }
+    }
+    return { riderId, riderName: chatData?.meta?.senderName || null, unreadCount, latest };
+  });
+}
+
 export function useRiderChatAlerts({
   riders,
+  dispatcherId,
   activeRiderId,
   onOpenRiderChat,
 }: UseRiderChatAlertsProps) {
@@ -87,42 +133,22 @@ export function useRiderChatAlerts({
     }
   }, [activeRiderId, markRiderAsRead]);
 
-  useEffect(() => {
-    const riderChatsRef = ref(database, "rider_chats");
+  const chatMode = useRiderChatMode();
 
-    const unsubscribe = onValue(riderChatsRef, (snapshot) => {
-      const data = snapshot.val();
-      if (!data || typeof data !== "object") {
-        setUnreadCounts({});
-        return;
-      }
+  useEffect(() => {
+    if (dispatcherId == null) return;
+    const source = inboxSource(chatMode, dispatcherId);
+    initialLoadCompletedRef.current = false;
+
+    const unsubscribe = onValue(ref(database, source.path), (snapshot) => {
+      const summaries = summarize(chatMode, snapshot.val(), getLastReadTimestamp);
 
       const nextUnreads: Record<string, number> = {};
       const newAlerts: RiderChatAlertToast[] = [];
 
-      for (const [riderId, chatData] of Object.entries<any>(data)) {
-        if (!chatData) continue;
-        const meta = chatData.meta;
-        const messages = chatData.messages;
-        const riderName =
-          meta?.senderName || ridersMap.current.get(riderId) || `Rider #${riderId}`;
-
-        const lastRead = getLastReadTimestamp(riderId);
-        let unreadCount = 0;
-        let latestRiderMessage: any = null;
-
-        if (messages && typeof messages === "object") {
-          for (const msg of Object.values<any>(messages)) {
-            if (msg.role === "rider") {
-              if (msg.timestamp && msg.timestamp > lastRead) {
-                unreadCount++;
-              }
-              if (!latestRiderMessage || (msg.timestamp || 0) > (latestRiderMessage.timestamp || 0)) {
-                latestRiderMessage = msg;
-              }
-            }
-          }
-        }
+      for (const { riderId, riderName: namedInChat, unreadCount, latest } of summaries) {
+        const riderName = namedInChat || ridersMap.current.get(riderId) || `Rider #${riderId}`;
+        const latestRiderMessage = latest ? { ...latest, role: "rider" } : null;
 
         if (unreadCount > 0 && String(activeRiderIdRef.current) !== String(riderId)) {
           nextUnreads[riderId] = unreadCount;
@@ -141,7 +167,7 @@ export function useRiderChatAlerts({
               id: `${riderId}_${latestRiderMessage.timestamp}`,
               riderId,
               riderName,
-              messageText: latestRiderMessage.text || (latestRiderMessage.imageUrl ? "Sent a photo" : "New message"),
+              messageText: latestRiderMessage.text,
               timestamp: latestRiderMessage.timestamp,
             });
           }
@@ -185,7 +211,7 @@ export function useRiderChatAlerts({
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [chatMode, dispatcherId]);
 
   const totalUnreadCount = Object.values(unreadCounts).reduce((sum, c) => sum + c, 0);
 

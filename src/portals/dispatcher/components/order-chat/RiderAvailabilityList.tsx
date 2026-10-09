@@ -71,9 +71,9 @@ export function RiderAvailabilityList() {
   // screen keeps the roster: stale under a warning beats an empty list.
   if (loadError && riders.length === 0) {
     return (
-      <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-plate bg-status-waiting-fill px-3 py-2.5">
-        <p className="m-0 text-label text-status-waiting-ink">{copy.stage5.rosterFailed}</p>
-        <DispatcherButton type="button" size="sm" variant="secondary" icon={<RefreshCw size={13} />} onClick={reload}>
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-plate border border-status-waiting-ink/25 bg-status-waiting-fill px-3 py-2.5">
+        <p className="m-0 text-label font-medium text-status-waiting-ink">{copy.stage5.rosterFailed}</p>
+        <DispatcherButton type="button" size="sm" variant="secondary" className="font-semibold" icon={<RefreshCw size={13} />} onClick={reload}>
           {copy.stage5.rosterRetry}
         </DispatcherButton>
       </div>
@@ -91,14 +91,14 @@ export function RiderAvailabilityList() {
   return (
     <section aria-label={copy.stage5.rosterTitle(around.length)}>
       <div className="flex items-baseline justify-between gap-2 pb-1.5">
-        <h4 className="m-0 text-micro font-medium uppercase text-ink-muted">
+        <h4 className="m-0 text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
           {copy.stage5.rosterTitle(around.length)}
         </h4>
         {loadError && (
           <button
             type="button"
             onClick={reload}
-            className="cursor-pointer text-micro text-status-waiting-ink underline-offset-2 hover:underline"
+            className="cursor-pointer text-micro font-semibold tracking-[0.02em] text-status-waiting-ink underline-offset-2 hover:underline"
           >
             {copy.stage5.rosterRetry}
           </button>
@@ -112,12 +112,12 @@ export function RiderAvailabilityList() {
           const isFull = rider.activeOrdersCount >= RIDER_ERRAND_CAP;
           return (
             <li key={rider.id} className="flex items-center gap-2.5 px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-body text-ink" title={rider.name}>
+              <span className="min-w-0 flex-1 truncate text-body font-semibold text-ink" title={rider.name}>
                 {rider.name}
               </span>
               <span
                 className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-micro font-medium",
+                  "shrink-0 rounded-trim px-2 py-0.5 text-micro font-bold uppercase tracking-[0.06em]",
                   onDelivery
                     ? "bg-status-waiting-fill text-status-waiting-ink"
                     : "bg-status-done-fill text-status-done-ink"
@@ -128,7 +128,7 @@ export function RiderAvailabilityList() {
               <span
                 data-figure
                 className={cn(
-                  "w-24 shrink-0 text-right text-label tabular-nums",
+                  "w-24 shrink-0 text-right font-mono text-label font-bold tabular-nums",
                   isFull ? "text-status-act-ink" : "text-ink-muted"
                 )}
               >

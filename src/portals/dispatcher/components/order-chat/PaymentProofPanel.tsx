@@ -1,17 +1,18 @@
 import * as React from "react";
-import { Camera, CheckCircle2, Clock, Loader2, MessageSquare, ReceiptText, X } from "lucide-react";
+import { Camera, CheckCircle2, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { apiService, type ApiProofImage } from "../../../../services/apiService";
-import { copy, formatAgo } from "./copy";
-import { peso, PlanBadge, ProofRow, Figure, AttestationForm } from "./PaymentLedgerPanel";
+import { copy } from "./copy";
+import { peso, PlanBadge, ProofRow, Figure } from "./PaymentLedgerPanel";
 import type { useOrderPayments } from "./hooks/useOrderPayments";
 
 /**
- * The half-payment, on its own — beside the chat, not inside the Stage 4
- * accordion.
+ * The payment at the door, on its own, beside the chat. Shows the rider's
+ * photo of the transfer and what was read from it; since 2026-10-08 the system
+ * records it, so nothing here asks a dispatcher to confirm.
  *
  * Two things the ledger panel never had: the actual photo (not just its OCR'd
  * text), and every photo ever submitted for this errand, not just whichever
@@ -28,9 +29,6 @@ interface PaymentProofPanelProps {
   readOnly?: boolean;
   customerFirstName: string;
   riderName: string;
-  /** The chat, read only to know which half-payment cards were already sent. */
-  messages: Array<{ type?: string; timestamp?: number }>;
-  pushMessage: (payload: Record<string, any>) => void;
 }
 
 export function PaymentProofPanel({
@@ -38,11 +36,8 @@ export function PaymentProofPanel({
   payments,
   readOnly = false,
   customerFirstName,
-  riderName,
-  messages,
-  pushMessage,
 }: PaymentProofPanelProps) {
-  const { ledger, proof, pending, feedback, confirmBalance } = payments;
+  const { ledger, proof, feedback } = payments;
   const c = copy.payments;
 
   const [images, setImages] = React.useState<ApiProofImage[] | null>(null);
@@ -73,43 +68,25 @@ export function PaymentProofPanel({
 
   if (!ledger?.hasLedger) return null;
 
-  // The one photo an attestation would actually point at — the current
-  // (non-superseded) row, if there's exactly one. Ambiguous cases (none yet,
-  // or somehow more than one current) confirm without a proofImageId rather
-  // than guess.
-  const currentImages = (images ?? []).filter((img) => !img.supersededAt);
-  const currentImageId = currentImages.length === 1 ? currentImages[0].id : undefined;
-
   return (
     <DispatcherCard.Region padding="sm" className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <DispatcherCard.Label as="h4" className="mb-0 min-w-0 flex-1">
-          {c.halfPaymentPanelTitle}
+          {c.doorPanelTitle}
         </DispatcherCard.Label>
         <PlanBadge state={ledger.state} />
       </div>
 
-      <Figure label={c.balance} value={peso(ledger.balanceDue)} caption="collected at the door" />
+      <Figure label={c.balance} value={peso(ledger.balanceDue)} caption={c.balanceCaption} />
 
       <DispatcherInlineBanner message={feedback.message} onDismiss={feedback.dismiss} />
 
-      <HalfPaymentSteps
-        payments={payments}
-        readOnly={readOnly}
-        customerFirstName={customerFirstName}
-        riderName={riderName}
-        messages={messages}
-        pushMessage={pushMessage}
-        currentImageId={currentImageId}
-      />
-      {ledger.state === "OVERAGE_PENDING" && (
-        <p className="m-0 text-body text-ink-muted">{c.halfPaymentOveragePending}</p>
+      {ledger.state === "AWAITING_BALANCE" && (
+        <p className="text-body text-ink-muted">{c.atDoorHint(customerFirstName, peso(ledger.balanceDue))}</p>
       )}
-      {ledger.state === "REFUNDED" && (
-        <p className="m-0 text-body text-ink-muted">{c.halfPaymentRefunded}</p>
-      )}
+      {ledger.state === "REFUNDED" && <p className="text-body text-ink-muted">{c.refunded}</p>}
       {ledger.state === "SETTLED" && (
-        <p className="m-0 flex items-center gap-1.5 text-label text-status-done-ink">
+        <p className="flex items-center gap-1.5 text-label text-status-done-ink">
           <CheckCircle2 size={14} className="shrink-0" />
           {c.settled}
         </p>
@@ -144,11 +121,11 @@ export function PaymentProofPanel({
                     <Camera size={14} className="shrink-0 text-ink-muted" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-label text-ink">
+                    <span className="block truncate text-label font-medium text-ink">
                       {img.customerId ? c.proofPhotoCustomer : c.proofPhotoRider}
-                      {!isCurrent ? ` — ${c.proofPhotoSuperseded}` : ""}
+                      {!isCurrent ? ` · ${c.proofPhotoSuperseded}` : ""}
                     </span>
-                    <span className="block text-micro text-ink-muted">
+                    <span className="block font-mono text-micro tabular-nums text-ink-muted">
                       {c.proofPhotoCapturedAt(new Date(img.capturedAt).toLocaleString())}
                     </span>
                   </span>
@@ -185,16 +162,6 @@ export function PaymentProofPanel({
         </div>
       )}
 
-      {!readOnly && ledger.state === "AWAITING_BALANCE" && (
-        <AttestationForm
-          defaultAmount={ledger.balanceDue}
-          submitLabel={c.confirmBalance}
-          loadingLabel={c.confirmingBalance}
-          loading={pending === "balance"}
-          onSubmit={(amount, note) => confirmBalance(amount, note, currentImageId)}
-        />
-      )}
-
       {openImage && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
@@ -205,7 +172,7 @@ export function PaymentProofPanel({
         >
           <button
             onClick={() => setOpenImage(null)}
-            className="absolute right-5 top-5 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+            className="absolute right-5 top-5 grid size-9 place-items-center rounded-trim bg-white/10 text-white transition hover:bg-white/20"
             aria-label="Close the photo"
           >
             <X size={18} />
@@ -219,143 +186,5 @@ export function PaymentProofPanel({
         </div>
       )}
     </DispatcherCard.Region>
-  );
-}
-
-/**
- * The 50%, collected mid-way.
- *
- * The rider asks once they hold every item, so the amount is half of what they
- * actually paid. From there it is the dispatcher's turn, in order: ask the
- * customer for it, show them where the receipt goes, and let a receipt that
- * checks out settle it on its own. Laid out as that sequence so each step is
- * the next button, not something to remember, and tinted as the dispatcher's
- * turn because a rider is standing still until it is done.
- */
-function HalfPaymentSteps({
-  payments,
-  readOnly,
-  customerFirstName,
-  riderName,
-  messages,
-  pushMessage,
-  currentImageId,
-}: {
-  payments: ReturnType<typeof useOrderPayments>;
-  readOnly: boolean;
-  customerFirstName: string;
-  riderName: string;
-  messages: Array<{ type?: string; timestamp?: number }>;
-  pushMessage: (payload: Record<string, any>) => void;
-  currentImageId: number | undefined;
-}) {
-  const { ledger, proof, pending, confirmUpfront } = payments;
-  const c = copy.payments;
-  if (!ledger?.hasLedger) return null;
-
-  const requestedAtMs = ledger.halfPaymentRequestedAt
-    ? new Date(ledger.halfPaymentRequestedAt).getTime()
-    : null;
-  const upfront = ledger.entries.find((e) => e.kind === "UPFRONT") ?? null;
-
-  // Settled: say how, once. A half confirmed before any rider asked belongs to
-  // the old pay-before-dispatch flow, which the Payment stage already shows.
-  if (upfront) {
-    if (!requestedAtMs) return null;
-    return (
-      <p className="m-0 flex items-start gap-1.5 text-label text-status-done-ink" data-testid="half-payment-settled">
-        <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-        {upfront.confirmedBy
-          ? c.halfConfirmedBy(upfront.confirmedBy.name, riderName)
-          : c.halfAutoConfirmed(riderName)}
-      </p>
-    );
-  }
-  if (ledger.state !== "AWAITING_UPFRONT") return null;
-
-  if (!requestedAtMs) {
-    return <p className="m-0 text-body text-ink-muted">{c.halfNotYet(riderName)}</p>;
-  }
-
-  // Recovered from the chat rather than held in state, so a reload, or a second
-  // dispatcher opening the same order, sees what was already sent.
-  const sentSinceRequest = (type: string) =>
-    messages.some((m) => m.type === type && (m.timestamp ?? 0) >= requestedAtMs);
-  const asked = sentSinceRequest("half_payment_request");
-  const showedUpload = sentSinceRequest("payment_proof_request");
-  // Still owed with a receipt in hand means it did not settle on its own:
-  // the one case a person has to look at.
-  const receiptToReview = Boolean(proof && new Date(proof.capturedAt).getTime() >= requestedAtMs);
-
-  const amount = peso(ledger.dueUpFront);
-  const goods = peso(ledger.goodsTotal);
-  const minsAgo = Math.max(0, Math.floor((Date.now() - requestedAtMs) / 60000));
-
-  return (
-    <div
-      className="space-y-2.5 rounded-plate border border-status-act-ink/25 bg-status-act-fill p-3"
-      data-testid="half-payment-steps"
-    >
-      <div>
-        <p className="m-0 flex items-center gap-1.5 text-label font-semibold text-status-act-ink">
-          <Clock size={14} className="shrink-0" />
-          {c.halfRequestedTitle(riderName)}
-        </p>
-        <p className="m-0 mt-1 text-body text-ink">
-          {c.halfRequestedBody(customerFirstName, amount, goods, formatAgo(minsAgo))}
-        </p>
-      </div>
-
-      {!readOnly && (
-        <div className="flex flex-col gap-2">
-          <DispatcherButton
-            variant={asked ? "secondary" : "success"}
-            icon={asked ? <CheckCircle2 size={15} /> : <MessageSquare size={15} />}
-            className="w-full justify-center"
-            data-testid="half-payment-ask"
-            onClick={() =>
-              pushMessage({
-                type: "half_payment_request",
-                amount: ledger.dueUpFront,
-                goodsTotal: ledger.goodsTotal,
-                text: c.halfRequestMessage(amount, goods),
-              })
-            }
-          >
-            {asked ? c.halfAsked(customerFirstName) : c.halfAsk(customerFirstName, amount)}
-          </DispatcherButton>
-          <DispatcherButton
-            variant={asked && !showedUpload ? "success" : "secondary"}
-            icon={showedUpload ? <CheckCircle2 size={15} /> : <ReceiptText size={15} />}
-            className="w-full justify-center"
-            data-testid="half-payment-show-upload"
-            onClick={() =>
-              pushMessage({
-                type: "payment_proof_request",
-                amount: ledger.dueUpFront,
-                text: c.halfUploadMessage(amount),
-              })
-            }
-          >
-            {showedUpload ? c.halfShowedUpload(customerFirstName) : c.halfShowUpload(customerFirstName)}
-          </DispatcherButton>
-        </div>
-      )}
-
-      <p className="m-0 flex items-start gap-1.5 text-label text-ink-muted">
-        <ReceiptText size={14} className="mt-0.5 shrink-0" />
-        {receiptToReview ? c.halfReceiptReview : c.halfReceiptWaiting}
-      </p>
-
-      {!readOnly && receiptToReview && (
-        <AttestationForm
-          defaultAmount={ledger.dueUpFront}
-          submitLabel={c.confirmUpfront}
-          loadingLabel={c.confirmingUpfront}
-          loading={pending === "upfront"}
-          onSubmit={(amt, note) => confirmUpfront(amt, note, currentImageId)}
-        />
-      )}
-    </div>
   );
 }

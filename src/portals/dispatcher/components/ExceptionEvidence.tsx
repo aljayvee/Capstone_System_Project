@@ -71,11 +71,11 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
         <button
           onClick={() => void open()}
           disabled={isLoading}
-          className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-label text-ink-muted transition-colors hover:text-ink"
+          className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-trim border border-edge bg-board-ground/50 px-2.5 py-1 text-label font-semibold text-ink-muted transition-colors hover:border-board-trim hover:bg-board-plate hover:text-ink disabled:opacity-50"
           data-testid={`evidence-open-${errandId}`}
         >
-          {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-          {isLoading ? "Loading evidence" : loadFailed ? "Try the evidence again" : "Show the evidence"}
+          {isLoading ? <Loader2 size={13} className="animate-spin text-ink-muted" /> : <Camera size={13} className="text-ink-muted" />}
+          <span>{isLoading ? "Loading evidence" : loadFailed ? "Try the evidence again" : "Show the evidence"}</span>
         </button>
         {loadFailed ? (
           <p role="alert" className="text-label text-status-act-ink">
@@ -113,14 +113,14 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
             <button
               key={img.id}
               onClick={() => void view(img)}
-              className="w-[112px] shrink-0 cursor-pointer rounded-trim border border-edge bg-board-ground px-2 py-1.5 text-left transition-colors hover:border-board-field"
+              className="w-[124px] shrink-0 cursor-pointer rounded-trim border border-edge bg-board-ground/70 p-2 text-left transition-colors hover:border-board-field hover:bg-board-plate"
               data-testid={`evidence-${img.id}`}
             >
-              <div className="flex items-center gap-1 text-micro uppercase text-ink-muted">
+              <div className="flex items-center gap-1 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
                 {loadingId === img.id ? (
-                  <Loader2 size={10} className="animate-spin shrink-0" />
+                  <Loader2 size={11} className="animate-spin shrink-0 text-ink-muted" />
                 ) : (
-                  <Camera size={10} className="shrink-0" />
+                  <Camera size={11} className="shrink-0 text-ink-muted" />
                 )}
                 <span className="truncate">
                   {img.kind === "NO_RECEIPT"
@@ -135,14 +135,14 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
                 </span>
               </div>
               {figure !== null && figure !== undefined && (
-                <p data-figure className="font-mono text-data text-ink">
+                <p data-figure className="mt-1 font-mono text-data font-bold tabular-nums text-ink">
                   {formatPeso(figure)}
                 </p>
               )}
               {/* Says whose figure this is. An unverified total is the rider's
                   word, and a reader deciding on money should never have to guess
                   which of the two they are looking at. */}
-              <p className="text-label leading-tight text-ink-muted">
+              <p className="mt-0.5 text-micro leading-tight text-ink-muted">
                 {img.verified ? "Read from the receipt" : "Stated by the rider"}
               </p>
             </button>
@@ -152,7 +152,7 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
 
       {openImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
           onClick={() => setOpenImage(null)}
           role="dialog"
           aria-modal="true"
@@ -160,7 +160,7 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
         >
           <button
             onClick={() => setOpenImage(null)}
-            className="absolute top-5 right-5 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            className="absolute top-5 right-5 grid size-9 place-items-center rounded-trim bg-white/10 text-white hover:bg-white/20 transition cursor-pointer"
             aria-label="Close the photo"
           >
             <X size={18} />
@@ -168,7 +168,7 @@ export const ExceptionEvidence: React.FC<{ errandId: string; kind: ExceptionKind
           <img
             src={`data:${openImage.mimeType};base64,${openImage.imageData}`}
             alt="Proof captured by the rider"
-            className="max-h-full max-w-full rounded-modal object-contain"
+            className="max-h-[90vh] max-w-[90vw] rounded-plate object-contain border border-white/10 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
         </div>

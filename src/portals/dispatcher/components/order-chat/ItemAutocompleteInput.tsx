@@ -5,7 +5,7 @@ import {
   useCatalogAutocomplete,
   type CatalogItemSuggestion,
 } from "./hooks/useCatalogAutocomplete";
-import { Sparkles, Store } from "lucide-react";
+import { Sparkles, Store, X } from "lucide-react";
 
 interface ItemAutocompleteInputProps {
   value: string;
@@ -98,9 +98,9 @@ export const ItemAutocompleteInput: React.FC<ItemAutocompleteInputProps> = ({
       />
 
       {isOpen && suggestions.length > 0 && (
-        <div className="absolute left-0 top-full z-30 mt-1 max-h-64 w-full min-w-[260px] overflow-hidden rounded-plate border border-edge bg-board-plate shadow-md">
+        <div className="absolute left-0 top-full z-30 mt-1 max-h-64 w-full min-w-[260px] overflow-hidden rounded-plate border border-edge bg-board-plate shadow-plate">
           <div className="flex items-center justify-between border-b border-hairline bg-board-ground px-2.5 py-1 text-micro text-ink-muted">
-            <span className="font-medium">Suggestions</span>
+            <span className="font-bold uppercase tracking-[0.06em]">Suggestions</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -109,8 +109,10 @@ export const ItemAutocompleteInput: React.FC<ItemAutocompleteInputProps> = ({
                   setIsPinned(!isPinned);
                 }}
                 className={cn(
-                  "cursor-pointer text-micro underline",
-                  isPinned ? "font-bold text-ink" : "text-ink-muted"
+                  "cursor-pointer rounded-trim px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.04em] transition-colors",
+                  isPinned
+                    ? "bg-board-field text-board-plate"
+                    : "border border-edge bg-board-plate text-ink-muted hover:text-ink"
                 )}
               >
                 {isPinned ? "Pinned" : "Pin Open"}
@@ -122,10 +124,10 @@ export const ItemAutocompleteInput: React.FC<ItemAutocompleteInputProps> = ({
                   setIsOpen(false);
                   setIsPinned(false);
                 }}
-                className="cursor-pointer text-ink-muted hover:text-ink"
-                aria-label="Close"
+                className="grid size-6 place-items-center rounded-trim text-ink-muted hover:bg-board-ground hover:text-ink"
+                aria-label="Close suggestions"
               >
-                &times;
+                <X size={13} />
               </button>
             </div>
           </div>
@@ -149,7 +151,14 @@ export const ItemAutocompleteInput: React.FC<ItemAutocompleteInputProps> = ({
                   )}
                 >
                   <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium">{suggestion.itemName}</span>
+                    <span
+                      className={cn(
+                        "truncate font-semibold",
+                        isSelected ? "text-board-plate" : "text-ink"
+                      )}
+                    >
+                      {suggestion.itemName}
+                    </span>
                     <span
                       className={cn(
                         "flex items-center gap-1 truncate text-micro",
@@ -163,7 +172,7 @@ export const ItemAutocompleteInput: React.FC<ItemAutocompleteInputProps> = ({
 
                   <span
                     className={cn(
-                      "shrink-0 rounded-sm border px-1.5 py-0.5 text-micro uppercase",
+                      "shrink-0 rounded-trim border px-1.5 py-0.5 text-micro font-bold uppercase tracking-[0.06em]",
                       isSelected
                         ? "border-board-plate/30 text-board-plate"
                         : "border-edge text-ink-muted"

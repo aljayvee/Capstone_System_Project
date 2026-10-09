@@ -28,7 +28,7 @@ import {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-t border-hairline px-5 py-4">
-      <h3 className="mb-2.5 text-micro uppercase text-ink-muted">{title}</h3>
+      <h3 className="mb-2.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">{title}</h3>
       {children}
     </section>
   );
@@ -42,10 +42,10 @@ function MoneyRow({ label, value, emphasis = false }: { label: string; value: st
         emphasis && "mt-1 border-t border-hairline pt-2"
       )}
     >
-      <dt className={emphasis ? "text-label text-ink" : "text-body text-ink-muted"}>{label}</dt>
+      <dt className={emphasis ? "text-label font-bold text-ink" : "text-body text-ink-muted"}>{label}</dt>
       <dd
         data-figure
-        className={cn("font-mono tabular-nums text-ink", emphasis ? "text-data" : "text-body")}
+        className={cn("font-mono tabular-nums font-semibold text-ink", emphasis ? "text-data font-bold" : "text-body")}
       >
         {value}
       </dd>
@@ -56,8 +56,8 @@ function MoneyRow({ label, value, emphasis = false }: { label: string; value: st
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-micro uppercase text-ink-muted">{label}</dt>
-      <dd className="mt-0.5 break-words text-body text-ink">{children}</dd>
+      <dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">{label}</dt>
+      <dd className="mt-0.5 break-words text-body font-medium text-ink">{children}</dd>
     </div>
   );
 }
@@ -133,7 +133,7 @@ export function HistoryErrandDetail({ errand, onOpenChat }: HistoryErrandDetailP
       <header className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 data-figure className="font-mono text-panel text-ink">
+            <h3 data-figure className="font-mono text-panel font-bold tabular-nums tracking-wide text-ink">
               {formatErrandId(errand.id)}
             </h3>
             <DispatcherButton
@@ -141,14 +141,14 @@ export function HistoryErrandDetail({ errand, onOpenChat }: HistoryErrandDetailP
               size="sm"
               iconOnly
               aria-label={copied ? "Copied the errand ID" : "Copy the errand ID"}
-              icon={copied ? <Check size={14} /> : <Copy size={14} />}
+              icon={copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
               onClick={() => void copyId()}
             />
             {/* The board's own "close without an order" write reads as
                 PASSING BY until the next refresh; it is a cancellation. */}
             <StatusChip status={isCancelled ? "CANCELLED" : errand.status} />
           </div>
-          <p data-figure className="mt-1 text-label text-ink-muted">
+          <p data-figure className="mt-1 font-mono text-label tabular-nums text-ink-muted">
             {isCancelled ? "Closed" : "Delivered"} {formatClosedAt(errand)}
           </p>
         </div>
@@ -340,8 +340,8 @@ export function HistoryErrandDetail({ errand, onOpenChat }: HistoryErrandDetailP
         )}
 
         {!isCancelled ? (
-          <div className="mt-4 rounded-trim bg-board-ground px-3 py-2.5">
-            <p className="text-label text-ink">
+          <div className="mt-4 rounded-trim border border-edge bg-board-ground/60 p-3">
+            <p className="text-label font-semibold text-ink">
               Delivered by {errand.riderName || "a rider whose name was not recorded"}
             </p>
             {earnings ? (

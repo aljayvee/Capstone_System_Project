@@ -188,8 +188,8 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
       onClick={() => setActiveTab(id)}
       aria-pressed={activeTab === id}
       className={cn(
-        "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim px-3 text-micro uppercase transition-colors sm:flex-initial",
-        activeTab === id ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+        "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors sm:flex-initial",
+        activeTab === id ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink hover:bg-board-ground/60"
       )}
     >
       {icon}
@@ -206,7 +206,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
           <button
             type="button"
             onClick={onBackToBoard}
-            className="mb-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-micro uppercase text-board-trim transition-colors hover:text-board-plate lg:hidden"
+            className="mb-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-board-trim transition-colors hover:text-board-plate lg:hidden"
           >
             <ArrowLeft size={14} />
             Back to the board
@@ -215,7 +215,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 data-figure className="truncate font-mono text-title text-board-plate">
+            <h2 data-figure className="truncate font-mono text-title font-bold tabular-nums tracking-wide text-board-plate">
               {formatErrandId(errand.id)}
             </h2>
             <button
@@ -224,7 +224,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               aria-label="Copy this run's number"
               className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
             >
-              {copiedId ? <Check size={15} /> : <Copy size={15} />}
+              {copiedId ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
             </button>
           </div>
 
@@ -232,7 +232,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
         </div>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="truncate text-label text-board-plate/90">
+          <span className="truncate text-label font-semibold text-board-plate/95">
             {errand.customerName || "Customer"}
           </span>
           {errand.customerPhone ? (
@@ -241,16 +241,16 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 type="button"
                 onClick={handleCopyPhone}
                 aria-label={`Copy ${errand.customerName || "the customer"}'s phone number`}
-                className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label text-board-trim transition-colors hover:text-board-plate"
+                className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label tabular-nums text-board-trim transition-colors hover:text-board-plate"
               >
                 <Phone size={12} />
-                <span data-figure>{errand.customerPhone}</span>
-                {copiedPhone ? <Check size={12} /> : null}
+                <span data-figure className="font-mono tabular-nums">{errand.customerPhone}</span>
+                {copiedPhone ? <Check size={12} className="text-emerald-400" /> : null}
               </button>
               {errand.customerPhoneVerified ? (
                 <span
                   title={errand.customerPhoneVerifiedAt ? `Verified on ${new Date(errand.customerPhoneVerifiedAt).toLocaleDateString()}` : "Phone number verified via SMS OTP"}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 select-none"
                 >
                   <ShieldCheck size={10} className="text-emerald-400" />
                   <span>Verified</span>
@@ -258,7 +258,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               ) : (
                 <span
                   title="Phone number unverified"
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 select-none"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-medium tracking-wide uppercase bg-amber-500/15 text-amber-300 border border-amber-500/30 select-none"
                 >
                   <span>Unverified</span>
                 </span>
@@ -267,7 +267,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
           ) : (
             <span className="text-label text-board-trim">No number on file</span>
           )}
-          <span className="truncate text-label text-board-trim">{primaryStore}</span>
+          <span className="truncate text-label font-medium text-board-trim/90">{primaryStore}</span>
         </div>
       </div>
 
@@ -288,23 +288,23 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               <li
                 key={stage.label}
                 aria-current={isCurrent ? "step" : undefined}
-                className="flex min-w-0 flex-1 flex-col items-center gap-1 px-1 py-2"
+                className="flex min-w-0 flex-1 flex-col items-center gap-1.5 px-1 py-2"
               >
                 {/* A stamped detent: filled once passed, hollow while ahead.
                     Never colour alone, so the label carries the state too. */}
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "size-2.5",
-                    isCurrent ? "rounded-full bg-signal" : "rounded-full",
+                    "size-2.5 rounded-full transition-all",
+                    isCurrent ? "bg-signal ring-2 ring-signal/30" : "",
                     isDone && !isCurrent ? "bg-board-field" : "",
-                    !isDone ? "border-[1.5px] border-board-trim" : ""
+                    !isDone ? "border-[1.5px] border-board-trim bg-board-ground" : ""
                   )}
                 />
                 <span
                   className={cn(
-                    "w-full truncate text-center text-micro uppercase",
-                    isCurrent ? "text-ink" : isDone ? "text-ink-muted" : "text-board-trim"
+                    "w-full truncate text-center text-micro font-semibold uppercase tracking-[0.06em]",
+                    isCurrent ? "text-ink font-bold" : isDone ? "text-ink-muted" : "text-board-trim"
                   )}
                 >
                   {stage.label}
@@ -342,20 +342,20 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
           <>
             <DispatcherCard.Region padding="sm">
               <div className="flex items-baseline justify-between gap-3 border-b border-hairline pb-2">
-                <h3 className="text-micro uppercase text-ink">
+                <h3 className="text-micro font-semibold uppercase tracking-[0.06em] text-ink">
                   Requested items ({items.length})
                 </h3>
                 {/* A column head, so the figure on the right reads as a count
                     and not as a price. Prices are not shown on this list. */}
                 {items.length > 0 ? (
-                  <span className="w-10 shrink-0 text-right text-micro uppercase text-ink-muted">Qty</span>
+                  <span className="w-10 shrink-0 text-right text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">Qty</span>
                 ) : null}
               </div>
 
               {items.length === 0 ? (
                 <p className="pt-2 text-body text-ink-muted">
                   No individual items were listed. The customer asked for:{" "}
-                  <span className="text-ink">{errand.description || "a general errand"}</span>
+                  <span className="font-medium text-ink">{errand.description || "a general errand"}</span>
                 </p>
               ) : (
                 <ul className="divide-y divide-hairline">
@@ -365,13 +365,13 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                       className="flex items-start justify-between gap-3 py-2 first:pt-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-body text-ink">{formatItemLabel(item.itemName, item.size)}</p>
+                        <p className="truncate text-body font-medium text-ink">{formatItemLabel(item.itemName, item.size)}</p>
                         {item.notes ? (
                           <p className="mt-0.5 text-label text-ink-muted">Note: {item.notes}</p>
                         ) : null}
                       </div>
 
-                      <span data-figure className="w-10 shrink-0 text-right font-mono text-data text-ink">
+                      <span data-figure className="w-10 shrink-0 text-right font-mono text-data font-bold tabular-nums text-ink">
                         {item.quantity || 1}
                       </span>
                     </li>
@@ -392,15 +392,15 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               <DispatcherCard.Label as="h3">The route</DispatcherCard.Label>
               <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="min-w-0">
-                  <dt className="text-label text-ink-muted">Collect from</dt>
-                  <dd className="mt-0.5 truncate text-body text-ink">{primaryStore}</dd>
+                  <dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">Collect from</dt>
+                  <dd className="mt-0.5 truncate text-body font-semibold text-ink">{primaryStore}</dd>
                   <dd className="line-clamp-2 text-label text-ink-muted">
                     {errand.pickupAddress || "Address not recorded"}
                   </dd>
                 </div>
                 <div className="min-w-0">
-                  <dt className="text-label text-ink-muted">Deliver to</dt>
-                  <dd className="mt-0.5 truncate text-body text-ink">
+                  <dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">Deliver to</dt>
+                  <dd className="mt-0.5 truncate text-body font-semibold text-ink">
                     {errand.customerName || "Customer"}
                   </dd>
                   <dd className="line-clamp-2 text-label text-ink-muted">
@@ -416,20 +416,20 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 {subtotal > 0 ? (
                   <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
                     <dt>Items</dt>
-                    <dd data-figure className="font-mono text-ink">
+                    <dd data-figure className="font-mono font-semibold tabular-nums text-ink">
                       {formatPeso(subtotal)}
                     </dd>
                   </div>
                 ) : null}
                 <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
                   <dt>Delivery</dt>
-                  <dd data-figure className="font-mono text-ink">
+                  <dd data-figure className="font-mono font-semibold tabular-nums text-ink">
                     {formatPeso(fee)}
                   </dd>
                 </div>
-                <div className="flex items-baseline justify-between gap-3 border-t border-hairline pt-2 text-body text-ink">
+                <div className="flex items-baseline justify-between gap-3 border-t border-hairline pt-2 text-body font-semibold text-ink">
                   <dt>Total</dt>
-                  <dd data-figure className="font-mono text-data text-ink">
+                  <dd data-figure className="font-mono text-data font-bold tabular-nums text-ink">
                     {formatPeso(subtotal > 0 ? totalDisplay : fee)}
                   </dd>
                 </div>

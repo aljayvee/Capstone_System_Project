@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router";
 import { io, Socket } from "socket.io-client";
-import { toast } from "sonner";
 import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { postAccepted, postDeclined } from "../../../services/chatSystemMessages";
@@ -160,15 +159,9 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     );
   };
 
-  // Read by socket handlers registered once per connection, which would
-  // otherwise see the errand list and the router setter from their first render.
   // Read by the socket handlers, which are registered once (see below).
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
-  const errandsRef = useRef<Errand[]>(errands);
-  errandsRef.current = errands;
-  const openErrandRef = useRef(setSelectedErrandId);
-  openErrandRef.current = setSelectedErrandId;
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -304,40 +297,6 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
           `₱${payload.declaredTotal} at a shop that issued no receipt. Unverified: ` +
           `the photo shows the goods, not a printed total.`
       );
-    });
-
-    // A rider holding every item, standing still until the customer's 50% lands.
-    // Loud on purpose, and it stays up until handled: it is the one point in the
-    // flow where someone on the road is waiting on dispatch. Skipped only for an
-    // errand this list shows another dispatcher owns; the one who claimed it is
-    // the one who can open that chat.
-    socket.on("errand:half_payment_requested", (payload: any) => {
-      if (!payload?.errandId) return;
-      const known = errandsRef.current.find((e) => e.id === payload.errandId);
-      if (known?.dispatcherId && currentUserIdRef.current && String(known.dispatcherId) !== String(currentUserIdRef.current)) {
-        return;
-      }
-      const who = payload.customerName || "The customer";
-      const amount = `₱${Number(payload.dueUpFront ?? 0).toLocaleString("en-PH", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-      toast.warning(`${who} needs to send the half-payment`, {
-        id: `half-payment-${payload.errandId}`,
-        description: `${payload.riderName || "The rider"} has every item and is waiting. Ask ${who} for ${amount} in the chat.`,
-        duration: Infinity,
-        action: {
-          label: "Open chat",
-          onClick: () => openErrandRef.current(payload.errandId),
-        },
-      });
-    });
-
-    // Settled, by the receipt or by hand: the alert has done its job.
-    socket.on("errand:payment_updated", (payload: any) => {
-      if (payload?.errandId && payload.reason === "upfront_confirmed") {
-        toast.dismiss(`half-payment-${payload.errandId}`);
-      }
     });
 
     socket.on("errand:stop_mismatch", (payload: any) => {

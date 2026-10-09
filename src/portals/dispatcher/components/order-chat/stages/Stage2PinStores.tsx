@@ -108,7 +108,7 @@ function FeeBreakdown({ orderDetails }: { orderDetails: Partial<FeeFields> | nul
   return (
     <div className="rounded-plate border border-edge bg-board-ground/40 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="m-0 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+        <h4 className="m-0 text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
           What the delivery costs
         </h4>
       </div>
@@ -123,7 +123,7 @@ function FeeBreakdown({ orderDetails }: { orderDetails: Partial<FeeFields> | nul
         ))}
         <div className="mt-1.5 flex justify-between border-t border-hairline pt-1.5 text-body font-semibold text-ink">
           <dt>Delivery Total</dt>
-          <dd data-figure className="m-0 font-mono text-data tabular-nums text-status-done-ink">
+          <dd data-figure className="m-0 font-mono text-data font-bold tabular-nums text-status-done-ink">
             {formatPeso(fee)}
           </dd>
         </div>
@@ -190,8 +190,18 @@ export function Stage2PinStores({
     return rows.map((r) => String(r?.itemName || "").trim()).filter(Boolean);
   }, [orderDetails?.pabiliDetails, orderDetails?.pabiliItemRequests]);
 
-  // Asked only while it can still help: before the stores go to the customer.
-  const predictionWanted = !readOnly && !storesSentAt && itemNames.length > 0;
+  // Stores the customer picked themselves in the app ("Location" in its step 1)
+  // arrive as the errand's pins before any were sent. The dispatcher's own
+  // save always posts the "pinpoints" card, so pins on the errand with no card
+  // yet are the customer's, and the app marks such an order "Pabili Stores:".
+  const customerPickedCount =
+    !storesSentAt && String(orderDetails?.description ?? "").startsWith("Pabili Stores:")
+      ? (orderDetails?.pinpoints?.length ?? 0)
+      : 0;
+
+  // Asked only while it can still help: before the stores go to the customer,
+  // and not when the customer already named the stores.
+  const predictionWanted = !readOnly && !storesSentAt && itemNames.length > 0 && customerPickedCount === 0;
   const predictions = useStorePredictions(orderDetails?.id, itemNames, predictionWanted);
   const [predictionDismissed, setPredictionDismissed] = useState(false);
   const [acceptedCount, setAcceptedCount] = useState<number | null>(null);
@@ -207,6 +217,16 @@ export function Stage2PinStores({
   // The suggestions remain available and do not disappear when stores are pinned!
   const showPrediction =
     predictionWanted && !predictionDismissed && isSuggestionsOpen;
+
+  // The card stands in for "No stores pinned yet" only while it is loading or
+  // actually offering stores. Answered, failed or empty-handed, it is a one-line
+  // note, and the empty state still has to say how to pin one by hand.
+  const predictionFillsEmptySlot =
+    showPrediction &&
+    !predictions.answer &&
+    (predictions.status === "loading" ||
+      (predictions.status === "ready" &&
+        (predictions.prediction?.stores ?? []).some((s) => s.location.status !== "blocked")));
 
   const atLimit = pinpoints.length >= MAX_PINPOINTS;
 
@@ -273,24 +293,24 @@ export function Stage2PinStores({
     <div className="space-y-3">
       {/* Where everything is delivered to: the part of the old address step
           worth keeping on screen. */}
-      <div className="flex items-start gap-2.5 rounded-plate bg-board-ground px-3 py-2">
+      <div className="flex items-start gap-2.5 rounded-plate border border-edge bg-board-ground/60 px-3 py-2.5">
         <MapPin size={15} className="mt-0.5 shrink-0 text-ink-muted" />
         <p className="m-0 min-w-0 flex-1 break-words text-body text-ink">
-          <span className="text-ink-muted">{copy.stageAddress.deliverTo}: </span>
-          {orderDetails?.deliveryAddress || "Tacurong City"}
+          <span className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">{copy.stageAddress.deliverTo}: </span>
+          <span className="font-medium">{orderDetails?.deliveryAddress || "Tacurong City"}</span>
           {orderDetails?.description ? (
             <span className="text-ink-muted"> &ldquo;{orderDetails.description}&rdquo;</span>
           ) : null}
         </p>
         {onViewLocation && (
-          <DispatcherButton type="button" size="sm" variant="secondary" className="shrink-0" onClick={onViewLocation}>
+          <DispatcherButton type="button" size="sm" variant="secondary" className="shrink-0 font-semibold" onClick={onViewLocation}>
             {copy.stageAddress.map}
           </DispatcherButton>
         )}
       </div>
 
       {deliveryProblem && (
-        <div role="alert" className="space-y-2 rounded-plate bg-status-act-fill p-3 text-status-act-ink">
+        <div role="alert" className="space-y-2 rounded-plate border border-status-act-ink/30 bg-status-act-fill p-3 text-status-act-ink">
           <div className="flex items-start gap-2">
             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
             <div>
@@ -304,12 +324,12 @@ export function Stage2PinStores({
           </div>
           <div className="flex flex-wrap gap-2">
             {onAskInChat && (
-              <DispatcherButton type="button" size="sm" variant="secondary" onClick={onAskInChat}>
+              <DispatcherButton type="button" size="sm" variant="secondary" className="font-semibold" onClick={onAskInChat}>
                 {copy.stageAddress.askInChat(customerFirstName)}
               </DispatcherButton>
             )}
             {onDecline && (
-              <DispatcherButton type="button" size="sm" variant="danger-ghost" onClick={onDecline}>
+              <DispatcherButton type="button" size="sm" variant="danger-ghost" className="font-semibold" onClick={onDecline}>
                 {copy.declineOrder}
               </DispatcherButton>
             )}
@@ -317,40 +337,12 @@ export function Stage2PinStores({
         </div>
       )}
 
-      {showPrediction && (
-        <StorePredictionCard
-          prediction={predictions.prediction}
-          status={predictions.status}
-          answer={predictions.answer}
-          acceptedCount={acceptedCount}
-          pinnedStoreNames={pinpoints.map((p: StorePinpoint) => p.storeName)}
-          onAccept={(stores) => {
-            setAcceptedCount(addPredictedStores(stores));
-            predictions.setAnswer("accepted");
-          }}
-          onAcceptSingle={(store) => {
-            addPredictedStores([store]);
-          }}
-          onReject={() => predictions.setAnswer("rejected")}
-          onRetry={predictions.retry}
-          onDismiss={() => {
-            setPredictionDismissed(true);
-            setIsSuggestionsOpen(false);
-          }}
-          onReopen={() => {
-            predictions.setAnswer(null);
-            setPredictionDismissed(false);
-            setIsSuggestionsOpen(true);
-          }}
-        />
-      )}
-
       {/* the map, or an honest explanation of why there isn't one */}
       {mapUnavailable ? (
-        <div className="flex items-start gap-3 rounded-plate bg-status-waiting-fill p-3">
+        <div className="flex items-start gap-3 rounded-plate border border-status-waiting-ink/30 bg-status-waiting-fill p-3">
           <MapIcon size={16} className="mt-0.5 shrink-0 text-status-waiting-ink" />
           <div className="min-w-0">
-            <p className="m-0 text-label text-status-waiting-ink">{copy.stage2.mapDownTitle}</p>
+            <p className="m-0 text-label font-bold text-status-waiting-ink">{copy.stage2.mapDownTitle}</p>
             <p className="mb-0 mt-1 text-body text-status-waiting-ink/85">
               {copy.stage2.mapDownBody}
             </p>
@@ -368,7 +360,7 @@ export function Stage2PinStores({
               {copy.stage2.mapLoading}
             </div>
           )}
-          <p className="absolute bottom-2 left-2 right-2 m-0 rounded-trim bg-board-plate/95 px-2 py-1 text-center text-label text-ink-muted">
+          <p className="absolute bottom-2 left-2 right-2 m-0 rounded-trim border border-edge/40 bg-board-plate/95 px-2.5 py-1 text-center text-label font-medium text-ink-muted">
             {copy.stage2.hint}
           </p>
         </div>
@@ -381,6 +373,7 @@ export function Stage2PinStores({
             type="button"
             size="sm"
             variant={isSuggestionsOpen ? "success" : "secondary"}
+            className="font-semibold"
             icon={<Store size={14} />}
             onClick={() => {
               setIsSuggestionsOpen((prev) => !prev);
@@ -399,10 +392,10 @@ export function Stage2PinStores({
               <button
                 type="button"
                 onClick={onClearPrefill}
-                className="ml-1 cursor-pointer font-bold text-status-waiting-ink hover:opacity-80"
+                className="ml-1 grid size-5 cursor-pointer place-items-center rounded-trim text-status-waiting-ink hover:bg-status-waiting-ink/10"
                 aria-label="Clear prefill"
               >
-                &times;
+                <X size={12} />
               </button>
             )}
           </div>
@@ -537,13 +530,56 @@ export function Stage2PinStores({
         </div>
       )}
 
+      {/* The suggested stores sit with the pinned stores, where accepting them
+          lands, rather than above the map. While they are on offer they take
+          the empty state's place: "Yes, pin these" is the next step there. */}
+      {showPrediction && (
+        <StorePredictionCard
+          prediction={predictions.prediction}
+          status={predictions.status}
+          answer={predictions.answer}
+          acceptedCount={acceptedCount}
+          pinnedStoreNames={pinpoints.map((p: StorePinpoint) => p.storeName)}
+          onAccept={(stores) => {
+            setAcceptedCount(addPredictedStores(stores));
+            predictions.setAnswer("accepted");
+          }}
+          onAcceptSingle={(store) => {
+            addPredictedStores([store]);
+          }}
+          onReject={() => predictions.setAnswer("rejected")}
+          onRetry={predictions.retry}
+          onDismiss={() => {
+            setPredictionDismissed(true);
+            setIsSuggestionsOpen(false);
+          }}
+          onReopen={() => {
+            predictions.setAnswer(null);
+            setPredictionDismissed(false);
+            setIsSuggestionsOpen(true);
+          }}
+        />
+      )}
+
+      {customerPickedCount > 0 && pinpoints.length > 0 && (
+        <div
+          className="flex items-center gap-2 rounded-plate border border-edge bg-board-plate px-3 py-2"
+          data-testid="customer-picked-stores"
+        >
+          <Store size={15} className="shrink-0 text-ink-muted" />
+          <p className="m-0 text-body text-ink-muted">{copy.stage2.customerPicked(customerPickedCount)}</p>
+        </div>
+      )}
+
       {/* pinned stores */}
       {pinpoints.length === 0 ? (
-        <div className="rounded-trim bg-board-ground px-3 py-4 text-center">
-          <Store size={20} className="mx-auto text-board-trim" />
-          <p className="mb-0 mt-1.5 text-label text-ink">{copy.stage2.emptyTitle}</p>
-          <p className="mb-0 mt-0.5 text-body text-ink-muted">{copy.stage2.emptyBody}</p>
-        </div>
+        predictionFillsEmptySlot ? null : (
+          <div className="rounded-trim bg-board-ground px-3 py-4 text-center">
+            <Store size={20} className="mx-auto text-board-trim" />
+            <p className="mb-0 mt-1.5 text-label text-ink">{copy.stage2.emptyTitle}</p>
+            <p className="mb-0 mt-0.5 text-body text-ink-muted">{copy.stage2.emptyBody}</p>
+          </div>
+        )
       ) : (
         <div className="overflow-hidden rounded-plate border border-edge bg-board-plate divide-y divide-hairline">
           {pinpoints.map((pin: StorePinpoint, i: number) => (
@@ -561,7 +597,7 @@ export function Stage2PinStores({
                     and the stages read as one counting system. */}
                 <span
                   data-figure
-                  className="grid size-6 shrink-0 place-items-center rounded-full bg-board-field text-micro font-medium text-board-plate"
+                  className="grid size-6 shrink-0 place-items-center rounded-full bg-board-field font-mono text-micro font-bold tabular-nums text-board-plate"
                 >
                   {i + 1}
                 </span>
@@ -569,7 +605,7 @@ export function Stage2PinStores({
                   type="button"
                   onClick={() => focusPin(pin)}
                   disabled={mapUnavailable}
-                  className="min-h-8 min-w-0 flex-1 cursor-pointer truncate text-left text-body font-medium text-ink disabled:cursor-default"
+                  className="min-h-8 min-w-0 flex-1 cursor-pointer truncate text-left text-body font-semibold text-ink disabled:cursor-default"
                 >
                   {pin.storeName}
                 </button>
@@ -668,11 +704,11 @@ export function Stage2PinStores({
           their price and then press again to move on. Still hidden until the
           dispatcher says they are done: a first pin never throws them forward. */}
       {pinpoints.length > 0 && (quoteStatus === "ready" || quoteStatus === "error") && (
-        <div className={cn("rounded-plate p-3", storesUpToDate ? "bg-status-done-fill" : "bg-board-ground")}>
+        <div className={cn("rounded-plate border p-3.5", storesUpToDate ? "bg-status-done-fill border-status-done-ink/30" : "bg-board-ground border-edge")}>
           <p
             className={cn(
-              "m-0 text-body",
-              storesUpToDate ? "text-status-done-ink" : "text-ink-muted"
+              "m-0 text-body font-medium",
+              storesUpToDate ? "text-status-done-ink font-semibold" : "text-ink-muted"
             )}
           >
             {storesUpToDate
@@ -685,7 +721,7 @@ export function Stage2PinStores({
             type="button"
             variant={quoteStatus === "ready" ? "success" : "secondary"}
             size="md"
-            className="mt-2.5 w-full justify-center"
+            className="mt-2.5 w-full justify-center font-semibold"
             loading={isSaving}
             loadingText={copy.stage2.sending}
             icon={storesUpToDate ? <ArrowRight size={15} /> : <MapPin size={15} />}

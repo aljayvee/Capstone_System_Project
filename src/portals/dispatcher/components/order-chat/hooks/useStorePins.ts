@@ -27,8 +27,10 @@ import {
   inferCategoryFromGoogleTypes,
   inferCategoryFromCatalogueName,
   findDuplicatePin,
+  SAME_PLACE_METERS,
   type DuplicateVerdict,
 } from "./storeCategoryInference";
+import { normalizeStoreName } from "../../../../../utils/storeName";
 import type {
   StorePinpoint,
   MerchantCategory,
@@ -419,7 +421,28 @@ export function useStorePins({
               ? "catalogue"
               : "name") as CategorySource,
         };
-        if (findDuplicatePin(pin, [...pinsRef.current, ...batch]).kind === "exact") continue;
+        // The same shop already pinned, by catalogue id or, for a suggestion
+        // learned from past orders (no place id), by name at the same spot.
+        // Only "exact" was skipped before, which needs a place id on both
+        // sides, so "Pin" on one suggestion and then "Yes, pin these" pinned
+        // that shop twice. Same-building neighbours with other names still go
+        // through. Checked against every pin rather than through
+        // findDuplicatePin, which reports only the first nearby pin and in a
+        // mall that can be a different shop.
+        const name = normalizeStoreName(pin.storeName);
+        const sameShopPinned = [...pinsRef.current, ...batch].some(
+          (existing) =>
+            (pin.placeId != null &&
+              existing.placeId != null &&
+              String(existing.placeId) === String(pin.placeId)) ||
+            (name !== "" &&
+              normalizeStoreName(existing.storeName || "") === name &&
+              metresBetween(
+                { lat: Number(existing.latitude), lng: Number(existing.longitude) },
+                { lat: pin.latitude, lng: pin.longitude }
+              ) < SAME_PLACE_METERS)
+        );
+        if (sameShopPinned) continue;
         if (pinsRef.current.length + batch.length >= MAX_PINPOINTS) {
           notifyAtLimit();
           break;

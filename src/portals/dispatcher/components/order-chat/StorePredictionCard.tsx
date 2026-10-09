@@ -1,4 +1,4 @@
-import { AlertTriangle, RotateCw, Store, X } from "lucide-react";
+import { AlertTriangle, Check, RotateCw, Store, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
@@ -104,7 +104,7 @@ export function StorePredictionCard({
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {onReopen && (
-            <DispatcherButton type="button" size="sm" variant="secondary" onClick={onReopen}>
+            <DispatcherButton type="button" size="sm" variant="secondary" className="font-semibold" onClick={onReopen}>
               View Suggestions
             </DispatcherButton>
           )}
@@ -136,8 +136,14 @@ export function StorePredictionCard({
       <div className="flex items-start gap-2 rounded-plate bg-status-waiting-fill px-3 py-2">
         <AlertTriangle size={15} className="mt-0.5 shrink-0 text-status-waiting-ink" />
         <p className="m-0 min-w-0 flex-1 text-body text-status-waiting-ink">{text.failed}</p>
-        <DispatcherButton type="button" size="sm" variant="secondary" onClick={onRetry}>
-          <RotateCw size={13} />
+        <DispatcherButton
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="font-semibold"
+          icon={<RotateCw size={13} />}
+          onClick={onRetry}
+        >
           {text.retry}
         </DispatcherButton>
       </div>
@@ -170,7 +176,7 @@ export function StorePredictionCard({
     >
       <header className="border-b border-hairline px-3 pb-2 pt-3">
         <div className="flex items-center justify-between">
-          <h4 className="m-0 flex items-center gap-2 text-label text-ink">
+          <h4 className="m-0 flex items-center gap-2 text-label font-bold text-ink">
             <Store size={15} className="shrink-0 text-ink-muted" />
             {text.title}
           </h4>
@@ -191,15 +197,15 @@ export function StorePredictionCard({
           const isPinned = isStorePinned(store);
           return (
             <li key={`${store.storeName}-${i}`} className="flex items-center gap-2.5 px-3 py-2.5">
-              <span data-figure className="shrink-0 pt-px font-mono text-label text-ink-muted">
+              <span data-figure className="shrink-0 pt-px font-mono text-micro font-bold tabular-nums text-ink-muted">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                  <span className="min-w-0 truncate text-body font-medium text-ink">{store.storeName}</span>
+                  <span className="min-w-0 truncate text-body font-semibold text-ink">{store.storeName}</span>
                   <span
                     data-figure
-                    className={cn("shrink-0 font-mono text-micro tabular-nums", confidenceTone(store.confidence))}
+                    className={cn("shrink-0 font-mono text-micro font-semibold tabular-nums", confidenceTone(store.confidence))}
                   >
                     {isPinned ? text.alreadyPinned : text.sure(store.confidence)}
                   </span>
@@ -215,14 +221,15 @@ export function StorePredictionCard({
               </div>
               <div className="shrink-0 self-center pl-2">
                 {isPinned ? (
-                  <span className="inline-flex items-center rounded-trim bg-status-done-fill px-2 py-1 font-mono text-micro text-status-done-ink">
-                    Pinned &#10003;
+                  <span className="inline-flex items-center gap-1 rounded-trim bg-status-done-fill px-2 py-0.5 font-mono text-micro font-bold uppercase tracking-[0.04em] text-status-done-ink">
+                    Pinned <Check size={11} strokeWidth={2.5} />
                   </span>
                 ) : (
                   <DispatcherButton
                     type="button"
                     size="sm"
                     variant="secondary"
+                    className="font-semibold"
                     onClick={() => (onAcceptSingle ? onAcceptSingle(store) : onAccept([store]))}
                   >
                     Pin
@@ -245,11 +252,19 @@ export function StorePredictionCard({
       )}
 
       <footer className="flex flex-wrap items-center gap-2 border-t border-hairline bg-board-ground px-3 py-2.5">
-        <p className="m-0 w-full text-label text-ink sm:mr-auto sm:w-auto">{text.question}</p>
-        <DispatcherButton type="button" size="sm" variant="secondary" onClick={onReject}>
+        <p className="m-0 w-full text-label font-medium text-ink sm:mr-auto sm:w-auto">{text.question}</p>
+        <DispatcherButton type="button" size="sm" variant="secondary" className="font-semibold" onClick={onReject}>
           {text.no}
         </DispatcherButton>
-        <DispatcherButton type="button" size="sm" variant="success" onClick={() => onAccept(proposable)}>
+        {/* Only the stores not pinned yet. A store already pinned with its
+            own Pin button was sent again here and pinned a second time. */}
+        <DispatcherButton
+          type="button"
+          size="sm"
+          variant="success"
+          className="font-semibold"
+          onClick={() => onAccept(proposable.filter((store) => !isStorePinned(store)))}
+        >
           {text.yes}
         </DispatcherButton>
       </footer>

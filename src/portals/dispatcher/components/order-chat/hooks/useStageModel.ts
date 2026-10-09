@@ -42,7 +42,6 @@ interface UseStageModelArgs {
   isCustomerConfirmed: boolean;
   itemsSentAt: number | null;
   isPaymentConfirmed: boolean;
-  isUpfrontConfirmed: boolean;
   confirmedPaymentMode: string | null;
   paymentAskedAt: number | null;
   mapUnavailable: boolean;
@@ -67,7 +66,6 @@ export function useStageModel({
   isCustomerConfirmed,
   itemsSentAt,
   isPaymentConfirmed,
-  isUpfrontConfirmed,
   confirmedPaymentMode,
   paymentAskedAt,
   mapUnavailable,
@@ -230,7 +228,6 @@ export function useStageModel({
     isCustomerConfirmed,
     itemsSentAt,
     isPaymentConfirmed,
-    isUpfrontConfirmed,
     confirmedPaymentMode,
     paymentAskedAt,
     mapUnavailable,

@@ -66,7 +66,7 @@ export function useOrderDetails(orderId: string, dispatcher: any): UseOrderDetai
         if (!errandData) {
           setPanelError({
             variant: "not_found",
-            reason: `The requested errand with reference ID #${formatErrandId(orderId)} does not exist.`,
+            reason: `The requested errand with reference ID ${formatErrandId(orderId)} does not exist.`,
           });
           return;
         }
@@ -124,7 +124,7 @@ export function useOrderDetails(orderId: string, dispatcher: any): UseOrderDetai
           reason:
             err.response?.data?.error ||
             err.response?.data?.message ||
-            `Errand reference #${formatErrandId(orderId)} was not found.`,
+            `Errand reference ${formatErrandId(orderId)} was not found.`,
         });
       }
     }

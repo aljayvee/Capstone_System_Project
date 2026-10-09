@@ -136,6 +136,7 @@ export default function DispatcherPortal() {
     markRiderAsRead,
   } = useRiderChatAlerts({
     riders,
+    dispatcherId: user?.id ?? null,
     activeRiderId: activeTab === "messages" ? selectedRiderIdForChat : null,
     onOpenRiderChat: handleOpenRiderChat,
   });
@@ -192,7 +193,7 @@ export default function DispatcherPortal() {
     },
     {
       id: "exceptions",
-      label: "Conflict",
+      label: "Help Desk",
       icon: <AlertTriangle className="w-5 h-5" />,
       badge: exceptionCount > 0 ? exceptionCount : undefined,
       isActive: activeTab === "exceptions",
@@ -229,7 +230,7 @@ export default function DispatcherPortal() {
     },
     {
       id: "history",
-      label: "Customer Transaction",
+      label: "Errand Transaction",
       icon: <History className="w-5 h-5" />,
       isActive: activeTab === "history",
       onClick: () => setActiveTab("history"),
@@ -456,12 +457,12 @@ export default function DispatcherPortal() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Conflict Management (formerly Needs a Decision) */}
+                    {/* Help Desk (formerly Conflict Management, before that Needs a Decision) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("exceptions")}
                         isActive={activeTab === "exceptions"}
-                        tooltip={exceptionCount > 0 ? `Conflict Management (${exceptionCount} urgent)` : "Conflict Management"}
+                        tooltip={exceptionCount > 0 ? `Help Desk (${exceptionCount} urgent)` : "Help Desk"}
                         size="default"
                         className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "exceptions"
@@ -482,7 +483,7 @@ export default function DispatcherPortal() {
                             )}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Conflict Management
+                            Help Desk
                           </span>
                         </div>
                         {exceptionCount > 0 && (
@@ -542,12 +543,12 @@ export default function DispatcherPortal() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Customer Transaction (formerly My History): this dispatcher's delivered and cancelled orders */}
+                    {/* Errand Transaction (formerly Customer Transaction, before that My History): this dispatcher's delivered and cancelled orders */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("history")}
                         isActive={activeTab === "history"}
-                        tooltip="Customer Transaction"
+                        tooltip="Errand Transaction"
                         size="default"
                         className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "history"
@@ -565,7 +566,7 @@ export default function DispatcherPortal() {
                             />
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Customer Transaction
+                            Errand Transaction
                           </span>
                         </div>
                       </SidebarMenuButton>
@@ -821,10 +822,11 @@ export default function DispatcherPortal() {
               {/* scrolled away with the page and was the most interchangeable   */}
               {/* element on the surface.                                        */}
               {/* ───────────────────────────────────────────────────────────── */}
-              <div
-                data-on-field
-                className="shrink-0 rounded-plate bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
-              >
+              {activeTab === "queue" && (
+                <div
+                  data-on-field
+                  className="shrink-0 rounded-plate bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
+                >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {/* No SidebarTrigger here. The rail carries its own in
                       both states, as part of the alignment contract recorded
@@ -865,7 +867,7 @@ export default function DispatcherPortal() {
                         something is actually owed: on this surface red means
                         "you must act" and nothing else. */}
                     <div className="text-right">
-                      <p className="text-micro uppercase text-board-trim">Conflict Management</p>
+                      <p className="text-micro uppercase text-board-trim">Help Desk</p>
                       <p
                         data-figure
                         className={cn(
@@ -894,12 +896,13 @@ export default function DispatcherPortal() {
                     is what explains that dash — but on the exceptions tab the
                     panel itself says it in full, so the band stays quiet and
                     lets the failing region do the talking. */}
-                {exceptionQueue.loadError && activeTab !== "exceptions" ? (
+                {exceptionQueue.loadError ? (
                   <p role="status" className="mt-2 text-label text-board-trim">
                     {exceptionQueue.loadError}
                   </p>
                 ) : null}
               </div>
+              )}
 
               {/* A failed claim, status change or decline. This is where the
                   two alert() dialogs used to interrupt the shift. */}

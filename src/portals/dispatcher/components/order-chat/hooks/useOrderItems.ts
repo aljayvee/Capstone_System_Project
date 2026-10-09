@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ref, update } from "firebase/database";
 import { toast } from "sonner";
 import { database } from "../../../../../firebase/config";
@@ -11,6 +11,16 @@ const withNote = (label: string, notes?: string | null) => (notes?.trim() ? `${l
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 import type { EditableItem, StorePinpoint, MerchantCategory, OrderChatMessage } from "../types";
+import {
+  editItem,
+  itemLines,
+  newItemKey,
+  removeItemLines,
+  setOwned,
+  setOwnedAll,
+  withItemKeys,
+  type OwnershipContext,
+} from "../itemOwnership";
 
 /** Illegal Firebase RTDB key characters: . # $ / [ ] */
 const clean = (s: string) => (s || "").replace(/[.#$/[\]]/g, " ").replace(/\s+/g, " ").trim();
@@ -105,7 +115,7 @@ export function useOrderItems({
   const [isCustomerConfirmed, setIsCustomerConfirmed] = useState(false);
   const [sentAt, setSentAt] = useState<number | null>(null);
   /**
-   * Where each editable row should be bought, keyed by its index.
+   * Where each item should be bought, keyed by its item key (itemOwnership.ts).
    *
    * A full placement now, not just a category: the shop as well, chosen from
    * the stops stage 2 pinned. It also carries where the answer came from -
@@ -117,7 +127,7 @@ export function useOrderItems({
    * or ignores it; only their choice reaches `storeCategory`, which the rider's
    * shopping list and the errand's dwell allowance are both built from.
    */
-  const [categoryGuesses, setCategoryGuesses] = useState<Record<number, ApiItemPlacement>>({});
+  const [categoryGuesses, setCategoryGuesses] = useState<Record<string, ApiItemPlacement>>({});
   const feedback = useInlineMessage();
 
   const savedItems: any[] =
@@ -167,10 +177,50 @@ export function useOrderItems({
   /** The stores an item can be filed under — the labels the pins produce. */
   const storeOptions = pinpoints.map((_, i) => storeLabelFor(i));
 
+  /**
+   * Which pinned store a line is filed under, by position, or null when none.
+   *
+   * By the "Store N" number first, as the server files items
+   * (itemStopAssignment.ts): it survives a store name the label had to clean,
+   * such as "St. Joseph Drug". Then by name. A label naming no pinned store is
+   * no store at all, so its item waits under "Not assigned yet".
+   */
+  const storeIndexOf = useCallback(
+    (row: Pick<EditableItem, "storeCategory">): number | null => {
+      const { store, assigned } = parseStoreAndCat(row.storeCategory);
+      if (!assigned || pinpoints.length === 0) return null;
+      const ordinal = /^store\s*(\d+)\b/i.exec(store.trim());
+      if (ordinal) {
+        const index = Number(ordinal[1]) - 1;
+        if (index >= 0 && index < pinpoints.length) return index;
+      }
+      const wanted = clean(store.replace(/^store\s*\d+\s*[-:]\s*/i, "")).toLowerCase();
+      const byName = pinpoints.findIndex((pin) => clean(pin.storeName || "").toLowerCase() === wanted);
+      return byName >= 0 ? byName : null;
+    },
+    [parseStoreAndCat, pinpoints]
+  );
+
+  const ownership = useMemo<OwnershipContext>(
+    () => ({
+      storeIndexOf,
+      // A pin keeps its own category (categoryNameForPin): a line filed there follows it.
+      fileUnder: (row, storeIndex) =>
+        formatStoreAndCat(
+          storeLabelFor(storeIndex),
+          categoryNameForPin(pinpoints[storeIndex]) || parseStoreAndCat(row.storeCategory).category
+        ),
+      unfile: (row) => ` | ${clean(parseStoreAndCat(row.storeCategory).category) || "General"}`,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storeIndexOf, pinpoints, merchantCategories, parseStoreAndCat]
+  );
+
   /** Items the dispatcher still has to place, when placing them is a real choice. */
-  const unassignedCount = (isEditing ? editableItems : savedItems).filter(
-    (it: any) => !parseStoreAndCat(it.storeCategory).assigned
-  ).length;
+  const unassignedCount =
+    pinpoints.length === 0
+      ? 0
+      : (isEditing ? editableItems : savedItems).filter((it: any) => storeIndexOf(it) === null).length;
 
   const formatStoreAndCat = (storeName: string, catName: string) =>
     `${clean(storeName) || "Store 1"} | ${clean(catName) || "General"}`;
@@ -186,7 +236,7 @@ export function useOrderItems({
    * unavailable" teaches dispatchers to ignore banners.
    */
   const guessCategories = useCallback(
-    async (targets: Array<{ index: number; name: string }>) => {
+    async (targets: Array<{ key: string; name: string }>) => {
       // Two characters is the floor: "a" matches half the lexicon and the
       // answer would be noise dressed as a suggestion.
       const named = targets.filter((t) => t.name.trim().length >= 2);
@@ -202,11 +252,11 @@ export function useOrderItems({
         named.forEach((target, i) => {
           const placement = placements[i];
           if (placement && placement.categoryId != null) {
-            next[target.index] = placement;
+            next[target.key] = placement;
           } else {
             // Cleared rather than left stale: a row whose name has been
             // rewritten since the last guess must not keep showing the old one.
-            delete next[target.index];
+            delete next[target.key];
           }
         });
         return next;
@@ -223,11 +273,15 @@ export function useOrderItems({
    * they were still half-way through asking.
    */
   const guessCategoryFor = useCallback(
-    (index: number, name: string) => {
-      void guessCategories([{ index, name }]);
+    (key: string, name: string) => {
+      void guessCategories([{ key, name }]);
     },
     [guessCategories]
   );
+
+  /** One target per item, not per store's copy of it: the answer is the same. */
+  const guessTargets = (rows: EditableItem[]) =>
+    itemLines(rows, ownership).map((line) => ({ key: line.key, name: line.itemName || "" }));
   const startEditing = useCallback(() => {
     const rows: EditableItem[] = savedItems.map((d: any) => ({
       itemName: d.itemName,
@@ -240,13 +294,15 @@ export function useOrderItems({
       id: d.id != null ? Number(d.id) : undefined,
       fulfillmentStatus: d.fulfillmentStatus || undefined,
     }));
-    setEditableItems(rows);
+    const keyed = withItemKeys(rows, ownership);
+    setEditableItems(keyed);
     setCategoryGuesses({});
     setIsEditing(true);
     // One batched call for the whole basket, so every row's suggestion is ready
     // by the time the dispatcher has finished reading the first one.
-    void guessCategories(rows.map((row, index) => ({ index, name: row.itemName || "" })));
-  }, [savedItems, guessCategories]);
+    void guessCategories(guessTargets(keyed));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedItems, guessCategories, ownership]);
 
   const cancelEditing = useCallback(() => {
     setIsEditing(false);
@@ -254,30 +310,26 @@ export function useOrderItems({
     setCategoryGuesses({});
   }, []);
 
+  /**
+   * A new, empty item, bought at the store whose group it was added in. With no
+   * store named it waits under "Not assigned yet", unless one store is pinned.
+   */
   const addItem = useCallback(
-    (storeName?: string, catName?: string) => {
+    (storeIndex?: number) => {
       setEditableItems((prev) => {
-        // Inherits the shop the previous line was filed under, because the
-        // common case by a wide margin is another thing from the same shop.
-        // The row asks about it either way — see Stage 3's store question — so
-        // the default being wrong costs one click, not a wrong delivery.
-        const previous = prev.length > 0 ? prev[prev.length - 1] : null;
-        const inherited = previous ? parseStoreAndCat(previous.storeCategory) : null;
-        return [
-          ...prev,
-          {
-            itemName: "",
-            quantity: 1,
-            size: null,
-            storeCategory: formatStoreAndCat(
-              storeName || inherited?.store || defaultStore(),
-              catName || inherited?.category || defaultCategory()
-            ),
-          },
-        ];
+        const row: EditableItem = {
+          itemName: "",
+          quantity: 1,
+          size: null,
+          itemKey: newItemKey(),
+          storeCategory: ` | ${clean(defaultCategory())}`,
+        };
+        const at = storeIndex ?? (pinpoints.length === 1 ? 0 : null);
+        return [...prev, at === null ? row : { ...row, storeCategory: ownership.fileUnder(row, at) }];
       });
     },
-    [pinpoints, merchantCategories, parseStoreAndCat]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pinpoints, merchantCategories, ownership]
   );
 
   /**
@@ -313,7 +365,7 @@ export function useOrderItems({
       const category = (stop >= 0 && categoryNameForPin(pinpoints[stop])) || pick.categoryName;
       setEditableItems((prev) => [
         ...prev,
-        { itemName: pick.itemName, quantity: 1, size: null, storeCategory: `${store} | ${category}` },
+        { itemName: pick.itemName, quantity: 1, size: null, storeCategory: `${store} | ${category}`, itemKey: newItemKey() },
       ]);
       return stop >= 0 ? store : null;
     },
@@ -352,21 +404,23 @@ export function useOrderItems({
    * shop is left for the dispatcher rather than filled with a guess.
    */
   const applyCategoryGuess = useCallback(
-    (index: number) => {
-      const placement = categoryGuesses[index];
+    (key: string) => {
+      const placement = categoryGuesses[key];
       if (!placement?.categoryName) return;
+      const stopIndex = stopIndexFor(placement);
 
-      setEditableItems((prev) =>
-        prev.map((row, i) => {
-          if (i !== index) return row;
-          const { store, assigned } = parseStoreAndCat(row.storeCategory);
-          const stopIndex = stopIndexFor(placement);
-          const nextStore = stopIndex >= 0 ? storeLabelFor(stopIndex) : assigned ? store : "";
-          return { ...row, storeCategory: `${nextStore} | ${placement.categoryName}` };
-        })
-      );
+      setEditableItems((prev) => {
+        // The suggested store ticked, which moves an item no store buys there.
+        if (stopIndex >= 0) return setOwned(prev, key, stopIndex, true, ownership);
+        // No pinned store fits: the category alone, on the line waiting for one.
+        return prev.map((row) =>
+          row.itemKey === key && ownership.storeIndexOf(row) === null
+            ? { ...row, storeCategory: ` | ${clean(placement.categoryName)}` }
+            : row
+        );
+      });
     },
-    [categoryGuesses, parseStoreAndCat, stopIndexFor]
+    [categoryGuesses, stopIndexFor, ownership]
   );
   // ── recommendations that keep up with the list ──────────────────────────
   /**
@@ -389,7 +443,7 @@ export function useOrderItems({
     if (!isEditing) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      await guessCategories(editableItems.map((row, index) => ({ index, name: row.itemName || "" })));
+      await guessCategories(guessTargets(editableItems));
       if (!cancelled) setRecommendationsReady(true);
     }, RECOMMEND_AFTER_MS);
     return () => {
@@ -404,36 +458,33 @@ export function useOrderItems({
     setEditableItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
   }, []);
 
+  /** The item gone from the order: every store's copy of it. */
   const removeItem = useCallback(
-    (index: number) => {
-      const item = editableItems[index];
+    (key: string) => {
+      const copies = editableItems.filter((row) => row.itemKey === key);
+      const item = copies[0];
       const itemName = formatItemLabel(item?.itemName, item?.size);
-      const qty = item?.quantity || 1;
-      const { store, category } = parseStoreAndCat(item?.storeCategory);
+      const qty = copies.reduce((sum, row) => sum + (row.quantity || 1), 0) || 1;
+      const stores = copies
+        .map((row) => ownership.storeIndexOf(row))
+        .filter((at): at is number => at !== null)
+        .map((at) => clean(pinpoints[at]?.storeName || `Store ${at + 1}`));
+      const where = stores.length > 0 ? ` from ${stores.join(" and ")}` : "";
 
-      setEditableItems((prev) => prev.filter((_, i) => i !== index));
-
-      // The guesses are keyed by row position, so removing a row has to shift
-      // every key above it down one. Without this, deleting the first of five
-      // items leaves each remaining row wearing the suggestion belonging to the
-      // row that used to be above it.
+      setEditableItems((prev) => removeItemLines(prev, key));
       setCategoryGuesses((prev) => {
-        const next: typeof prev = {};
-        for (const [key, value] of Object.entries(prev)) {
-          const at = Number(key);
-          if (at < index) next[at] = value;
-          else if (at > index) next[at - 1] = value;
-        }
+        const next = { ...prev };
+        delete next[key];
         return next;
       });
 
       // Removing something the customer asked for is a change to their order,
       // not a private edit — they get told in the chat.
-      if (itemName && orderId) {
+      if (item && itemName && orderId) {
         try {
           pushMessage({
             type: "item_deleted",
-            text: `The item "${itemName}" (Qty: ${qty}) from ${store} (${category}) was removed from your order.`,
+            text: `The item "${itemName}" (Qty: ${qty})${where} was removed from your order.`,
           });
           feedback.showSuccess(copy.stage3.removedNotice(itemName));
         } catch (err) {
@@ -442,8 +493,35 @@ export function useOrderItems({
         }
       }
     },
-    [editableItems, orderId, parseStoreAndCat, pushMessage, feedback]
+    [editableItems, orderId, ownership, pinpoints, pushMessage, feedback]
   );
+
+  /** Ticks or unticks one item at one store (itemOwnership.setOwned). */
+  const setItemOwned = useCallback(
+    (key: string, storeIndex: number, owned: boolean) => {
+      setEditableItems((prev) => setOwned(prev, key, storeIndex, owned, ownership));
+    },
+    [ownership]
+  );
+
+  /** A store heading's check button: every item bought there, or none. */
+  const setStoreOwnsAll = useCallback(
+    (storeIndex: number, owned: boolean) => {
+      setEditableItems((prev) => setOwnedAll(prev, storeIndex, owned, ownership));
+    },
+    [ownership]
+  );
+
+  /** A new name or unit, on every store's copy of the item. */
+  const editItemFields = useCallback(
+    (key: string, patch: Partial<Pick<EditableItem, "itemName" | "size" | "notes">>) => {
+      setEditableItems((prev) => editItem(prev, key, patch));
+    },
+    []
+  );
+
+  /** The order's items, each once, with the line each store buys it on. */
+  const lines = useMemo(() => itemLines(editableItems, ownership), [editableItems, ownership]);
 
   /**
    * The working list differs from the one saved on the order.
@@ -627,6 +705,11 @@ export function useOrderItems({
     storeOptions,
     unassignedCount,
     categoryNameForPin,
+    storeIndexOf,
+    lines,
+    setItemOwned,
+    setStoreOwnsAll,
+    editItemFields,
     pushMessage,
     onOrderUpdated,
   };

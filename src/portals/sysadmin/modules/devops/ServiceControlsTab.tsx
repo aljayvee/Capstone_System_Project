@@ -9,6 +9,7 @@ import {
   X,
   Terminal,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import type { SystemTelemetry } from "../../../../types/sysAdmin";
@@ -67,6 +68,43 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
       });
     } finally {
       setIsTogglingServerError(false);
+    }
+  };
+
+  // Dispatcher Help Desk AI suggestions switch. Read from telemetry, so the
+  // card shows what the server holds rather than what this browser last set.
+  const [isAiSuggestionsEnabled, setIsAiSuggestionsEnabled] = useState(false);
+  const [isTogglingAiSuggestions, setIsTogglingAiSuggestions] = useState(false);
+
+  React.useEffect(() => {
+    if (telemetry && typeof telemetry.dispatcherAiSuggestionsEnabled === "boolean") {
+      setIsAiSuggestionsEnabled(telemetry.dispatcherAiSuggestionsEnabled);
+    }
+  }, [telemetry]);
+
+  const handleToggleAiSuggestions = async () => {
+    if (isTogglingAiSuggestions) return;
+    const nextState = !isAiSuggestionsEnabled;
+    setIsTogglingAiSuggestions(true);
+    setResultMessage(null);
+    try {
+      const res = await sysAdminApiService.toggleDispatcherAiSuggestions(nextState);
+      setIsAiSuggestionsEnabled(res.enabled);
+      setResultMessage({
+        type: "success",
+        text: res.enabled
+          ? "AI suggestions turned on. Dispatchers see the Generate suggestion button the next time they open a reason box."
+          : "AI suggestions turned off. The Generate suggestion button is hidden from every dispatcher.",
+      });
+      onRefreshTelemetry();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update dispatcher AI suggestions.";
+      setResultMessage({
+        type: "error",
+        text: msg,
+      });
+    } finally {
+      setIsTogglingAiSuggestions(false);
     }
   };
 
@@ -312,6 +350,64 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
                   isServerErrorActive ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Dispatcher Help Desk AI Suggestions Switch Card */}
+      <div className="p-5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div
+              className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                isAiSuggestionsEnabled
+                  ? "bg-emerald-950/80 border border-emerald-800/80 text-emerald-400"
+                  : "bg-slate-800/80 border border-slate-700/80 text-slate-400"
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white">Dispatcher AI Suggestions</h3>
+                {isAiSuggestionsEnabled ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
+                    ON FOR DISPATCHERS
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60">
+                    OFF
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                Shows the <span className="font-mono text-amber-300">Generate suggestion</span> button and the Tab shortcut in the dispatcher Help Desk, for every dispatcher. While off, the button is hidden and the server refuses suggestion requests.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 sm:self-center shrink-0 bg-[#070D1B] px-4 py-2.5 rounded-xl border border-slate-800">
+            <span className="text-xs font-semibold text-white">
+              Turn on AI suggestions
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isAiSuggestionsEnabled}
+              onClick={handleToggleAiSuggestions}
+              disabled={isTogglingAiSuggestions}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                isAiSuggestionsEnabled ? "bg-emerald-600" : "bg-slate-700"
+              } ${isTogglingAiSuggestions ? "opacity-50 cursor-not-allowed" : ""}`}
+              title="Turn on AI suggestions"
+              aria-label="Turn on AI suggestions"
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  isAiSuggestionsEnabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>

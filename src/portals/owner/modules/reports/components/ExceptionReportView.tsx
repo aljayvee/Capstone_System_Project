@@ -48,7 +48,7 @@ export const ExceptionReportView: React.FC = () => {
     if (!data) return;
     downloadCSV(
       // Exceptions nests its window under `meta`, unlike the other five.
-      `Sugo_Conflict_Report_${(data.meta?.rangeLabel ?? "report").replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
+      `Sugo_Help_Desk_Report_${(data.meta?.rangeLabel ?? "report").replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       ["Errand", "Kind", "At Risk (PHP)", "Rider", "Occurred", "Detail", "Resolved By", "Reason"],
       data.exceptions.map((e) => [
         e.errandId,
@@ -79,7 +79,7 @@ export const ExceptionReportView: React.FC = () => {
         isLoading={isLoading}
         error={error}
         onRetry={reload}
-        title="The conflict report did not load"
+        title="The Help Desk report did not load"
         loadingRows={4}
       />
 

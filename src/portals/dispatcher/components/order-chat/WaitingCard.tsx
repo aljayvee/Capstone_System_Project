@@ -21,15 +21,15 @@ interface WaitingCardProps {
 
 export function WaitingCard({ title, detail, actions = [] }: WaitingCardProps) {
   return (
-    <div className="flex items-start gap-3 rounded-plate bg-status-waiting-fill p-3">
+    <div className="flex items-start gap-3 rounded-plate border border-status-waiting-ink/25 bg-status-waiting-fill p-3">
       <Hourglass size={16} className="mt-0.5 shrink-0 text-status-waiting-ink" />
       <div className="min-w-0 flex-1">
-        <p className="m-0 text-label text-status-waiting-ink">{title}</p>
-        <p className="mb-0 mt-1 text-body text-status-waiting-ink/85">{detail}</p>
+        <p className="m-0 text-label font-bold text-status-waiting-ink">{title}</p>
+        <p className="mb-0 mt-1 text-body font-medium text-status-waiting-ink/90">{detail}</p>
         {actions.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-2">
             {actions.map((a) => (
-              <DispatcherButton key={a.label} type="button" size="sm" variant="secondary" onClick={a.onClick}>
+              <DispatcherButton key={a.label} type="button" size="sm" variant="secondary" className="font-semibold" onClick={a.onClick}>
                 {a.label}
               </DispatcherButton>
             ))}

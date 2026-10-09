@@ -75,7 +75,7 @@ export function Stage4Payment({
         <button
           type="button"
           onClick={onOpenProof}
-          className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-edge bg-board-plate px-3 py-2 text-micro uppercase text-ink transition-colors hover:bg-board-ground"
+          className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-edge bg-board-plate px-3 py-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-board-ground"
         >
           <Receipt size={14} />
           View Uploaded Proof & Attestation
@@ -102,7 +102,7 @@ export function Stage4Payment({
     // is still answering "how is this being paid for?".
     return (
       <div className="space-y-3">
-        <p className="m-0 flex items-center gap-2 rounded-plate bg-status-done-fill px-3 py-2.5 text-label text-status-done-ink">
+        <p className="m-0 flex items-center gap-2 rounded-plate border border-status-done-ink/20 bg-status-done-fill px-3.5 py-2.5 text-label font-semibold text-status-done-ink">
           <CheckCircle2 size={15} className="shrink-0" />
           {copy.stage4.settled(confirmedPaymentMode || "Settled")}
         </p>
@@ -134,11 +134,12 @@ export function Stage4Payment({
         />
       ) : (
         // The list is out and the question is not: say so, and offer it.
-        <div className="space-y-2 rounded-plate bg-status-waiting-fill px-3 py-2.5">
-          <p className="m-0 text-label text-status-waiting-ink">{copy.stage4.notAsked(customerFirstName)}</p>
+        <div className="space-y-2 rounded-plate border border-status-waiting-ink/30 bg-status-waiting-fill px-3.5 py-2.5">
+          <p className="m-0 text-label font-bold text-status-waiting-ink">{copy.stage4.notAsked(customerFirstName)}</p>
           <DispatcherButton
             variant="secondary"
             size="sm"
+            className="font-semibold"
             loading={isAsking}
             loadingText={copy.stage4.asking}
             icon={<CreditCard size={14} />}

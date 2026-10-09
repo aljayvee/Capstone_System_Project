@@ -32,6 +32,8 @@ export interface LoginChallengeResponse {
   profileSetupRequired?: boolean;
   challengeToken: string;
   maskedEmail?: string | null;
+  maskedPhone?: string | null;
+  phone?: string | null;
   role: string;
   expiresInSeconds: number;
 }
@@ -821,10 +823,15 @@ export const apiService = {
 
   async verifyLoginOtp(
     challengeToken: string,
-    code: string
+    code?: string,
+    firebaseIdToken?: string
   ): Promise<LoginSuccessResponse | ChallengeError> {
     try {
-      const response = await apiClient.post("/auth/verify-login-otp", { challengeToken, code });
+      const response = await apiClient.post("/auth/verify-login-otp", {
+        challengeToken,
+        code,
+        firebaseIdToken,
+      });
       const data = response.data;
       // Mirrors login(): this is the point the session actually begins.
       if (data.token) {
@@ -1190,6 +1197,20 @@ export const apiService = {
         { params: { kind, occurredAt } }
       );
       return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * Whether a sysadmin has the Help Desk AI suggestions turned on. Null means
+   * the request failed; the caller treats that as off.
+   */
+  async getDispatcherAiSuggestionsEnabled(): Promise<boolean | null> {
+    try {
+      const response = await apiClient.get<{ enabled: boolean }>("/system/dispatcher-ai-suggestions");
+      return response.data.enabled === true;
     } catch (err) {
       console.warn("API unavailable", err);
       return null;

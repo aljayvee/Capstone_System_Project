@@ -19,7 +19,7 @@ const REPORT_TABS: ReadonlyArray<OwnerTab<ReportTab>> = [
   { id: "settlement", label: "Settlement", icon: Wallet },
   { id: "transactions", label: "Transaction Summary", icon: Receipt },
   // Last, because it is the one read after the numbers rather than instead of them.
-  { id: "exceptions", label: "Conflict Report", icon: AlertTriangle },
+  { id: "exceptions", label: "Help Desk Report", icon: AlertTriangle },
 ];
 
 export interface FinancialReportsModuleProps {

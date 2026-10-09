@@ -85,17 +85,17 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
         onClick={() => onSegmentChange(id)}
         aria-pressed={isActive}
         className={cn(
-          "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-trim px-3 text-micro uppercase transition-colors relative",
-          isActive ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+          "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-all relative",
+          isActive ? "bg-board-field text-board-plate shadow-xs" : "text-ink-muted hover:text-ink hover:bg-board-plate/60"
         )}
       >
         <span>{label}</span>
-        <span data-figure className="tabular-nums">
+        <span data-figure className="font-mono tabular-nums font-bold">
           {count}
         </span>
         {hasUnread && (
           <span
-            className="size-2 rounded-full bg-amber-400 animate-pulse"
+            className="size-2 rounded-full bg-signal"
             title={`${activeUnreadTotal} unread customer messages`}
           />
         )}
@@ -126,10 +126,10 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
               onClick={() => onCategoryChange("ALL")}
               aria-pressed={selectedCategory === "ALL"}
               className={cn(
-                "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim px-3 text-micro uppercase transition-colors",
+                "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim border px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
                 selectedCategory === "ALL"
-                  ? "bg-board-field text-board-plate"
-                  : "bg-board-ground text-ink-muted hover:text-ink"
+                  ? "border-board-field bg-board-field text-board-plate"
+                  : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink hover:bg-board-ground/40"
               )}
             >
               All
@@ -143,10 +143,10 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
                   onClick={() => onCategoryChange(cat)}
                   aria-pressed={isActive}
                   className={cn(
-                    "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim px-3 text-micro uppercase transition-colors",
+                    "min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-trim border px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
                     isActive
-                      ? "bg-board-field text-board-plate"
-                      : "bg-board-ground text-ink-muted hover:text-ink"
+                      ? "border-board-field bg-board-field text-board-plate"
+                      : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink hover:bg-board-ground/40"
                   )}
                 >
                   {cat}
@@ -177,7 +177,7 @@ export const DispatchMasterStream: React.FC<DispatchMasterStreamProps> = ({
           errorTitle="The board did not load"
           loadingRows={6}
         >
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {errands.map((errand) => (
               <DispatchErrandCard
                 key={errand.id}

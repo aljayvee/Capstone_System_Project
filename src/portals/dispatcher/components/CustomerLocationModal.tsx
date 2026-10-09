@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { importGoogleMapsLibrary } from "../../../utils/loadGoogleMaps";
+import { GOOGLE_MAP_ID, canUseAdvancedMarkers } from "../../../utils/googleMapId";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { toast } from "sonner";
@@ -117,7 +118,10 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
 
       const pos = { lat: activeLat, lng: activeLng };
 
-      const googleMapId = (import.meta as any).env?.VITE_GOOGLE_MAP_ID;
+      // The shared Map ID (DEMO_MAP_ID when none is configured), as every other
+      // map here uses. This read VITE_GOOGLE_MAP_ID directly, which is unset,
+      // so the map had no Map ID while still placing an Advanced Marker, and
+      // Google answered with "This page can't load Google Maps correctly".
       const mapOptions: any = {
         center: pos,
         zoom: 17,
@@ -125,10 +129,8 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
         zoomControl: true,
         streetViewControl: false,
         fullscreenControl: false,
+        mapId: GOOGLE_MAP_ID,
       };
-      if (googleMapId) {
-        mapOptions.mapId = googleMapId;
-      }
 
       const map = new Map(mapContainerRef.current, mapOptions);
 
@@ -137,7 +139,7 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
       let marker: any;
       const titleStr = `Customer drop-off: ${deliveryAddress}`;
 
-      if (markerLib?.AdvancedMarkerElement && g.maps.marker?.PinElement) {
+      if (markerLib?.AdvancedMarkerElement && canUseAdvancedMarkers(g) && g.maps.marker?.PinElement) {
         // Navy on deep navy, no glyph. The emoji it used to carry was the one
         // pictograph left anywhere in this console, and it sat on two greens
         // that are not in the palette.
@@ -204,7 +206,7 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
       onClick={() => setMapProvider(id)}
       aria-pressed={mapProvider === id}
       className={cn(
-        "min-h-9 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
+        "min-h-9 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
         mapProvider === id
           ? "bg-board-field text-board-plate"
           : "text-ink-muted hover:text-ink"
@@ -236,7 +238,7 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
           className="flex shrink-0 flex-row items-start justify-between gap-3 bg-board-field px-4 py-3 shadow-field"
         >
           <div className="min-w-0">
-            <DialogTitle className="truncate text-panel text-board-plate">
+            <DialogTitle className="truncate text-panel font-bold text-board-plate">
               Where this is going
             </DialogTitle>
             <DialogDescription className="text-label text-board-trim">
@@ -253,7 +255,7 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
 
         {/* Which map is drawing it */}
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline bg-board-ground px-3 py-1.5">
-          <span className="text-micro uppercase text-ink-muted">Map</span>
+          <span className="text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">Map</span>
           <div className="flex items-center gap-1">
             {providerTab("osm", "OpenStreetMap")}
             {providerTab("google", "Google")}
@@ -292,13 +294,8 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
               {copyButton(deliveryAddress, "address", "Address")}
             </div>
 
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-hairline pt-2">
-              <span data-figure className="font-mono text-label tabular-nums text-ink-muted">
-                {activeLat.toFixed(5)}, {activeLng.toFixed(5)}
-              </span>
-              {/* Says what it is rather than "Copy GPS" in a blue link. */}
-              {copyButton(`${activeLat}, ${activeLng}`, "coordinates", "Coordinates")}
-            </div>
+            {/* The coordinates are not shown: the map and "Open in Google
+                Maps" carry the pin, and a raw lat/long was noise beside them. */}
 
             {!hasValidCoords ? (
               <p className="mt-2 text-label text-status-waiting-ink">
@@ -333,9 +330,9 @@ export const CustomerLocationModal: React.FC<CustomerLocationModalProps> = ({
                       {customerPhoneVerified ? (
                         <span
                           title="Phone number verified via SMS OTP"
-                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none"
+                          className="inline-flex items-center gap-1 rounded-trim border border-status-done-ink/30 bg-status-done-fill px-1.5 py-0.5 font-mono text-micro font-bold uppercase tracking-[0.06em] text-status-done-ink select-none"
                         >
-                          <ShieldCheck size={10} />
+                          <ShieldCheck size={11} />
                           <span>Verified</span>
                         </span>
                       ) : null}

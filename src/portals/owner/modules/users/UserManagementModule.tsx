@@ -598,6 +598,12 @@ export const UserManagementModule: React.FC = () => {
                       )}
                     </button>
                   </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-ink-muted">Channels:</span>
+                    <span className="text-[10px] text-ink font-medium">
+                      {u.email && u.phone ? "Email & SMS OTP" : u.phone ? "SMS OTP" : "Email OTP"}
+                    </span>
+                  </div>
                 </div>
               )}
               renderRowActions={(u) => (
@@ -625,10 +631,14 @@ export const UserManagementModule: React.FC = () => {
                   ],
                 },
                 {
-                  title: "Contact Details",
+                  title: "Contact & Authentication",
                   items: [
-                    { label: "Email", value: u.email || "Not provided", fullWidth: true },
-                    { label: "Phone", value: u.phone || "Not provided" },
+                    { label: "Email (Gmail OTP)", value: u.email || "Not provided", fullWidth: true },
+                    { label: "Phone (SMS OTP)", value: u.phone || "Not provided" },
+                    {
+                      label: "Sign-In Channels",
+                      value: u.email && u.phone ? "Email OTP & SMS OTP (Dual-Channel)" : u.phone ? "SMS OTP" : "Email OTP",
+                    },
                   ],
                 },
               ]}
@@ -702,6 +712,11 @@ export const UserManagementModule: React.FC = () => {
                                 </span>
                               )}
                             </button>
+                            {u.phone && (
+                              <span className="inline-block mt-0.5 text-[10px] text-status-done-ink font-sans">
+                                SMS OTP Ready
+                              </span>
+                            )}
                           </td>
 
                           {/* Status */}

@@ -77,17 +77,17 @@ export function storeShowAll(next: boolean) {
  * label beside it carries it in words.
  */
 function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
-  const base = "grid size-6 shrink-0 place-items-center rounded-full text-micro";
+  const base = "grid size-6 shrink-0 place-items-center rounded-full text-micro font-medium";
 
   if (stage.state === "done") {
     return (
       <span
         className={cn(
           base,
-          onField ? "bg-board-plate text-board-field" : "bg-status-done-ink text-board-plate"
+          onField ? "bg-board-plate text-board-field font-bold" : "bg-status-done-ink text-board-plate font-bold"
         )}
       >
-        <Check size={13} />
+        <Check size={13} strokeWidth={2.5} />
       </span>
     );
   }
@@ -97,6 +97,7 @@ function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
         data-figure
         className={cn(
           base,
+          "font-mono font-bold tabular-nums",
           onField ? "bg-board-plate text-board-field" : "bg-board-field text-board-plate"
         )}
       >
@@ -109,6 +110,7 @@ function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
       data-figure
       className={cn(
         base,
+        "font-mono font-semibold tabular-nums",
         onField
           ? "border-[1.5px] border-board-trim text-board-trim"
           : "border-[1.5px] border-board-trim text-ink-muted"
@@ -174,7 +176,7 @@ export function StageList({
                 {/* Hidden below sm: compact detents fit on mobile viewports. */}
                 <span
                   className={cn(
-                    "hidden w-full truncate text-center text-micro uppercase sm:block",
+                    "hidden w-full truncate text-center text-micro font-bold uppercase tracking-[0.06em] sm:block",
                     isOpen && !showAll
                       ? "text-board-plate"
                       : stage.state === "todo"
@@ -203,14 +205,14 @@ export function StageList({
             )}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-hairline px-3 py-2.5">
-              <h3 className="min-w-0 truncate text-panel text-ink">{stage.label}</h3>
+              <h3 className="min-w-0 truncate text-panel font-bold text-ink">{stage.label}</h3>
               <span
                 className={cn(
-                  "flex min-w-0 items-center gap-1 truncate text-body",
+                  "flex min-w-0 items-center gap-1 truncate text-label font-medium tabular-nums",
                   stage.state === "done"
-                    ? "text-status-done-ink"
+                    ? "text-status-done-ink font-semibold"
                     : isWaiting
-                      ? "text-status-waiting-ink"
+                      ? "text-status-waiting-ink font-semibold"
                       : "text-ink-muted"
                 )}
               >
@@ -238,7 +240,7 @@ export function StageList({
         <button
           type="button"
           onClick={() => onShowAllChange(!showAll)}
-          className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-edge bg-board-plate text-micro uppercase text-ink-muted transition-colors hover:text-ink"
+          className="flex min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-plate border border-edge bg-board-plate text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted transition-colors hover:text-ink"
         >
           {showAll ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
           {showAll ? copy.showOneStep : copy.showAllSteps}

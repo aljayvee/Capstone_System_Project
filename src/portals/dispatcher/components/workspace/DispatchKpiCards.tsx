@@ -65,14 +65,14 @@ function Figure({
   const unknown = isLoading || (isStale && value === "0");
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2 sm:gap-1 sm:px-5 sm:py-2.5">
-      <span className="text-micro uppercase text-board-trim">{label}</span>
+      <span className="text-micro font-semibold uppercase tracking-[0.06em] text-board-trim">{label}</span>
       {/* Board scale is for reading across a room, which a phone held at arm's
           length is not. Three figures at 34px plus their detail lines filled
           most of a 390x844 screen before the board itself appeared. */}
       <span
         data-figure
         className={cn(
-          "text-title tabular-nums sm:text-board",
+          "font-mono text-title font-bold tabular-nums tracking-tight sm:text-board",
           emphasis ? "text-signal-on-field" : "text-board-plate",
           unknown && "text-board-trim"
         )}
@@ -80,7 +80,7 @@ function Figure({
         {unknown ? "--" : value}
       </span>
       {detail && !unknown ? (
-        <span className="hidden truncate text-label text-board-trim sm:block">{detail}</span>
+        <span className="hidden truncate text-label text-board-trim/90 sm:block">{detail}</span>
       ) : null}
     </div>
   );
@@ -97,9 +97,9 @@ export const DispatchKpiCards: React.FC<DispatchBoardStripProps> = ({
   return (
     <div
       data-on-field
-      className="shrink-0 overflow-hidden rounded-plate bg-board-field shadow-field"
+      className="shrink-0 overflow-hidden rounded-plate border border-white/10 bg-board-field shadow-field"
     >
-      <div className="flex divide-x divide-field-line py-1">
+      <div className="flex divide-x divide-white/10 py-1">
         {/* Emphasised only when something is actually waiting: red means "you
             must act" on this surface, so an empty queue must not wear it. */}
         <Figure
@@ -135,7 +135,7 @@ export const DispatchKpiCards: React.FC<DispatchBoardStripProps> = ({
       {isStale ? (
         <p
           role="status"
-          className="border-t border-field-line px-4 py-2 text-label text-board-trim sm:px-5"
+          className="border-t border-white/10 px-4 py-2 text-label text-board-trim sm:px-5"
         >
           These figures could not be refreshed. Anything showing is the last
           number anyone had, and a dash means there is none to show.

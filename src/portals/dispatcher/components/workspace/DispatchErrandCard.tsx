@@ -98,10 +98,10 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
       onClick={onClick}
       aria-current={isSelected ? "true" : undefined}
       className={cn(
-        "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-colors duration-150",
+        "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-all duration-150",
         isSelected
-          ? "bg-board-field"
-          : "border border-edge bg-board-plate hover:border-board-trim"
+          ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field shadow-sm"
+          : "border border-edge bg-board-plate hover:border-board-trim hover:bg-board-ground/30"
       )}
     >
       {/* Customer and departure clock */}
@@ -109,7 +109,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <h3
             className={cn(
-              "truncate text-title uppercase",
+              "truncate text-title font-bold uppercase tracking-tight",
               isSelected ? "text-board-plate" : "text-ink"
             )}
           >
@@ -118,21 +118,21 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
           {unreadChatCount > 0 && (
             <span
               className={cn(
-                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-bold shrink-0 animate-pulse",
+                "inline-flex items-center gap-1.5 rounded-trim px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.06em] shrink-0",
                 isSelected
-                  ? "bg-amber-400/30 text-amber-200 border border-amber-300/40"
-                  : "bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                  ? "bg-signal text-white"
+                  : "bg-signal text-white"
               )}
             >
-              <MessageCircle size={11} />
-              <span>{unreadChatCount} new</span>
+              <MessageCircle size={11} className="shrink-0" />
+              <span data-figure className="font-mono tabular-nums">{unreadChatCount} new</span>
             </span>
           )}
         </div>
         <span
           data-figure
           className={cn(
-            "shrink-0 text-label tabular-nums",
+            "shrink-0 font-mono text-label font-semibold tabular-nums",
             isWaitingTooLong
               ? isSelected
                 ? "text-signal-on-field"
@@ -151,7 +151,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
         <span
           data-figure
           className={cn(
-            "shrink-0 font-mono text-data",
+            "shrink-0 font-mono text-data font-bold tabular-nums tracking-wide",
             isSelected ? "text-board-plate" : "text-ink"
           )}
         >
@@ -159,7 +159,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
         </span>
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-right text-label",
+            "min-w-0 flex-1 truncate text-right text-label font-medium",
             isSelected ? "text-board-plate/90" : "text-ink-muted"
           )}
         >
@@ -177,7 +177,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span
             className={cn(
-              "truncate text-label",
+              "truncate text-label font-medium",
               isSelected ? "text-board-plate/90" : "text-ink"
             )}
           >
@@ -185,11 +185,13 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
           </span>
           <span
             data-figure
-            className={cn("text-label", isSelected ? "text-board-trim" : "text-ink-muted")}
+            className={cn("text-label font-medium", isSelected ? "text-board-trim" : "text-ink-muted")}
           >
             {itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "General errand"}
             {" · "}
-            {formatPeso(totalDisplay)}
+            <span className={cn("font-mono font-semibold tabular-nums", isSelected ? "text-board-plate" : "text-ink")}>
+              {formatPeso(totalDisplay)}
+            </span>
             {errand.totalCost ? "" : " fee"}
           </span>
         </div>

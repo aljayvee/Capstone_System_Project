@@ -130,15 +130,15 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                   onClick={() => setStatusFilter(f.id)}
                   aria-pressed={isActive}
                   className={cn(
-                    "flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-3 text-micro uppercase transition-colors",
+                    "flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-3.5 py-1.5 text-micro font-semibold uppercase tracking-[0.06em] transition-all",
                     isActive
-                      ? "bg-board-field text-board-plate"
-                      : "bg-board-ground text-ink-muted hover:text-ink"
+                      ? "bg-board-field text-board-plate border border-board-field shadow-sm"
+                      : "bg-board-ground/60 text-ink-muted hover:text-ink border border-edge hover:border-board-trim"
                   )}
                 >
                   {f.icon}
                   <span>{f.label}</span>
-                  <span data-figure className="tabular-nums">
+                  <span data-figure className="font-mono tabular-nums font-bold">
                     {counts[f.id]}
                   </span>
                 </button>
@@ -188,18 +188,18 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
             // `left-4` with `w-full` made this 100% of the map's width starting
             // 16px in, so it overflowed the map by 16px on every screen. Pinned
             // on both edges and capped instead.
-            <div className="absolute bottom-3 left-3 right-3 z-20 max-w-sm space-y-2 rounded-plate border border-edge bg-board-plate p-3">
+            <div className="absolute bottom-3 left-3 right-3 z-20 max-w-sm space-y-2.5 rounded-plate border border-edge bg-board-plate/95 backdrop-blur-sm p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span
-                    className="grid size-8 shrink-0 place-items-center rounded-trim text-board-plate"
+                    className="grid size-9 shrink-0 place-items-center rounded-trim text-board-plate shadow-xs"
                     style={{ backgroundColor: selectedTheme.primaryColor }}
                   >
-                    <Bike size={16} />
+                    <Bike size={18} />
                   </span>
                   <div className="min-w-0">
-                    <h3 className="truncate text-panel text-ink">{selectedRider.name}</h3>
-                    <p data-figure className="font-mono text-label text-ink-muted">
+                    <h3 className="truncate text-body font-bold text-ink">{selectedRider.name}</h3>
+                    <p data-figure className="font-mono text-label font-bold tabular-nums text-ink-muted">
                       #{selectedRider.id}
                     </p>
                   </div>
@@ -207,7 +207,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
 
                 <span
                   className={cn(
-                    "shrink-0 rounded-full border px-2.5 py-0.5 text-micro uppercase",
+                    "shrink-0 rounded-trim border px-2.5 py-0.5 text-micro font-semibold uppercase tracking-[0.06em]",
                     selectedTheme.badgeClassName
                   )}
                 >
@@ -215,17 +215,17 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                 </span>
               </div>
 
-              <dl className="grid grid-cols-2 gap-2 border-t border-hairline pt-2">
+              <dl className="grid grid-cols-2 gap-2 border-t border-hairline pt-2.5">
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <Phone size={12} className="shrink-0 text-ink-muted" />
-                  <dd data-figure className="truncate text-label text-ink">
+                  <Phone size={13} className="shrink-0 text-ink-muted" />
+                  <dd data-figure className="truncate font-mono text-label font-medium tabular-nums text-ink">
                     {selectedRider.phone || "No number"}
                   </dd>
                 </div>
                 <div className="min-w-0 text-right">
                   <dt className="sr-only">Active errands</dt>
-                  <dd data-figure className="text-label text-ink">
-                    {selectedRider.activeOrdersCount} on hand
+                  <dd data-figure className="text-label font-medium text-ink">
+                    <span className="font-mono tabular-nums font-bold">{selectedRider.activeOrdersCount}</span> on hand
                   </dd>
                 </div>
               </dl>
@@ -243,7 +243,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                     <span
                       data-figure
                       className={cn(
-                        "font-mono text-label",
+                        "font-mono text-label font-bold tabular-nums",
                         low ? "text-status-act-ink" : "text-ink"
                       )}
                     >
@@ -258,14 +258,14 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
 
         {/* The roster */}
         <div className="flex min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-3 py-2.5">
-            <h3 className="text-panel text-ink">Roster</h3>
-            <span data-figure className="text-label text-ink-muted tabular-nums">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-3.5 py-2.5 bg-board-ground/40">
+            <h3 className="text-panel font-bold text-ink">Roster</h3>
+            <span data-figure className="font-mono text-label font-semibold text-ink-muted tabular-nums">
               {filteredRiders.length} of {counts.ALL}
             </span>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
             <PanelState
               isEmpty={filteredRiders.length === 0}
               hasFilters={hasFilters}
@@ -287,13 +287,15 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                       onClick={() => setSelectedRiderId(r.id)}
                       aria-current={isSelected ? "true" : undefined}
                       className={cn(
-                        "flex w-full cursor-pointer items-center justify-between gap-2 rounded-trim p-2.5 text-left transition-colors",
-                        isSelected ? "bg-board-field" : "hover:bg-board-ground"
+                        "flex w-full cursor-pointer items-center justify-between gap-2 rounded-trim p-2.5 text-left transition-all",
+                        isSelected
+                          ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field text-board-plate shadow-sm"
+                          : "border border-edge bg-board-plate hover:border-board-trim hover:bg-board-ground/60"
                       )}
                     >
                       <div className="flex min-w-0 items-center gap-2.5">
                         <span
-                          className="grid size-9 shrink-0 place-items-center rounded-trim text-micro text-board-plate"
+                          className="grid size-9 shrink-0 place-items-center rounded-trim font-mono text-micro font-bold text-board-plate shadow-xs"
                           style={{ backgroundColor: theme.primaryColor }}
                         >
                           {r.name.slice(0, 2).toUpperCase()}
@@ -301,7 +303,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                         <div className="min-w-0">
                           <p
                             className={cn(
-                              "truncate text-body",
+                              "truncate text-body font-semibold",
                               isSelected ? "text-board-plate" : "text-ink"
                             )}
                           >
@@ -310,7 +312,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                           <p
                             data-figure
                             className={cn(
-                              "truncate font-mono text-label",
+                              "truncate font-mono text-label font-bold tabular-nums",
                               isSelected ? "text-board-trim" : "text-ink-muted"
                             )}
                           >
@@ -320,11 +322,11 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                           {/* Why: "No signal for 4 min", "Shift ended at 12:00 AM". */}
                           <p
                             className={cn(
-                              "truncate text-label",
+                              "truncate text-micro font-medium",
                               isSelected
                                 ? "text-board-trim"
                                 : r.presence === "AVAILABLE_SIGNAL_LOST"
-                                  ? "text-status-act-ink"
+                                  ? "text-status-act-ink font-semibold"
                                   : "text-ink-muted"
                             )}
                           >
@@ -333,10 +335,10 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 flex-col items-end gap-1">
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
                         <span
                           className={cn(
-                            "rounded-full border px-2 py-0.5 text-micro uppercase",
+                            "rounded-trim border px-2 py-0.5 text-micro font-semibold uppercase tracking-[0.06em]",
                             theme.badgeClassName
                           )}
                         >
@@ -346,7 +348,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                           <span
                             data-figure
                             className={cn(
-                              "font-mono text-label",
+                              "font-mono text-micro font-bold tabular-nums",
                               pct <= 20
                                 ? "text-status-act-ink"
                                 : isSelected

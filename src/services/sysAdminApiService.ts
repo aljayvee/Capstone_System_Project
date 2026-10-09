@@ -43,6 +43,10 @@ import type {
   LogTailResult,
   ServiceControlResponse,
   PortalMaintenanceStatus,
+  AppReleaseTarget,
+  AppReleaseInfo,
+  AppReleasesResponse,
+  AppReleaseUpdateInput,
 } from "../types/sysAdmin";
 
 // ─── Dedicated SysAdmin Axios Instance ───────────────────────────────────────
@@ -147,6 +151,16 @@ sysAdminAxios.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export interface UploadChunkProgress {
+  currentChunk: number;
+  totalChunks: number;
+  chunkProgressPercent: number;
+  overallPercent: number;
+  uploadedBytes: number;
+  totalBytes: number;
+  stage: "uploading" | "assembling" | "completed";
+}
 
 // ─── SysAdmin API Service ─────────────────────────────────────────────────────
 
@@ -426,6 +440,14 @@ export const sysAdminApiService = {
     return response.data;
   },
 
+  async toggleDispatcherAiSuggestions(enabled: boolean): Promise<{ enabled: boolean }> {
+    const response = await sysAdminAxios.post<{ enabled: boolean }>(
+      "/sysadmin/devops/dispatcher-ai-suggestions",
+      { enabled }
+    );
+    return response.data;
+  },
+
   async getBackups(): Promise<{ backups: DatabaseBackupRecord[] }> {
     const response = await sysAdminAxios.get<{ backups: DatabaseBackupRecord[] }>("/sysadmin/devops/backups");
     return response.data;
@@ -604,6 +626,178 @@ export const sysAdminApiService = {
   async removeWhitelistedIp(id: number): Promise<{ message: string }> {
     const response = await sysAdminAxios.delete<{ message: string }>(`/sysadmin/threats/whitelist/${id}`);
     return response.data;
+  },
+
+  // ── App Releases & APK Deployment ──────────────────────────────────────────
+
+  async getAppReleases(): Promise<AppReleasesResponse> {
+    const response = await sysAdminAxios.get<AppReleasesResponse>("/sysadmin/app-releases");
+    return response.data;
+  },
+
+  async updateAppRelease(
+    target: AppReleaseTarget,
+    data: AppReleaseUpdateInput
+  ): Promise<{ success: boolean; message: string; release: AppReleaseInfo }> {
+    const response = await sysAdminAxios.put<{ success: boolean; message: string; release: AppReleaseInfo }>(
+      `/sysadmin/app-releases/${target}`,
+      data
+    );
+    return response.data;
+  },
+
+  async uploadAppReleaseApkChunked(
+    target: AppReleaseTarget,
+    file: File,
+    version?: string,
+    onProgress?: (progress: UploadChunkProgress) => void
+  ): Promise<{ success: boolean; message: string; release: AppReleaseInfo }> {
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per slice
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = `apk_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const token = getSysAdminMemoryToken();
+
+    let uploadedBaseBytes = 0;
+
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * CHUNK_SIZE;
+      const end = Math.min(file.size, start + CHUNK_SIZE);
+      const chunkBlob = file.slice(start, end);
+
+      let attempts = 0;
+      const maxAttempts = 3;
+      let chunkUploaded = false;
+      let lastError: Error | null = null;
+
+      while (attempts < maxAttempts && !chunkUploaded) {
+        attempts++;
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const chunkUrl = `${SYSADMIN_API_BASE}/sysadmin/app-releases/upload-chunk/${target}`;
+            xhr.open("POST", chunkUrl, true);
+            xhr.withCredentials = true;
+
+            if (token) {
+              xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+            }
+            xhr.setRequestHeader("Content-Type", "application/octet-stream");
+            xhr.setRequestHeader("X-SysAdmin-Client", "sugo-sysadmin-web");
+            xhr.setRequestHeader("X-Upload-Id", uploadId);
+            xhr.setRequestHeader("X-Chunk-Index", chunkIndex.toString());
+            xhr.setRequestHeader("X-Total-Chunks", totalChunks.toString());
+            xhr.setRequestHeader("X-Chunk-Size", chunkBlob.size.toString());
+            xhr.setRequestHeader("X-Total-Size", file.size.toString());
+            xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+
+            if (xhr.upload && onProgress) {
+              xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                  const currentTotal = uploadedBaseBytes + e.loaded;
+                  const chunkPct = Math.round((e.loaded / chunkBlob.size) * 100);
+                  const overallPct = Math.min(99, Math.round((currentTotal / file.size) * 100));
+                  onProgress({
+                    currentChunk: chunkIndex + 1,
+                    totalChunks,
+                    chunkProgressPercent: chunkPct,
+                    overallPercent: overallPct,
+                    uploadedBytes: currentTotal,
+                    totalBytes: file.size,
+                    stage: "uploading",
+                  });
+                }
+              };
+            }
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+              } else {
+                try {
+                  const errData = JSON.parse(xhr.responseText);
+                  reject(
+                    new Error(
+                      errData.message ||
+                        `Chunk ${chunkIndex + 1} upload failed with status ${xhr.status}`
+                    )
+                  );
+                } catch {
+                  reject(new Error(`Chunk ${chunkIndex + 1} upload failed with status ${xhr.status}`));
+                }
+              }
+            };
+
+            xhr.onerror = () => {
+              reject(new Error(`Network error uploading chunk ${chunkIndex + 1}/${totalChunks}`));
+            };
+
+            xhr.send(chunkBlob);
+          });
+          chunkUploaded = true;
+          uploadedBaseBytes += chunkBlob.size;
+        } catch (err: any) {
+          lastError = err;
+          if (attempts < maxAttempts) {
+            await new Promise((r) => setTimeout(r, 1200));
+          }
+        }
+      }
+
+      if (!chunkUploaded) {
+        // Attempt cleanup on server
+        try {
+          await sysAdminAxios.post(`/sysadmin/app-releases/cancel-upload/${target}`, { uploadId });
+        } catch {}
+        throw lastError || new Error(`Failed to upload chunk ${chunkIndex + 1} after ${maxAttempts} attempts`);
+      }
+    }
+
+    // All chunks uploaded; notify assembling stage
+    onProgress?.({
+      currentChunk: totalChunks,
+      totalChunks,
+      chunkProgressPercent: 100,
+      overallPercent: 99,
+      uploadedBytes: file.size,
+      totalBytes: file.size,
+      stage: "assembling",
+    });
+
+    // Finalize assembly on server
+    const finalizeRes = await sysAdminAxios.post<{
+      success: boolean;
+      message: string;
+      release: AppReleaseInfo;
+    }>(`/sysadmin/app-releases/finalize-upload/${target}`, {
+      uploadId,
+      totalChunks,
+      fileName: file.name,
+      totalSize: file.size,
+      version,
+    });
+
+    onProgress?.({
+      currentChunk: totalChunks,
+      totalChunks,
+      chunkProgressPercent: 100,
+      overallPercent: 100,
+      uploadedBytes: file.size,
+      totalBytes: file.size,
+      stage: "completed",
+    });
+
+    return finalizeRes.data;
+  },
+
+  async uploadAppReleaseApk(
+    target: AppReleaseTarget,
+    file: File,
+    version?: string,
+    onProgress?: (progressPercent: number, loadedBytes: number, totalBytes: number) => void
+  ): Promise<{ success: boolean; message: string; release: AppReleaseInfo }> {
+    return this.uploadAppReleaseApkChunked(target, file, version, (p) => {
+      onProgress?.(p.overallPercent, p.uploadedBytes, p.totalBytes);
+    });
   },
 };
 

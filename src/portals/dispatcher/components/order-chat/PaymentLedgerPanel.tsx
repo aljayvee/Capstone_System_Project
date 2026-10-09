@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, Undo2 } from "lucide-react";
+import { CheckCircle2, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherBadge } from "@/components/panel/DispatcherBadge";
@@ -9,30 +9,11 @@ import { copy } from "./copy";
 import type { useOrderPayments } from "./hooks/useOrderPayments";
 
 /**
- * The money on a 50% downpayment errand.
+ * The money on a GCash / PayMaya or Bank Transfer errand.
  *
- * Payment lands on the company Facebook Page, outside this system. There is no
- * callback to trust - a dispatcher looks at that page and says whether it
- * arrived - so this panel is a place to make an ATTESTATION, and it is built
- * to feel like one. The amount is typed rather than one-tapped: a button
- * reading "confirm what we expected" would record agreement with a figure
- * nobody read, and the server refuses a mismatch precisely so that typing is
- * meaningful.
- *
- * One state, one action. The panel never shows the dispatcher a choice between
- * confirming a downpayment and clearing an overage, because only one of those
- * is ever the next thing.
- *
- * Route board build. This panel renders inside a stage body, which is already
- * inside the stage card, and it opened with `bg-white border rounded-xl` and
- * then put two more bordered boxes inside that: four levels of surface for one
- * ledger. It is regions on the stage plate now, and the two figures sit either
- * side of one rule instead of in two matching boxes.
- *
- * Three em dash placeholders are gone. A dash where a reference number should
- * be tells a dispatcher nothing about whether the OCR failed, the field was
- * blank, or nobody has uploaded anything - and this is the screen where money
- * gets vouched for.
+ * Since 2026-10-08 the whole bill is paid at the door, like cash on delivery:
+ * the rider photographs a transfer and the system records it, or takes cash.
+ * So this panel reports; the one act left to a dispatcher is a refund.
  */
 
 export const peso = (n: number) =>
@@ -51,15 +32,13 @@ interface PaymentLedgerPanelProps {
 export function PaymentLedgerPanel({
   payments,
   customerFirstName,
-  actualBasket,
-  agreedBasket,
   readOnly = false,
 }: PaymentLedgerPanelProps) {
-  const { ledger, proof, pending, feedback, confirmUpfront, confirmTopUp, recordRefund } = payments;
+  const { ledger, pending, feedback, recordRefund } = payments;
 
   const [showRefund, setShowRefund] = React.useState(false);
 
-  // Not a downpayment errand - nothing here applies.
+  // Cash on delivery: no ledger, nothing here applies.
   if (!ledger?.hasLedger) return null;
 
   const c = copy.payments;
@@ -73,139 +52,39 @@ export function PaymentLedgerPanel({
         <PlanBadge state={ledger.state} />
       </div>
 
-      {/* The two figures, always both - a dispatcher asking "how much is left?"
-          should never have to subtract. Label names the thing, value IS the
-          number, caption gives it context. They used to carry the amount in the
-          label AND a different amount as the value ("Due before dispatch:
-          500.00" over "0.00"), which put two figures with two meanings in one
-          box. */}
-      <dl className="m-0 grid grid-cols-2 divide-x divide-hairline">
-        <Figure
-          label={c.paidUpFront}
-          value={peso(ledger.amountPaid)}
-          caption={c.paidUpFrontOf(peso(ledger.dueUpFront))}
-        />
-        <Figure
-          label={c.balance}
-          value={peso(ledger.balanceDue)}
-          caption="collected at the door"
-          className="pl-3"
-        />
+      <dl className="grid grid-cols-2 divide-x divide-hairline">
+        <Figure label={c.paid} value={peso(ledger.amountPaid)} caption={c.paidCaption(ledger.amountPaid)} />
+        <Figure label={c.balance} value={peso(ledger.balanceDue)} caption={c.balanceCaption} className="pl-3" />
       </dl>
 
       <DispatcherInlineBanner message={feedback.message} onDismiss={feedback.dismiss} />
 
-      {/* ── the one thing to do next ─────────────────────────────────────── */}
-      {/* What the customer says they sent, read off their own screenshot by
-          Cloud Vision. It does NOT confirm anything - OCR can be fooled by an
-          edited image and the money is real - but it puts a reference on screen
-          that the dispatcher can search the Facebook Page for, instead of
-          confirming from memory.
-
-          Balance-state proof viewing and confirmation now live in the
-          standalone PaymentProofPanel (the chat's right-side panel), not
-          here — this stays scoped to the upfront half, which is still part
-          of the sequential Stage 4 flow. */}
-      {ledger.state === "AWAITING_UPFRONT" && (
-        <div>
-          <DispatcherCard.Label as="h5">{c.proofTitle}</DispatcherCard.Label>
-
-          {proof?.extraction ? (
-            <>
-              <ProofRow label={c.proofRef} value={proof.extraction.referenceNo} mono />
-              {proof.extraction.transactionId && (
-                <ProofRow label={c.proofTxn} value={proof.extraction.transactionId} mono />
-              )}
-              <ProofRow
-                label={c.proofAmount}
-                value={
-                  proof.extraction.extractedTotal != null
-                    ? peso(proof.extraction.extractedTotal)
-                    : null
-                }
-                mono
-              />
-              <ProofRow
-                label={c.proofDate}
-                value={
-                  proof.extraction.extractedDate
-                    ? new Date(proof.extraction.extractedDate).toLocaleDateString()
-                    : null
-                }
-              />
-              <p className="m-0 pt-1 text-label text-ink-muted">
-                {c.proofRead(proof.extraction.engine)}
-              </p>
-            </>
-          ) : (
-            <p className="m-0 text-body text-ink-muted">{c.proofNone}</p>
-          )}
-        </div>
-      )}
-
-      {!readOnly && ledger.state === "AWAITING_UPFRONT" && (
-        <AttestationForm
-          hint={c.downpaymentHint(customerFirstName, peso(ledger.dueUpFront))}
-          defaultAmount={ledger.dueUpFront}
-          submitLabel={c.confirmUpfront}
-          loadingLabel={c.confirmingUpfront}
-          loading={pending === "upfront"}
-          onSubmit={(amount, note) => confirmUpfront(amount, note)}
-        />
-      )}
-
-      {!readOnly && ledger.state === "OVERAGE_PENDING" && (
-        <div className="space-y-2 rounded-trim bg-status-waiting-fill p-3">
-          <p className="m-0 flex items-center gap-1.5 text-label text-status-waiting-ink">
-            <AlertTriangle size={14} className="shrink-0" />
-            {c.overageTitle}
-          </p>
-          <p className="m-0 text-body text-status-waiting-ink">
-            {c.overageHint(
-              peso(agreedBasket ?? 0),
-              peso(actualBasket ?? 0),
-              peso(Math.max(0, (actualBasket ?? 0) - (agreedBasket ?? 0)))
-            )}
-          </p>
-          <AttestationForm
-            defaultAmount={Math.max(0, (actualBasket ?? 0) - (agreedBasket ?? 0))}
-            submitLabel={c.confirmTopUp}
-            loadingLabel={c.confirmingTopUp}
-            loading={pending === "top-up"}
-            onSubmit={(amount, note) => confirmTopUp(amount, note)}
-          />
-        </div>
-      )}
-
-      {/* Confirming the balance itself happens in the standalone
-          PaymentProofPanel now — this just points there so a dispatcher
-          working the stage accordion isn't left wondering where it went. */}
+      {/* Since 2026-10-08 nothing here is a dispatcher's to confirm: the rider
+          photographs a transfer at the door and the system records it, or the
+          rider takes cash. */}
       {ledger.state === "AWAITING_BALANCE" && (
-        <p className="m-0 text-body text-ink-muted">
-          {c.balanceHint} See the Half-payment panel to confirm it.
-        </p>
+        <p className="text-body text-ink-muted">{c.atDoorHint(customerFirstName, peso(ledger.balanceDue))}</p>
       )}
-
       {ledger.state === "SETTLED" && (
-        <p className="m-0 flex items-center gap-1.5 text-label text-status-done-ink">
+        <p className="flex items-center gap-1.5 text-label text-status-done-ink">
           <CheckCircle2 size={14} className="shrink-0" />
           {c.settled}
         </p>
       )}
+      {ledger.state === "REFUNDED" && <p className="text-body text-ink-muted">{c.refunded}</p>}
 
-      {/* ── what has already been recorded, and who vouched for it ───────── */}
+      {/* what has been recorded, and who or what vouched for it */}
       {ledger.entries.length > 0 && (
-        <ul className="m-0 list-none divide-y divide-hairline border-t border-hairline p-0 pt-1">
+        <ul className="list-none divide-y divide-hairline border-t border-hairline p-0 pt-1">
           {ledger.entries.map((e) => (
             <li key={e.id} className="flex items-baseline justify-between gap-2 py-1.5">
-              <span className="min-w-0 truncate text-body text-ink-muted">
-                <span className="text-ink">{KIND_LABEL[e.kind]}</span>
-                {e.confirmedBy && (
-                  <span>
-                    {" · "}
-                    {c.attestedBy(e.confirmedBy.name, new Date(e.confirmedAt).toLocaleString())}
-                  </span>
-                )}
+              <span className="min-w-0">
+                <span className="block text-body text-ink">{KIND_LABEL[e.kind]}</span>
+                <span className="block text-label text-ink-muted">
+                  {e.confirmedBy
+                    ? c.attestedBy(e.confirmedBy.name, new Date(e.confirmedAt).toLocaleString())
+                    : c.recordedFromPhoto(new Date(e.confirmedAt).toLocaleString())}
+                </span>
               </span>
               <span
                 data-figure
@@ -257,20 +136,16 @@ export function PaymentLedgerPanel({
 }
 
 const KIND_LABEL: Record<string, string> = {
-  UPFRONT: "Paid up front",
+  UPFRONT: "Paid before delivery (old 50% plan)",
   TOP_UP: "Top-up",
-  FINAL: "Balance",
+  FINAL: "Paid at the door",
   REFUND: "Refund",
 };
 
 export function PlanBadge({ state }: { state: string }) {
   switch (state) {
-    case "AWAITING_UPFRONT":
-      return <DispatcherBadge variant="warning">Awaiting payment</DispatcherBadge>;
-    case "OVERAGE_PENDING":
-      return <DispatcherBadge variant="danger">Goods held</DispatcherBadge>;
     case "AWAITING_BALANCE":
-      return <DispatcherBadge variant="info">Balance outstanding</DispatcherBadge>;
+      return <DispatcherBadge variant="info">Pay at the door</DispatcherBadge>;
     case "SETTLED":
       return <DispatcherBadge variant="success">Paid in full</DispatcherBadge>;
     case "REFUNDED":
@@ -326,11 +201,11 @@ export function Figure({
 }) {
   return (
     <div className={cn("min-w-0 pr-3", className)}>
-      <dt className="m-0 text-micro uppercase text-ink-muted">{label}</dt>
-      <dd data-figure className="m-0 font-mono text-data tabular-nums text-ink">
+      <dt className="m-0 text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">{label}</dt>
+      <dd data-figure className="m-0 font-mono text-data font-bold tabular-nums text-ink">
         {value}
       </dd>
-      <p className="m-0 text-label text-ink-muted">{caption}</p>
+      <p className="m-0 text-micro text-ink-muted mt-0.5">{caption}</p>
     </div>
   );
 }
@@ -372,16 +247,16 @@ export function AttestationForm({
   const noteValid = !noteRequired || note.trim().length > 0;
 
   const field =
-    "min-h-10 w-full rounded-trim border border-edge bg-board-plate px-2 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field";
+    "min-h-10 w-full rounded-trim border border-edge bg-board-plate px-2.5 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field";
 
   return (
     <div className="space-y-2">
       {hint && <p className="m-0 text-body text-ink-muted">{hint}</p>}
 
       <label className="block min-w-0">
-        <span className="mb-1 block text-micro uppercase text-ink-muted">{c.amountLabel}</span>
+        <span className="mb-1 block text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">{c.amountLabel}</span>
         <div className="flex items-center gap-1.5">
-          <span data-figure className="font-mono text-data text-ink-muted">
+          <span data-figure className="font-mono text-data font-bold text-ink-muted">
             {"₱"}
           </span>
           <input
@@ -391,13 +266,13 @@ export function AttestationForm({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             // The one themed focus outline, not a per-field navy glow.
-            className={cn(field, "font-mono tabular-nums")}
+            className={cn(field, "font-mono font-bold tabular-nums")}
           />
         </div>
       </label>
 
       <label className="block">
-        <span className="mb-1 block text-micro uppercase text-ink-muted">
+        <span className="mb-1 block text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
           {noteRequired ? c.noteRequired : c.noteLabel}
         </span>
         <input
@@ -418,12 +293,12 @@ export function AttestationForm({
           loadingText={loadingLabel}
           disabled={!amountValid || !noteValid}
           onClick={() => onSubmit(parsed, note)}
-          className="flex-1 justify-center"
+          className="flex-1 justify-center font-semibold"
         >
           {submitLabel}
         </DispatcherButton>
         {onCancel && (
-          <DispatcherButton variant="secondary" size="md" onClick={onCancel}>
+          <DispatcherButton variant="secondary" size="md" className="font-semibold" onClick={onCancel}>
             {c.cancel}
           </DispatcherButton>
         )}

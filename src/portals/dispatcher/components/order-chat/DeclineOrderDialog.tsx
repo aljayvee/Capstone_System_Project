@@ -71,9 +71,9 @@ export function DeclineOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isDeclining && onOpenChange(next)}>
-      <DialogContent data-surface="dispatch" className="rounded-modal border-edge shadow-plate">
+      <DialogContent data-surface="dispatch" className="rounded-modal border border-edge bg-board-plate shadow-plate">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-panel font-bold text-ink">
             <Ban className="text-status-act-ink" size={18} /> {copy.decline.title}
           </DialogTitle>
           <DialogClose
@@ -83,12 +83,12 @@ export function DeclineOrderDialog({
             <X size={18} />
           </DialogClose>
         </DialogHeader>
-        <DialogDescription>{copy.decline.body(customerFirstName)}</DialogDescription>
+        <DialogDescription className="text-body text-ink-muted">{copy.decline.body(customerFirstName)}</DialogDescription>
 
         <fieldset className="m-0 space-y-1 border-0 p-0">
           <legend className="sr-only">Reason</legend>
           {copy.declineReasons.map((r) => (
-            <label key={r} className="flex min-h-9 cursor-pointer items-center gap-2 text-body text-ink">
+            <label key={r} className="flex min-h-9 cursor-pointer items-center gap-2 text-body font-medium text-ink">
               <input
                 type="radio"
                 name="decline-order-reason"
@@ -111,7 +111,7 @@ export function DeclineOrderDialog({
         )}
 
         {error && (
-          <p role="alert" className="m-0 rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink">
+          <p role="alert" className="m-0 rounded-plate border border-status-act-ink/30 bg-status-act-fill px-3 py-2 text-label font-medium text-status-act-ink">
             {error}
           </p>
         )}
@@ -121,7 +121,7 @@ export function DeclineOrderDialog({
             type="button"
             variant="secondary"
             size="md"
-            className="flex-1"
+            className="flex-1 font-semibold"
             disabled={isDeclining}
             onClick={() => onOpenChange(false)}
           >
@@ -131,7 +131,7 @@ export function DeclineOrderDialog({
             type="button"
             variant="primary"
             size="md"
-            className="flex-1 justify-center"
+            className="flex-1 justify-center font-bold tracking-[0.02em]"
             loading={isDeclining}
             loadingText="Declining"
             disabled={!finalReason}

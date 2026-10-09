@@ -67,19 +67,19 @@ export function ConversationPane({
       <div className="flex shrink-0 items-center gap-2.5 border-b border-hairline bg-board-plate px-3 py-2.5">
         <div
           data-on-field
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-board-field text-label text-board-plate"
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-board-field font-mono text-label font-bold text-board-plate shadow-sm"
         >
           {customerName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="m-0 truncate text-label text-ink">{customerName}</p>
+          <p className="m-0 truncate text-label font-bold text-ink">{customerName}</p>
           {customerOnline ? (
-            <p className="m-0 flex items-center gap-1.5 text-body text-status-done-ink">
+            <p className="m-0 flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-status-done-ink">
               <span aria-hidden className="size-1.5 rounded-full bg-status-done-ink" />
               {copy.activeNow}
             </p>
           ) : (
-            <p className="m-0 flex items-center gap-1.5 text-body text-ink-muted">
+            <p className="m-0 flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
               <span aria-hidden className="size-1.5 rounded-full bg-board-trim" />
               {copy.offline}
             </p>
@@ -89,7 +89,7 @@ export function ConversationPane({
           type="button"
           size="sm"
           variant="secondary"
-          className="shrink-0"
+          className="shrink-0 font-semibold"
           icon={<MapPin size={14} />}
           onClick={onViewLocation}
         >
@@ -107,7 +107,7 @@ export function ConversationPane({
         ) : messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <MessageSquare size={24} className="text-board-trim" />
-            <p className="m-0 text-panel text-ink">
+            <p className="m-0 text-panel font-bold text-ink">
               {copy.emptyFeedTitle(customerFirstName)}
             </p>
             <p className="m-0 max-w-xs text-body text-ink-muted">{copy.emptyFeedBody}</p>
@@ -129,7 +129,7 @@ export function ConversationPane({
       </div>
 
       {readOnly ? (
-        <div className="flex shrink-0 items-center justify-center gap-1.5 border-t border-hairline bg-status-closed-fill p-3 text-label text-status-closed-ink">
+        <div className="flex shrink-0 items-center justify-center gap-1.5 border-t border-hairline bg-status-closed-fill p-3 text-label font-semibold text-status-closed-ink">
           <Lock size={14} />
           {copy.closedConversation}
         </div>
@@ -141,7 +141,7 @@ export function ConversationPane({
                 key={chip}
                 type="button"
                 onClick={() => onPrefill(chip)}
-                className="min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-edge bg-board-plate px-3 text-body text-ink-muted transition-colors hover:border-board-field hover:text-ink"
+                className="min-h-8 shrink-0 cursor-pointer whitespace-nowrap rounded-trim border border-edge bg-board-plate px-2.5 py-1 text-label font-medium text-ink-muted transition-colors hover:border-board-field hover:bg-board-ground hover:text-ink"
               >
                 {chip}
               </button>
@@ -174,7 +174,7 @@ export function ConversationPane({
               type="submit"
               disabled={!inputText.trim()}
               aria-label={copy.send}
-              className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-plate bg-go px-3 text-label text-white transition-colors hover:bg-go-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
+              className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-plate bg-go px-3.5 text-label font-semibold text-white transition-colors hover:bg-go-deep disabled:cursor-not-allowed disabled:bg-status-closed-fill disabled:text-status-closed-ink"
             >
               <span className="hidden sm:inline">{copy.send}</span>
               <Send size={15} />

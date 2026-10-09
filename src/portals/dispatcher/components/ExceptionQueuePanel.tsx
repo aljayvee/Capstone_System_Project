@@ -1,16 +1,33 @@
 import React, { useEffect, useRef, useState } from "react";
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Check, Clock, Copy, RefreshCw, Sparkles, User } from "lucide-react";
 import { apiService, type ApiErrandException, type ExceptionKind } from "../../../services/apiService";
 import { cn } from "@/lib/utils";
 import { type OpenExceptions } from "../hooks/useOpenExceptions";
 import { ExceptionEvidence } from "./ExceptionEvidence";
 import { formatPeso } from "../../../utils/format";
+import { formatErrandId } from "../../../utils/formatErrandId";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { Field, fieldInputClasses } from "@/components/panel/Field";
 import { useDraft } from "../lib/useDraft";
 import { useDispatcherAiSettings } from "../hooks/useDispatcherAiSettings";
+
+const formatTimestamp = (dateStr?: string | null) => {
+  if (!dateStr) return "Just now";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "Recently";
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "Recently";
+  }
+};
 
 /** Plain names, so a reader never needs the enum to read the queue. */
 const KIND_LABEL: Record<ExceptionKind, string> = {
@@ -55,12 +72,13 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
   const [resolving, setResolving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const keyOf = (e: ApiErrandException) => `${e.errandId}:${e.kind}`;
 
   return (
     <PanelShell
-      title="Conflict Management"
+      title="Help Desk"
       figure={{
         label: "Open",
         // A dash when the queue never loaded, so this cannot report a
@@ -94,7 +112,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
         errorTitle="The exception queue did not load"
         loadingRows={3}
       >
-        <ul className="space-y-2" data-testid="exception-queue">
+        <ul className="space-y-2.5" data-testid="exception-queue">
           {exceptions.map((e) => {
             const key = keyOf(e);
             const isResolving = resolving === key;
@@ -102,31 +120,67 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
             return (
               <li
                 key={key}
-                className="rounded-plate border border-edge bg-board-plate p-4"
+                className={cn(
+                  "rounded-plate p-4 transition-all",
+                  isResolving
+                    ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-plate shadow-sm"
+                    : "border border-edge bg-board-plate hover:border-board-trim"
+                )}
                 data-testid={`exception-${key}`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-panel text-ink">{KIND_LABEL[e.kind]}</h3>
-                      <span data-figure className="font-mono text-label text-ink-muted">
-                        {e.errandId.slice(0, 8)}
-                      </span>
+                      <h3 className="text-panel font-bold text-ink">{KIND_LABEL[e.kind]}</h3>
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          navigator.clipboard.writeText(formatErrandId(e.errandId)).catch(() => {});
+                          setCopiedId(e.errandId);
+                          setTimeout(() => setCopiedId(null), 1500);
+                        }}
+                        className="group/copy inline-flex items-center gap-1.5 rounded-trim bg-board-ground/60 px-2 py-0.5 border border-edge text-ink hover:border-board-trim hover:bg-board-ground transition-colors cursor-pointer"
+                        title="Click to copy Errand ID"
+                      >
+                        <span data-figure className="font-mono text-data font-bold tabular-nums tracking-wide">
+                          {formatErrandId(e.errandId)}
+                        </span>
+                        {copiedId === e.errandId ? (
+                          <span className="inline-flex items-center gap-0.5 text-micro font-semibold text-emerald-600 uppercase tracking-wider">
+                            <Check size={11} strokeWidth={2.5} />
+                            <span>Copied</span>
+                          </span>
+                        ) : (
+                          <Copy size={11} className="text-ink-muted opacity-0 group-hover/copy:opacity-100 transition-opacity" />
+                        )}
+                      </button>
                       {e.riderName ? (
-                        <span className="text-label text-ink-muted">{e.riderName}</span>
+                        <span className="inline-flex items-center gap-1 text-label font-medium text-ink-muted">
+                          <User size={12} className="text-ink-muted/80" />
+                          <span>{e.riderName}</span>
+                        </span>
                       ) : null}
                     </div>
-                    <p className="text-body text-ink">{e.detail}</p>
-                    <p data-figure className="text-label text-ink-muted">
-                      {new Date(e.occurredAt).toLocaleString()}
-                    </p>
+                    <p className="text-body font-semibold text-status-act-ink leading-relaxed">{e.detail}</p>
+                    <div className="flex items-center gap-1.5 text-label text-ink-muted">
+                      <Clock size={12} className="text-ink-muted/80" />
+                      <span data-figure className="font-mono tabular-nums">
+                        {formatTimestamp(e.occurredAt)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     {e.amountAtRisk > 0 ? (
-                      <span data-figure className="font-mono text-data text-status-act-ink">
-                        {formatPeso(e.amountAtRisk)}
-                      </span>
+                      <div className="text-right">
+                        <span className="block text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+                          At risk
+                        </span>
+                        <span data-figure className="font-mono text-data font-bold tabular-nums text-status-act-ink">
+                          {formatPeso(e.amountAtRisk)}
+                        </span>
+                      </div>
                     ) : null}
                     {!isResolving ? (
                       <DispatcherButton
@@ -137,8 +191,9 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                           setErrors((prev) => ({ ...prev, [key]: null }));
                         }}
                         data-testid={`resolve-${key}`}
+                        className="font-semibold"
                       >
-                        Clear this
+                        Resolve
                       </DispatcherButton>
                     ) : null}
                   </div>
@@ -331,18 +386,19 @@ function ResolveForm({
               disabled={busy}
               onClick={() => void generate()}
               data-testid="suggest-reason"
+              className="font-semibold"
             >
               Generate suggestion
             </DispatcherButton>
             <span className="text-label text-ink-muted">
               or press{" "}
-              <kbd className="rounded-trim border border-edge bg-board-ground px-1.5 py-0.5 font-mono text-micro text-ink">
+              <kbd className="rounded-trim border border-edge bg-board-ground px-1.5 py-0.5 font-mono text-micro text-ink shadow-sm">
                 Tab
               </kbd>{" "}
               in the empty box
             </span>
           </div>
-          <p className="mt-1 m-0 text-micro text-ink opacity-50">
+          <p className="mt-1 m-0 text-micro text-ink-muted">
             Model can make mistakes. Please verify the suggested reason against the receipt and rider notes before updating.
           </p>
 
@@ -370,10 +426,11 @@ function ResolveForm({
             if (ok) clearReason();
           }}
           data-testid="resolve-confirm"
+          className="font-bold"
         >
           Update
         </DispatcherButton>
-        <DispatcherButton variant="secondary" size="md" disabled={busy} onClick={onCancel}>
+        <DispatcherButton variant="secondary" size="md" disabled={busy} onClick={onCancel} className="font-semibold">
           Cancel
         </DispatcherButton>
       </div>
@@ -400,10 +457,10 @@ function SuggestionStatus({
       // Emptied by hand: the note would describe text that is no longer there.
       if (boxIsEmpty) return null;
       return (
-        <p className="mt-1.5 flex items-start gap-1.5 text-label text-ink-muted">
-          <Sparkles size={13} className="mt-0.5 shrink-0" />
+        <p className="mt-1.5 flex items-start gap-1.5 text-label font-medium text-ink-muted">
+          <Sparkles size={13} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
-            Suggested based on settlement figures and rider notes ({percent(state.confidence)}{" "}
+            Suggested based on settlement figures and rider notes (<span className="font-mono tabular-nums">{percent(state.confidence)}</span>{" "}
             confidence). Please review against the receipt evidence and adjust any details if needed.
           </span>
         </p>
@@ -411,18 +468,19 @@ function SuggestionStatus({
 
     case "offered":
       return (
-        <div className="mt-2 rounded-trim border border-edge bg-board-ground px-3 py-2">
-          <p className="flex items-center gap-1.5 text-micro uppercase text-ink-muted">
-            <Sparkles size={12} className="shrink-0" />
-            Suggested reason &bull; {percent(state.confidence)} confidence
+        <div className="mt-2 rounded-trim border border-edge bg-board-ground p-3">
+          <p className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+            <Sparkles size={12} className="shrink-0 text-amber-500" />
+            <span>Suggested reason &bull; <span className="font-mono tabular-nums">{percent(state.confidence)}</span> confidence</span>
           </p>
-          <p className="mt-1 text-body text-ink">{state.text}</p>
+          <p className="mt-1 text-body font-medium text-ink leading-relaxed">{state.text}</p>
           <div className="mt-2">
             <DispatcherButton
               variant="secondary"
               size="sm"
               onClick={() => onUse(state.text, state.confidence, state.checkedBy)}
               data-testid="use-suggestion"
+              className="font-semibold"
             >
               Use this instead
             </DispatcherButton>
@@ -434,22 +492,22 @@ function SuggestionStatus({
       // When the evidence and rider notes do not match any standard category:
       if (state.noneFits) {
         return (
-          <p className="mt-1.5 text-label text-status-waiting-ink">
+          <p className="mt-1.5 text-label font-medium text-status-waiting-ink">
             The settlement figures and rider notes do not match a standard reason pattern. Please
             describe what happened manually.
           </p>
         );
       }
       return (
-        <p className="mt-1.5 text-label text-status-waiting-ink">
-          Not enough evidence for an automatic suggestion ({percent(state.confidence)} confidence;{" "}
-          {percent(state.threshold)} required). Please enter the resolution reason manually.
+        <p className="mt-1.5 text-label font-medium text-status-waiting-ink">
+          Not enough evidence for an automatic suggestion (<span className="font-mono tabular-nums">{percent(state.confidence)}</span> confidence;{" "}
+          <span className="font-mono tabular-nums">{percent(state.threshold)}</span> required). Please enter the resolution reason manually.
         </p>
       );
 
     case "failed":
       return (
-        <p role="alert" className="mt-1.5 text-label text-status-act-ink">
+        <p role="alert" className="mt-1.5 text-label font-medium text-status-act-ink">
           Could not generate a suggestion right now. Please try again or enter the reason manually.
         </p>
       );

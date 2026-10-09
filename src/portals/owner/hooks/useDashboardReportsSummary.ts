@@ -204,7 +204,7 @@ export function useDashboardReportsSummary(
           totalAtRisk: report.summary?.totalAtRisk ?? 0,
         };
       } else {
-        newErrors.conflicts = "Conflict report unavailable";
+        newErrors.conflicts = "Help Desk report unavailable";
       }
 
       setMetrics({

@@ -30,8 +30,8 @@ InputOTPGroup.displayName = "InputOTPGroup";
 
 const InputOTPSlot = React.forwardRef<
   React.ElementRef<"div">,
-  React.ComponentPropsWithoutRef<"div"> & { index: number }
->(({ index, className, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<"div"> & { index: number; activeClassName?: string }
+>(({ index, className, activeClassName, ...props }, ref) => {
   const inputOTPContext = React.useContext(OTPInputContext);
   const slot = inputOTPContext.slots[index];
   const char = slot?.char;
@@ -44,7 +44,7 @@ const InputOTPSlot = React.forwardRef<
       className={cn(
         "relative flex h-12 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50",
         "text-lg font-bold font-mono text-slate-800 transition-all",
-        isActive && "z-10 border-[#1E3A5F] ring-2 ring-[#1E3A5F]/30 bg-white",
+        isActive && (activeClassName ?? "z-10 border-[#1E3A5F] ring-2 ring-[#1E3A5F]/30 bg-white"),
         className
       )}
       {...props}

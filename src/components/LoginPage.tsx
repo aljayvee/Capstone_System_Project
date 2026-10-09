@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
-import type { LoginSuccessResponse } from "../services/apiService";
+import type { LoginSuccessResponse, LoginChallengeResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
 import { io, Socket } from "socket.io-client";
 import {
@@ -84,6 +84,8 @@ export default function LoginPage() {
   const [stage, setStage] = useState<Stage>("CREDENTIALS");
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
+  const [maskedPhone, setMaskedPhone] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string | null>(null);
   const [challengeExpiresAt, setChallengeExpiresAt] = useState(0);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [isResending, setIsResending] = useState(false);
@@ -191,6 +193,8 @@ export default function LoginPage() {
     setStage("CREDENTIALS");
     setChallengeToken(null);
     setMaskedEmail(null);
+    setMaskedPhone(null);
+    setPhone(null);
     setChallengeExpiresAt(0);
     setResendAvailableAt(0);
     setPassword("");
@@ -224,14 +228,7 @@ export default function LoginPage() {
     });
   };
 
-  const enterChallenge = (challenge: {
-    challengeToken: string;
-    maskedEmail?: string | null;
-    role: string;
-    expiresInSeconds: number;
-    profileSetupRequired?: boolean;
-    otpRequired?: boolean;
-  }) => {
+  const enterChallenge = (challenge: LoginChallengeResponse) => {
     const role = String(challenge.role || "").toLowerCase();
     if (isMobileOnlyRole(role)) {
       void apiClient.post("/auth/logout").catch(() => {});
@@ -241,6 +238,8 @@ export default function LoginPage() {
 
     setChallengeToken(challenge.challengeToken);
     setMaskedEmail(challenge.maskedEmail ?? null);
+    setMaskedPhone(challenge.maskedPhone ?? null);
+    setPhone(challenge.phone ?? null);
     setChallengeExpiresAt(Date.now() + challenge.expiresInSeconds * 1000);
     setStage(challenge.profileSetupRequired ? "PROFILE_SETUP" : "OTP");
     if (challenge.otpRequired) {
@@ -424,6 +423,24 @@ export default function LoginPage() {
     completeSession(result);
   };
 
+  const handleFirebasePhoneSubmit = async (firebaseIdToken: string) => {
+    if (!challengeToken) return;
+    setActiveAlert(null);
+    setIsLoading(true);
+
+    const result = await apiService.verifyLoginOtp(challengeToken, undefined, firebaseIdToken);
+    if ("error" in result) {
+      setActiveAlert({
+        variant: "error",
+        title: "SMS Verification Failed",
+        message: result.error,
+      });
+      setIsLoading(false);
+      return;
+    }
+    completeSession(result);
+  };
+
   const handleResend = async () => {
     if (!challengeToken) return;
     setActiveAlert(null);
@@ -446,6 +463,8 @@ export default function LoginPage() {
 
     setChallengeToken(result.challengeToken);
     setMaskedEmail(result.maskedEmail ?? null);
+    setMaskedPhone(result.maskedPhone ?? null);
+    setPhone(result.phone ?? null);
     setChallengeExpiresAt(Date.now() + result.expiresInSeconds * 1000);
     setResendAvailableAt(Date.now() + RESEND_COOLDOWN_MS);
     toast.success(`A new code has been sent to ${result.maskedEmail || "your email"}.`);
@@ -462,7 +481,7 @@ export default function LoginPage() {
   const headings: Record<Stage, { title: string; description: string }> = {
     CREDENTIALS: { title: "Sugo On the Go Portal", description: "Tacurong City Logistics & Fleet Management" },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
-    OTP: { title: "Verify Your Email", description: "Enter the 6-digit verification code sent to your email" },
+    OTP: { title: "Two-Factor Authentication", description: "Verify your identity using Email (Gmail) or SMS OTP" },
   };
 
   if (isServerErrorOverlayActive) {
@@ -684,12 +703,15 @@ export default function LoginPage() {
             )}
             <OtpStep
               maskedEmail={maskedEmail}
+              maskedPhone={maskedPhone}
+              phone={phone}
               expiresAt={challengeExpiresAt}
               resendAvailableAt={resendAvailableAt}
               serverError={activeAlert?.message || ""}
               isSubmitting={isLoading}
               isResending={isResending}
               onSubmit={handleOtpSubmit}
+              onSubmitFirebasePhone={handleFirebasePhoneSubmit}
               onResend={handleResend}
               onExpire={handleChallengeExpired}
               onCancel={() => resetToCredentials()}

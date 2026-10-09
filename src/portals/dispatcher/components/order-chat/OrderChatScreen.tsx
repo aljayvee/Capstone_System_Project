@@ -203,13 +203,11 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     onCustomerConfirmed: markCustomerConfirmed,
   });
 
-  // The downpayment ledger. Separate hook from useOrderPayment above: that one
-  // is the customer CHOOSING a method, this one is a dispatcher attesting that
-  // money arrived on the Facebook Page.
-  const payments = useOrderPayments({
-    orderId,
-    onOrderUpdated: setOrderDetails,
-  });
+  // The payment ledger of a GCash / PayMaya or Bank Transfer errand. Separate
+  // hook from useOrderPayment above: that one is the customer CHOOSING a
+  // method; this one shows what was paid at the door (since 2026-10-08 the
+  // system records it from the rider's photo; no dispatcher confirms anything).
+  const payments = useOrderPayments({ orderId });
 
   const dispatchRider = useRiderDispatch({
     orderId,
@@ -232,7 +230,6 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     isCustomerConfirmed: items.isCustomerConfirmed,
     itemsSentAt: items.sentAt,
     isPaymentConfirmed: payment.isPaymentConfirmed,
-    isUpfrontConfirmed: payments.isUpfrontConfirmed,
     confirmedPaymentMode: payment.confirmedPaymentMode,
     paymentAskedAt: payment.askedAt,
     mapUnavailable: pins.mapUnavailable,
@@ -479,7 +476,6 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             hasPins={pins.pinpoints.length > 0}
             isCustomerConfirmed={items.isCustomerConfirmed}
             isPaymentConfirmed={payment.isPaymentConfirmed}
-            isUpfrontConfirmed={payments.isUpfrontConfirmed}
             onSend={dispatchRider.sendRider}
             onBlocked={() => {
               if (model.firstUnfinishedId) jumpToStage(model.firstUnfinishedId);
@@ -502,29 +498,30 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
       {/* ── header ───────────────────────────────────────────────────────── */}
       <header
         data-on-field
-        className="flex shrink-0 items-center gap-2.5 bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
+        className="flex shrink-0 items-center gap-2.5 bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4 border-b border-field-line"
       >
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-trim px-2.5 text-micro uppercase text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-trim px-2.5 text-micro font-semibold uppercase tracking-[0.06em] text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
         >
           <ArrowLeft size={14} />
           <span className="hidden sm:inline">{copy.backToQueue}</span>
         </button>
 
-        <div className="min-w-0 flex-1 flex items-center gap-2 flex-wrap">
-          <span className="truncate text-label text-board-plate">{customerName}</span>
-          {/* The route number was blue-200, the only blue on the surface and a
-              direct breach of the locked palette. It is a figure, so it now
-              reads as one. */}
-          <span data-figure className="hidden font-mono text-micro text-board-trim sm:inline">
+        <div className="min-w-0 flex-1 flex items-center gap-2.5 flex-wrap">
+          <span className="truncate text-label font-bold text-board-plate sm:text-panel">{customerName}</span>
+          {/* The Errand ID contract: bold tabular monospace on dark field */}
+          <span
+            data-figure
+            className="inline-flex items-center rounded-trim border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-data font-bold tabular-nums tracking-wide text-board-plate"
+          >
             {formatErrandId(orderId)}
           </span>
           {orderDetails?.status ? (
             <StatusChip status={orderDetails.status} className="shrink-0" />
           ) : (
-            <span className="text-micro uppercase text-board-trim">Loading</span>
+            <span className="text-micro font-semibold uppercase tracking-[0.06em] text-board-trim">Loading</span>
           )}
         </div>
 
@@ -535,14 +532,14 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               onClick={() => setShowMenu((v) => !v)}
               aria-label={copy.moreActions}
               aria-expanded={showMenu}
-              className="grid size-9 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
+              className="grid size-9 cursor-pointer place-items-center rounded-trim border border-field-line bg-white/5 text-board-trim transition-colors hover:bg-white/10 hover:text-board-plate"
             >
               <MoreHorizontal size={16} />
             </button>
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-11 z-20 w-56 overflow-hidden rounded-plate border border-edge bg-board-plate shadow-plate">
+                <div className="absolute right-0 top-11 z-20 w-56 overflow-hidden rounded-plate border border-edge bg-board-plate shadow-plate divide-y divide-hairline">
                   {/* Declining used to live in the "Check the order" step.
                       Opening an order now accepts it, so this is where the
                       honest exit is: beside the other rare, final action. */}
@@ -553,7 +550,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
                         setShowMenu(false);
                         setShowDecline(true);
                       }}
-                      className="flex min-h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-label text-status-act-ink transition-colors hover:bg-status-act-fill"
+                      className="flex min-h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-label font-semibold text-status-act-ink transition-colors hover:bg-status-act-fill"
                     >
                       <Ban size={14} />
                       {copy.declineOrder}
@@ -567,7 +564,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
                       setShowMenu(false);
                       setShowPassByConfirm(true);
                     }}
-                    className="flex min-h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-label text-status-act-ink transition-colors hover:bg-status-act-fill"
+                    className="flex min-h-10 w-full cursor-pointer items-center gap-2 px-3 text-left text-label font-semibold text-status-act-ink transition-colors hover:bg-status-act-fill"
                   >
                     <Slash size={14} />
                     {copy.closeWithoutOrder}
@@ -593,9 +590,9 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
           onClick={() => setMobilePane("chat")}
           aria-pressed={mobilePane === "chat"}
           className={cn(
-            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
+            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
             mobilePane === "chat"
-              ? "bg-board-field text-board-plate"
+              ? "bg-board-field text-board-plate shadow-plate"
               : "bg-board-ground text-ink-muted hover:text-ink"
           )}
         >
@@ -604,7 +601,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
           {unreadCount > 0 && (
             <span
               className={cn(
-                "rounded-full px-1.5 text-micro tabular-nums",
+                "rounded-trim px-1.5 font-mono text-micro font-bold tabular-nums",
                 mobilePane === "chat"
                   ? "bg-board-plate/20 text-board-plate"
                   : "bg-signal text-white"
@@ -619,15 +616,15 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
           onClick={() => setMobilePane("steps")}
           aria-pressed={mobilePane === "steps"}
           className={cn(
-            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors",
+            "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
             mobilePane === "steps"
-              ? "bg-board-field text-board-plate"
+              ? "bg-board-field text-board-plate shadow-plate"
               : "bg-board-ground text-ink-muted hover:text-ink"
           )}
         >
           <ListChecks size={14} />
           {copy.stepsTab}
-          <span data-figure className="tabular-nums opacity-75">
+          <span data-figure className="font-mono tabular-nums opacity-85">
             {model.doneCount}/{model.stages.length}
           </span>
         </button>
@@ -636,7 +633,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             type="button"
             onClick={() => setShowProofModal(true)}
             aria-label={copy.paymentTab}
-            className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro uppercase transition-colors bg-board-ground text-ink-muted hover:text-ink"
+            className="flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] transition-colors bg-board-ground text-ink-muted hover:text-ink"
           >
             <Wallet size={14} />
             {copy.paymentTab}
@@ -742,19 +739,19 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-hairline px-3 py-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-micro font-bold uppercase tracking-wider text-ink-muted">
+                    <span className="text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
                       Step {activeStage.id} of {model.stages.length}
                     </span>
                     <span className="text-hairline">·</span>
-                    <h3 className="min-w-0 truncate text-panel text-ink">{activeStage.label}</h3>
+                    <h3 className="min-w-0 truncate text-panel font-bold text-ink">{activeStage.label}</h3>
                   </div>
                   <span
                     className={cn(
-                      "flex min-w-0 items-center gap-1 truncate text-body",
+                      "flex min-w-0 items-center gap-1 truncate text-label font-medium tabular-nums",
                       activeStage.state === "done"
-                        ? "text-status-done-ink"
+                        ? "text-status-done-ink font-semibold"
                         : isWaitingOnActive
-                          ? "text-status-waiting-ink"
+                          ? "text-status-waiting-ink font-semibold"
                           : "text-ink-muted"
                     )}
                   >
@@ -813,11 +810,11 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
         <Dialog open={showProofModal} onOpenChange={setShowProofModal}>
           <DialogContent
             data-surface="dispatch"
-            className="max-h-[90vh] max-w-xl overflow-y-auto rounded-modal border-edge p-0 shadow-plate"
+            className="max-h-[90vh] max-w-xl overflow-y-auto rounded-modal border border-edge bg-board-plate p-0 shadow-plate"
           >
             <DialogHeader className="flex flex-row items-center justify-between border-b border-hairline px-4 py-3">
-              <DialogTitle className="flex items-center gap-2 text-panel text-ink">
-                <Receipt size={16} /> Downpayment Proof & Attestation
+              <DialogTitle className="flex items-center gap-2 text-panel font-bold text-ink">
+                <Receipt size={16} /> {copy.payments.doorPanelTitle}
               </DialogTitle>
               <DialogClose className="grid size-8 place-items-center rounded-trim text-ink-muted hover:bg-board-ground hover:text-ink">
                 <X size={16} />
@@ -829,9 +826,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
                 payments={payments}
                 readOnly={isReadOnly}
                 customerFirstName={customerFirstName}
-                riderName={riderName}
-                messages={chat.messages}
-                pushMessage={chat.pushMessage}
+                riderName={riderName || "Rider"}
               />
             </div>
           </DialogContent>
@@ -857,9 +852,9 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
 
       {/* ── close without an order ────────────────────────────────────────── */}
       <Dialog open={showPassByConfirm} onOpenChange={setShowPassByConfirm}>
-        <DialogContent data-surface="dispatch" className="rounded-modal border-edge shadow-plate">
+        <DialogContent data-surface="dispatch" className="rounded-modal border border-edge bg-board-plate shadow-plate">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-panel font-bold text-ink">
               <Slash className="text-status-waiting-ink" size={18} /> {copy.passBy.title}
             </DialogTitle>
             <DialogClose
@@ -869,9 +864,9 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               <X size={18} />
             </DialogClose>
           </DialogHeader>
-          <DialogDescription>{copy.passBy.body}</DialogDescription>
+          <DialogDescription className="text-body text-ink-muted">{copy.passBy.body}</DialogDescription>
           {closeError ? (
-            <p role="alert" className="rounded-plate bg-status-act-fill px-3 py-2 text-label text-status-act-ink">
+            <p role="alert" className="rounded-plate border border-status-act-ink/30 bg-status-act-fill px-3 py-2 text-label font-medium text-status-act-ink">
               {closeError}
             </p>
           ) : null}
@@ -880,7 +875,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               type="button"
               variant="secondary"
               size="md"
-              className="flex-1"
+              className="flex-1 font-semibold"
               onClick={() => {
                 setCloseError(null);
                 setShowPassByConfirm(false);
@@ -897,7 +892,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
               onClick={() => {
                 void handleCloseWithoutOrder();
               }}
-              className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-plate bg-signal px-4 text-label text-white transition-colors hover:bg-signal-deep"
+              className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-plate bg-signal px-4 text-label font-semibold text-white transition-colors hover:bg-signal-deep"
             >
               <Slash size={16} /> {copy.passBy.confirm}
             </button>

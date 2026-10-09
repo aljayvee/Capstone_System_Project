@@ -63,9 +63,14 @@ export function useCustomerChatAlerts({
   const initialLoadCompletedRef = useRef<Set<string>>(new Set());
   const subscriptionsRef = useRef<Map<string, Unsubscribe>>(new Map());
 
-  // Track active errands map for fast lookup
+  // Errands whose chat this dispatcher may read: claimed and not finished. The
+  // list holds the unclaimed queue as well, and since 2026-10-07 a customer's
+  // chat opens only to the dispatcher who claimed it (chat_access in the
+  // Firebase rules), so listening to a queued errand's chat is only a refusal.
   const activeErrands = useMemo(() => {
-    return errands.filter((e) => !isTerminalStatus(e.status));
+    return errands.filter(
+      (e) => !isTerminalStatus(e.status) && String(e.status ?? "").toUpperCase() !== "AVAILABLE"
+    );
   }, [errands]);
 
   const activeErrandsMap = useMemo(() => {

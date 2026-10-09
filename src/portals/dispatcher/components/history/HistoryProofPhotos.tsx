@@ -178,10 +178,10 @@ export function ProofPhotoGrid({
                 type="button"
                 onClick={() => void view(image)}
                 disabled={loadingId === image.id}
-                className="flex h-full w-full cursor-pointer flex-col gap-1 rounded-trim border border-edge bg-board-ground px-2.5 py-2 text-left transition-colors hover:border-board-field disabled:cursor-wait"
+                className="flex h-full w-full cursor-pointer flex-col gap-1 rounded-trim border border-edge bg-board-ground/60 px-2.5 py-2 text-left transition-colors hover:border-board-field hover:bg-board-plate disabled:cursor-wait"
                 aria-label={`Open the photo: ${labelOf(image)}`}
               >
-                <span className="flex items-center gap-1.5 text-micro uppercase text-ink-muted">
+                <span className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
                   {loadingId === image.id ? (
                     <Loader2 size={12} className="shrink-0 animate-spin" />
                   ) : (
@@ -192,7 +192,7 @@ export function ProofPhotoGrid({
                   </span>
                 </span>
                 {figure != null ? (
-                  <span data-figure className="font-mono text-data text-ink">
+                  <span data-figure className="font-mono text-data font-bold tabular-nums text-ink">
                     {formatPeso(figure)}
                   </span>
                 ) : null}
@@ -206,7 +206,7 @@ export function ProofPhotoGrid({
                 <span className="flex flex-wrap items-center gap-1.5">
                   {!image.verified ? <DispatcherBadge tone="waiting">Unverified</DispatcherBadge> : null}
                   {!Number.isNaN(capturedAt.getTime()) ? (
-                    <span data-figure className="text-label text-ink-muted">
+                    <span data-figure className="font-mono text-label tabular-nums text-ink-muted">
                       {capturedAt.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" })}
                     </span>
                   ) : null}
@@ -228,7 +228,7 @@ export function ProofPhotoGrid({
           <button
             type="button"
             onClick={() => setOpen(null)}
-            className="absolute right-5 top-5 cursor-pointer rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+            className="absolute right-5 top-5 grid size-9 cursor-pointer place-items-center rounded-trim bg-white/10 text-white transition hover:bg-white/20"
             aria-label="Close the photo"
           >
             <X size={18} />

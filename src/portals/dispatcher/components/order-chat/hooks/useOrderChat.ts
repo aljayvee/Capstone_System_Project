@@ -213,11 +213,11 @@ export function useOrderChat({
         const notifText =
           payload.text ||
           (payload.type === 'pinpoints'
-            ? '📍 Updated store pinpoints for your errand'
+            ? 'Updated store pinpoints for your errand'
             : payload.type === 'revision'
-            ? '📋 Sent an order breakdown for your review'
+            ? 'Sent an order breakdown for your review'
             : payload.type === 'payment_enabled'
-            ? '💳 Enabled GCash / Maya payment for your errand'
+            ? 'Enabled GCash / Maya payment for your errand'
             : null);
 
         if (notifText) {

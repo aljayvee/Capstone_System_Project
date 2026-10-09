@@ -16,6 +16,7 @@ import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
 import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES } from "../constants/riderPresence";
 import { decodePolyline } from "../utils/polyline";
+import { cn } from "@/lib/utils";
 
 /** For a stop pinned outside the catalogue. Mirrors the server's default. */
 const DEFAULT_ARRIVAL_RADIUS_METERS = 75;
@@ -573,11 +574,12 @@ export default function LiveFleetMap({
             onClick={onToggleHideOffline}
             title={hideOffline ? "Show offline riders" : "Hide offline riders"}
             data-elevate
-            className={`h-9 px-3 text-xs font-bold rounded-plate shadow-plate border transition flex items-center gap-1.5 ${
+            className={cn(
+              "h-9 px-3.5 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border transition-all flex items-center gap-1.5 cursor-pointer shadow-sm",
               hideOffline
-                ? "bg-slate-800 text-white border-slate-800"
-                : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900"
-            }`}
+                ? "bg-board-field text-board-plate border-board-field"
+                : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900 hover:border-slate-300"
+            )}
           >
             {hideOffline ? <EyeOff size={14} /> : <Eye size={14} />}
             <span className="hidden sm:inline">{hideOffline ? "Offline Hidden" : "Hide Offline"}</span>
@@ -590,7 +592,7 @@ export default function LiveFleetMap({
           onClick={handleFitBounds}
           title="Fit all visible riders on map"
           data-elevate
-          className="h-9 px-3 bg-white/95 hover:bg-white text-slate-700 text-xs font-bold rounded-plate shadow-plate border border-slate-200/80 flex items-center gap-1.5 transition hover:text-[#1E3A5F]"
+          className="h-9 px-3.5 bg-white/95 hover:bg-white text-slate-700 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border border-slate-200/80 hover:border-slate-300 flex items-center gap-1.5 transition-all hover:text-[#1E3A5F] cursor-pointer shadow-sm"
         >
           <Target size={15} className="text-[#1E3A5F]" />
           <span className="hidden sm:inline">Fit All</span>
@@ -603,30 +605,34 @@ export default function LiveFleetMap({
             when they were zero because the roster request had failed. A
             solid mark still reads as a status; a pulse that never checks
             anything is an assertion the component cannot support. */}
-        <div className="bg-white/95 px-3 py-2 rounded-plate border border-slate-200/80 text-xs font-bold text-slate-800 flex items-center gap-2">
+        <div className="bg-white/95 px-3.5 py-2 rounded-trim border border-slate-200/80 text-micro font-semibold text-slate-800 flex items-center gap-2 shadow-sm">
           <span
-            className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+            className={cn(
+              "inline-flex h-2.5 w-2.5 shrink-0 rounded-full",
               presenceUnknown
                 ? "bg-slate-400"
                 : liveLinkDown
                   ? "bg-amber-500"
                   : "bg-emerald-500"
-            }`}
+            )}
           />
           <span>
             {presenceUnknown ? (
               "Presence unknown"
             ) : (
               <>
-                {activeReadyCount} Online • {activeBusyCount} On delivery
-                {signalLostCount > 0 ? <> • <span className="text-red-700">{signalLostCount} Signal lost</span></> : null}
+                <span className="font-mono tabular-nums font-bold text-slate-900">{activeReadyCount}</span> Online •{" "}
+                <span className="font-mono tabular-nums font-bold text-slate-900">{activeBusyCount}</span> On delivery
+                {signalLostCount > 0 ? (
+                  <> • <span className="text-red-700 font-semibold"><span className="font-mono tabular-nums font-bold">{signalLostCount}</span> Signal lost</span></>
+                ) : null}
               </>
             )}
           </span>
           {/* Said in words, not only by the dot's colour. Pins may still move
               over RTDB while this shows; they are just not guaranteed to. */}
           {!presenceUnknown && liveLinkDown ? (
-            <span className="font-semibold text-amber-700">Reconnecting</span>
+            <span className="font-semibold text-amber-700 uppercase tracking-wider text-[10px]">Reconnecting</span>
           ) : null}
         </div>
       </div>

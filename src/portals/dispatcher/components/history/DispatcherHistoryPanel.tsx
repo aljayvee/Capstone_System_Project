@@ -61,26 +61,28 @@ function HistoryRow({
       onClick={onSelect}
       aria-current={isSelected ? "true" : undefined}
       className={cn(
-        "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-colors duration-150",
-        isSelected ? "bg-board-field" : "border border-edge bg-board-plate hover:border-board-trim"
+        "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-all duration-150",
+        isSelected
+          ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field shadow-sm"
+          : "border border-edge bg-board-plate hover:border-board-trim hover:bg-board-ground/30"
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
         <span
-          className={cn("min-w-0 truncate text-data", isSelected ? "text-board-plate" : "text-ink")}
+          className={cn("min-w-0 truncate text-title font-bold uppercase tracking-tight", isSelected ? "text-board-plate" : "text-ink")}
           title={errand.customerName}
         >
           {errand.customerName || "Customer"}
         </span>
         {isCancelled ? (
-          <span className={cn("shrink-0 text-label", isSelected ? "text-board-trim" : "text-ink-muted")}>
+          <span className={cn("shrink-0 text-label font-medium", isSelected ? "text-board-trim" : "text-ink-muted")}>
             Not delivered
           </span>
         ) : (
           <span
             data-figure
             className={cn(
-              "shrink-0 font-mono text-data tabular-nums",
+              "shrink-0 font-mono text-data font-bold tabular-nums",
               isSelected ? "text-board-plate" : "text-ink"
             )}
           >
@@ -92,14 +94,14 @@ function HistoryRow({
       <div className="mt-0.5 flex items-baseline justify-between gap-3">
         <span
           data-figure
-          className={cn("min-w-0 truncate text-label", isSelected ? "text-board-trim" : "text-ink-muted")}
+          className={cn("min-w-0 truncate text-label font-medium", isSelected ? "text-board-trim" : "text-ink-muted")}
         >
-          <span className="font-mono">{formatErrandId(errand.id)}</span>
+          <span className="font-mono text-data font-bold tabular-nums tracking-wide">{formatErrandId(errand.id)}</span>
           {" · "}
-          {formatClosedAt(errand)}
+          <span className="font-mono tabular-nums">{formatClosedAt(errand)}</span>
         </span>
         {!isCancelled && fee != null ? (
-          <span className={cn("shrink-0 text-micro uppercase", isSelected ? "text-board-trim" : "text-ink-muted")}>
+          <span className={cn("shrink-0 text-micro font-semibold uppercase tracking-[0.06em]", isSelected ? "text-board-trim" : "text-ink-muted")}>
             Delivery fee
           </span>
         ) : null}
@@ -113,7 +115,7 @@ function HistoryRow({
       >
         <span
           className={cn(
-            "flex min-w-0 items-center gap-1.5 text-label",
+            "flex min-w-0 items-center gap-1.5 text-label font-medium",
             isSelected ? "text-board-plate/90" : "text-ink"
           )}
         >
@@ -126,7 +128,7 @@ function HistoryRow({
           {distanceKm != null ? (
             <span
               data-figure
-              className={cn("shrink-0 font-mono", isSelected ? "text-board-trim" : "text-ink-muted")}
+              className={cn("shrink-0 font-mono tabular-nums", isSelected ? "text-board-trim" : "text-ink-muted")}
             >
               · {formatKm(distanceKm)}
             </span>
@@ -139,7 +141,7 @@ function HistoryRow({
 }
 
 /**
- * Customer Transaction (formerly My History): the orders this dispatcher handled that are finished, searched,
+ * Errand Transaction (formerly Customer Transaction, before that My History): the orders this dispatcher handled that are finished, searched,
  * sorted and paged in the browser, with the full record of the selected one
  * beside the list.
  *
@@ -254,7 +256,7 @@ export function DispatcherHistoryPanel({
 
   return (
     <PanelShell
-      title="Customer Transaction"
+      title="Errand Transaction"
       figure={{ label: "Delivered", value: isUnknown ? "--" : String(summary.deliveredCount) }}
       detail={detailLine}
       aside={
@@ -263,7 +265,7 @@ export function DispatcherHistoryPanel({
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
             placeholder="Search ID, customer, address or store"
-            aria-label="Search customer transactions"
+            aria-label="Search errand transactions"
           />
         </div>
       }
@@ -279,24 +281,26 @@ export function DispatcherHistoryPanel({
                   onClick={() => changeFilter(option.id)}
                   aria-pressed={isActive}
                   className={cn(
-                    "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-3 text-micro uppercase transition-colors",
-                    isActive ? "bg-board-field text-board-plate" : "bg-board-plate text-ink-muted hover:text-ink"
+                    "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim border px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
+                    isActive
+                      ? "border-board-field bg-board-field text-board-plate"
+                      : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink hover:bg-board-ground/40"
                   )}
                 >
-                  {option.label}
-                  <span data-figure className="tabular-nums">
+                  <span>{option.label}</span>
+                  <span data-figure className="font-mono tabular-nums font-bold">
                     {isUnknown ? "--" : counts[option.id]}
                   </span>
                 </button>
               );
             })}
           </div>
-          <label className="flex items-center gap-2 text-micro uppercase text-ink-muted">
+          <label className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
             Sort
             <select
               value={sort}
               onChange={(event) => changeSort(event.target.value as SortKey)}
-              className="min-h-9 cursor-pointer rounded-trim border border-edge bg-board-plate px-2 text-label normal-case text-ink"
+              className="min-h-9 cursor-pointer rounded-trim border border-edge bg-board-plate px-2 text-label normal-case text-ink transition-colors hover:border-board-trim"
             >
               {SORTS.map((option) => (
                 <option key={option.key} value={option.key}>
@@ -317,7 +321,7 @@ export function DispatcherHistoryPanel({
             isEmpty={mine.length === 0}
             emptyTitle="Nothing finished yet"
             emptyBody="Orders you handle collect here once they are delivered or cancelled, with the receipts the rider filed."
-            errorTitle="Customer transactions did not load"
+            errorTitle="Errand transactions did not load"
             loadingRows={6}
           >
             <></>
@@ -326,14 +330,14 @@ export function DispatcherHistoryPanel({
       ) : (
         <div className="flex h-full min-h-0 flex-col gap-3">
           {/* Narrow: one pane at a time, as on the queue. */}
-          <div className="flex shrink-0 items-center gap-1 rounded-plate bg-board-plate p-1 lg:hidden">
+          <div className="flex shrink-0 items-center gap-1 rounded-plate border border-edge bg-board-plate p-1 lg:hidden">
             <button
               type="button"
               onClick={() => setNarrowPane("list")}
               aria-pressed={narrowPane === "list"}
               className={cn(
-                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors",
-                narrowPane === "list" ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
+                narrowPane === "list" ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink hover:bg-board-ground/60"
               )}
             >
               Transactions
@@ -344,8 +348,8 @@ export function DispatcherHistoryPanel({
               aria-pressed={narrowPane === "order"}
               disabled={!selected}
               className={cn(
-                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro uppercase transition-colors disabled:cursor-not-allowed disabled:text-board-trim",
-                narrowPane === "order" ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink"
+                "min-h-9 flex-1 cursor-pointer rounded-trim px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors disabled:cursor-not-allowed disabled:text-board-trim",
+                narrowPane === "order" ? "bg-board-field text-board-plate" : "text-ink-muted hover:text-ink hover:bg-board-ground/60"
               )}
             >
               The order
@@ -367,7 +371,7 @@ export function DispatcherHistoryPanel({
                     </PanelState>
                   </div>
                 ) : (
-                  <ul className="space-y-2" aria-label="Finished orders">
+                  <ul className="space-y-2.5" aria-label="Finished orders">
                     {visible.map((errand) => (
                       <li key={errand.id}>
                         <HistoryRow
@@ -382,13 +386,13 @@ export function DispatcherHistoryPanel({
               </div>
               {sorted.length > 0 ? (
                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-plate border border-edge bg-board-plate px-3 py-2">
-                  <p data-figure className="text-label text-ink-muted">
+                  <p data-figure className="font-mono text-label tabular-nums text-ink-muted">
                     {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, sorted.length)} of{" "}
                     {sorted.length}
                   </p>
                   <div className="flex items-center gap-2">
                     {pageButton("prev")}
-                    <span data-figure className="px-1 text-label text-ink">
+                    <span data-figure className="font-mono px-1 text-label tabular-nums text-ink">
                       Page {safePage} of {pageCount}
                     </span>
                     {pageButton("next")}

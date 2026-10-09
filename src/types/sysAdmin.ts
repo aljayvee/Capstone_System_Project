@@ -267,6 +267,7 @@ export interface SystemTelemetry {
   };
   maintenance: Record<PortalKey, PortalMaintenanceStatus>;
   serverErrorSimulated?: boolean;
+  dispatcherAiSuggestionsEnabled?: boolean;
 }
 
 export type PortalKey = "owner" | "dispatcher" | "rider" | "customer";
@@ -431,5 +432,37 @@ export interface LogTailResult {
 export interface ServiceControlResponse {
   success: boolean;
   message: string;
+}
+
+export type AppReleaseTarget = "customer" | "rider";
+
+export interface AppReleaseInfo {
+  target: AppReleaseTarget;
+  appName: string;
+  packageName: string;
+  version: string;
+  minAndroid: string;
+  fileSize: string;
+  fileSizeBytes: number;
+  fileName: string;
+  downloadUrl: string;
+  updatedAt: string;
+  whatsNew: string[];
+  sha256?: string;
+}
+
+export interface AppReleasesResponse {
+  success: boolean;
+  releases: {
+    customer: AppReleaseInfo;
+    rider: AppReleaseInfo;
+  };
+}
+
+export interface AppReleaseUpdateInput {
+  version?: string;
+  minAndroid?: string;
+  fileSize?: string;
+  whatsNew?: string[];
 }
 

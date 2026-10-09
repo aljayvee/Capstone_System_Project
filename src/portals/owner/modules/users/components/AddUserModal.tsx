@@ -420,6 +420,19 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSave }) =
                   <p className="mt-1 text-label text-status-act-ink">{fieldErrors.email}</p>
                 )}
               </div>
+
+              {/* Dual-Channel Authentication Informational Card */}
+              <div className="flex items-start gap-2.5 p-3 rounded-plate bg-board-ground border border-edge text-ink">
+                <ShieldCheck size={16} className="text-status-done-ink shrink-0 mt-0.5" />
+                <div className="space-y-0.5 text-micro">
+                  <p className="font-semibold text-ink">
+                    Dual-Channel Authentication Ready
+                  </p>
+                  <p className="text-ink-muted leading-relaxed">
+                    When this user logs in, they can choose to verify their identity via <span className="text-ink font-medium">Email (Gmail)</span> or <span className="text-ink font-medium">SMS OTP (Phone)</span>.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* 4. SECURITY & PASSWORD */}

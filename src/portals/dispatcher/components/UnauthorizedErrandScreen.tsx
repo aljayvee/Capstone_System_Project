@@ -74,7 +74,7 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
   const handleCopyId = async () => {
     setCopyFailed(false);
     try {
-      await navigator.clipboard.writeText(errandId);
+      await navigator.clipboard.writeText(formattedId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -126,15 +126,20 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
 
         <DispatcherCard.Region padding="sm" className="space-y-2 text-left">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-micro uppercase text-ink-muted">Order</span>
+            <span className="text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">Order</span>
             <button
               type="button"
               onClick={() => void handleCopyId()}
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim border border-edge bg-board-plate px-2.5 font-mono text-label text-ink transition-colors hover:border-board-field"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim border border-edge bg-board-plate px-2.5 transition-colors hover:border-board-field"
               aria-label={copied ? "Order number copied" : `Copy order number ${formattedId}`}
             >
-              <span data-figure>{formattedId}</span>
-              {copied ? <Check size={14} /> : <Copy size={14} />}
+              <span
+                data-figure
+                className="font-mono text-data font-bold tabular-nums tracking-wide text-ink"
+              >
+                {formattedId}
+              </span>
+              {copied ? <Check size={14} className="text-status-done-ink" /> : <Copy size={14} className="text-ink-muted" />}
             </button>
           </div>
 
@@ -146,8 +151,8 @@ export const UnauthorizedErrandScreen: React.FC<UnauthorizedErrandScreenProps> =
 
           {!isNotFound && (
             <div className="flex items-center justify-between gap-2 border-t border-hairline pt-2">
-              <span className="text-micro uppercase text-ink-muted">Assigned to</span>
-              <span className="truncate text-label text-ink">{claimantName}</span>
+              <span className="text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">Assigned to</span>
+              <span className="truncate text-label font-semibold text-ink">{claimantName}</span>
             </div>
           )}
 

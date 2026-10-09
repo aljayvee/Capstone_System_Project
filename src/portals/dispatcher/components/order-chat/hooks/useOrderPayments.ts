@@ -5,12 +5,13 @@ import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "../copy";
 
 /**
- * The money on a 50% downpayment errand.
+ * The money on a GCash / PayMaya or Bank Transfer errand.
  *
  * Separate from useOrderPayment, which is about the customer CHOOSING a method.
- * This is about a dispatcher attesting that money actually arrived on the
- * company's Facebook Page — a different act, by a different person, at a
- * different moment, and the only one of the two that touches a ledger.
+ * Since 2026-10-08 the whole bill is paid at the door, like cash on delivery:
+ * the rider photographs a transfer and the system records it, or takes cash.
+ * So this only reads the ledger, and records the one act still a dispatcher's,
+ * a refund.
  *
  * Every figure here is the server's. Nothing is derived in this hook: the
  * downpayment due, the balance and the plan state all come from
@@ -31,27 +32,16 @@ export interface PaymentLedger {
   errandId: string;
   /** False on COD, where there is no ledger and nothing below applies. */
   hasLedger: boolean;
-  /** Half the goods: half of what the rider actually paid, once they have. */
-  dueUpFront: number;
-  /** The goods figure the half is taken on. The rider's receipts once filed. */
+  /** The goods figure: the rider's receipts once filed. */
   goodsTotal: number;
-  /** When the rider, holding every item, asked for the half. Null until then. */
-  halfPaymentRequestedAt: string | null;
   amountPaid: number;
   /** What the rider collects at the door. */
   balanceDue: number;
-  state:
-    | "AWAITING_UPFRONT"
-    | "OVERAGE_PENDING"
-    | "AWAITING_BALANCE"
-    | "SETTLED"
-    | "REFUNDED";
-  overageEscalatedAt: string | null;
-  overageResolvedAt: string | null;
+  state: "AWAITING_BALANCE" | "SETTLED" | "REFUNDED";
   entries: PaymentLedgerEntry[];
 }
 
-type Action = "upfront" | "top-up" | "balance" | "refund";
+type Action = "refund";
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
@@ -59,8 +49,6 @@ const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
 
 interface UseOrderPaymentsArgs {
   orderId: string;
-  /** Refreshes the errand after a top-up, which reprices the handling fee. */
-  onOrderUpdated?: (errand: any) => void;
 }
 
 export interface PaymentProof {
@@ -76,7 +64,7 @@ export interface PaymentProof {
   } | null;
 }
 
-export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsArgs) {
+export function useOrderPayments({ orderId }: UseOrderPaymentsArgs) {
   const [ledger, setLedger] = useState<PaymentLedger | null>(null);
   const [proof, setProof] = useState<PaymentProof | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,9 +77,8 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     try {
       const [led, prf] = await Promise.all([
         apiClient.get(`/errands/${orderId}/payments`),
-        // The customer's own receipt, where they have sent one. Fetched
-        // together so the panel never shows a confirm button and the evidence
-        // for it a render apart.
+        // A screenshot the customer uploaded themselves, on errands from before
+        // the 50% was retired. Read for the record; nothing is confirmed from it.
         apiClient.get(`/errands/${orderId}/payment-proof`).catch(() => null),
       ]);
       setLedger(led.data?.ledger ?? null);
@@ -110,9 +97,8 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     refresh();
   }, [refresh]);
 
-  // Live, not on reload. The rider asking, the customer's receipt landing and
-  // an automatic confirmation all happen while this panel is open, and it used
-  // to learn about none of them until the dispatcher pressed something.
+  // Live, not on reload. The transfer the rider photographs at the door is
+  // recorded while this panel is open, and it should show at once.
   // Authenticated, because these are errand-scoped events: an anonymous socket
   // (like useOrderPayment's) is never in the staff room they are sent to.
   useEffect(() => {
@@ -124,8 +110,6 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
       if (payload?.errandId && String(payload.errandId) === String(orderId)) void refresh();
     };
     socket.on("errand:payment_updated", onEvent);
-    socket.on("errand:payment_proof_uploaded", onEvent);
-    socket.on("errand:half_payment_requested", onEvent);
     // Anything missed while disconnected.
     socket.on("connect", () => void refresh());
     return () => {
@@ -153,19 +137,6 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
         });
         const next: PaymentLedger | null = res.data?.ledger ?? null;
         setLedger(next);
-
-        // A top-up re-stamps the handling-fee ceiling and reprices the errand,
-        // so the surrounding screen's copy of it is now stale.
-        if (action === "top-up" && onOrderUpdated) {
-          try {
-            const fresh = await apiClient.get(`/errands/${orderId}`);
-            onOrderUpdated(fresh.data?.errand ?? fresh.data);
-          } catch {
-            // The ledger write succeeded; a stale fee panel is not worth
-            // reporting as a failure of the thing the dispatcher just did.
-          }
-        }
-
         return { ok: true as const, ledger: next };
       } catch (err: any) {
         const serverMessage = err?.response?.data?.error;
@@ -175,34 +146,7 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
         setPending(null);
       }
     },
-    [orderId, feedback, onOrderUpdated]
-  );
-
-  const confirmUpfront = useCallback(
-    async (amount: number, note?: string, proofImageId?: number) => {
-      const r = await record("upfront", amount, note, proofImageId);
-      if (r.ok) feedback.showSuccess(copy.payments.upfrontConfirmed(peso(amount)));
-      return r.ok;
-    },
-    [record, feedback]
-  );
-
-  const confirmTopUp = useCallback(
-    async (amount: number, note?: string) => {
-      const r = await record("top-up", amount, note);
-      if (r.ok) feedback.showSuccess(copy.payments.topUpConfirmed(peso(amount)));
-      return r.ok;
-    },
-    [record, feedback]
-  );
-
-  const confirmBalance = useCallback(
-    async (amount: number, note?: string, proofImageId?: number) => {
-      const r = await record("balance", amount, note, proofImageId);
-      if (r.ok) feedback.showSuccess(copy.payments.balanceConfirmed(peso(amount)));
-      return r.ok;
-    },
-    [record, feedback]
+    [orderId, feedback]
   );
 
   const recordRefund = useCallback(
@@ -221,17 +165,7 @@ export function useOrderPayments({ orderId, onOrderUpdated }: UseOrderPaymentsAr
     pending,
     feedback,
     refresh,
-    confirmUpfront,
-    confirmTopUp,
-    confirmBalance,
     recordRefund,
-    /**
-     * True unless the half is owed and has not arrived. Always true on COD.
-     * No longer gates stage 5: the half is collected mid-way, after purchase.
-     */
-    isUpfrontConfirmed:
-      !ledger?.hasLedger || ledger.entries.some((e) => e.kind === "UPFRONT"),
-    isOveragePending: ledger?.state === "OVERAGE_PENDING",
   };
 }
 

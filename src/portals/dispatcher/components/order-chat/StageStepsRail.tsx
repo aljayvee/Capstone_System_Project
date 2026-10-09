@@ -15,10 +15,10 @@ export function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
       <span
         className={cn(
           base,
-          onField ? "bg-board-plate text-board-field" : "bg-status-done-ink text-board-plate"
+          onField ? "bg-board-plate text-board-field font-bold" : "bg-status-done-ink text-board-plate font-bold"
         )}
       >
-        <Check size={13} />
+        <Check size={13} strokeWidth={2.5} />
       </span>
     );
   }
@@ -28,6 +28,7 @@ export function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
         data-figure
         className={cn(
           base,
+          "font-mono font-bold tabular-nums",
           onField ? "bg-board-plate text-board-field" : "bg-board-field text-board-plate"
         )}
       >
@@ -40,6 +41,7 @@ export function Detent({ stage, onField }: { stage: Stage; onField: boolean }) {
       data-figure
       className={cn(
         base,
+        "font-mono font-semibold tabular-nums",
         onField
           ? "border-[1.5px] border-board-trim text-board-trim"
           : "border-[1.5px] border-board-trim text-ink-muted"
@@ -77,10 +79,10 @@ export function StageStepsRail({
     <div className="flex h-full flex-col overflow-hidden bg-board-plate">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b border-hairline px-3.5 py-3">
-        <h3 className="text-micro font-bold uppercase tracking-wider text-ink-muted">
+        <h3 className="text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
           Order Stages
         </h3>
-        <span data-figure className="font-mono text-micro text-ink-muted">
+        <span data-figure className="font-mono text-micro font-semibold tabular-nums text-ink-muted">
           {doneCount} / {stages.length} done
         </span>
       </div>
@@ -108,7 +110,7 @@ export function StageStepsRail({
                     "group relative flex w-full items-center gap-2.5 rounded-plate border p-2.5 text-left transition-colors",
                     isActive
                       ? "border-board-field bg-board-field text-board-plate shadow-plate"
-                      : "border-edge bg-board-plate text-ink hover:bg-board-ground",
+                      : "border-edge bg-board-plate text-ink hover:bg-board-ground/60",
                     isLocked && "cursor-not-allowed opacity-40 bg-board-ground/50",
                     isFlashed && "ring-2 ring-signal"
                   )}
@@ -134,7 +136,7 @@ export function StageStepsRail({
                     <div className="flex items-center justify-between gap-1">
                       <span
                         className={cn(
-                          "truncate text-label font-medium",
+                          "truncate text-label font-semibold",
                           isActive
                             ? "text-board-plate"
                             : stage.state === "todo"
@@ -142,12 +144,12 @@ export function StageStepsRail({
                               : "text-ink"
                         )}
                       >
-                        {stage.id}. {stage.label}
+                        <span className="font-mono tabular-nums">{stage.id}.</span> {stage.label}
                       </span>
                     </div>
                     <p
                       className={cn(
-                        "truncate text-micro mt-0.5",
+                        "truncate text-micro tabular-nums mt-0.5",
                         isActive ? "text-board-plate/80" : "text-ink-muted"
                       )}
                     >
@@ -161,13 +163,13 @@ export function StageStepsRail({
         </ol>
       </div>
 
-      {/* Downpayment Ledger trigger at foot if errand has ledger */}
+      {/* What was paid at the door, on a GCash / PayMaya or Bank Transfer errand */}
       {hasLedger && (
         <div className="shrink-0 border-t border-hairline p-3 bg-board-ground/40">
           <button
             type="button"
             onClick={onOpenProof}
-            className="flex w-full cursor-pointer items-center justify-between rounded-plate border border-edge bg-board-plate px-3 py-2 text-micro uppercase text-ink transition-colors hover:bg-board-field hover:text-board-plate"
+            className="flex w-full cursor-pointer items-center justify-between rounded-plate border border-edge bg-board-plate px-3 py-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-board-field hover:text-board-plate"
           >
             <span className="flex items-center gap-1.5 font-medium">
               <Receipt size={14} className="shrink-0" />
