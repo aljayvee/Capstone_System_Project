@@ -448,6 +448,9 @@ export interface AppReleaseInfo {
   downloadUrl: string;
   updatedAt: string;
   whatsNew: string[];
+  features?: string[];
+  fixes?: string[];
+  logs?: string[];
   sha256?: string;
 }
 
@@ -464,5 +467,8 @@ export interface AppReleaseUpdateInput {
   minAndroid?: string;
   fileSize?: string;
   whatsNew?: string[];
+  features?: string[];
+  fixes?: string[];
+  logs?: string[];
 }
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Clock, Copy, RefreshCw, Sparkles, User } from "lucide-react";
-import { apiService, type ApiErrandException, type ExceptionKind } from "../../../services/apiService";
+import { apiService, type ExceptionKind } from "../../../services/apiService";
 import { cn } from "@/lib/utils";
-import { type OpenExceptions } from "../hooks/useOpenExceptions";
+import { type ExceptionGroup, type OpenExceptions } from "../hooks/useOpenExceptions";
 import { ExceptionEvidence } from "./ExceptionEvidence";
 import { formatPeso } from "../../../utils/format";
 import { formatErrandId } from "../../../utils/formatErrandId";
@@ -69,15 +69,16 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
  *
  * "Clear this" was an 11px underlined text link with no padding, about 16px
  * tall, and it is this panel's primary action.
+ *
+ * Rows are groups (see ExceptionGroup): every exception of one kind on one
+ * errand is one row, because one reason clears them all.
  */
 export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue }) => {
-  const { exceptions, totalAtRisk, isLoading, loadError, isConfirmedClear, reload, resolve } = queue;
+  const { groups, totalAtRisk, isLoading, loadError, isConfirmedClear, reload, resolve } = queue;
   const [resolving, setResolving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const keyOf = (e: ApiErrandException) => `${e.errandId}:${e.kind}`;
 
   return (
     <PanelShell
@@ -116,9 +117,10 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
         loadingRows={3}
       >
         <ul className="space-y-2.5" data-testid="exception-queue">
-          {exceptions.map((e) => {
-            const key = keyOf(e);
+          {groups.map((e) => {
+            const key = e.key;
             const isResolving = resolving === key;
+            const count = e.members.length;
 
             return (
               <li
@@ -135,6 +137,11 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                   <div className="min-w-0 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-panel font-bold text-ink">{KIND_LABEL[e.kind]}</h3>
+                      {count > 1 ? (
+                        <span className="text-label font-semibold text-ink-muted" data-testid={`exception-count-${key}`}>
+                          <span data-figure className="tabular-nums">{count}</span> on this errand
+                        </span>
+                      ) : null}
                       <button
                         type="button"
                         onClick={(ev) => {
@@ -165,20 +172,40 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-body font-semibold text-status-act-ink leading-relaxed">{e.detail}</p>
-                    <div className="flex items-center gap-1.5 text-label text-ink-muted">
-                      <Clock size={12} className="text-ink-muted/80" />
-                      <span data-figure className="font-mono tabular-nums">
-                        {formatTimestamp(e.occurredAt)}
-                      </span>
-                    </div>
+                    {count === 1 ? (
+                      <>
+                        <p className="text-body font-semibold text-status-act-ink leading-relaxed">{e.members[0].detail}</p>
+                        <div className="flex items-center gap-1.5 text-label text-ink-muted">
+                          <Clock size={12} className="text-ink-muted/80" />
+                          <span data-figure className="font-mono tabular-nums">
+                            {formatTimestamp(e.occurredAt)}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      // Every one the reason will clear, each with its own time,
+                      // so nobody clears a line they never saw.
+                      <ul className="space-y-1.5" data-testid={`exception-members-${key}`}>
+                        {e.members.map((m, i) => (
+                          <li key={`${m.occurredAt}:${i}`}>
+                            <p className="text-body font-semibold text-status-act-ink leading-relaxed">{m.detail}</p>
+                            <div className="flex items-center gap-1.5 text-label text-ink-muted">
+                              <Clock size={12} className="text-ink-muted/80" />
+                              <span data-figure className="font-mono tabular-nums">
+                                {formatTimestamp(m.occurredAt)}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     {e.amountAtRisk > 0 ? (
                       <div className="text-right">
                         <span className="block text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
-                          At risk
+                          {count > 1 ? "At risk, all" : "At risk"}
                         </span>
                         <span data-figure className="font-mono text-data font-bold tabular-nums text-status-act-ink">
                           {formatPeso(e.amountAtRisk)}
@@ -196,7 +223,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                         data-testid={`resolve-${key}`}
                         className="font-semibold"
                       >
-                        Resolve
+                        {count > 1 ? `Resolve all ${count}` : "Resolve"}
                       </DispatcherButton>
                     ) : null}
                   </div>
@@ -211,7 +238,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                 {isResolving ? (
                   <ResolveForm
                     rowKey={key}
-                    exception={e}
+                    group={e}
                     busy={busy}
                     error={errors[key] ?? null}
                     onCancel={() => {
@@ -226,6 +253,8 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                       setBusy(true);
                       setErrors((prev) => ({ ...prev, [key]: null }));
                       try {
+                        // The group's sum: the record freezes what this one
+                        // reason was written against, which is all of them.
                         await resolve(e.errandId, e.kind, reason.trim(), e.amountAtRisk);
                         setResolving(null);
                         return true;
@@ -278,14 +307,14 @@ const percent = (p: number) => `${Math.floor(p * 100)}%`;
 
 function ResolveForm({
   rowKey,
-  exception,
+  group,
   busy,
   error,
   onCancel,
   onSubmit,
 }: {
   rowKey: string;
-  exception: ApiErrandException;
+  group: ExceptionGroup;
   busy: boolean;
   error: string | null;
   onCancel: () => void;
@@ -301,17 +330,27 @@ function ResolveForm({
   reasonNow.current = reason;
   // A Cancel mid-request must not have the answer land in the draft store
   // afterwards and reappear the next time this row is opened.
+  // Set true on every mount: StrictMode's dev remount ran only the cleanup, so
+  // in dev every suggestion was thrown away as if the form had been cancelled.
   const mounted = useRef(true);
-  useEffect(() => () => void (mounted.current = false), []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => void (mounted.current = false);
+  }, []);
+
+  const count = group.members.length;
+  // The model reads one exception, so a suggestion on a group describes the
+  // first (most at risk) of them. The note below the box says so.
+  const first = group.members[0];
 
   const generate = async () => {
     if (suggest.status === "loading") return;
     setSuggest({ status: "loading" });
 
     const result = await apiService.suggestExceptionReason(
-      exception.errandId,
-      exception.kind,
-      exception.occurredAt
+      first.errandId,
+      first.kind,
+      first.occurredAt
     );
     if (!mounted.current) return;
 
@@ -344,8 +383,17 @@ function ResolveForm({
 
   return (
     <div className="mt-3 border-t border-hairline pt-3">
+      {count > 1 ? (
+        // Above the box, not in the hint, because a validation error replaces
+        // the hint and this has to stay in view while the reason is written.
+        <p className="mb-2.5 text-body font-medium text-ink" data-testid="resolve-covers-all">
+          This reason clears all <span data-figure className="tabular-nums">{count}</span> listed above. They are
+          recorded together, so write it to cover every one.
+          {aiSuggestionsEnabled ? " A suggestion describes only the first, so edit it to fit the rest." : null}
+        </p>
+      ) : null}
       <Field
-        label="Why is this being cleared?"
+        label={count > 1 ? "Why are these being cleared?" : "Why is this being cleared?"}
         error={error}
         hint="This is the record anyone reviewing the money will read."
         required

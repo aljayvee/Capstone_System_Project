@@ -1,5 +1,63 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiService, type ApiErrandException, type ExceptionKind } from "../../../services/apiService";
+
+/**
+ * Every open exception of one kind on one errand, as the single queue row it is.
+ *
+ * The server can raise several of a kind on one errand: one UNVERIFIED_PURCHASE
+ * per receiptless proof, one WRONG_BRANCH or MISSING_RECEIPT per stop, one
+ * RECEIPT_DIVERGENCE per receipt, one STALLED_STOP per dwell. But a resolution is
+ * recorded per errand and kind (ExceptionReview has no proof or stop id), so one
+ * reason clears every one of them. Listed apart, they shared a React key, a
+ * draft and an open form, and clearing one silently cleared its siblings. As one
+ * row, the screen shows what the record does: one decision covering them all.
+ */
+export interface ExceptionGroup {
+  /** `${errandId}:${kind}`, which is now unique per row. */
+  key: string;
+  errandId: string;
+  kind: ExceptionKind;
+  riderName: string | null;
+  /** In the server's order: most at risk first, then oldest. Never empty. */
+  members: ApiErrandException[];
+  /** The sum, since one reason clears all of it. */
+  amountAtRisk: number;
+  /** The oldest member's, so the row ages as the server ranks it. */
+  occurredAt: string;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export function groupExceptions(exceptions: ApiErrandException[]): ExceptionGroup[] {
+  const byKey = new Map<string, ExceptionGroup>();
+
+  for (const e of exceptions) {
+    const key = `${e.errandId}:${e.kind}`;
+    const group = byKey.get(key);
+    if (!group) {
+      byKey.set(key, {
+        key,
+        errandId: e.errandId,
+        kind: e.kind,
+        riderName: e.riderName,
+        members: [e],
+        amountAtRisk: e.amountAtRisk,
+        occurredAt: e.occurredAt,
+      });
+      continue;
+    }
+    group.members.push(e);
+    group.amountAtRisk = round2(group.amountAtRisk + e.amountAtRisk);
+    if (new Date(e.occurredAt).getTime() < new Date(group.occurredAt).getTime()) group.occurredAt = e.occurredAt;
+  }
+
+  // The server's rule (rankExceptions), applied to the sums: two ₱100 purchases
+  // on one errand are ₱200 held, and outrank a single ₱150.
+  return [...byKey.values()].sort((a, b) => {
+    if (b.amountAtRisk !== a.amountAtRisk) return b.amountAtRisk - a.amountAtRisk;
+    return new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime();
+  });
+}
 
 /**
  * Open exceptions across all live and recent errands.
@@ -75,14 +133,20 @@ export function useOpenExceptions(pollMs = 60_000) {
     [reload]
   );
 
+  const groups = useMemo(() => groupExceptions(exceptions), [exceptions]);
+
   return {
     exceptions,
+    /** What the panel lists: one row per errand and kind. */
+    groups,
     totalAtRisk,
     isLoading,
     loadError,
     reload,
     resolve,
-    openCount: exceptions.length,
+    // Rows, not raw exceptions, so the sidebar badge and the list it sits
+    // beside always show the same number.
+    openCount: groups.length,
     /**
      * True only when the queue is confirmed clear: loaded, no failure, nothing
      * open. The all-clear copy is gated on this rather than on a count of zero.

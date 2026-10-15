@@ -10,7 +10,8 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { apiService, type ApiPredictedStore } from "../../../../../services/apiService";
 import { cn } from "@/lib/utils";
 import { formatItemLabel } from "../../../../../utils/format";
@@ -111,6 +112,43 @@ export function Stage3ConfirmItems({
     [pinpoints, merchantCategories]
   );
   const [openStoreIndex, setOpenStoreIndex] = useState<number | null>(null);
+
+  /**
+   * A tick or untick says what it did (2026-10-10): the list shows only what
+   * each store buys, so a change made in a store's dialog is otherwise unseen
+   * until it closes. One message per store: the store's previous toast is
+   * dismissed and a fresh one shown. Re-using one toast id instead lost the
+   * message whenever the earlier toast was already on its way out.
+   */
+  const lastNoticeByStore = useRef<Record<number, string | number>>({});
+  const noticeAt = useCallback((storeIndex: number, message: string, added: boolean) => {
+    const previous = lastNoticeByStore.current[storeIndex];
+    if (previous !== undefined) toast.dismiss(previous);
+    lastNoticeByStore.current[storeIndex] = added ? toast.success(message) : toast(message);
+  }, []);
+  const storeNameAt = (storeIndex: number) => stores[storeIndex]?.name ?? `Store ${storeIndex + 1}`;
+
+  const tickWithNotice = useCallback(
+    (key: string, storeIndex: number, owned: boolean) => {
+      const line = lines.find((l) => l.key === key);
+      setItemOwned(key, storeIndex, owned);
+      const item = formatItemLabel(line?.itemName.trim() || copy.stage3.unnamedItem, line?.size);
+      const store = storeNameAt(storeIndex);
+      noticeAt(storeIndex, owned ? copy.stage3.addedTo(item, store) : copy.stage3.removedFrom(item, store), owned);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lines, stores, setItemOwned, noticeAt]
+  );
+
+  const tickAllWithNotice = useCallback(
+    (storeIndex: number, owned: boolean) => {
+      setStoreOwnsAll(storeIndex, owned);
+      const store = storeNameAt(storeIndex);
+      noticeAt(storeIndex, owned ? copy.stage3.allAddedTo(store) : copy.stage3.allRemovedFrom(store), owned);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stores, setStoreOwnsAll, noticeAt]
+  );
 
   // When the status in the Rider App is "On the Way to the Customer" (itemsPurchasedAt is set),
   // no modification of items order is allowed.
@@ -590,9 +628,10 @@ export function Stage3ConfirmItems({
 
       {oosBanner}
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="m-0 text-body text-ink-muted">{copy.stage3.intro(customerFirstName)}</p>
-        {canModifyItems && (
+      {/* The intro line ("Check the list, then send it...") was removed on
+          request, so the row exists only for the catalog button. */}
+      {canModifyItems && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <DispatcherButton
             type="button"
             size="sm"
@@ -602,8 +641,8 @@ export function Stage3ConfirmItems({
           >
             {isCatalogOpen ? "Hide Catalog Helper" : "Catalog Menu Helper"}
           </DispatcherButton>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Crawled Catalog & Menu Helper Drawer / Tray */}
       {isCatalogOpen && (
@@ -705,8 +744,7 @@ export function Stage3ConfirmItems({
             stores={stores}
             lines={lines}
             rows={editableItems}
-            onTick={setItemOwned}
-            onTickAll={setStoreOwnsAll}
+            onTick={tickWithNotice}
             onEditItem={editItemFields}
             onQuantity={(rowIndex, quantity) => updateItem(rowIndex, { quantity })}
             onRemove={removeItem}
@@ -724,8 +762,8 @@ export function Stage3ConfirmItems({
             stores={stores}
             lines={lines}
             rows={editableItems}
-            onTick={setItemOwned}
-            onTickAll={setStoreOwnsAll}
+            onTick={tickWithNotice}
+            onTickAll={tickAllWithNotice}
           />
         </>
       ) : (

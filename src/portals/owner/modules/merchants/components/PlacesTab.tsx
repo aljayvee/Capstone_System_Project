@@ -24,8 +24,38 @@ import {
   ArrowUp,
   ArrowDown,
   RotateCcw,
+  BadgeCheck,
+  Camera,
 } from "lucide-react";
 import { MobileResponsiveTable } from "../../../../../components/table";
+import { GooglePlaceFinder, type GooglePlaceDetails } from "./GooglePlaceFinder";
+import { WeeklyHoursEditor } from "./WeeklyHoursEditor";
+import { StorePhotoField, type PhotoChange } from "./StorePhotoField";
+import {
+  readWeek,
+  sameWeek,
+  summarizeWeek,
+  weekProblem,
+  type WeeklyHours,
+} from "../../../../../utils/storeHours";
+import { storePhotoUrl } from "../../../../../utils/storePhoto";
+import { metresBetween } from "../../../../../utils/geo";
+
+/**
+ * How far the pin may sit from where Google Maps puts the store: the server's
+ * PIN_MAX_FROM_GOOGLE_METERS, checked here first so the owner sees it on the map.
+ */
+const PIN_MAX_FROM_GOOGLE_METERS = 100;
+
+/** Active Location Stores that look registered more than once (GET /places/duplicates). */
+interface DuplicateGroup {
+  reason: "google_place" | "name" | "nearby";
+  places: Array<{ id: string; name: string; categoryName: string | null }>;
+}
+
+/** The server's words for a refusal: `error` first, as the API writes it. */
+const apiError = (err: any, fallback: string): string =>
+  err?.response?.data?.error || err?.response?.data?.message || fallback;
 
 export interface PlaceCategory {
   id: number;
@@ -46,6 +76,14 @@ export interface VerifiedPlace {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** The Google Maps place this store is. Null for a store registered before 2026-10-13. */
+  googlePlaceId?: string | null;
+  /** A real store Google Maps does not list, pinned on the map by the owner. */
+  ownerPinned?: boolean;
+  /** The owner's weekly hours (utils/storeHours.ts), as stored. */
+  openingHours?: unknown;
+  /** When the storefront photo last changed; null when there is none. */
+  photoUpdatedAt?: string | null;
 }
 
 interface PlacesTabProps {
@@ -123,6 +161,31 @@ export default function PlacesTab({
    * apart, and the owner is the one who can tell.
    */
   const [duplicateWarning, setDuplicateWarning] = useState<PlaceDuplicateWarning | null>(null);
+  /**
+   * The server's own duplicate refusal (409) when the owner may still go on:
+   * a same-name store it found that the browser's check did not. The next save
+   * says the owner confirmed it is another branch.
+   */
+  const [serverDuplicate, setServerDuplicate] = useState<string | null>(null);
+
+  // The Google Maps place the form holds (2026-10-13): every Location Store is
+  // one, so the form starts from a Google Maps search, never a typed-in pin.
+  const [formGooglePlaceId, setFormGooglePlaceId] = useState<string | null>(null);
+  const [formGoogleName, setFormGoogleName] = useState<string | null>(null);
+  /** Where Google Maps puts the store; the pin may move PIN_MAX_FROM_GOOGLE_METERS from it. */
+  const [formGooglePos, setFormGooglePos] = useState<{ lat: number; lng: number } | null>(null);
+  /**
+   * A real Tacurong store Google Maps does not list: the owner pins it on the
+   * map themselves. `pinTouched` is whether they actually did, this time: the
+   * map's starting point is never a store's location.
+   */
+  const [formOwnerPinned, setFormOwnerPinned] = useState(false);
+  const [pinTouched, setPinTouched] = useState(false);
+  const [formHours, setFormHours] = useState<WeeklyHours | null>(null);
+  const [formHoursSource, setFormHoursSource] = useState<string | null>(null);
+  const [photoChange, setPhotoChange] = useState<PhotoChange>({ kind: "keep" });
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
+  const googleCircleRef = useRef<any>(null);
 
   // Google Maps State
   const mapRef = useRef<HTMLDivElement>(null);
@@ -147,6 +210,12 @@ export default function PlacesTab({
       const res = await apiClient.get("/places?includeInactive=true");
       setPlaces(res.data || []);
       setPlacesError(null);
+      // The server's duplicate check over the whole directory. A failure only
+      // costs the banner, never the list.
+      apiClient
+        .get("/places/duplicates")
+        .then((dup) => setDuplicateGroups(dup.data?.groups ?? []))
+        .catch((dupErr) => console.warn("Duplicate check failed:", dupErr));
     } catch (err) {
       console.warn("Failed to fetch verified places:", err);
       // A rejected request is not an empty directory. Recording it is what
@@ -190,6 +259,7 @@ export default function PlacesTab({
       setIsMapReady(false);
       googleMapInstance.current = null;
       activeMarkerRef.current = null;
+      googleCircleRef.current = null;
       return;
     }
 
@@ -228,6 +298,7 @@ export default function PlacesTab({
           const lng = e.latLng.lng();
           setFormLatitude(lat.toFixed(6));
           setFormLongitude(lng.toFixed(6));
+          setPinTouched(true);
           updateActiveMarker(map, lat, lng);
         });
 
@@ -235,6 +306,7 @@ export default function PlacesTab({
         setIsMapReady(true);
         setMapError(null);
         updateActiveMarker(map, currentLat, currentLng);
+        drawGoogleZone(map, formGooglePos);
       } catch (err) {
         console.warn("Map initialization error:", err);
         // The pin box is a blank grey rectangle under a label that promises
@@ -287,6 +359,7 @@ export default function PlacesTab({
         const newLng = e.latLng.lng();
         setFormLatitude(newLat.toFixed(6));
         setFormLongitude(newLng.toFixed(6));
+        setPinTouched(true);
       });
     } else {
       activeMarkerRef.current = new g.maps.Marker({
@@ -301,9 +374,77 @@ export default function PlacesTab({
         const newLng = e.latLng.lng();
         setFormLatitude(newLat.toFixed(6));
         setFormLongitude(newLng.toFixed(6));
+        setPinTouched(true);
       });
     }
   };
+
+  /**
+   * The ring the pin must stay inside: PIN_MAX_FROM_GOOGLE_METERS around where
+   * Google Maps puts the store. Drawn so the owner sees the rule, not just
+   * reads it after a refused save.
+   */
+  const drawGoogleZone = (mapInst: any, pos: { lat: number; lng: number } | null) => {
+    const g = (window as any).google;
+    if (googleCircleRef.current) {
+      googleCircleRef.current.setMap(null);
+      googleCircleRef.current = null;
+    }
+    if (!mapInst || !g?.maps?.Circle || !pos) return;
+    googleCircleRef.current = new g.maps.Circle({
+      map: mapInst,
+      center: pos,
+      radius: PIN_MAX_FROM_GOOGLE_METERS,
+      // Literals, as for the pin: the Maps API takes no design tokens. Navy
+      // field ink at low weight, so the ring reads as a boundary, not an alert.
+      strokeColor: "#0B132B",
+      strokeOpacity: 0.5,
+      strokeWeight: 1,
+      fillColor: "#0B132B",
+      fillOpacity: 0.06,
+      clickable: false,
+    });
+  };
+
+  /** A Google Maps store picked in the finder fills the form with what Google knows of it. */
+  const handlePickGooglePlace = (place: GooglePlaceDetails) => {
+    setFormOwnerPinned(false);
+    setFormGooglePlaceId(place.googlePlaceId);
+    setFormGoogleName(place.name);
+    setFormGooglePos({ lat: place.latitude, lng: place.longitude });
+    setFormName(place.name);
+    setFormAddress(place.address);
+    if (place.barangay) setFormBarangay(place.barangay);
+    setFormLatitude(place.latitude.toFixed(6));
+    setFormLongitude(place.longitude.toFixed(6));
+    if (place.categoryId && categories.some((c) => c.id === place.categoryId)) {
+      setFormCategoryId(place.categoryId);
+    }
+    // Google's hours prefill an empty schedule; the owner's own are never overwritten.
+    if (place.openingHours && !formHours) {
+      setFormHours(place.openingHours);
+      setFormHoursSource("From Google Maps. Check them against the shop's own sign.");
+    }
+    setServerDuplicate(null);
+    setFormError(
+      place.temporarilyClosed ? "Google Maps lists this store as temporarily closed. Check before registering it." : null,
+    );
+    const map = googleMapInstance.current;
+    if (map) {
+      map.panTo({ lat: place.latitude, lng: place.longitude });
+      map.setZoom?.(18);
+      updateActiveMarker(map, place.latitude, place.longitude);
+      drawGoogleZone(map, { lat: place.latitude, lng: place.longitude });
+    }
+  };
+
+  /** How far the pin sits from Google's position, or null before a Google Maps place is chosen. */
+  const pinOffsetMetres = useMemo(() => {
+    const lat = parseFloat(formLatitude);
+    const lng = parseFloat(formLongitude);
+    if (!formGooglePos || isNaN(lat) || isNaN(lng)) return null;
+    return Math.round(metresBetween({ lat, lng }, formGooglePos));
+  }, [formGooglePos, formLatitude, formLongitude]);
 
   const resetForm = () => {
     setIsEditing(false);
@@ -316,6 +457,19 @@ export default function PlacesTab({
     setFormKeywords("");
     setFormIsActive(true);
     setFormError(null);
+    setServerDuplicate(null);
+    setFormGooglePlaceId(null);
+    setFormGoogleName(null);
+    setFormGooglePos(null);
+    setFormOwnerPinned(false);
+    setPinTouched(false);
+    setFormHours(null);
+    setFormHoursSource(null);
+    setPhotoChange({ kind: "keep" });
+    if (googleCircleRef.current) {
+      googleCircleRef.current.setMap(null);
+      googleCircleRef.current = null;
+    }
     if (typeof selectedCategory === "number") {
       setFormCategoryId(selectedCategory);
     } else if (categories.length > 0) {
@@ -341,6 +495,17 @@ export default function PlacesTab({
     setFormKeywords(place.keywords || "");
     setFormIsActive(place.isActive);
     setFormError(null);
+    setServerDuplicate(null);
+    setFormGooglePlaceId(place.googlePlaceId ?? null);
+    setFormGoogleName(place.googlePlaceId ? place.name : null);
+    // The store was confirmed on Google Maps at its saved pin, so the ring
+    // starts there; choosing the place again in the finder re-reads Google's.
+    setFormGooglePos(place.googlePlaceId ? { lat: place.latitude, lng: place.longitude } : null);
+    setFormOwnerPinned(Boolean(place.ownerPinned) && !place.googlePlaceId);
+    setPinTouched(false);
+    setFormHours(readWeek(place.openingHours));
+    setFormHoursSource(null);
+    setPhotoChange({ kind: "keep" });
     setShowForm(true);
   };
 
@@ -351,7 +516,8 @@ export default function PlacesTab({
   // otherwise one dismissed warning would wave through every later edit too.
   useEffect(() => {
     setDuplicateWarning(null);
-  }, [formName, formLatitude, formLongitude]);
+    setServerDuplicate(null);
+  }, [formName, formLatitude, formLongitude, formGooglePlaceId]);
 
   const getPlaceModifiedFields = (): Array<{ label: string; from: string; to: string }> => {
     if (!isEditing || !editingId) return [];
@@ -399,6 +565,29 @@ export default function PlacesTab({
         to: formIsActive ? "Active" : "Retired",
       });
     }
+    const linkLabel = (googleId: string | null | undefined, pinned: boolean, name?: string | null) =>
+      googleId ? name ?? "Linked" : pinned ? "Pinned by you, not on Google Maps" : "Not linked";
+    if (
+      (formGooglePlaceId ?? null) !== (current.googlePlaceId ?? null) ||
+      (!formGooglePlaceId && formOwnerPinned !== Boolean(current.ownerPinned))
+    ) {
+      changes.push({
+        label: "Google Maps place",
+        from: linkLabel(current.googlePlaceId, Boolean(current.ownerPinned)),
+        to: linkLabel(formGooglePlaceId, formOwnerPinned, formGoogleName),
+      });
+    }
+    const currentHours = readWeek(current.openingHours);
+    if (!sameWeek(formHours, currentHours)) {
+      changes.push({ label: "Opening hours", from: summarizeWeek(currentHours), to: summarizeWeek(formHours) });
+    }
+    if (photoChange.kind !== "keep") {
+      changes.push({
+        label: "Storefront photo",
+        from: current.photoUpdatedAt ? "Photo" : "No photo",
+        to: photoChange.kind === "set" ? "New photo" : "No photo",
+      });
+    }
 
     return changes;
   };
@@ -426,11 +615,48 @@ export default function PlacesTab({
       setFormError("Please click on the map to set valid GPS coordinates.");
       return;
     }
+    // A store stays a Google Maps place. A retired store from before linking
+    // may stay unlinked while it is retired; the server holds the same rule.
+    if (!formGooglePlaceId && !formOwnerPinned && formIsActive) {
+      setFormError(
+        isEditing
+          ? "Link this store to its Google Maps place first: search for it above and choose it. If Google Maps does not have it, pin it yourself."
+          : "Find the store on Google Maps first: search for it above and choose it. If Google Maps does not have it, pin it yourself.",
+      );
+      return;
+    }
+    // A store the owner pins needs a pin they placed, not the map's starting
+    // point or a pin nobody confirmed. One already pinned by them may stay put.
+    const current = isEditing ? places.find((p) => p.id === editingId) : undefined;
+    if (formOwnerPinned && !formGooglePlaceId && !pinTouched && !current?.ownerPinned) {
+      setFormError("Click the map at the store's door, or drag the pin there, to place it yourself.");
+      return;
+    }
+    if (pinOffsetMetres !== null && pinOffsetMetres > PIN_MAX_FROM_GOOGLE_METERS) {
+      setFormError(
+        `The pin is ${pinOffsetMetres} m from where Google Maps puts this store. Keep it inside the ring, at the store's door.`,
+      );
+      return;
+    }
+    const hoursProblem = formHours ? weekProblem(formHours) : null;
+    if (hoursProblem) {
+      setFormError(hoursProblem);
+      return;
+    }
 
-    if (!duplicateWarning) {
+    // As the server decides (placeService.updatePlace): an edit is checked for
+    // duplicates only when the name, the pin or the Google Maps place changed,
+    // and then only against active stores. Changing hours or a photo is never a
+    // new duplicate, and a retired look-alike is history.
+    const identityChanged =
+      !current ||
+      formName.trim() !== current.name ||
+      (formGooglePlaceId ?? null) !== (current.googlePlaceId ?? null) ||
+      metresBetween({ lat: latNum, lng: lngNum }, { lat: current.latitude, lng: current.longitude }) > 1;
+    if (!duplicateWarning && identityChanged) {
       const clash = findDuplicatePlace(
         { name: formName.trim(), latitude: latNum, longitude: lngNum },
-        places,
+        isEditing ? places.filter((p) => p.isActive) : places,
         isEditing ? editingId : null,
       );
       if (clash) {
@@ -464,22 +690,61 @@ export default function PlacesTab({
         longitude: lngNum,
         keywords: formKeywords.trim() || null,
         isActive: formIsActive,
+        googlePlaceId: formGooglePlaceId,
+        ownerPinned: !formGooglePlaceId && formOwnerPinned,
+        openingHours: formHours,
+        // The owner already saw a duplicate warning (the browser's or the
+        // server's) and pressed Save again: it is another branch.
+        confirmDuplicate: Boolean(duplicateWarning || serverDuplicate),
       };
 
+      let placeId = editingId;
       if (isEditing && editingId) {
         await apiClient.put(`/places/${editingId}`, payload);
       } else {
-        await apiClient.post("/places", payload);
+        const created = await apiClient.post("/places", payload);
+        placeId = created.data?.id ?? null;
+      }
+
+      // The photo goes up after the store is saved: a new store has no id before.
+      let photoFailed = false;
+      if (placeId && photoChange.kind !== "keep") {
+        try {
+          if (photoChange.kind === "set") {
+            const { imageData, mimeType, fileSize, fileName } = photoChange.image;
+            await apiClient.put(`/places/${placeId}/photo`, { imageData, mimeType, fileSize, fileName });
+          } else {
+            await apiClient.delete(`/places/${placeId}/photo`);
+          }
+        } catch (photoErr) {
+          console.warn("Store photo not saved:", photoErr);
+          photoFailed = true;
+        }
       }
 
       await fetchPlaces();
+      if (photoFailed && placeId) {
+        // The store saved; only the photo did not. Keep the form open on the
+        // saved store so the owner can try the photo again.
+        setShowSaveConfirm(false);
+        setIsEditing(true);
+        setEditingId(placeId);
+        setFormError("The store was saved, but its photo was not. Choose the photo again and save.");
+        return;
+      }
       resetForm();
       setDuplicateWarning(null);
       setShowSaveConfirm(false);
       setShowForm(false);
     } catch (err: any) {
       setShowSaveConfirm(false);
-      setFormError(err.response?.data?.message || "Failed to save establishment details.");
+      const data = err.response?.data;
+      if (err.response?.status === 409 && data?.canConfirm) {
+        // Another store by that name: the owner decides whether it is a branch.
+        setServerDuplicate(apiError(err, "This store looks like one already registered."));
+        return;
+      }
+      setFormError(apiError(err, "Failed to save establishment details."));
     } finally {
       setIsSaving(false);
     }
@@ -707,6 +972,66 @@ export default function PlacesTab({
               category and a new store pin cannot be assigned one.
             </p>
           ) : null}
+
+          {/* The server's duplicate check over the whole directory (2026-10-13). */}
+          {duplicateGroups.length > 0 ? (
+            <div
+              role="status"
+              className="rounded-plate border border-status-waiting-ink/20 bg-status-waiting-fill px-3 py-2 text-label text-status-waiting-ink"
+            >
+              <p className="m-0 flex items-center gap-1.5 font-semibold">
+                <AlertCircle size={14} className="shrink-0" />
+                {duplicateGroups.length === 1
+                  ? "One store looks registered more than once."
+                  : `${duplicateGroups.length} stores look registered more than once.`}{" "}
+                Keep one of each and retire the rest, unless they are different branches.
+              </p>
+              <ul className="m-0 mt-1 list-none space-y-1 p-0">
+                {duplicateGroups.map((group, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-1.5">
+                    {group.places.map((p, j) => {
+                      const place = places.find((x) => x.id === p.id);
+                      return (
+                        <React.Fragment key={p.id}>
+                          {j > 0 ? <span className="opacity-70">and</span> : null}
+                          <button
+                            type="button"
+                            disabled={!place}
+                            onClick={() => place && handleEditPlace(place)}
+                            className="rounded-trim underline underline-offset-2 hover:opacity-80"
+                          >
+                            {p.name}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                    <span className="opacity-70">
+                      {group.reason === "google_place"
+                        ? "(the same Google Maps place)"
+                        : group.reason === "name"
+                          ? "(the same name)"
+                          : "(next to each other)"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Stores typed in before 2026-10-13, with a guessed pin, until the owner links them. */}
+          {(() => {
+            const unlinked = livePlaces.filter((p) => !p.googlePlaceId && !p.ownerPinned).length;
+            return unlinked > 0 ? (
+              <p
+                role="status"
+                className="m-0 flex items-center gap-1.5 rounded-plate border border-status-waiting-ink/20 bg-status-waiting-fill px-3 py-1.5 text-label text-status-waiting-ink"
+              >
+                <AlertCircle size={14} className="shrink-0" />
+                {unlinked === 1 ? "1 store is" : `${unlinked} stores are`} not linked to Google Maps yet, so
+                {unlinked === 1 ? " its pin is" : " their pins are"} unconfirmed. Edit each one and find it on Google Maps.
+              </p>
+            ) : null;
+          })()}
         </div>
 
         {/* Directory List Table - ONLY THIS SECTION SCROLLS! */}
@@ -756,12 +1081,15 @@ export default function PlacesTab({
               primaryHeader="Establishment & Address"
               secondaryHeader="Category"
               renderPrimary={(place) => (
-                <div className="min-w-0">
-                  <div className="font-semibold text-ink text-xs truncate">
-                    {place.name}
-                  </div>
-                  <div className="text-[10px] text-ink-muted truncate">
-                    {place.barangay || "Tacurong City"} · {place.address}
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <StoreThumb place={place} />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-ink text-xs truncate">
+                      {place.name}
+                    </div>
+                    <div className="text-[10px] text-ink-muted truncate">
+                      {place.barangay || "Tacurong City"} · {place.address}
+                    </div>
                   </div>
                 </div>
               )}
@@ -781,6 +1109,14 @@ export default function PlacesTab({
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-ink-muted">Coordinates:</span>
                     <span className="font-mono text-ink">{place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-ink-muted">Hours:</span>
+                    <span className="text-ink">{summarizeWeek(readWeek(place.openingHours))}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-ink-muted">Google Maps:</span>
+                    <GoogleLinkStatus place={place} />
                   </div>
                   {place.keywords && (
                     <div className="text-[11px] text-ink-muted line-clamp-1">
@@ -827,6 +1163,14 @@ export default function PlacesTab({
                     { label: "Address", value: place.address, fullWidth: true },
                     { label: "Latitude", value: place.latitude.toFixed(6) },
                     { label: "Longitude", value: place.longitude.toFixed(6) },
+                    { label: "Google Maps", value: place.googlePlaceId ? "Linked" : "Not linked", fullWidth: true },
+                  ],
+                },
+                {
+                  title: "Hours & Photo",
+                  items: [
+                    { label: "Opening Hours", value: summarizeWeek(readWeek(place.openingHours)), fullWidth: true },
+                    { label: "Storefront Photo", value: place.photoUpdatedAt ? "Uploaded" : "None" },
                   ],
                 },
               ]}
@@ -838,7 +1182,10 @@ export default function PlacesTab({
                       <SortTh field="category" label="Category" />
                       <SortTh field="address" label="Barangay & Address" />
                       <th scope="col" className="p-4">
-                        GPS Coordinates
+                        Opening Hours
+                      </th>
+                      <th scope="col" className="p-4">
+                        Google Maps
                       </th>
                       <th scope="col" className="p-4 text-right">
                         Actions
@@ -856,14 +1203,19 @@ export default function PlacesTab({
                           }`}
                         >
                           <td className="p-4 font-semibold text-ink">
-                            <p className="truncate max-w-[240px] text-label text-ink">
-                              {place.name}
-                            </p>
-                            {place.keywords && (
-                              <p className="text-body text-ink-muted truncate max-w-[240px] mt-0.5 font-normal">
-                                {place.keywords}
-                              </p>
-                            )}
+                            <div className="flex items-center gap-3">
+                              <StoreThumb place={place} />
+                              <div className="min-w-0">
+                                <p className="truncate max-w-[240px] text-label text-ink">
+                                  {place.name}
+                                </p>
+                                {place.keywords && (
+                                  <p className="text-body text-ink-muted truncate max-w-[240px] mt-0.5 font-normal">
+                                    {place.keywords}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="p-4 text-label text-ink whitespace-nowrap">
                             {place.category?.name || "General"}
@@ -872,8 +1224,11 @@ export default function PlacesTab({
                             <p className="font-semibold text-ink">{place.barangay || "Tacurong City"}</p>
                             <p className="text-label text-ink-muted truncate mt-0.5">{place.address}</p>
                           </td>
-                          <td className="p-4 font-mono text-label text-ink-muted whitespace-nowrap">
-                            {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                          <td className="p-4 text-label text-ink-muted whitespace-nowrap">
+                            {summarizeWeek(readWeek(place.openingHours))}
+                          </td>
+                          <td className="p-4 whitespace-nowrap">
+                            <GoogleLinkStatus place={place} />
                           </td>
                           <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
                             <button
@@ -914,13 +1269,23 @@ export default function PlacesTab({
                   <span>
                     {mapError
                       ? "Map unavailable"
-                      : isMapReady
-                        ? "Click map to drop store pin"
-                        : "Loading map..."}
+                      : formOwnerPinned && !formGooglePlaceId
+                        ? "Click the map at the store's door"
+                        : !formGooglePlaceId
+                        ? "Find the store on Google Maps first"
+                        : isMapReady
+                          ? "Drag the pin to the store's door, inside the ring"
+                          : "Loading map..."}
                   </span>
                 </span>
-                <span className="font-mono text-label text-ink-muted">
-                  {formLatitude}, {formLongitude}
+                <span
+                  className={`font-mono text-label ${
+                    pinOffsetMetres !== null && pinOffsetMetres > PIN_MAX_FROM_GOOGLE_METERS
+                      ? "text-status-act-ink"
+                      : "text-ink-muted"
+                  }`}
+                >
+                  {pinOffsetMetres !== null ? `${pinOffsetMetres} m from Google Maps` : `${formLatitude}, ${formLongitude}`}
                 </span>
               </div>
               <div ref={mapRef} className="flex-1 w-full h-full min-h-[240px]" />
@@ -969,6 +1334,16 @@ export default function PlacesTab({
                 </div>
               )}
 
+              {serverDuplicate && !duplicateWarning && (
+                <div className="mb-4 p-3 bg-status-waiting-fill border border-status-waiting-ink/20 rounded-plate text-label text-status-waiting-ink flex items-start gap-2">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold m-0">{serverDuplicate}</p>
+                    <p className="m-0 mt-1 opacity-80">Press Save again to register it as another branch.</p>
+                  </div>
+                </div>
+              )}
+
               {formError && (
                 <div className="mb-4 p-3 bg-status-act-fill border border-status-act-ink/20 rounded-plate text-label text-status-act-ink flex items-center gap-2">
                   <AlertCircle size={14} className="shrink-0" />
@@ -981,6 +1356,66 @@ export default function PlacesTab({
                 className="space-y-4 flex-1 flex flex-col justify-between"
               >
                 <div className="space-y-3.5">
+                  {/* Google Maps place (2026-10-13): the store is found there, never typed in. */}
+                  <div>
+                    <label className="block text-label font-medium text-ink mb-1">Google Maps place *</label>
+                    {formGooglePlaceId ? (
+                      <p className="m-0 mb-2 flex items-center gap-1.5 rounded-plate bg-status-done-fill px-3 py-2 text-label text-status-done-ink">
+                        <BadgeCheck size={14} className="shrink-0" />
+                        <span className="min-w-0 truncate">
+                          {formGoogleName ?? formName}: on Google Maps. Search again to choose another.
+                        </span>
+                      </p>
+                    ) : formOwnerPinned ? (
+                      <div className="m-0 mb-2 rounded-plate border border-edge bg-board-ground px-3 py-2 text-label text-ink">
+                        <p className="m-0 flex items-center gap-1.5 font-medium">
+                          <MapPin size={14} className="shrink-0" />
+                          Pinned by you: not on Google Maps
+                        </p>
+                        <p className="m-0 mt-1 text-ink-muted">
+                          {pinTouched || (isEditing && places.find((p) => p.id === editingId)?.ownerPinned)
+                            ? "The pin is where you put it. The store must be inside Tacurong and beside a road."
+                            : "Click the map at the store's door, or drag the pin there. Then fill in the name and address below."}
+                        </p>
+                      </div>
+                    ) : isEditing ? (
+                      <p className="m-0 mb-2 flex items-start gap-1.5 rounded-plate bg-status-waiting-fill px-3 py-2 text-label text-status-waiting-ink">
+                        <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                        <span>
+                          Registered before stores were linked to Google Maps. Find it below so its pin is
+                          Google's, not a guess.
+                        </span>
+                      </p>
+                    ) : null}
+                    <GooglePlaceFinder
+                      initialQuery={isEditing && !formGooglePlaceId ? formName : ""}
+                      categories={categories}
+                      editingId={isEditing ? editingId : null}
+                      selectedGooglePlaceId={formGooglePlaceId}
+                      onPick={handlePickGooglePlace}
+                    />
+                    {/* A real Tacurong store Google Maps does not list (2026-10-13). */}
+                    {!formGooglePlaceId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !formOwnerPinned;
+                          setFormOwnerPinned(next);
+                          setFormError(null);
+                          if (next) {
+                            setFormGooglePos(null);
+                            drawGoogleZone(googleMapInstance.current, null);
+                          }
+                        }}
+                        className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-plate px-1 text-label text-ink-muted underline underline-offset-2 transition-colors hover:text-ink"
+                      >
+                        {formOwnerPinned
+                          ? "Search Google Maps instead"
+                          : "Not on Google Maps? Pin the store on the map yourself"}
+                      </button>
+                    ) : null}
+                  </div>
+
                   {/* Store Name */}
                   <div>
                     <label className="block text-label font-medium text-ink mb-1">
@@ -1051,10 +1486,11 @@ export default function PlacesTab({
                       <input
                         type="text"
                         required
-                        placeholder="6.6873"
+                        readOnly
+                        placeholder="From Google Maps"
                         value={formLatitude}
-                        onChange={(e) => setFormLatitude(e.target.value)}
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink focus:bg-board-plate"
+                        title="Set by Google Maps and the pin on the map"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink-muted"
                       />
                     </div>
                     <div>
@@ -1064,12 +1500,35 @@ export default function PlacesTab({
                       <input
                         type="text"
                         required
-                        placeholder="124.6752"
+                        readOnly
+                        placeholder="From Google Maps"
                         value={formLongitude}
-                        onChange={(e) => setFormLongitude(e.target.value)}
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink focus:bg-board-plate"
+                        title="Set by Google Maps and the pin on the map"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink-muted"
                       />
                     </div>
+                  </div>
+
+                  {/* Opening hours: what the customer app shows as open or closed. */}
+                  <WeeklyHoursEditor
+                    value={formHours}
+                    onChange={(next) => {
+                      setFormHours(next);
+                      setFormHoursSource(null);
+                    }}
+                    sourceNote={formHoursSource}
+                  />
+
+                  {/* Storefront photo: ours to keep, shown on the store's card. */}
+                  <div>
+                    <label className="block text-label font-medium text-ink mb-1">Storefront photo</label>
+                    <StorePhotoField
+                      placeId={isEditing ? editingId : null}
+                      photoUpdatedAt={(isEditing && places.find((p) => p.id === editingId)?.photoUpdatedAt) || null}
+                      storeName={formName}
+                      change={photoChange}
+                      onChange={setPhotoChange}
+                    />
                   </div>
 
                   {/* Search Keywords / Tags */}
@@ -1119,6 +1578,26 @@ export default function PlacesTab({
                     </div>
                   )}
                 </div>
+
+                {/* Why the last Save did not go through, beside the button pressed:
+                    the same message at the top of the form is out of sight once
+                    the owner has scrolled down to the hours or the photo. */}
+                {formError || serverDuplicate || duplicateWarning ? (
+                  <p
+                    role="alert"
+                    className={`m-0 flex items-start gap-1.5 rounded-plate px-3 py-2 text-label ${
+                      formError
+                        ? "bg-status-act-fill text-status-act-ink"
+                        : "bg-status-waiting-fill text-status-waiting-ink"
+                    }`}
+                  >
+                    <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                    <span>
+                      {formError ??
+                        `${serverDuplicate ?? describePlaceDuplicate(duplicateWarning!)} Press Save again to go ahead anyway.`}
+                    </span>
+                  </p>
+                ) : null}
 
                 {/* Submit Buttons */}
                 <div className="pt-4 border-t border-hairline flex items-center justify-end gap-2.5">
@@ -1220,6 +1699,21 @@ export default function PlacesTab({
                     {parseFloat(formLongitude || "0").toFixed(4)}
                   </span>
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-ink-muted shrink-0">Google Maps:</span>
+                  <span className="text-ink text-right">
+                    {formGoogleName ?? (formOwnerPinned ? "Not listed, pinned by you" : "Not linked")}
+                    {pinOffsetMetres !== null ? `, pin ${pinOffsetMetres} m from it` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-ink-muted shrink-0">Opening hours:</span>
+                  <span className="text-ink text-right">{summarizeWeek(formHours)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted">Storefront photo:</span>
+                  <span className="text-ink">{photoChange.kind === "set" ? "Uploaded with the store" : "None"}</span>
+                </div>
               </div>
             </div>
           )
@@ -1262,5 +1756,50 @@ export default function PlacesTab({
         </p>
       )}
     </div>
+  );
+}
+
+/** The storefront photo, or a camera mark where there is none yet. */
+function StoreThumb({ place }: { place: VerifiedPlace }) {
+  if (!place.photoUpdatedAt) {
+    return (
+      <span
+        title="No storefront photo yet"
+        className="flex h-9 w-12 shrink-0 items-center justify-center rounded-trim border border-dashed border-edge text-ink-muted"
+      >
+        <Camera size={14} />
+      </span>
+    );
+  }
+  return (
+    <img
+      src={storePhotoUrl(place.id, place.photoUpdatedAt)}
+      alt=""
+      loading="lazy"
+      className="h-9 w-12 shrink-0 rounded-trim border border-edge object-cover"
+    />
+  );
+}
+
+/** Linked to its Google Maps place, or still a typed-in pin from before 2026-10-13. */
+function GoogleLinkStatus({ place }: { place: VerifiedPlace }) {
+  if (!place.googlePlaceId && place.ownerPinned) {
+    return (
+      <span className="inline-flex items-center gap-1 text-label text-ink-muted" title="Not on Google Maps; pinned by the owner">
+        <MapPin size={13} />
+        Pinned by owner
+      </span>
+    );
+  }
+  return place.googlePlaceId ? (
+    <span className="inline-flex items-center gap-1 text-label text-status-done-ink">
+      <BadgeCheck size={13} />
+      Linked
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-label text-status-waiting-ink">
+      <AlertCircle size={13} />
+      Not linked
+    </span>
   );
 }

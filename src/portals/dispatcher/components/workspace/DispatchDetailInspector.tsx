@@ -8,8 +8,6 @@ import {
   ArrowLeft,
   Check,
   Copy,
-  ExternalLink,
-  MessageSquare,
   Phone,
   ShieldCheck,
 } from "lucide-react";
@@ -69,7 +67,9 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   loadError = null,
   onBackToBoard,
 }) => {
-  const [activeTab, setActiveTab] = useState<"OVERVIEW" | "CHAT">("OVERVIEW");
+  // One tab now: the "Customer chat" tab was removed on request. The footer's
+  // "Open the dispatch console" is the way to the conversation.
+  const [activeTab, setActiveTab] = useState<"OVERVIEW">("OVERVIEW");
   const [copiedId, setCopiedId] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
@@ -143,11 +143,6 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   // reconciling shows up on the screen instead of in an audit.
   const unreconciled = errand.totalCost ? Number(errand.totalCost) - lineSum : 0;
 
-  // The mode the customer actually confirmed, where they have. Null before the
-  // choice is made, which the fee note says plainly rather than assuming COD.
-  const paymentModeName: string | null =
-    (errand as any).paymentSelection?.paymentMode?.name ?? null;
-
   const progressIndex = progressIndexOf(errand.status);
 
   // Same supervision signal as ActiveErrandsPanel/RecentChatsPanel: a run
@@ -182,7 +177,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
     }
   };
 
-  const tab = (id: "OVERVIEW" | "CHAT", label: string, icon?: React.ReactNode) => (
+  const tab = (id: "OVERVIEW", label: string, icon?: React.ReactNode) => (
     <button
       type="button"
       onClick={() => setActiveTab(id)}
@@ -318,7 +313,6 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
       {/* Tabs, mandated by AGENTS.md 8.30 */}
       <div className="flex shrink-0 items-center gap-1 border-b border-hairline p-2">
         {tab("OVERVIEW", "Order and items")}
-        {tab("CHAT", "Customer chat", <MessageSquare size={13} />)}
       </div>
 
       {claimError ? (
@@ -378,13 +372,6 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                   ))}
                 </ul>
               )}
-
-              {items.length > 0 && !anyLinePriced ? (
-                <p className="mt-2 border-t border-hairline pt-2 text-label text-ink-muted">
-                  No prices yet. They are settled against the receipt the rider files, not
-                  against this list.
-                </p>
-              ) : null}
             </DispatcherCard.Region>
 
             {/* Route. Two figures on one region rather than two matching cards. */}
@@ -392,7 +379,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               <DispatcherCard.Label as="h3">The route</DispatcherCard.Label>
               <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="min-w-0">
-                  <dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">Collect from</dt>
+                  <dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">Store(s)</dt>
                   <dd className="mt-0.5 truncate text-body font-semibold text-ink">{primaryStore}</dd>
                   <dd className="line-clamp-2 text-label text-ink-muted">
                     {errand.pickupAddress || "Address not recorded"}
@@ -411,7 +398,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
             </DispatcherCard.Region>
 
             <DispatcherCard.Region padding="sm">
-              <DispatcherCard.Label as="h3">What it comes to</DispatcherCard.Label>
+              <DispatcherCard.Label as="h3">Estimated Fee(s)</DispatcherCard.Label>
               <dl className="space-y-1.5">
                 {subtotal > 0 ? (
                   <div className="flex items-baseline justify-between gap-3 text-body text-ink-muted">
@@ -435,12 +422,6 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 </div>
               </dl>
 
-              {subtotal === 0 ? (
-                <p className="mt-2 text-label text-ink-muted">
-                  Excludes item cost — settled upon rider purchase receipt.
-                </p>
-              ) : null}
-
               {subtotal > 0 && Math.abs(unreconciled) > 0.01 ? (
                 <p role="status" className="mt-2 text-label text-status-act-ink">
                   These lines do not add up to the recorded total. The difference is{" "}
@@ -449,37 +430,14 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 </p>
               ) : null}
 
-              <p className="mt-2 flex flex-wrap items-center gap-2 text-label text-ink-muted">
-                <span>
-                  The delivery fee is realised on completion.{" "}
-                  {paymentModeName
-                    ? `The customer pays by ${paymentModeName}.`
-                    : "No payment mode has been chosen yet."}
-                </span>
-                {needsBalanceSupervision ? (
+              {needsBalanceSupervision ? (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-label text-ink-muted">
                   <DispatcherBadge variant="warning">Balance outstanding</DispatcherBadge>
-                ) : null}
-              </p>
+                </p>
+              ) : null}
             </DispatcherCard.Region>
           </>
-        ) : (
-          <DispatcherCard.Region padding="md">
-            <h3 className="text-panel text-ink">Talk to {errand.customerName || "the customer"}</h3>
-            <p className="mt-1.5 text-body text-ink-muted">
-              The conversation and the five dispatch stages open in the full console, where you
-              confirm what was in stock, agree substitutions, and take payment.
-            </p>
-            <DispatcherButton
-              variant="field"
-              size="md"
-              className="mt-3"
-              icon={<ExternalLink size={14} />}
-              onClick={() => onOpenChat(errand.id)}
-            >
-              Open the dispatch console
-            </DispatcherButton>
-          </DispatcherCard.Region>
-        )}
+        ) : null}
       </div>
 
       {/* Action footer: a flex sibling, not an absolutely positioned overlay */}

@@ -200,9 +200,24 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     orderId,
     customerDisplayName: customerFirstName,
     onOrderUpdated: setOrderDetails,
-    postCard: chat.postCard,
+    pushMessage: chat.pushMessage,
     onCustomerConfirmed: markCustomerConfirmed,
   });
+
+  // The customer's app stamps the order summary when they choose how to pay
+  // (2026-10-15), over the same channel that carries their approval. The stamp
+  // is a cue to ask the server, not the choice itself.
+  const paymentStamp = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const m: any = chat.messages[i];
+      if (m.type === "order_confirmation") return m.paymentChosenAt ?? null;
+    }
+    return null;
+  }, [chat.messages]);
+  const { refreshSelection } = payment;
+  useEffect(() => {
+    if (paymentStamp) void refreshSelection();
+  }, [paymentStamp, refreshSelection]);
 
   // The payment ledger of a GCash / PayMaya or Bank Transfer errand. Separate
   // hook from useOrderPayment above: that one is the customer CHOOSING a
@@ -802,6 +817,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
             messagesEndRef={chat.messagesEndRef}
             readOnly={isReadOnly}
             composerRef={composerRef}
+            confirmedPaymentMode={payment.confirmedPaymentMode}
           />
         </section>
       </div>

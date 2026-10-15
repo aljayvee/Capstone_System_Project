@@ -70,8 +70,6 @@ export function Stage5SendRider({
 
   return (
     <div className="space-y-3">
-      <p className="m-0 text-body text-ink-muted">{copy.stage5.intro}</p>
-
       <DispatcherButton
         variant="success"
         size="lg"

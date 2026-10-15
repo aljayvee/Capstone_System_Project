@@ -116,7 +116,6 @@ export const copy = {
     approvedChoosingPayment: (who: string) => `${who} approved, choosing payment`,
     approvedAndPaid: (mode: string) => `Approved · ${mode}`,
     riderAssigned: (rider: string) => `${rider} is on it`,
-    readyWhenYouAre: "Ready when you are",
   },
 
   showAllSteps: "Show all steps",
@@ -260,8 +259,6 @@ export const copy = {
     pinAStore: "Pin a store in step 1",
     pinnedFor: (store: string, item: string) =>
       `Pinned ${store} for ${item}. Check it on the map, then continue.`,
-    intro: (who: string) =>
-      `Check the list, then send it. ${who} approves it and picks how to pay in the same message.`,
     addItem: "Add an item",
     itemPlaceholder: "What is it?",
     /**
@@ -316,6 +313,14 @@ export const copy = {
     untickAt: (item: string, store: string) => `Stop buying ${item} at ${store}`,
     tickAllAt: (store: string) => `Buy every item at ${store}`,
     clearAllAt: (store: string) => `Buy nothing at ${store}`,
+    /** Said after a tick or untick: the list shows only what each store buys. */
+    addedTo: (item: string, store: string) => `${item} is added to ${store}.`,
+    removedFrom: (item: string, store: string) => `${item} is removed from ${store}.`,
+    allAddedTo: (store: string) => `Every item is added to ${store}.`,
+    allRemovedFrom: (store: string) => `Every item is removed from ${store}.`,
+    /** Opens a store's dialog, the one place an item is ticked at a store. */
+    chooseItems: "Choose items",
+    nothingAtStore: (store: string) => `Nothing is bought at ${store} yet.`,
     addItemTo: (store: string) => `Add an item to ${store}`,
     removeFromOrder: (item: string) => `Remove ${item} from the order`,
     noItemsYet: "No items on this order yet.",
@@ -357,36 +362,40 @@ export const copy = {
 
   // ── stage 2, the payment half ───────────────────────────────────────────
   stage4: {
-    intro: (who: string) =>
-      `${who} chooses how they pay. Anything other than cash is arranged with you directly.`,
     heading: "Payment",
-    /** Before the list goes out: the send asks for payment too. */
-    asksWithList: (who: string) => `${who} picks how to pay when you send the list.`,
-    /** The list went out but the payment question did not (it failed, or an older order). */
-    notAsked: (who: string) => `The payment question has not reached ${who} yet.`,
-    answersEitherOrder: "They can choose before or after approving the list.",
-    ask: (who: string) => `Ask ${who} how they will pay`,
-    asking: "Asking",
-    asked: (who: string) => `Asked. ${who} will see it in the chat.`,
+    /**
+     * Before the list goes out. Since 2026-10-15 there is no payment card: the
+     * customer's Approve opens the choice, in a dialog they cannot dismiss.
+     */
+    asksWithList: (who: string) => `${who} chooses how to pay right after approving the list.`,
+    /** The list is out, not approved yet. Nothing to choose until it is. */
+    afterApproval: (who: string) => `The list is with ${who}. Approving it opens the payment choice.`,
+    /** Approved, no choice yet: the app was closed on the choice. */
+    choosing: (who: string) =>
+      `${who} approved the list. Their order summary now shows Choose payment method.`,
+    /** The list went out but payment was not opened (it failed, or an older order). */
+    notAsked: (who: string) => `Choosing how to pay is not open for ${who} yet.`,
+    ask: (who: string) => `Open payment for ${who}`,
+    asking: "Opening",
+    asked: (who: string) => `Done. ${who} chooses how to pay when they approve the list.`,
     settled: (mode: string) => `Settled by ${mode}.`,
     failed: "Couldn't set up payment. Try again.",
-    /** A reminder, not a second question: the payment card stays the one in the chat. */
+    /** A chat message pointing at the order summary's button, with a push. */
     resend: "Resend Payment Method",
     resending: "Reminding",
     reminded: (who: string) => `Reminded ${who} to choose how to pay.`,
-    remindedMoved: (who: string) =>
-      `The payment card was buried in the chat, so it is at the bottom again. ${who} was reminded.`,
     remindFailed: "Couldn't send the reminder. Try again.",
   },
 
   // ── push notifications for a card updated where it stands ───────────────
   //
   // Addressed to the customer. Sent instead of a new chat message when the
-  // order summary, the payment card or the store locations are updated in
-  // place (useOrderChat.postCard), so they know to look again.
+  // order summary or the store locations are updated in place
+  // (useOrderChat.postCard), so they know to look again. paymentReminder is
+  // the exception: it goes into the chat (useOrderPayment.remindCustomer).
   chatCards: {
     listUpdated: "Your item list was updated. Please check it again and approve it in our chat.",
-    paymentReminder: "Please choose how you will pay. Tap Choose Payment Mode on the payment card in our chat.",
+    paymentReminder: "Please choose how you will pay. Tap Choose payment method on your order summary in our chat.",
     storesUpdated: "The store locations for your errand were updated. You can see them in our chat.",
   },
 
@@ -445,7 +454,6 @@ export const copy = {
 
   // ── stage 3: assign a rider ─────────────────────────────────────────────
   stage5: {
-    intro: "The system gives this to the nearest free rider. This is who is around right now.",
     send: "Assign a rider",
     sending: "Finding the nearest rider",
     assigned: (rider: string, ref: string) => `${rider} is assigned to order #${ref}.`,

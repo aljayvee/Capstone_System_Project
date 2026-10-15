@@ -672,7 +672,8 @@ export function useOrderItems({
         };
 
       // One order summary in the chat: updated where it stands, or moved to the
-      // bottom when buried, with the payment card following it down. The
+      // bottom when buried, with an older chat's payment card following it
+      // down (none is sent since 2026-10-15). The
       // approval is reset either way (confirmed: false): a changed list is a
       // new question, and the customer's Approve button comes back for it.
       await postCard(

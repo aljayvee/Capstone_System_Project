@@ -109,7 +109,9 @@ export function useStageModel({
           return hasItems ? copy.status.itemCount(itemCount) : copy.status.notStarted;
         case 3:
           if (done[3]) return copy.status.riderAssigned(riderName || "A rider");
-          if (activeStageId === 3) return copy.status.readyWhenYouAre;
+          // Nothing to say while it is the step in hand: the button is the
+          // message. ("Ready when you are" was removed on request.)
+          if (activeStageId === 3) return "";
           return copy.status.notStarted;
       }
     };

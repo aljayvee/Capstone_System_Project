@@ -48,6 +48,11 @@ interface ChatBubbleProps {
   message: ChatMessageData;
   isCurrentUser: boolean;
   currentUserFirstName?: string;
+  /**
+   * The payment mode the customer confirmed, as the server records it. Null or
+   * absent until they confirm one, and the payment card then says "None".
+   */
+  paymentMode?: string | null;
 }
 
 interface ParsedErrandItem {
@@ -295,22 +300,6 @@ function ItemLine({
   );
 }
 
-/**
- * Said once, under the basket.
- *
- * Every line used to carry its own "Official receipt upon purchase" caption,
- * so a five-item order repeated the same seven words five times down the right
- * edge of a 38% pane. It is a property of how this product prices things, not
- * of any one item.
- */
-function ReceiptNote() {
-  return (
-    <p className="m-0 text-label text-ink-muted">
-      Item prices are settled against the actual receipt, not this list.
-    </p>
-  );
-}
-
 /** The fee line. Rendered only when there is a real figure to render. */
 function FeeLine({ label, value }: { label: string; value: number }) {
   return (
@@ -330,6 +319,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   message,
   isCurrentUser,
   currentUserFirstName,
+  paymentMode = null,
 }) => {
   // 1. Store-grouped order confirmation
   if (message.type === "order_confirmation") {
@@ -408,28 +398,34 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
           })
         )}
 
-        <ReceiptNote />
-
         {fee != null ? <FeeLine label="Delivery fee, exact and up front" value={fee} /> : null}
       </ThreadCard>
     );
   }
 
   // 2. Payment method confirmation
+  // The card used to say "Cash on delivery" and "Confirmed" whatever the
+  // customer had done. It now follows the confirmed choice, and says "None"
+  // until there is one.
   if (message.type === "payment_prompt") {
+    const MethodIcon = paymentMode && !/cash/i.test(paymentMode) ? CreditCard : Banknote;
     return (
       <ThreadCard
         mark={<CreditCard size={16} />}
         title="Payment method"
-        detail="Cash on delivery"
-        state={{ label: "Confirmed", tone: "done", icon: <Banknote size={12} /> }}
+        detail={paymentMode ?? "Not confirmed yet"}
+        state={
+          paymentMode
+            ? { label: "Confirmed", tone: "done", icon: <MethodIcon size={12} /> }
+            : { label: "Waiting", tone: "waiting", icon: <Clock size={12} /> }
+        }
       >
         <p className="m-0 text-body text-ink [overflow-wrap:anywhere]">{message.text}</p>
         <div className="flex items-center justify-between gap-2 border-t border-hairline pt-2">
           <span className="text-label text-ink-muted">Selected method</span>
           <span className="flex items-center gap-1.5 text-label text-ink">
-            <Banknote size={15} className="text-ink-muted" />
-            Cash on delivery
+            {paymentMode ? <MethodIcon size={15} className="text-ink-muted" /> : null}
+            {paymentMode ?? "None"}
           </span>
         </div>
       </ThreadCard>
@@ -547,8 +543,6 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
             );
           })
         )}
-
-        <ReceiptNote />
 
         {fee !== null && <FeeLine label="Delivery fee, first estimate" value={fee} />}
 

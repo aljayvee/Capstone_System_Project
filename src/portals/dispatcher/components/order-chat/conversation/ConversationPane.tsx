@@ -40,6 +40,8 @@ interface ConversationPaneProps {
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   readOnly: boolean;
   composerRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** The customer's confirmed payment mode, or null before they confirm one. */
+  confirmedPaymentMode: string | null;
 }
 
 export function ConversationPane({
@@ -60,6 +62,7 @@ export function ConversationPane({
   messagesEndRef,
   readOnly,
   composerRef,
+  confirmedPaymentMode,
 }: ConversationPaneProps) {
   return (
     <>
@@ -119,6 +122,7 @@ export function ConversationPane({
               message={m as any}
               isCurrentUser={m.role === "dispatcher"}
               currentUserFirstName={dispatcherFirstName}
+              paymentMode={confirmedPaymentMode}
             />
           ))
         )}

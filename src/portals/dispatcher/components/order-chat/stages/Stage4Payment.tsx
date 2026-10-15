@@ -8,11 +8,12 @@ import { copy, formatAgo } from "../copy";
 /**
  * The payment half of step 2, "Confirm items and payment".
  *
- * Asking is no longer a step of its own: sending the item list asks too (see
- * OrderChatScreen's onListSent), so this section mostly reports. The one
- * button left is a recovery: shown only when the list is out but the question
- * never reached the customer, because the ask failed or the order predates the
- * merge.
+ * Asking is no longer a step of its own: sending the item list opens payment
+ * too (see OrderChatScreen's onListSent), and since 2026-10-15 the customer's
+ * Approve leads straight into choosing, with no payment card in the chat. So
+ * this section mostly reports. Two buttons are left, both recoveries: opening
+ * payment when that failed or the order predates the merge, and a reminder for
+ * a customer who approved and closed the app before choosing.
  *
  * One button. The screen this replaces had "1. Enable Payment" and
  * "2. Prompt Customer in Chat" as separately numbered controls the dispatcher
@@ -145,21 +146,17 @@ export function Stage4Payment({
       {!hasSentList ? (
         <p className="m-0 text-body text-ink-muted">{copy.stage4.asksWithList(customerFirstName)}</p>
       ) : isPrompted && !isListApproved ? (
-        <div className="space-y-2">
-          <p className="m-0 text-body text-ink-muted">
-            {askedAt ? `You asked how they will pay ${formatAgo(minsAgo)}. ` : ""}
-            {copy.stage4.answersEitherOrder}
-          </p>
-          {resendButton}
-        </div>
+        // Nothing to remind about yet: the choice opens with their Approve, and
+        // the list's own waiting card above carries the nudge.
+        <p className="m-0 text-body text-ink-muted">{copy.stage4.afterApproval(customerFirstName)}</p>
       ) : isPrompted ? (
         <div className="space-y-2">
           <WaitingCard
             title={`Waiting for ${customerFirstName}`}
             detail={
               askedAt
-                ? `You asked how they will pay ${formatAgo(minsAgo)}.`
-                : copy.stage4.intro(customerFirstName)
+                ? `${copy.stage4.choosing(customerFirstName)} You sent the list ${formatAgo(minsAgo)}.`
+                : copy.stage4.choosing(customerFirstName)
             }
             actions={[{ label: copy.nowActions.nudge(customerFirstName), onClick: onNudge }]}
           />

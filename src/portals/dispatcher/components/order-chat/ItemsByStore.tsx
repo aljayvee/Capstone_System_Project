@@ -19,11 +19,12 @@ import type { EditableItem } from "./types";
 /**
  * Step 2's list, grouped by store (2026-10-08).
  *
- * Every store lists every item of the order, ticked where that store buys it,
- * so who buys what is read without opening anything. Ticking an item at a
- * second store buys it there too. A store's name opens the same choice as a
- * dialog, and its check button ticks or clears every item at once. Items no
- * store buys wait at the top, under "Not assigned yet".
+ * Each store lists only the items it buys (2026-10-10). Every store used to
+ * list every item of the order, ticked or not, so a three-store order showed
+ * each item three times, mostly as unticked rows. Which store buys what is
+ * chosen in the store's dialog (StoreItemsDialog), opened from its heading;
+ * Stage3ConfirmItems says what each tick did. Items no store buys wait at the
+ * top, under "Not assigned yet".
  */
 
 export interface StoreColumn {
@@ -36,8 +37,8 @@ interface ItemsByStoreProps {
   stores: StoreColumn[];
   lines: ItemLine[];
   rows: EditableItem[];
+  /** "Buy at" on an item no store buys yet. */
   onTick: (key: string, storeIndex: number, owned: boolean) => void;
-  onTickAll: (storeIndex: number, owned: boolean) => void;
   onEditItem: (key: string, patch: Partial<Pick<EditableItem, "itemName" | "size">>) => void;
   /** A store's quantity: its own line's. */
   onQuantity: (rowIndex: number, quantity: number) => void;
@@ -122,7 +123,6 @@ export function ItemsByStore({
   lines,
   rows,
   onTick,
-  onTickAll,
   onEditItem,
   onQuantity,
   onRemove,
@@ -223,8 +223,8 @@ export function ItemsByStore({
       )}
 
       {stores.map((store, storeIndex) => {
-        const tick = storeTickState(lines, storeIndex);
-        const owned = lines.filter((line) => line.rowByStore[storeIndex] !== undefined).length;
+        const ownedLines = lines.filter((line) => line.rowByStore[storeIndex] !== undefined);
+        const owned = ownedLines.length;
         return (
           <section
             key={storeIndex}
@@ -248,58 +248,40 @@ export function ItemsByStore({
                     {[store.category, copy.stage3.storeCount(owned, lines.length)].filter(Boolean).join(" · ")}
                   </span>
                 </span>
+                {/* Named, not just a chevron: the dialog is now the only place
+                    an item is ticked at a store. */}
+                <span className="shrink-0 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted group-hover:text-ink">
+                  {copy.stage3.chooseItems}
+                </span>
                 <ChevronRight size={15} className="shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5" />
               </button>
-              <TickBox
-                state={tick}
-                label={tick === "all" ? copy.stage3.clearAllAt(store.name) : copy.stage3.tickAllAt(store.name)}
-                onToggle={() => onTickAll(storeIndex, tick !== "all")}
-                disabled={lines.length === 0}
-              />
             </header>
 
             {lines.length === 0 ? (
               <p className="m-0 px-3 py-3 text-body text-ink-muted">{copy.stage3.noItemsYet}</p>
+            ) : ownedLines.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                <p className="m-0 min-w-0 flex-1 text-body text-ink-muted">{copy.stage3.nothingAtStore(store.name)}</p>
+                <DispatcherButton type="button" variant="secondary" size="sm" className="font-semibold" onClick={() => onOpenStore(storeIndex)}>
+                  {copy.stage3.chooseItems}
+                </DispatcherButton>
+              </div>
             ) : (
               <div className="divide-y divide-hairline">
-                {lines.map((line) => {
+                {ownedLines.map((line) => {
                   const rowIndex = line.rowByStore[storeIndex];
-                  const isOwned = rowIndex !== undefined;
                   return (
-                    <div key={line.key} className={cn("px-1 py-1.5", !isOwned && "bg-board-ground/30")}>
+                    <div key={line.key} className="px-2 py-1.5">
                       <div className="flex items-center gap-2">
-                        <TickBox
-                          state={isOwned ? "all" : "none"}
-                          label={
-                            isOwned
-                              ? copy.stage3.untickAt(nameOf(line), store.name)
-                              : copy.stage3.tickAt(nameOf(line), store.name)
-                          }
-                          onToggle={() => onTick(line.key, storeIndex, !isOwned)}
+                        {editors(line)}
+                        <QtyStepper
+                          value={rows[rowIndex].quantity}
+                          onChange={(quantity) => onQuantity(rowIndex, quantity)}
+                          label={nameOf(line)}
                         />
-                        {isOwned ? (
-                          <>
-                            {editors(line)}
-                            <QtyStepper
-                              value={rows[rowIndex].quantity}
-                              onChange={(quantity) => onQuantity(rowIndex, quantity)}
-                              label={nameOf(line)}
-                            />
-                            {removeButton(line)}
-                          </>
-                        ) : (
-                          <>
-                            <span className="min-w-0 flex-1 truncate text-body text-ink-muted">
-                              {formatItemLabel(nameOf(line), line.size)}
-                            </span>
-                            <span className="w-[108px] shrink-0 text-center text-label text-ink-muted" aria-hidden>
-                              -
-                            </span>
-                            <span className="size-9 shrink-0" aria-hidden />
-                          </>
-                        )}
+                        {removeButton(line)}
                       </div>
-                      {isOwned && renderLineExtras?.(rowIndex)}
+                      {renderLineExtras?.(rowIndex)}
                     </div>
                   );
                 })}

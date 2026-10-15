@@ -17,6 +17,8 @@ import {
   FileText,
   ShoppingBag,
   Bike,
+  Sparkles,
+  Wrench,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import type {
@@ -30,6 +32,9 @@ interface AppFormState {
   minAndroid: string;
   fileSize: string;
   whatsNew: string[];
+  features: string[];
+  fixes: string[];
+  logs: string[];
 }
 
 export const AppReleasesTab: React.FC = () => {
@@ -46,8 +51,8 @@ export const AppReleasesTab: React.FC = () => {
 
   // Form edit states
   const [forms, setForms] = useState<Record<AppReleaseTarget, AppFormState>>({
-    customer: { version: "", minAndroid: "", fileSize: "", whatsNew: [] },
-    rider: { version: "", minAndroid: "", fileSize: "", whatsNew: [] },
+    customer: { version: "", minAndroid: "", fileSize: "", whatsNew: [], features: [], fixes: [], logs: [] },
+    rider: { version: "", minAndroid: "", fileSize: "", whatsNew: [], features: [], fixes: [], logs: [] },
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -76,12 +81,26 @@ export const AppReleasesTab: React.FC = () => {
             minAndroid: data.releases.customer.minAndroid || "Android 8.0+",
             fileSize: data.releases.customer.fileSize || "125 MB",
             whatsNew: [...(data.releases.customer.whatsNew || [])],
+            features: [
+              ...(data.releases.customer.features ||
+                data.releases.customer.whatsNew ||
+                []),
+            ],
+            fixes: [...(data.releases.customer.fixes || [])],
+            logs: [...(data.releases.customer.logs || [])],
           },
           rider: {
             version: data.releases.rider.version || "1.0.0",
             minAndroid: data.releases.rider.minAndroid || "Android 8.0+",
             fileSize: data.releases.rider.fileSize || "173 MB",
             whatsNew: [...(data.releases.rider.whatsNew || [])],
+            features: [
+              ...(data.releases.rider.features ||
+                data.releases.rider.whatsNew ||
+                []),
+            ],
+            fixes: [...(data.releases.rider.fixes || [])],
+            logs: [...(data.releases.rider.logs || [])],
           },
         });
       }
@@ -117,6 +136,102 @@ export const AppReleasesTab: React.FC = () => {
       [activeTarget]: {
         ...prev[activeTarget],
         [field]: value,
+      },
+    }));
+  };
+
+  // Features item operations
+  const handleAddFeature = () => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        features: [...prev[activeTarget].features, ""],
+      },
+    }));
+  };
+
+  const handleUpdateFeature = (index: number, text: string) => {
+    setForms((prev) => {
+      const nextList = [...prev[activeTarget].features];
+      nextList[index] = text;
+      return {
+        ...prev,
+        [activeTarget]: { ...prev[activeTarget], features: nextList },
+      };
+    });
+  };
+
+  const handleRemoveFeature = (index: number) => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        features: prev[activeTarget].features.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  // Fixes item operations
+  const handleAddFix = () => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        fixes: [...prev[activeTarget].fixes, ""],
+      },
+    }));
+  };
+
+  const handleUpdateFix = (index: number, text: string) => {
+    setForms((prev) => {
+      const nextList = [...prev[activeTarget].fixes];
+      nextList[index] = text;
+      return {
+        ...prev,
+        [activeTarget]: { ...prev[activeTarget], fixes: nextList },
+      };
+    });
+  };
+
+  const handleRemoveFix = (index: number) => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        fixes: prev[activeTarget].fixes.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  // Logs item operations
+  const handleAddLog = () => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        logs: [...prev[activeTarget].logs, ""],
+      },
+    }));
+  };
+
+  const handleUpdateLog = (index: number, text: string) => {
+    setForms((prev) => {
+      const nextList = [...prev[activeTarget].logs];
+      nextList[index] = text;
+      return {
+        ...prev,
+        [activeTarget]: { ...prev[activeTarget], logs: nextList },
+      };
+    });
+  };
+
+  const handleRemoveLog = (index: number) => {
+    setForms((prev) => ({
+      ...prev,
+      [activeTarget]: {
+        ...prev[activeTarget],
+        logs: prev[activeTarget].logs.filter((_, i) => i !== index),
       },
     }));
   };
@@ -168,11 +283,19 @@ export const AppReleasesTab: React.FC = () => {
 
     const currentForm = forms[activeTarget];
     try {
+      const cleanFeatures = currentForm.features.filter((item) => item.trim().length > 0);
+      const cleanFixes = currentForm.fixes.filter((item) => item.trim().length > 0);
+      const cleanLogs = currentForm.logs.filter((item) => item.trim().length > 0);
+      const cleanWhatsNew = currentForm.whatsNew.filter((item) => item.trim().length > 0);
+
       const res = await sysAdminApiService.updateAppRelease(activeTarget, {
         version: currentForm.version,
         minAndroid: currentForm.minAndroid,
         fileSize: currentForm.fileSize,
-        whatsNew: currentForm.whatsNew.filter((item) => item.trim().length > 0),
+        features: cleanFeatures,
+        fixes: cleanFixes,
+        logs: cleanLogs,
+        whatsNew: cleanWhatsNew.length > 0 ? cleanWhatsNew : [...cleanFeatures, ...cleanFixes.map(f => `Fix: ${f}`)],
       });
 
       if (res?.release) {
@@ -641,25 +764,28 @@ export const AppReleasesTab: React.FC = () => {
               </div>
             </div>
 
-            {/* What's New List Editor */}
-            <div className="space-y-2.5 pt-1">
+            {/* 1. Features Added List Editor */}
+            <div className="space-y-2.5 pt-1 border-t border-slate-800">
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-slate-400" />
-                  <span>What's New in this Version (Landing Page Bullets)</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Features Added</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                    {activeForm.features.length}
+                  </span>
                 </label>
                 <button
                   type="button"
-                  onClick={handleAddWhatsNew}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors"
+                  onClick={handleAddFeature}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3 h-3 text-red-400" />
                   <span>Add Feature</span>
                 </button>
               </div>
 
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {activeForm.whatsNew.map((item, idx) => (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {activeForm.features.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
                       #{idx + 1}
@@ -667,14 +793,14 @@ export const AppReleasesTab: React.FC = () => {
                     <input
                       type="text"
                       value={item}
-                      onChange={(e) => handleUpdateWhatsNew(idx, e.target.value)}
-                      placeholder="Describe what's new or improved..."
+                      onChange={(e) => handleUpdateFeature(idx, e.target.value)}
+                      placeholder="e.g. Real-time multi-stop errand route tracking on map..."
                       className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
                     />
                     <button
                       type="button"
-                      onClick={() => handleRemoveWhatsNew(idx)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0"
+                      onClick={() => handleRemoveFeature(idx)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
                       title="Remove feature"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -682,9 +808,113 @@ export const AppReleasesTab: React.FC = () => {
                   </div>
                 ))}
 
-                {activeForm.whatsNew.length === 0 && (
-                  <div className="p-4 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
-                    No release bullets added yet. Click "+ Add Feature" above to specify what's new.
+                {activeForm.features.length === 0 && (
+                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                    No new features listed. Click "+ Add Feature" above.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Bug Fixes List Editor */}
+            <div className="space-y-2.5 pt-1 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Bug Fixes & Stability</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                    {activeForm.fixes.length}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddFix}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3 h-3 text-red-400" />
+                  <span>Add Fix</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {activeForm.fixes.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => handleUpdateFix(idx, e.target.value)}
+                      placeholder="e.g. Fixed receipt image orientation glitch on Android 14..."
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFix(idx)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
+                      title="Remove fix"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {activeForm.fixes.length === 0 && (
+                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                    No bug fixes listed. Click "+ Add Fix" above.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3. Detailed Logs & Improvements List Editor */}
+            <div className="space-y-2.5 pt-1 border-t border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Release Logs & Improvements</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                    {activeForm.logs.length}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddLog}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3 h-3 text-red-400" />
+                  <span>Add Log</span>
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {activeForm.logs.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => handleUpdateLog(idx, e.target.value)}
+                      placeholder="e.g. Upgraded Expo SDK 57 runtime and reduced cold start latency..."
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLog(idx)}
+                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
+                      title="Remove log"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {activeForm.logs.length === 0 && (
+                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                    No system logs listed. Click "+ Add Log" above.
                   </div>
                 )}
               </div>
