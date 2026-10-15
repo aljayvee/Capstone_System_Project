@@ -16,6 +16,7 @@ import { auth } from "../../firebase/config";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
+  signOut,
   type ConfirmationResult,
 } from "firebase/auth";
 
@@ -241,6 +242,11 @@ export const OtpStep: React.FC<OtpStepProps> = ({
     try {
       const userCredential = await confirmationResultRef.current.confirm(codeVal);
       const idToken = await userCredential.user.getIdToken();
+      // The phone sign-in existed only to prove the number. Left signed in, it
+      // stood in for the staff identity the session mints next
+      // (ensureRealtimeSession), which the database rules refuse, so the live
+      // map and chat stayed dark until the next sign-out.
+      await signOut(auth).catch(() => {});
       confirmationResultRef.current = null;
       if (recaptchaVerifierRef.current) {
         try {

@@ -46,6 +46,14 @@ function getFirebaseAuth(): Auth {
  */
 let inFlight: Promise<boolean> | null = null;
 
+/**
+ * True for the uids the server mints for portal staff (firebaseUidFor in the
+ * API: `staff_<id>`). Any other Firebase user is not one the rules recognise.
+ */
+function isPortalIdentity(uid: string): boolean {
+  return /^staff_\d+$/.test(uid);
+}
+
 export type RealtimeAuthState = 'signed-in' | 'signed-out' | 'unavailable';
 
 let lastState: RealtimeAuthState = 'signed-out';
@@ -79,9 +87,18 @@ export async function ensureRealtimeSession(): Promise<boolean> {
     return false;
   }
 
-  if (getFirebaseAuth().currentUser) {
+  const current = getFirebaseAuth().currentUser;
+  if (current && isPortalIdentity(current.uid)) {
     publish('signed-in');
     return true;
+  }
+  if (current) {
+    // Some other Firebase user is signed in: in practice the phone user an SMS
+    // check leaves behind (signInWithPhoneNumber signs in as it verifies, and
+    // the SDK persists it across reloads). The security rules admit only the
+    // server-minted identities, so treating it as "signed in" left the map and
+    // chat denied until the next sign-out. Replace it instead.
+    await signOut(getFirebaseAuth()).catch(() => {});
   }
 
   if (inFlight) return inFlight;
