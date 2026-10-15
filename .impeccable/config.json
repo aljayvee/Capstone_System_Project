@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "src/pages/legal/LegalDocumentView.tsx"
+        ],
+        "createdAt": "2026-10-15T12:43:53.906Z",
+        "reason": "Claude: L87 is text-slate-900 on bg-white; the only colour is the ::selection pair bg-red-50 / text-red-900, so no gray text sits on a coloured background"
+      }
+    ]
+  }
+}
