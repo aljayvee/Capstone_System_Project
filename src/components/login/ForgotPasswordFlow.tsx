@@ -32,15 +32,6 @@ import {
 
 type Step = "FIND" | "CHOOSE" | "EMAIL_CODE" | "SMS_NUMBER" | "SMS_CODE" | "NEW_PASSWORD";
 
-const STEP_NUMBER: Record<Step, number> = {
-  FIND: 1,
-  CHOOSE: 2,
-  EMAIL_CODE: 3,
-  SMS_NUMBER: 3,
-  SMS_CODE: 3,
-  NEW_PASSWORD: 4,
-};
-
 const SMS_RESEND_SECONDS = 60;
 
 // The same five rules the server enforces (staffResetPassword in the API's
@@ -439,9 +430,6 @@ export const ForgotPasswordFlow: React.FC<ForgotPasswordFlowProps> = ({
       <div id={`${ids}-recaptcha`} />
 
       <div className="space-y-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Step {STEP_NUMBER[step]} of 4
-        </p>
         <h2 ref={headingRef} tabIndex={-1} className="text-white text-lg font-bold tracking-tight outline-none">
           {headings[step].title}
         </h2>
