@@ -128,6 +128,11 @@ export default function LoginPage() {
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  // A failed sign-in wants the cursor back in the username field, but at that
+  // moment the field is still disabled from the request, and the browser drops
+  // focus() on a disabled input. So the request is noted here and carried out
+  // once loading ends and the field is enabled again.
+  const refocusUsernameRef = useRef(false);
 
   // 500 Server Error [nginx] Outage Simulation State
   const [isServerErrorOverlayActive, setIsServerErrorOverlayActive] = useState<boolean>(() => {
@@ -214,6 +219,13 @@ export default function LoginPage() {
       (rememberedIdentifier ? passwordInputRef : usernameInputRef).current?.focus();
     }
   }, [stage, isServerErrorOverlayActive, rememberedIdentifier]);
+
+  useEffect(() => {
+    if (!isLoading && refocusUsernameRef.current) {
+      refocusUsernameRef.current = false;
+      usernameInputRef.current?.focus();
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     if (isServerErrorOverlayActive) {
@@ -354,7 +366,7 @@ export default function LoginPage() {
 
         // Standard authentication error
         setPassword("");
-        usernameInputRef.current?.focus();
+        refocusUsernameRef.current = true;
         setActiveAlert({
           variant: "error",
           title: "Invalid Credentials",
@@ -592,7 +604,7 @@ export default function LoginPage() {
             {/* Email / Username Input */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                <label htmlFor="login-identifier" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
                   Email
                 </label>
                 {fieldErrors.email && (
@@ -602,6 +614,7 @@ export default function LoginPage() {
                 )}
               </div>
               <input
+                id="login-identifier"
                 ref={usernameInputRef}
                 type="text"
                 value={identifier}
@@ -627,7 +640,7 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <label className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                  <label htmlFor="login-password" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
                     Password
                   </label>
                   {isCapsLockOn && (
@@ -644,6 +657,7 @@ export default function LoginPage() {
               </div>
               <div className="relative">
                 <input
+                  id="login-password"
                   ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
                   value={password}
