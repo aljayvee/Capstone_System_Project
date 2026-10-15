@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, ShieldAlert, Smartphone, Info, RefreshCw, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ShieldAlert, Smartphone, Info, Clock, X } from "lucide-react";
 
 export type AlertVariant = "error" | "security_cooldown" | "role_notice" | "info" | "success";
 
@@ -7,7 +7,11 @@ export interface LoginAlertBannerProps {
   variant: AlertVariant;
   title: string;
   message: string;
-  cooldownSeconds?: number;
+  // security_cooldown only: when the pause ends, as a Date.now() timestamp.
+  // The countdown is read off the clock on every tick rather than decremented,
+  // so a tab the browser throttled in the background is still right when it
+  // comes back.
+  cooldownEndsAt?: number;
   onCooldownExpire?: () => void;
   actionText?: string;
   onAction?: () => void;
@@ -20,14 +24,18 @@ function formatCountdown(totalSeconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
   const mins = Math.floor(safeSeconds / 60);
   const secs = safeSeconds % 60;
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function secondsUntil(endsAt: number): number {
+  return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
 }
 
 export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
   variant,
   title,
   message,
-  cooldownSeconds = 0,
+  cooldownEndsAt,
   onCooldownExpire,
   actionText,
   onAction,
@@ -35,10 +43,14 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
   autoDismissMs,
   className = "",
 }) => {
-  const [remainingTime, setRemainingTime] = useState<number>(cooldownSeconds);
+  const [remainingTime, setRemainingTime] = useState<number>(() =>
+    cooldownEndsAt ? secondsUntil(cooldownEndsAt) : 0
+  );
   const [isVisible, setIsVisible] = useState<boolean>(true);
   const onDismissRef = React.useRef(onDismiss);
   onDismissRef.current = onDismiss;
+  const onCooldownExpireRef = React.useRef(onCooldownExpire);
+  onCooldownExpireRef.current = onCooldownExpire;
 
   // Auto-dismiss countdown timer (e.g. 1500ms to disappear)
   useEffect(() => {
@@ -59,27 +71,34 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
     };
   }, [autoDismissMs, title, message]);
 
-  // Security cooldown ticker (for 429 rate limits)
+  // Security cooldown ticker (for 429 rate limits). Expiry is reported once.
   useEffect(() => {
-    setRemainingTime(cooldownSeconds);
-  }, [cooldownSeconds]);
+    if (variant !== "security_cooldown" || !cooldownEndsAt) {
+      setRemainingTime(0);
+      return;
+    }
 
-  useEffect(() => {
-    if (variant !== "security_cooldown" || remainingTime <= 0) return;
+    let expired = false;
+    const tick = () => {
+      if (expired) return;
+      const left = secondsUntil(cooldownEndsAt);
+      setRemainingTime(left);
+      if (left <= 0) {
+        expired = true;
+        clearInterval(timer);
+        onCooldownExpireRef.current?.();
+      }
+    };
+    const timer = setInterval(tick, 1000);
+    tick();
+    // A tab brought back to the front catches up at once, not on the next tick.
+    document.addEventListener("visibilitychange", tick);
 
-    const timer = setInterval(() => {
-      setRemainingTime((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          if (onCooldownExpire) onCooldownExpire();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [variant, remainingTime, onCooldownExpire]);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [variant, cooldownEndsAt]);
 
   // Variant-specific styling configuration
   const config = {
@@ -97,7 +116,8 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
       textColor: "text-amber-200/90",
       icon: ShieldAlert,
       iconColor: "text-amber-400",
-      buttonBg: "bg-amber-600 hover:bg-amber-700 text-white",
+      // amber-700, not 600: white 12px text on amber-600 is only about 3.2:1.
+      buttonBg: "bg-amber-700 hover:bg-amber-800 text-white",
     },
     role_notice: {
       container: "bg-sky-500/10 border-sky-500/30 text-sky-100",
@@ -145,10 +165,16 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
               {title}
             </h4>
 
+            {/* Hidden from screen readers: inside role="alert", a value that
+                changes every second would be read out every second. The
+                message states the end time once instead. */}
             {variant === "security_cooldown" && remainingTime > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                <RefreshCw size={10} className="animate-spin" />
-                Wait {formatCountdown(remainingTime)}
+              <span
+                aria-hidden="true"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold tabular-nums bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              >
+                <Clock size={11} />
+                {formatCountdown(remainingTime)} left
               </span>
             )}
           </div>

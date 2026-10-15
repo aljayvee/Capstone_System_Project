@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Eye, EyeOff, ChevronRight, Check,
-  Loader2, ShieldAlert, Laptop, Globe, Clock
+  Loader2, ShieldAlert, Laptop, Globe, Clock, Lock, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
-import type { LoginSuccessResponse, LoginChallengeResponse } from "../services/apiService";
+import type { LoginSuccessResponse, LoginChallengeResponse, LoginErrorResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
 import { io, Socket } from "socket.io-client";
 import {
@@ -70,12 +70,75 @@ function writeRememberedIdentifier(value: string | null): void {
   }
 }
 
+// When the API's sign-in limit stops this browser, the pause is kept here so a
+// reload does not bring back a form the API would only refuse again. It holds
+// the end time and which limit it was, nothing about the account. Shared by
+// every tab, like the device id the API counts against.
+const SIGN_IN_PAUSE_KEY = "sugo_staff_login_paused_until";
+// The API's window is 15 minutes; anything stored further out than this is a
+// corrupt or hand-edited value, not a pause, and is ignored.
+const MAX_SIGN_IN_PAUSE_MS = 60 * 60 * 1000;
+const DEFAULT_PAUSE_SECONDS = 15 * 60;
+const FEW_ATTEMPTS_LEFT = 3;
+
+interface SignInPause {
+  until: number;
+  scope: "device" | "network" | null;
+  // Set when the pause began with a wrong password that used the last attempt,
+  // rather than with a request the API refused outright. Not kept on reload.
+  lastAttemptUsed?: boolean;
+}
+
+function readSignInPause(): SignInPause | null {
+  try {
+    const raw = localStorage.getItem(SIGN_IN_PAUSE_KEY);
+    if (!raw) return null;
+    const stored = JSON.parse(raw);
+    const until = Number(stored?.until);
+    const left = until - Date.now();
+    if (!Number.isFinite(until) || left <= 0 || left > MAX_SIGN_IN_PAUSE_MS) return null;
+    const scope = stored.scope === "device" || stored.scope === "network" ? stored.scope : null;
+    return { until, scope };
+  } catch {
+    return null;
+  }
+}
+
+function writeSignInPause(pause: SignInPause | null): void {
+  try {
+    if (pause) {
+      localStorage.setItem(SIGN_IN_PAUSE_KEY, JSON.stringify({ until: pause.until, scope: pause.scope }));
+    } else {
+      localStorage.removeItem(SIGN_IN_PAUSE_KEY);
+    }
+  } catch {
+    // Storage blocked: the pause lasts until a reload, and the API still enforces it.
+  }
+}
+
+// Rounded up to the minute, so the form never opens later than it says.
+function formatPauseEnd(until: number): string {
+  return new Date(Math.ceil(until / 60_000) * 60_000).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function signInPauseMessage(pause: SignInPause): string {
+  const why = pause.lastAttemptUsed
+    ? "That password was not accepted, and it was the last attempt allowed for now."
+    : pause.scope === "network"
+      ? "Too many sign-ins from your network have failed. This limit covers everyone on the same connection."
+      : pause.scope === "device"
+        ? "Too many sign-ins from this browser have failed."
+        : "Too many sign-in attempts have failed.";
+  return `${why} For security, sign-in is paused until ${formatPauseEnd(pause.until)}. If you have forgotten your password, you can reset it now.`;
+}
+
 interface ActiveAlert {
   variant: AlertVariant;
   title: string;
   message: string;
-  cooldownSeconds?: number;
-  onCooldownExpire?: () => void;
   actionText?: string;
   onAction?: () => void;
   autoDismissMs?: number;
@@ -113,6 +176,11 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [mobileAppRoleAlert, setMobileAppRoleAlert] = useState<string | null>(null);
   const [isCapsLockOn, setIsCapsLockOn] = useState(false);
+  const [signInPause, setSignInPause] = useState<SignInPause | null>(readSignInPause);
+  // Failed sign-ins this browser has left before the API pauses it, as the API
+  // reported on the last refusal (null when unknown).
+  const [attemptsLeft, setAttemptsLeft] = useState<{ count: number; scope: SignInPause["scope"] } | null>(null);
+  const isCooldownActive = signInPause !== null;
 
   const [stage, setStage] = useState<Stage>("CREDENTIALS");
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
@@ -234,6 +302,31 @@ export default function LoginPage() {
     }
   }, [isLoading]);
 
+  // A pause disables every field, and the browser drops focus from a disabled
+  // one, so focus goes to the banner that explains it. When the pause ends,
+  // it comes back to the field still to fill in.
+  const pauseBannerRef = useRef<HTMLDivElement>(null);
+  const wasPausedRef = useRef(isCooldownActive);
+  useEffect(() => {
+    if (stage === "CREDENTIALS") {
+      if (isCooldownActive) {
+        pauseBannerRef.current?.focus();
+      } else if (wasPausedRef.current) {
+        (identifierRef.current.trim() ? passwordInputRef : usernameInputRef).current?.focus();
+      }
+    }
+    wasPausedRef.current = isCooldownActive;
+  }, [isCooldownActive, stage]);
+
+  // Another tab of this browser hitting the limit pauses this one too.
+  useEffect(() => {
+    const handlePauseStorage = (e: StorageEvent) => {
+      if (e.key === SIGN_IN_PAUSE_KEY) setSignInPause(readSignInPause());
+    };
+    window.addEventListener("storage", handlePauseStorage);
+    return () => window.removeEventListener("storage", handlePauseStorage);
+  }, []);
+
   useEffect(() => {
     if (isServerErrorOverlayActive) {
       const prevTitle = document.title;
@@ -328,7 +421,51 @@ export default function LoginPage() {
     navigate(`/${rawRole}`);
   };
 
+  // The API stops a sign-in for the rest of its window in two ways: a request
+  // it refuses outright (429), or a wrong password that used the last attempt
+  // (nothing left, so the next try would be that 429). Both pause the form
+  // until the window resets. Returns false for any other refusal.
+  const pauseIfLimited = (response: LoginErrorResponse): boolean => {
+    const isLimited = response.isRateLimit || response.statusCode === 429;
+    const lastAttemptUsed = !isLimited && response.attemptsRemaining === 0;
+    if (!isLimited && !lastAttemptUsed) return false;
+
+    const seconds = response.retryAfterSeconds || DEFAULT_PAUSE_SECONDS;
+    const pause: SignInPause = {
+      until: Date.now() + seconds * 1000,
+      scope: response.limitScope ?? null,
+      lastAttemptUsed,
+    };
+    writeSignInPause(pause);
+    setSignInPause(pause);
+    setAttemptsLeft(null);
+    setActiveAlert(null);
+    setPassword("");
+    return true;
+  };
+
+  const handlePauseExpired = () => {
+    writeSignInPause(null);
+    setSignInPause(null);
+    setActiveAlert({
+      variant: "info",
+      title: "You can sign in again",
+      message: "Sign-in is no longer paused. If you are not sure of the password, reset it rather than guessing.",
+    });
+  };
+
+  // Called on every refused password: from a few attempts out, the form says
+  // how many are left, so the pause never comes as a surprise.
+  const noteAttemptsLeft = (response: LoginErrorResponse) => {
+    setAttemptsLeft(
+      response.attemptsRemaining === undefined
+        ? null
+        : { count: response.attemptsRemaining, scope: response.limitScope ?? null }
+    );
+  };
+
   const handleLogin = async () => {
+    if (isCooldownActive) return;
     const errors: { email?: string; password?: string } = {};
 
     if (!identifier.trim()) {
@@ -354,24 +491,10 @@ export default function LoginPage() {
         setIsLoading(false);
 
         // Check for rate limit or security cooldown
-        if (response.isRateLimit || response.statusCode === 429) {
-          setActiveAlert({
-            variant: "security_cooldown",
-            title: "Security Rate Limit Activated",
-            message: response.error || "Too many failed attempts. Access is temporarily paused.",
-            cooldownSeconds: response.retryAfterSeconds || 900,
-            onCooldownExpire: () => {
-              setActiveAlert({
-                variant: "info",
-                title: "Cooldown Expired",
-                message: "You may now try signing in again.",
-              });
-            },
-          });
-          return;
-        }
+        if (pauseIfLimited(response)) return;
 
         // Standard authentication error
+        noteAttemptsLeft(response);
         setPassword("");
         refocusUsernameRef.current = true;
         setActiveAlert({
@@ -414,6 +537,8 @@ export default function LoginPage() {
       const response = await apiService.login(identifier.trim(), password.trim(), true);
       if ("error" in response) {
         setIsLoading(false);
+        if (pauseIfLimited(response)) return;
+        noteAttemptsLeft(response);
         setActiveAlert({
           variant: "error",
           title: "Sign In Failed",
@@ -588,7 +713,8 @@ export default function LoginPage() {
     );
   }
 
-  const isCooldownActive = activeAlert?.variant === "security_cooldown" && (activeAlert.cooldownSeconds ?? 0) > 0;
+  const showAttemptsWarning =
+    !isCooldownActive && attemptsLeft !== null && attemptsLeft.count > 0 && attemptsLeft.count <= FEW_ATTEMPTS_LEFT;
 
   return (
     <main
@@ -617,19 +743,35 @@ export default function LoginPage() {
             className="space-y-4"
           >
             
-            {/* Alert Banner System */}
-            {activeAlert && (
+            {/* Alert Banner System. During a pause only a password-reset
+                success shows beside it, so the person who just reset knows
+                both that it worked and when they can use it. */}
+            {activeAlert && (!isCooldownActive || activeAlert.variant === "success") && (
               <LoginAlertBanner
                 variant={activeAlert.variant}
                 title={activeAlert.title}
                 message={activeAlert.message}
-                cooldownSeconds={activeAlert.cooldownSeconds}
                 actionText={activeAlert.actionText}
                 onAction={activeAlert.onAction}
                 onDismiss={() => setActiveAlert(null)}
-                onCooldownExpire={activeAlert.onCooldownExpire}
                 autoDismissMs={activeAlert.autoDismissMs}
               />
+            )}
+
+            {/* No dismiss button: closing it used to re-enable a form the
+                API would only refuse again. It ends by itself. */}
+            {signInPause && (
+              <div ref={pauseBannerRef} tabIndex={-1} className="outline-none">
+                <LoginAlertBanner
+                  variant="security_cooldown"
+                  title="Sign-in paused"
+                  message={signInPauseMessage(signInPause)}
+                  cooldownEndsAt={signInPause.until}
+                  onCooldownExpire={handlePauseExpired}
+                  actionText="Reset password"
+                  onAction={openForgotPassword}
+                />
+              </div>
             )}
 
             {/* Email / Username Input */}
@@ -760,12 +902,24 @@ export default function LoginPage() {
               </button>
             </div>
 
+            {/* Warns while there is still time to stop guessing */}
+            {showAttemptsWarning && (
+              <p role="status" className="flex items-start gap-2 text-xs leading-relaxed text-amber-300">
+                <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-amber-400" />
+                <span>
+                  {attemptsLeft!.count === 1 ? "1 attempt" : `${attemptsLeft!.count} attempts`} left before sign-in
+                  is paused{attemptsLeft!.scope === "network" ? " for your whole network" : ""}. If you are not sure
+                  of the password, reset it rather than guessing.
+                </span>
+              </p>
+            )}
+
             {/* Submit CTA Button */}
             <div className="pt-2">
               <button
                 type="submit"
                 disabled={isLoading || isCooldownActive}
-                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
+                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
                 style={{
                   background: isCooldownActive ? "#475569" : "#DC2626",
                 }}
@@ -774,6 +928,11 @@ export default function LoginPage() {
                   <>
                     <Loader2 size={16} className="animate-spin" />
                     <span>Authenticating...</span>
+                  </>
+                ) : isCooldownActive ? (
+                  <>
+                    <Lock size={16} aria-hidden="true" />
+                    <span>Sign-in paused</span>
                   </>
                 ) : (
                   <>

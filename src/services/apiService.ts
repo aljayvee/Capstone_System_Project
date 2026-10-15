@@ -59,6 +59,17 @@ export interface LoginErrorResponse {
   statusCode?: number;
   retryAfterSeconds?: number;
   isRateLimit?: boolean;
+  // Failures this browser has left before sign-in is paused, and which limit
+  // that is (the API's X-Login-Attempts-* headers). An API without them leaves
+  // these undefined, and the screen simply gives no early warning.
+  attemptsRemaining?: number;
+  limitScope?: "device" | "network";
+}
+
+// Header values arrive as strings, or not at all when CORS does not expose them.
+function headerNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "string" ? parseInt(value, 10) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 export type LoginResponse =
@@ -790,12 +801,22 @@ export const apiService = {
       console.warn("Backend auth failed, error:", err);
       const statusCode = err.response?.status;
       const isRateLimit = statusCode === 429;
-      const retryHeader = err.response?.headers?.["retry-after"];
-      const parsedRetry = retryHeader ? parseInt(retryHeader, 10) : undefined;
+      const headers = err.response?.headers ?? {};
+      const attemptsRemaining = headerNumber(headers["x-login-attempts-remaining"]);
+      const scopeHeader = headers["x-login-attempts-scope"];
+      const scopeCode = err.response?.data?.code;
+      const limitScope =
+        scopeCode === "LOGIN_NETWORK_LIMIT" || scopeHeader === "network"
+          ? "network"
+          : scopeCode === "LOGIN_DEVICE_LIMIT" || scopeHeader === "device"
+            ? "device"
+            : undefined;
+      // A 429 says how long it lasts. A refused password says when the count
+      // resets, which is the same thing once no attempts are left.
       const retryAfterSeconds =
         err.response?.data?.details?.retryAfterSeconds ||
-        parsedRetry ||
-        (isRateLimit ? 900 : undefined);
+        headerNumber(headers["retry-after"]) ||
+        (isRateLimit ? 900 : headerNumber(headers["x-login-attempts-reset"]));
 
       const errorMessage =
         err.response?.data?.error || err.message || "Unable to connect to backend authentication server.";
@@ -804,6 +825,8 @@ export const apiService = {
         statusCode,
         isRateLimit,
         retryAfterSeconds,
+        attemptsRemaining,
+        limitScope,
       };
     }
   },
