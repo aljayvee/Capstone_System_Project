@@ -1,0 +1,43 @@
+# Checks every push to main and every pull request: typecheck, then a
+# production build. It uses no secrets, so it is safe on this public repo and
+# on pull requests from forks.
+#
+# Deploying is deliberately not here yet. The live portal is built from a
+# working tree that is ahead of GitHub, so a deploy job would replace it with
+# older code. Add one only after main matches production.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # The VPS runs Node 20.
+          node-version: 20
+          cache: npm
+
+      # .npmrc turns on legacy-peer-deps, which the lockfile was made with.
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      # There is no .env here, so every VITE_* value builds as undefined. That
+      # proves the bundle compiles; a deploy job must write the real values.
+      - run: npm run build
