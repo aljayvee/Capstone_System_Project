@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  Eye, EyeOff, ChevronRight,
+  Eye, EyeOff, ChevronRight, Check,
   Loader2, ShieldAlert, Laptop, Globe, Clock
 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,32 @@ type Stage = "CREDENTIALS" | "PROFILE_SETUP" | "OTP";
 
 const RESEND_COOLDOWN_MS = 60_000;
 
+// "Remember me" keeps only the email or username exactly as the user typed it:
+// never the password, never a token. Every read and write tolerates storage
+// being unavailable (blocked site data, some private modes), in which case the
+// box simply forgets and sign-in carries on as normal.
+const REMEMBERED_IDENTIFIER_KEY = "sugo_staff_login_remembered_identifier";
+
+function readRememberedIdentifier(): string {
+  try {
+    return localStorage.getItem(REMEMBERED_IDENTIFIER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeRememberedIdentifier(value: string | null): void {
+  try {
+    if (value) {
+      localStorage.setItem(REMEMBERED_IDENTIFIER_KEY, value);
+    } else {
+      localStorage.removeItem(REMEMBERED_IDENTIFIER_KEY);
+    }
+  } catch {
+    // Storage blocked: nothing is kept, which is the safe outcome.
+  }
+}
+
 interface ActiveAlert {
   variant: AlertVariant;
   title: string;
@@ -72,7 +98,11 @@ function toPortalUser(rawUser: any, fallbackIdentifier: string, token: string): 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState("");
+  // Read once on mount: prefills the field and ticks the box when a previous
+  // sign-in asked to be remembered.
+  const [rememberedIdentifier] = useState(readRememberedIdentifier);
+  const [identifier, setIdentifier] = useState(rememberedIdentifier);
+  const [rememberMe, setRememberMe] = useState(rememberedIdentifier !== "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [activeAlert, setActiveAlert] = useState<ActiveAlert | null>(null);
@@ -97,10 +127,15 @@ export default function LoginPage() {
   } | null>(null);
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // 500 Server Error [nginx] Outage Simulation State
   const [isServerErrorOverlayActive, setIsServerErrorOverlayActive] = useState<boolean>(() => {
-    return localStorage.getItem("sugo_simulate_500_error") === "true";
+    try {
+      return localStorage.getItem("sugo_simulate_500_error") === "true";
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
@@ -172,12 +207,13 @@ export default function LoginPage() {
     };
   }, []);
 
-  // Automatically focus the username/email input when the login authentication UI is active
+  // Automatically focus the username/email input when the login authentication UI is active.
+  // A remembered identifier is already filled in, so the password is what is left to type.
   useEffect(() => {
     if (stage === "CREDENTIALS" && !isServerErrorOverlayActive) {
-      usernameInputRef.current?.focus();
+      (rememberedIdentifier ? passwordInputRef : usernameInputRef).current?.focus();
     }
-  }, [stage, isServerErrorOverlayActive]);
+  }, [stage, isServerErrorOverlayActive, rememberedIdentifier]);
 
   useEffect(() => {
     if (isServerErrorOverlayActive) {
@@ -258,6 +294,11 @@ export default function LoginPage() {
       triggerMobileRoleNotice(rawRole);
       return;
     }
+
+    // Only here, once a portal session really exists. Every success path (plain
+    // sign-in, takeover, OTP, SMS) ends in this function, and every failure or
+    // challenge leaves before it, so a wrong password never touches what is kept.
+    writeRememberedIdentifier(rememberMe ? identifier.trim() : null);
 
     login(
       toPortalUser(rawUser, identifier.trim(), response.token),
@@ -603,6 +644,7 @@ export default function LoginPage() {
               </div>
               <div className="relative">
                 <input
+                  ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => {
@@ -636,6 +678,32 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+
+            {/* Remember Me: a native checkbox (Tab to reach, Space to toggle) styled flat */}
+            <div>
+              <label
+                htmlFor="login-remember-me"
+                className="inline-flex items-center gap-2.5 py-1 text-sm text-slate-300 cursor-pointer select-none has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+              >
+                <span className="relative inline-flex h-4 w-4 shrink-0">
+                  <input
+                    id="login-remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={isLoading || isCooldownActive}
+                    className="peer h-4 w-4 appearance-none rounded border border-slate-500 bg-slate-800 transition-colors cursor-pointer checked:border-red-600 checked:bg-red-600 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
+                  />
+                  <Check
+                    size={12}
+                    strokeWidth={3}
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 m-auto text-white opacity-0 peer-checked:opacity-100"
+                  />
+                </span>
+                Remember me
+              </label>
             </div>
 
             {/* Submit CTA Button */}
