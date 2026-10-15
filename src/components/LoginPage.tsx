@@ -25,6 +25,7 @@ const MobileAppNoticeModal = lazyWithRetry(() =>
 );
 import { ProfileSetupStep } from "./login/ProfileSetupStep";
 import { OtpStep } from "./login/OtpStep";
+import { ForgotPasswordFlow } from "./login/ForgotPasswordFlow";
 import { LoginAlertBanner, AlertVariant } from "./login/LoginAlertBanner";
 
 // Sign-in is a small state machine, not a single request. An account that has
@@ -37,7 +38,9 @@ import { LoginAlertBanner, AlertVariant } from "./login/LoginAlertBanner";
 // separate /verify route mid-challenge). The challenge token is held in React
 // state only, never sessionStorage, so it stays out of reach of XSS and dies on
 // refresh (by design: the user simply signs in again).
-type Stage = "CREDENTIALS" | "PROFILE_SETUP" | "OTP";
+// FORGOT_PASSWORD hands the whole card to ForgotPasswordFlow, which runs its
+// own steps and only reports back when the password has changed.
+type Stage = "CREDENTIALS" | "PROFILE_SETUP" | "OTP" | "FORGOT_PASSWORD";
 
 const RESEND_COOLDOWN_MS = 60_000;
 
@@ -213,12 +216,16 @@ export default function LoginPage() {
   }, []);
 
   // Automatically focus the username/email input when the login authentication UI is active.
-  // A remembered identifier is already filled in, so the password is what is left to type.
+  // An identifier already filled in (remembered, or carried back from another
+  // step) leaves the password as what is left to type. Read through a ref so
+  // typing in the field does not re-run this and yank the cursor away.
+  const identifierRef = useRef(identifier);
+  identifierRef.current = identifier;
   useEffect(() => {
     if (stage === "CREDENTIALS" && !isServerErrorOverlayActive) {
-      (rememberedIdentifier ? passwordInputRef : usernameInputRef).current?.focus();
+      (identifierRef.current.trim() ? passwordInputRef : usernameInputRef).current?.focus();
     }
-  }, [stage, isServerErrorOverlayActive, rememberedIdentifier]);
+  }, [stage, isServerErrorOverlayActive]);
 
   useEffect(() => {
     if (!isLoading && refocusUsernameRef.current) {
@@ -527,6 +534,29 @@ export default function LoginPage() {
     resetToCredentials("Your sign-in session expired. Please sign in again.");
   }, [resetToCredentials]);
 
+  const openForgotPassword = () => {
+    setPassword("");
+    setFieldErrors({});
+    setActiveAlert(null);
+    setStage("FORGOT_PASSWORD");
+  };
+
+  // The flow only searches by email or mobile number, so a username typed here
+  // is not carried over.
+  const forgotPasswordPrefill = /@|^[\d\s()+-]{10,}$/.test(identifier.trim()) ? identifier.trim() : "";
+
+  const handlePasswordResetComplete = (email: string | null) => {
+    if (email) setIdentifier(email);
+    setPassword("");
+    setStage("CREDENTIALS");
+    setActiveAlert({
+      variant: "success",
+      title: "Password reset",
+      message:
+        "Your password was changed and every device was signed out. Sign in with your new password.",
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !isLoading) handleLogin();
   };
@@ -535,6 +565,7 @@ export default function LoginPage() {
     CREDENTIALS: { title: "Sugo On the Go Portal", description: "Tacurong City Logistics & Fleet Management" },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
     OTP: { title: "Two-Factor Authentication", description: "Verify your identity using Email (Gmail) or SMS OTP" },
+    FORGOT_PASSWORD: { title: "Reset Your Password", description: "Sugo On the Go Portal" },
   };
 
   if (isServerErrorOverlayActive) {
@@ -695,7 +726,7 @@ export default function LoginPage() {
             </div>
 
             {/* Remember Me: a native checkbox (Tab to reach, Space to toggle) styled flat */}
-            <div>
+            <div className="flex items-center justify-between gap-3">
               <label
                 htmlFor="login-remember-me"
                 className="inline-flex items-center gap-2.5 py-1 text-sm text-slate-300 cursor-pointer select-none has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
@@ -718,6 +749,15 @@ export default function LoginPage() {
                 </span>
                 Remember me
               </label>
+              {/* Not disabled during a sign-in cooldown: that is exactly when it is needed */}
+              <button
+                type="button"
+                onClick={openForgotPassword}
+                disabled={isLoading}
+                className="text-sm font-medium text-red-400 hover:text-red-300 transition-colors cursor-pointer rounded px-1 py-1 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              >
+                Forgot password?
+              </button>
             </div>
 
             {/* Submit CTA Button */}
@@ -744,6 +784,15 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
+        )}
+
+        {/* FORGOT PASSWORD: find account, verify by email or SMS, set a new password */}
+        {stage === "FORGOT_PASSWORD" && (
+          <ForgotPasswordFlow
+            initialIdentifier={forgotPasswordPrefill}
+            onCancel={() => setStage("CREDENTIALS")}
+            onComplete={handlePasswordResetComplete}
+          />
         )}
 
         {/* STAGE 2: PROFILE SETUP (First-time Admin Setup) */}
@@ -802,8 +851,11 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Website Copyright Footer at Bottom Edge */}
-      <footer className="w-full pt-6 pb-4 md:absolute md:bottom-4 md:left-0 md:right-0 text-center select-none z-10" role="contentinfo">
+      {/* Website Copyright Footer at Bottom Edge. In normal flow at every width:
+          absolutely positioned on desktop it sat on top of any step tall enough
+          to reach it (the forgot-password steps on a 768px screen) and took
+          the clicks meant for the links underneath. */}
+      <footer className="w-full pt-6 pb-4 text-center select-none" role="contentinfo">
         <p className="text-xs text-slate-400 font-medium tracking-wide">
           &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
         </p>

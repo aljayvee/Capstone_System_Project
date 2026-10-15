@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, ShieldAlert, Smartphone, Info, RefreshCw, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ShieldAlert, Smartphone, Info, RefreshCw, X } from "lucide-react";
 
-export type AlertVariant = "error" | "security_cooldown" | "role_notice" | "info";
+export type AlertVariant = "error" | "security_cooldown" | "role_notice" | "info" | "success";
 
 export interface LoginAlertBannerProps {
   variant: AlertVariant;
@@ -114,6 +114,14 @@ export const LoginAlertBanner: React.FC<LoginAlertBannerProps> = ({
       icon: Info,
       iconColor: "text-slate-400",
       buttonBg: "bg-slate-700 hover:bg-slate-600 text-white",
+    },
+    success: {
+      container: "bg-emerald-500/10 border-emerald-500/30 text-emerald-100",
+      titleColor: "text-emerald-200",
+      textColor: "text-emerald-200/90",
+      icon: CheckCircle2,
+      iconColor: "text-emerald-400",
+      buttonBg: "bg-emerald-600 hover:bg-emerald-700 text-white",
     },
   }[variant];
 

@@ -250,7 +250,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof document !== "undefined") {
           document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
         }
-      } else if (payload?.reason === "REVOKED_BY_USER" || payload?.reason === "REVOKED_ALL_OTHERS") {
+      } else if (
+        payload?.reason === "REVOKED_BY_USER" ||
+        payload?.reason === "REVOKED_ALL_OTHERS" ||
+        // The account's password was reset (possibly from another device):
+        // this tab is holding a session that no longer exists.
+        payload?.reason === "PASSWORD_RESET"
+      ) {
         void logout();
       }
     });

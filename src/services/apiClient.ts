@@ -10,6 +10,9 @@ const AUTH_ENDPOINT_PATHS = [
   "/auth/complete-profile",
   "/auth/verify-login-otp",
   "/auth/resend-login-otp",
+  // Forgot password: the caller has no session, so a refusal must never set
+  // off a refresh.
+  "/auth/password-reset",
 ];
 
 // In-Memory Access Token Storage (Never written to localStorage/sessionStorage)
