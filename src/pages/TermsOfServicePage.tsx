@@ -82,7 +82,7 @@ export const TermsOfServicePage: React.FC = () => {
             </nav>
             <div className="pt-6 border-t border-slate-100 text-xs text-slate-500 space-y-2">
               <p className="font-semibold text-slate-800">Questions?</p>
-              <p className="leading-relaxed">Contact legal operations at <a href="mailto:aljayveversola@gmail.com" className="text-red-600 hover:underline">aljayveversola@gmail.com</a>.</p>
+              <p className="leading-relaxed">Contact legal operations at <a href="mailto:aljayveeversola@gmail.com" className="text-red-600 hover:underline">aljayveeversola@gmail.com</a>.</p>
             </div>
           </aside>
 
@@ -212,7 +212,7 @@ export const TermsOfServicePage: React.FC = () => {
                 <p className="font-bold text-slate-900">Questions Regarding Terms</p>
                 <p>Location: Tacurong City, Sultan Kudarat, Philippines 9800</p>
                 <p>
-                  Support Email: <a href="mailto:aljayveversola@gmail.com" className="text-red-600 hover:underline">aljayveversola@gmail.com</a>
+                  Support Email: <a href="mailto:aljayveeversola@gmail.com" className="text-red-600 hover:underline">aljayveeversola@gmail.com</a>
                 </p>
                 <p>
                   Portal: <a href="https://portal.sugo-express.org" className="text-red-600 hover:underline">https://portal.sugo-express.org</a>
