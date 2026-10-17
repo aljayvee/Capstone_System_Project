@@ -122,15 +122,6 @@ export const RatesOverviewView: React.FC<RatesOverviewViewProps> = ({
               </span>
             </div>
           </div>
-
-          <p className="text-label text-ink-muted leading-relaxed pt-1">
-            An order of exactly{" "}
-            <span className="font-bold text-ink">₱{groceryFeeThreshold - 1}</span> pays the flat ₱
-            {groceryFeeFlat}; from{" "}
-            <span className="font-bold text-ink">₱{groceryFeeThreshold}</span> it pays{" "}
-            {groceryFeePercent}%. Crossing that line never costs more than the order grew, because the
-            fee eases in rather than jumping.
-          </p>
         </div>
 
         {/* SECTION 4: NON-CASH PAYMENT SURCHARGE */}
@@ -166,13 +157,6 @@ export const RatesOverviewView: React.FC<RatesOverviewViewProps> = ({
               </span>
             </div>
           </div>
-
-          <p className="text-label text-ink-muted leading-relaxed pt-1">
-            Applies only once a confirmed payment mode is not Cash on Delivery. A purchase under{" "}
-            <span className="font-bold text-ink">₱{nonCodThreshold}</span> pays ₱{nonCodFeeLow}; at{" "}
-            <span className="font-bold text-ink">₱{nonCodThreshold}</span> or more it pays ₱
-            {nonCodFeeHigh}.
-          </p>
         </div>
       </div>
     </div>

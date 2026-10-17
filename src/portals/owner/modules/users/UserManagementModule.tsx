@@ -712,11 +712,6 @@ export const UserManagementModule: React.FC = () => {
                                 </span>
                               )}
                             </button>
-                            {u.phone && (
-                              <span className="inline-block mt-0.5 text-[10px] text-status-done-ink font-sans">
-                                SMS OTP Ready
-                              </span>
-                            )}
                           </td>
 
                           {/* Status */}

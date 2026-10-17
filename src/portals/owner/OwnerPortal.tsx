@@ -30,7 +30,6 @@ import {
   LogOut,
   Bike as BikeIcon,
   X,
-  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -103,7 +102,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "merchants", label: "Merchants Category", icon: Store },
       { id: "rates", label: "Service Rates", icon: DollarSign },
-      { id: "security", label: "Account Logs", icon: ShieldCheck },
     ],
   },
 ];
@@ -181,14 +179,6 @@ export default function OwnerPortal() {
       isActive: activeModule === "merchants",
       onClick: () => setActiveModule("merchants"),
       description: "Configure active merchant categories",
-    },
-    {
-      id: "security",
-      label: "Account Logs",
-      icon: <ShieldCheck className="w-5 h-5" />,
-      isActive: activeModule === "security",
-      onClick: () => setActiveModule("security"),
-      description: "Security audit trail, logins & active sessions",
     },
   ];
 

@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  Save,
-  Pencil,
   CheckCircle2,
   Loader2,
   AlertTriangle,
@@ -313,45 +311,6 @@ export const ServiceRatesModule: React.FC = () => {
           )}
         </div>
       }
-      action={
-        activeMode === "view" ? (
-          <PanelButton
-            variant="primary"
-            size="sm"
-            icon={<Pencil size={14} />}
-            onClick={() => handleModeChange("edit")}
-            disabled={isLoading || Boolean(loadError)}
-          >
-            Edit Rates
-          </PanelButton>
-        ) : (
-          <div className="flex items-center gap-2">
-            <PanelButton
-              variant="secondary"
-              size="sm"
-              onClick={() => handleModeChange("view")}
-              disabled={isSaving}
-            >
-              Cancel
-            </PanelButton>
-            <PanelButton
-              variant="primary"
-              size="sm"
-              icon={isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              onClick={handleSaveSubmit}
-              disabled={
-                isSaving ||
-                !hasChanges ||
-                Boolean(loadError) ||
-                nonCodFeeHigh < nonCodFeeLow ||
-                groceryFeeThreshold < 1000
-              }
-            >
-              Save Rates
-            </PanelButton>
-          </div>
-        )
-      }
       aside={
         savedSuccess && (
           <span
@@ -367,6 +326,22 @@ export const ServiceRatesModule: React.FC = () => {
         <div className="bg-board-plate border border-edge rounded-plate p-10 flex flex-col items-center justify-center space-y-3">
           <Loader2 size={24} className="animate-spin text-ink-muted" />
           <p className="text-body text-ink-muted">Loading service rates configuration...</p>
+        </div>
+      ) : loadError && !initialRates ? (
+        <div className="bg-board-plate border border-edge rounded-plate p-10 flex flex-col items-center justify-center space-y-3 text-center">
+          <AlertTriangle size={32} className="text-status-act-ink" />
+          <p className="text-body text-ink font-semibold">Service Rates Failed to Load</p>
+          <p className="text-label text-ink-muted max-w-md">
+            {loadError} Please check your connection to the server and retry.
+          </p>
+          <PanelButton
+            variant="primary"
+            size="sm"
+            icon={<RotateCcw size={14} />}
+            onClick={() => void loadConfig()}
+          >
+            Retry Loading Rates
+          </PanelButton>
         </div>
       ) : activeMode === "view" && initialRates ? (
         <RatesOverviewView

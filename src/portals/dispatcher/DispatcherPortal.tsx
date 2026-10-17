@@ -18,9 +18,10 @@ import { DispatcherRiderMessagesPanel } from "./components/DispatcherRiderMessag
 import { ActiveErrandsPanel } from "./components/ActiveErrandsPanel";
 import { ExceptionQueuePanel } from "./components/ExceptionQueuePanel";
 import { DispatcherProfilePanel } from "./components/DispatcherProfilePanel";
+import { DispatcherDashboardView } from "./components/dashboard/DispatcherDashboardView";
 import { useOpenExceptions } from "./hooks/useOpenExceptions";
 import {
-  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle, History
+  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle, History, LayoutDashboard
 } from "lucide-react";
 import { DispatcherHistoryPanel } from "./components/history/DispatcherHistoryPanel";
 import { NotificationBell } from "../../components/NotificationBell";
@@ -80,6 +81,12 @@ export default function DispatcherPortal() {
     actionError,
     dismissActionError,
     selectedErrandId,
+    setSelectedErrandId,
+    selectedQueueErrandId,
+    navigateToQueueAndSelect,
+    dashboardSummary,
+    isSummaryLoading,
+    fetchDashboardSummary,
     fetchOrders,
     handleClaimOrder,
     handleVerifyErrand,
@@ -88,6 +95,15 @@ export default function DispatcherPortal() {
     handleOpenChat,
     handleCloseChat,
   } = useDispatcherPortal(user?.id, user?.name);
+
+  const handleClaimAndSelect = useCallback(async (orderId: string) => {
+    try {
+      await handleClaimOrder(orderId, user);
+    } catch {
+      // Allow fallback if already claimed
+    }
+    navigateToQueueAndSelect(orderId);
+  }, [handleClaimOrder, user, navigateToQueueAndSelect]);
   const { riders, telemetryError: fleetTelemetryError, liveLink: fleetLiveLink } = useRiderFleetPresence({
     alertOnSignalLost: true,
   });
@@ -175,6 +191,14 @@ export default function DispatcherPortal() {
   const { isMobile } = useDeviceTier();
 
   const mobilePrimaryTabs: MobileNavTab[] = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboard className="w-5 h-5" />,
+      badge: (dashboardSummary?.urgentUnclaimedCount || 0) > 0 ? `${dashboardSummary?.urgentUnclaimedCount} urgent` : undefined,
+      isActive: activeTab === "dashboard",
+      onClick: () => setActiveTab("dashboard"),
+    },
     {
       id: "queue",
       label: "Queue",
@@ -360,6 +384,53 @@ export default function DispatcherPortal() {
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-1">
+                    {/* Dashboard */}
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setActiveTab("dashboard")}
+                        isActive={activeTab === "dashboard"}
+                        tooltip={
+                          (dashboardSummary?.urgentUnclaimedCount || 0) > 0
+                            ? `Dashboard (${dashboardSummary?.urgentUnclaimedCount} urgent)`
+                            : "Dashboard"
+                        }
+                        size="default"
+                        className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
+                          activeTab === "dashboard"
+                            ? "bg-signal text-board-plate"
+                            : "text-board-trim hover:bg-white/10 hover:text-board-plate"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
+                          <div className="relative flex items-center justify-center shrink-0">
+                            <LayoutDashboard
+                              size={16}
+                              className={`shrink-0 transition-colors ${
+                                activeTab === "dashboard" ? "text-board-plate" : "text-board-trim group-hover:text-board-plate"
+                              }`}
+                            />
+                            {(dashboardSummary?.urgentUnclaimedCount || 0) > 0 && (
+                              <span className="hidden group-data-[collapsible=icon]:block absolute -top-1 -right-1 size-2 rounded-full bg-red-500 ring-2 ring-[#0F2035] animate-pulse" />
+                            )}
+                          </div>
+                          <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                            Dashboard
+                          </span>
+                        </div>
+                        {(dashboardSummary?.urgentUnclaimedCount || 0) > 0 && (
+                          <span
+                            className={`group-data-[collapsible=icon]:hidden font-mono text-micro px-2 py-0.5 rounded-full ${
+                              activeTab === "dashboard"
+                                ? "bg-white/20 text-board-plate"
+                                : "bg-red-500/20 text-red-300 border border-red-500/30 animate-pulse"
+                            }`}
+                          >
+                            {dashboardSummary?.urgentUnclaimedCount} urgent
+                          </span>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
                     {/* Dispatcher Management (formerly Order Queue) */}
                     <SidebarMenuItem>
                       <SidebarMenuButton
@@ -749,8 +820,8 @@ export default function DispatcherPortal() {
               <DialogDescription className="text-body text-ink-muted">
                 Thanks for your work today,{" "}
                 {(user?.name || "Duty Dispatcher").split(" ")[0]}. Signing out ends your shift on
-                this console, and anything you have claimed stays claimed until someone releases
-                it.
+                this console. Any unverified or unassigned orders you have claimed will automatically
+                be returned to the queue for the next dispatcher on duty.
               </DialogDescription>
               <DialogFooter className="flex-row gap-3">
                 <DispatcherButton
@@ -935,6 +1006,21 @@ export default function DispatcherPortal() {
                   one needing an overflow of its own here; nesting that inside
                   a PanelShell scroller would have made two. */}
               <div className="min-h-0 min-w-0 flex-1">
+                {activeTab === "dashboard" && (
+                  <DispatcherDashboardView
+                    summary={dashboardSummary}
+                    isLoading={isSummaryLoading}
+                    loadError={loadError}
+                    onRefresh={() => {
+                      fetchOrders();
+                      fetchDashboardSummary();
+                    }}
+                    riders={riders}
+                    onClaimAndSelect={handleClaimAndSelect}
+                    onOpenChat={handleOpenChat}
+                    onNavigateTab={(tab) => setActiveTab(tab as any)}
+                  />
+                )}
                 {activeTab === "queue" && (
                   <DispatchManagementWorkspace
                     errands={errands}
@@ -947,6 +1033,12 @@ export default function DispatcherPortal() {
                     loadError={loadError}
                     onRetry={fetchOrders}
                     onSignedRunChange={setSignedRun}
+                    selectedErrandId={selectedQueueErrandId}
+                    onSelectErrand={(id) => {
+                      if (id) {
+                        navigateToQueueAndSelect(id);
+                      }
+                    }}
                   />
                 )}
                 {activeTab === "active_errands" && (

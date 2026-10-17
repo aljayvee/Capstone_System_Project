@@ -25,6 +25,8 @@ interface DispatchManagementWorkspaceProps {
    * own header, which is what makes the band a board rather than a title.
    */
   onSignedRunChange?: (errand: Errand | null) => void;
+  selectedErrandId?: string | null;
+  onSelectErrand?: (id: string | null) => void;
 }
 
 interface MerchantCategoryItem {
@@ -45,6 +47,8 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   loadError = null,
   onRetry,
   onSignedRunChange,
+  selectedErrandId: externalSelectedErrandId,
+  onSelectErrand,
 }) => {
   const { riders } = useRiderFleetPresence();
   // Below the side-by-side breakpoint the board and the run share the screen
@@ -52,7 +56,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   // the columns carried `min-h-[580px]` and `min-h-[400px]`, so a tablet got
   // a page taller than itself with the run pushed below the fold.
   const [narrowPane, setNarrowPane] = useState<"board" | "run">("board");
-  const [selectedErrandId, setSelectedErrandId] = useState<string | null>(null);
+  const [selectedErrandId, setSelectedErrandId] = useState<string | null>(externalSelectedErrandId || null);
   const [activeSegment, setActiveSegment] = useState<"INCOMING" | "ACTIVE">("INCOMING");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -147,17 +151,36 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
     return filteredActive;
   }, [activeSegment, filteredIncoming, filteredActive]);
 
+  // Synchronize selection when an external errand is targeted (e.g. deep-link from Dashboard)
+  useEffect(() => {
+    if (externalSelectedErrandId) {
+      setSelectedErrandId(externalSelectedErrandId);
+      const isAvailable = availableErrands.some((e) => e.id === externalSelectedErrandId);
+      if (isAvailable) {
+        setActiveSegment("INCOMING");
+      } else {
+        const isActive = activeErrands.some((e) => e.id === externalSelectedErrandId);
+        if (isActive) {
+          setActiveSegment("ACTIVE");
+        }
+      }
+      setNarrowPane("run");
+    }
+  }, [externalSelectedErrandId, availableErrands, activeErrands]);
+
   // Auto-selection of first item when list changes or current item is missing
   useEffect(() => {
     if (currentDisplayedList.length > 0) {
       const exists = currentDisplayedList.some((e) => e.id === selectedErrandId);
       if (!exists) {
         setSelectedErrandId(currentDisplayedList[0].id);
+        onSelectErrand?.(currentDisplayedList[0].id);
       }
     } else {
       setSelectedErrandId(null);
+      onSelectErrand?.(null);
     }
-  }, [currentDisplayedList, selectedErrandId]);
+  }, [currentDisplayedList, selectedErrandId, onSelectErrand]);
 
   const selectedErrand = useMemo(
     () => errands.find((e) => e.id === selectedErrandId) || null,
@@ -202,6 +225,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
       selectedErrandId={selectedErrandId}
       onSelectErrand={(e) => {
         setSelectedErrandId(e.id);
+        onSelectErrand?.(e.id);
         // Picking a run re-signs the board. On a narrow screen that means
         // handing the screen to the run itself.
         setNarrowPane("run");

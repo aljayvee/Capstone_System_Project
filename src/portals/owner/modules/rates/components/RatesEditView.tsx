@@ -261,14 +261,6 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
               <span>Order threshold must be at least ₱1,000 for handling fee calculations.</span>
             </div>
           )}
-
-          <p className="text-label text-ink-muted leading-relaxed pt-1">
-            An order of exactly{" "}
-            <span className="font-bold text-ink">₱{groceryFeeThreshold - 1}</span> pays the flat ₱
-            {groceryFeeFlat}; from{" "}
-            <span className="font-bold text-ink">₱{groceryFeeThreshold}</span> it pays{" "}
-            {groceryFeePercent}%.
-          </p>
         </div>
 
         {/* SECTION 4: NON-CASH PAYMENT SURCHARGE */}
@@ -346,10 +338,6 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
               </span>
             </div>
           )}
-
-          <p className="text-label text-ink-muted leading-relaxed pt-1">
-            Applies only once a confirmed payment mode is not Cash on Delivery.
-          </p>
         </div>
 
         {/* BOTTOM ACTION BAR */}

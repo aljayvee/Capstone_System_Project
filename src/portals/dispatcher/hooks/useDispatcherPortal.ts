@@ -5,7 +5,7 @@ import { ref, set } from "firebase/database";
 import { database } from "../../../firebase/config";
 import { postAccepted, postDeclined } from "../../../services/chatSystemMessages";
 import { getMemoryAccessToken, onMemoryAccessTokenChange } from "../../../services/apiClient";
-import { Errand, ErrandStatus } from "../../../types/errand";
+import { Errand, ErrandStatus, DispatcherDashboardSummary } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
@@ -13,6 +13,7 @@ const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   : "http://localhost:5000";
 
 type DispatcherTab =
+  | "dashboard"
   | "queue"
   | "active_errands"
   | "exceptions"
@@ -22,6 +23,7 @@ type DispatcherTab =
   | "history"
   | "profile";
 const TAB_IDS: DispatcherTab[] = [
+  "dashboard",
   "queue",
   "active_errands",
   "exceptions",
@@ -92,6 +94,9 @@ function mapPrismaErrand(prismaErrand: any): Errand {
     acceptedAt: prismaErrand.acceptedAt ?? null,
     deliveredAt: prismaErrand.deliveredAt ?? null,
     completedAt: prismaErrand.completedAt ?? null,
+    overageEscalatedAt: prismaErrand.overageEscalatedAt ?? null,
+    overageResolvedAt: prismaErrand.overageResolvedAt ?? null,
+    proximityAlertSentAt: prismaErrand.proximityAlertSentAt ?? null,
     feeBreakdown: prismaErrand.feeBreakdown ?? null,
     riderEarnings: prismaErrand.riderEarnings ?? null,
     createdAt: prismaErrand.createdAt,
@@ -126,12 +131,15 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
   // dialog that is not in-context recovery and cannot be styled or read by the
   // panel that caused it.
   const [actionError, setActionError] = useState<string | null>(null);
+  const [dashboardSummary, setDashboardSummary] = useState<DispatcherDashboardSummary | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true);
 
   const requestedTab = searchParams.get("tab");
   const activeTab: DispatcherTab = TAB_IDS.includes(requestedTab as DispatcherTab)
     ? (requestedTab as DispatcherTab)
-    : "queue";
+    : "dashboard";
   const selectedErrandId = searchParams.get("errand");
+  const selectedQueueErrandId = searchParams.get("select");
 
   const setActiveTab = (tab: DispatcherTab) => {
     setSearchParams(
@@ -159,9 +167,38 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     );
   };
 
+  const navigateToQueueAndSelect = useCallback(
+    (errandId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", "queue");
+          next.set("select", errandId);
+          next.delete("errand"); // Close chat modal if open so inspector is directly visible
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
   // Read by the socket handlers, which are registered once (see below).
   const currentUserIdRef = useRef(currentUserId);
   currentUserIdRef.current = currentUserId;
+
+  const fetchDashboardSummary = useCallback(async () => {
+    try {
+      const res = await apiClient.get<DispatcherDashboardSummary>("/errands/dispatcher-dashboard-summary");
+      if (res.data) {
+        setDashboardSummary(res.data);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch dispatcher dashboard summary:", err);
+    } finally {
+      setIsSummaryLoading(false);
+    }
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -183,7 +220,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      await fetchOrders();
+      await Promise.all([fetchOrders(), fetchDashboardSummary()]);
       setIsLoading(false);
     }
     loadData();
@@ -217,25 +254,38 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
       console.log("[Socket.io] Received order:new:", newOrder);
       const errand = mapPrismaErrand(newOrder);
       setErrands((prev) => [errand, ...prev.filter((e) => e.id !== errand.id)]);
+      fetchDashboardSummary();
     });
 
     socket.on("order:claimed", (claimedOrder: any) => {
       console.log("[Socket.io] Received order:claimed:", claimedOrder);
       const errand = mapPrismaErrand(claimedOrder);
-      setErrands((prev) =>
-        isVisibleToDispatcher(errand, currentUserIdRef.current)
-          ? prev.map((e) => (e.id === errand.id ? errand : e))
-          : prev.filter((e) => e.id !== errand.id)
-      );
+      setErrands((prev) => {
+        if (!isVisibleToDispatcher(errand, currentUserIdRef.current)) {
+          return prev.filter((e) => e.id !== errand.id);
+        }
+        const exists = prev.some((e) => e.id === errand.id);
+        if (exists) {
+          return prev.map((e) => (e.id === errand.id ? errand : e));
+        }
+        return [errand, ...prev];
+      });
+      fetchDashboardSummary();
     });
 
     socket.on("order:updated", (updatedOrder: any) => {
       const errand = mapPrismaErrand(updatedOrder);
-      setErrands((prev) =>
-        isVisibleToDispatcher(errand, currentUserIdRef.current)
-          ? prev.map((e) => (e.id === errand.id ? errand : e))
-          : prev.filter((e) => e.id !== errand.id)
-      );
+      setErrands((prev) => {
+        if (!isVisibleToDispatcher(errand, currentUserIdRef.current)) {
+          return prev.filter((e) => e.id !== errand.id);
+        }
+        const exists = prev.some((e) => e.id === errand.id);
+        if (exists) {
+          return prev.map((e) => (e.id === errand.id ? errand : e));
+        }
+        return [errand, ...prev];
+      });
+      fetchDashboardSummary();
     });
 
     // Live ETA. Patched onto the errand already in state rather than refetching:
@@ -441,6 +491,12 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     actionError,
     dismissActionError: () => setActionError(null),
     selectedErrandId,
+    setSelectedErrandId,
+    selectedQueueErrandId,
+    navigateToQueueAndSelect,
+    dashboardSummary,
+    isSummaryLoading,
+    fetchDashboardSummary,
     fetchOrders,
     handleClaimOrder,
     handleVerifyErrand,

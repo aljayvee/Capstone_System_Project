@@ -5,10 +5,10 @@
 ---
 
 ## 📡 Tunnel State
-* **Active Mission**: Dispatcher UI Polish, Functional Rider Item Checklist (#1), Smart Out-of-Stock Substitute AI (#2), Debugging Time Items Lifecycle, & Owner Database Operations Digest (#3)
-* **Current Driver**: Antigravity 2.0 (Gemini 3.7 Flash High)
-* **Target Workspace**: `Capstone_Project_Web` (Web Dashboard & Consolidated Architecture)
-* **Last Updated**: 2026-09-26 (Debugging Time Fixes Deployed to `https://sugo-express.org`)
+* **Active Mission**: Dispatcher Portal Dashboard, Operational Pulse Strip, Bottleneck Attention Radar & Shift Handover Handshake
+* **Current Driver**: Antigravity 2.0 (Gemini 3.8 Flash High)
+* **Target Workspace**: `Capstone_Project_Web` (Web Portal) & `Capstone_Server/server` (API Backend)
+* **Last Updated**: 2026-10-17 (Compiler Verified: `npx tsc --noEmit` clean 0 errors)
 
 ---
 
@@ -107,6 +107,43 @@
   - Gemini models (Gemini 3.x Pro, Gemini 3.8 Flash High) are strictly prohibited from autonomous or unilateral execution.
   - Must strictly emulate and execute through the 6-stage Claude Cognitive Thinking Process (Context Grounding -> Hypothesis & Trade-offs -> User Consultation Gate -> Surgical Delta -> Defensive Rigor -> Empirical Verification).
   - Codified in `C:\Capstone_Project_Web\.agents\rules\gemini-claude-thinking-alignment.md` and global `GEMINI.md`.
+
+
+---
+
+## 2026-10-17 - Dispatcher Portal Dashboard, Operational Pulse Strip, Bottleneck Radar & Queue Deep-Link Auto-Select (Antigravity 2.0, Gemini 3.8 Flash High)
+* **Status**: [COMPLETED & VERIFIED - `npx tsc --noEmit` passed with 0 errors across `Capstone_Project_Web` and `Capstone_Server/server`].
+* **Feature & Implementation Specification**:
+  - **Dispatcher Dashboard Views & Layout**:
+    - Default landing tab set to `dashboard` (`/portal/dispatcher?tab=dashboard`) across desktop sidebar and mobile bottom navigation.
+    - `DispatcherDashboardView.tsx`: Main dashboard container using `PanelShell` and `PanelState` with 60s background refresh and instant Socket.io cache invalidation.
+    - `DispatcherPulseStrip.tsx`: 5-metric operational pulse strip with hairline dividers and WCAG 2.2 AA contrast (`text-signal-on-field` on dark field `#0B132B`).
+    - `DispatcherAttentionRadar.tsx`: 60% width attention center with actionable drill-downs (stalled dwells, stale unclaimed, overage disputes, cancellations) and `[ Claim & Review ➔ ]` CTA.
+    - `DispatcherFleetMatrix.tsx`: 40% width real-time fleet presence, battery health, and online status.
+    - `DispatcherPipelineTracker.tsx`: Visual milestone tracker mapping active Tacurong orders across the 5 canonical phases (`Claimed` -> `To Store` -> `Bought` -> `On the way` -> `Delivered`).
+    - `DispatcherOperationalMetrics.tsx`: High-density operational data cards displaying today's top merchants, top decline reasons, and personal dispatcher shift throughput/latency (omitted rush histogram per Decision 3).
+  - **Queue Deep-Link Auto-Select & Modal Separation**:
+    - Separated full-screen chat modal (`?errand=...`) from queue workspace inspection selection (`selectedQueueErrandId` via `?select=...`).
+    - `navigateToQueueAndSelect(errandId)` in `useDispatcherPortal.ts` atomically navigates to `tab=queue&select=ERR-xxx` and clears `errand` so the chat modal does NOT block the queue inspection view.
+    - `DispatchManagementWorkspace.tsx`: Added `selectedErrandId` prop, synchronized selection upon change, automatically switched `activeSegment` to `"ACTIVE"`, and set `narrowPane("run")`.
+  - **Socket Order Synchronization**:
+    - Updated `order:claimed` and `order:updated` socket listeners in `useDispatcherPortal.ts` to prepend newly released/available orders into state without requiring manual page reload.
+* **Files Modified / Created**:
+  - `src/portals/dispatcher/DispatcherPortal.tsx`
+  - `src/portals/dispatcher/hooks/useDispatcherPortal.ts`
+  - `src/portals/dispatcher/components/workspace/DispatchManagementWorkspace.tsx`
+  - `src/types/errand.ts`
+  - `src/portals/dispatcher/components/dashboard/DispatcherDashboardView.tsx`
+  - `src/portals/dispatcher/components/dashboard/DispatcherPulseStrip.tsx`
+  - `src/portals/dispatcher/components/dashboard/DispatcherAttentionRadar.tsx`
+  - `src/portals/dispatcher/components/dashboard/DispatcherFleetMatrix.tsx`
+  - `src/portals/dispatcher/components/dashboard/DispatcherPipelineTracker.tsx`
+  - `src/portals/dispatcher/components/dashboard/DispatcherOperationalMetrics.tsx`
+  - `AGENT_HANDSHAKE.md`
+* **Verification Ledger**:
+  - `Capstone_Project_Web`: `npx tsc --noEmit` -> 0 errors (clean).
+  - `Capstone_Server/server`: `npx tsc --noEmit` -> 0 errors (clean).
+  - `Capstone_Server/server`: `npx vitest run tests/dispatcherDashboard.test.ts` -> 3/3 passed (100%).
 
 ---
 
@@ -374,6 +411,54 @@
     local 06:55 build byte for byte and `copy.ts` was the only newer file, its whole diff ours. Deployed with
     `scripts/deploy-web.sh`, rollback `/root/deploy-backups/web-20261006-154721`; live entry `index-eFChC1MC.js`
     loads `DispatcherPortal-Bx1KKwrJ.js`, which reads `sizeLabel:"Unit"`.
+
+* **Account ownership: no data across accounts (2026-10-07, Claude, status: SERVER + RULES DEPLOYED; web, rider and customer apps pending)**:
+  - **Report**: 2 dispatchers and 2 customers registered together; a customer's phone showed another account's
+    notifications, and dispatchers could read each other's rider chats.
+  - **Root cause, one sentence**: customers (`customer_accounts`) and staff/riders (`users`) are two id sequences
+    from 1, and many paths keyed a person by the bare number. Customer 9 joined socket room `user:9` (dispatcher 9's),
+    `emitToCustomer` also hit `user:9`, `assertSelfOrOwner` and several self-only routes compared ids only, logout
+    closed rider 9's shift for customer 9, and session revoke and presence keyed by id alone.
+  - **Also**: `order:new/claimed/updated` (and 6 other errand events) went out via global `io.emit`, so every phone
+    learned every errand id; the customer app then opened those errands' chats, and the RTDB rules allowed any
+    signed-in uid to read any chat. Push tokens were never taken off an account at logout or on re-registration.
+  - **No `[LOCKED]` contract touched**: no Prisma schema change, JWT architecture unchanged.
+  - **Server** (`/var/www/server`, backup `/root/deploy-backups/server-20261007-151501` VPS clock):
+    `identityRooms()` (customers join `customer:<id>` only), `emitToCustomer` customer room only, errand events via
+    `publishToErrand` (staff role rooms + that errand's customer and rider), presence and session revoke by role,
+    `pushTokenOwnership.ts` (token on one account; cleared at logout), role guards on `/users/profile|password`,
+    rider photo, customer-location writes, `assertSelfOrOwner` requires CUSTOMER. Tests: `accountOwnership.test.ts`
+    (18). Suite 1201 pass; 9 failures identical on HEAD (env-dependent, pre-existing).
+  - **RTDB** (published 2026-10-07 after `npm run chat-access:backfill`, 42 errands): `chats/$errandId` readable
+    by OWNER and the two uids in server-written `chat_access/$errandId` (customer, claiming dispatcher; written by
+    `src/lib/chatAccess.ts` on create/claim/release). `rider_chats` closed to customers. New per-dispatcher paths
+    `rider_threads`, `rider_inbox`, `dispatcher_inbox`, switch `config/riderChatMode`. 27 synthetic-identity checks
+    passed on the live database; previous rules kept at `/root/rtdb-rules-live-20261007.json`.
+  - **Server tests can no longer reach live Firebase**: `tests/setup/noLiveFirebase.ts`. One test run before it
+    existed wrote `chat_access/e1` to production; removed.
+  - **Web deployed 2026-10-07 21:37 (+08), on the user's instruction "deploy alongside the modification of Gemini
+    3.8 Flash"**: the whole tree, i.e. these changes together with the uncommitted dispatcher work of Antigravity
+    (Gemini 3.8 Flash High) from 15:48-21:05. `tsc` clean first; no file edited in the 30 min before. Rollback:
+    `rsync -rlpt /root/deploy-backups/web-20261007-213720/ /var/www/web/dist/`. Live entry `index-C26bbRgq.js`
+    (holds `/system/dispatcher-ai-suggestions`), `DispatcherPortal-DlnMq3l1.js` (holds `config/riderChatMode`,
+    `dispatcher_inbox`, `rider_threads`).
+  - **Gemini's sysadmin switch for dispatcher AI suggestions went live with this session's SERVER builds, unintended**:
+    its source (`sysAdminDevOps*`, `sysAdminRoutes.ts`, `exceptionController.ts`) was copied to `/var/www/server/src`
+    at 09:57 VPS time without a rebuild; the 15:15 and 15:31 builds here compiled it in. It defaults OFF
+    (`config/maintenance.json` `dispatcherAiSuggestionsEnabled: false`) and the server refuses suggestions while off,
+    so dispatchers have had none since ~15:15 VPS. A sysadmin turns it on in Service Controls.
+  - **Apps (need builds)**: rider app reads `config/riderChatMode`, shows one tab per dispatcher thread
+    (`firebase/dispatcherChat.ts`; `pickReplyThread`: the current errand's claiming dispatcher, else the newest
+    conversation, else nobody, composer closed; 8 tests in `tests/dispatcherChat.test.ts`); customer app resets
+    listeners per account and drops order events for other customers.
+  - **Switch to private rider threads**: (1) every rider on the new build, (2) set `config/riderChatMode` =
+    `threads`, (3) tighten `rider_chats/$riderId` to rider + OWNER. See server `firebase/README.md`.
+  - **Rider positions closed the same day**: `riders/$riderId` is readable by that rider, staff, and the customers
+    in server-written `rider_watchers/$riderId/<customerUid>/<errandId>` (errand ASSIGNED or IN_TRANSIT).
+    `src/lib/riderWatch.ts` rebuilds the node from MariaDB ~2 s after any errand event and every minute
+    (`jobs/riderWatchReconcile.ts`); `publishToErrand` grants a new assignment before emitting. Customer app
+    retries a refused listen (5 x 4 s). Server backup `/root/deploy-backups/server-20261007-153109`; rules
+    rollback `/root/rtdb-rules-before-riderwatch.json`; 35 synthetic-identity checks passed live.
 
 ---
 
@@ -1722,3 +1807,1298 @@
     presets will not receive a code. One of them was already in git history inside a July document.
   - **Server tests at `7f85e63`**: 1171 pass, 9 fail in categoryWarm, exceptionAccess, exceptionReasonSuggestion,
     exceptionSecondOpinion, firebaseUid and passwordReset (all other sessions' areas, none touched here).
+
+* **Drop-off map modal fixes (2026-10-07, Claude)**:
+  - **OpenStreetMap blank on production**: nginx's portal CSP had no `openstreetmap.org` in `frame-src`, so the embed
+    iframe was blocked. Added `https://www.openstreetmap.org` to `frame-src` in
+    `/etc/nginx/snippets/portal-security-headers.conf` (VPS), `nginx -t` OK, reloaded. Backup
+    `/root/deploy-backups/nginx-20261007-000748/` (VPS clock). This file is not in any repo.
+  - **"This page can't load Google Maps correctly"** in `CustomerLocationModal.tsx`: not the API key. The modal read
+    `VITE_GOOGLE_MAP_ID` directly (unset), built a map with no Map ID and still placed an Advanced Marker. It now uses
+    `GOOGLE_MAP_ID` / `canUseAdvancedMarkers` from `utils/googleMapId.ts` like every other map.
+  - **Coordinates hidden** in the Drop-off address region (the lat/long row and its copy button).
+  - Web part deployed 2026-10-07 06:24 (also took the fake phone numbers live). Rollback `web-20261007-062420`.
+
+* **Store suggestions moved to the pinned-stores spot (2026-10-07, Claude, DEPLOYED 06:32, rollback `web-20261007-063224`)**:
+  - `order-chat/stages/Stage2PinStores.tsx` (step 1, Pin the stores): the "Suggested stores for this list" card moved
+    from above the map to just above the pinned-store list. While it is loading or offering stores and nothing is
+    pinned, it replaces "No stores pinned yet"; answered, failed or with nothing to offer, it is a one-line note and the
+    empty state shows below it. With stores pinned it sits directly above the list. No behaviour change.
+
+* **Fix: suggested store pinned twice (2026-10-07, Claude, DEPLOYED 06:40, rollback `web-20261007-064025`)**:
+  - **Bug**: "Pin" on one suggestion, then "Yes, pin these", pinned that shop again. The card sent every proposed
+    store, and `addPredictedStores` (`hooks/useStorePins.ts`) skipped only an `exact` duplicate, which needs a
+    `placeId` on both pins. Suggestions learned from past orders carry none (`verified_places` is empty in production).
+  - **Fix**: the card's "Yes, pin these" sends only stores not already pinned (`StorePredictionCard.tsx`), and
+    `addPredictedStores` skips a store already pinned by place id or by the same normalised name within
+    `SAME_PLACE_METERS` (40 m), checked against every pin. A different shop in the same building still pins.
+  - Verified on a harness with the real `useStorePins`: Pin one, then Yes, gives 2 pins (the other shop added);
+    Pin both, then Yes, stays at 2 with "Those stores were already pinned." tsc clean.
+
+* **Active Errands Screen UI Polish & Defensive Fixes (2026-10-07, Antigravity 2.0)**:
+  - **File**: `src/portals/dispatcher/components/ActiveErrandsPanel.tsx`.
+  - **Constraints**: 100% verbatim copy preserved across all titles, filter tags, badges, and button names; button placement anchored on the right of each card; Errand ID contract `formatErrandId(e.id)` (`SGO-#####`) maintained in bold tabular monospace (`font-mono text-data font-bold tabular-nums tracking-wide text-ink`).
+  - **Visual & Surface Enhancements**: Swiss micro-typography with tracking (`tracking-[0.06em] text-micro uppercase font-semibold text-ink-muted`), flat crisp plate borders (`border-edge hover:border-board-trim`), indented item container (`bg-board-ground/60 border border-hairline rounded-trim`), solid SUGO Red (`variant="primary"`) for unread chat states and solid Field Navy (`variant="field"`) otherwise; zero purple gradients, zero pill action buttons, zero emojis.
+  - **Defensive & Anti-Happy-Path Fixes**:
+    1. Fixed falsy 0 bug on `e.deliveryFee`: ₱0 fee correctly renders `"₱0"` instead of falling back to `"Not set"`.
+    2. Guarded timestamp formatting with defensive try-catch and NaN validation to eliminate runtime `RangeError: Invalid time value` crashes.
+    3. Isolated monospace tabular numerals strictly to numeric phone figures while keeping `"No number on file"` as clean non-monospace label text.
+    4. Protected address and notes against viewport overflow with `break-words` and tooltip attribute `title`.
+    5. Added tooltip attribute `title` to truncated item summaries in the indented items region.
+    6. Completed the milestone progression rail with a bounded `bg-board-field` fill track matching the active progress step without overshooting container bounds.
+    7. Guarded clipboard copy with optional chaining and error catch.
+  - **Empirical Verification**: `npx tsc --noEmit` and `npm run build` both exit cleanly with code 0 (zero errors, production bundle built in 10.97s).
+  - **Production Deployment (Contabo VPS `109.123.239.182`)**:
+    - Ran `scripts/deploy-web.sh --no-build` via Git Bash at 2026-10-07 20:00 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (22 old chunks safely parked in `/root/deploy-backups/web-20261007-195919`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+    - Live probe: `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **Dispatcher Management Screen UI Polish (2026-10-07, Antigravity 2.0)**:
+  - **Files**:
+    1. `src/portals/dispatcher/components/workspace/DispatchKpiCards.tsx`: Standing KPI figures elevated with Swiss typography, tracking (`text-micro font-semibold uppercase tracking-[0.06em]`), hairline container framing (`border border-white/10`), bold tabular figures (`font-mono text-title font-bold tabular-nums sm:text-board`).
+    2. `src/portals/dispatcher/components/workspace/DispatchErrandCard.tsx`: Bento queue card upgraded with a 4px tactile left indicator bar on selection (`border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field`), bold monospace tabular Errand ID (`formatErrandId(errand.id)`), solid SUGO red unread chat indicator chip (`bg-signal text-white rounded-trim`), departure clock with tabular figures, and hover plate styling.
+    3. `src/portals/dispatcher/components/workspace/DispatchMasterStream.tsx`: Segment control elevated with bold tabular counts, solid SUGO red unread dot, category filter chips with crisp tactile borders (`border border-edge`), and refined card spacing.
+    4. `src/portals/dispatcher/components/workspace/DispatchDetailInspector.tsx`: Waybill inspector elevated with bold monospace tabular Errand ID, green check copy feedback, milestone rail detents with active ring accent, tabular numbers in item checklist and fee calculations, and crisp border plate decline modal.
+    5. `src/portals/dispatcher/components/workspace/DispatchManagementWorkspace.tsx`: Mobile pane switcher ("The board" / "The run") refined with hairline border and Swiss micro tracking.
+  - **Constraints**: 100% verbatim copy preserved across all titles, sections, and button labels (`"Accept and open the order"`, `"Decline"`, `"Open the dispatch console"`, `"Keep it"`, `"Decline it"`, etc.); button placements unchanged; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`); zero purple gradients, zero pill action buttons, zero emojis.
+  - **Empirical Verification**: `npx tsc --noEmit` and `npm run build` both exit code 0 cleanly (3601 modules transformed, built in 13.24s).
+  - **Production Deployment (Contabo VPS `109.123.239.182`)**:
+    - Ran `scripts/deploy-web.sh --no-build` via Git Bash at 2026-10-07 20:15 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (22 old chunks safely parked in `/root/deploy-backups/web-20261007-201508`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+    - Live probe: `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **Order Chat Screen UI Polish & Texture Elevation (2026-10-07, Antigravity 2.0 - Reviewed & Hardened)**:
+  - **Component Directory**: `src/portals/dispatcher/components/order-chat/*`, container `OrderChatScreen.tsx`, and related modals `CustomerLocationModal.tsx`, `UnauthorizedErrandScreen.tsx`.
+  - **Touched Files**:
+    1. `OrderChatScreen.tsx`: Dark-field bold tabular monospace Errand ID (`formatErrandId(orderId)` with `text-data font-bold tabular-nums tracking-wide text-board-plate bg-white/5 border border-white/10 px-2 py-0.5 rounded-trim`), Swiss micro uppercase tracking on back button, status chip, more-menu dropdown, mobile switcher tabs, and active stage header. Crisp border hygiene (`border border-edge bg-board-plate shadow-plate`) on pass-by and downpayment modals. Null-safe fallback `riderName={riderName || "Rider"}` for `PaymentProofPanel`.
+    2. `NowBar.tsx`: Crisp hairline bottom border `border-b border-hairline/40`, elevated sentence font weight (`font-semibold text-label`), tabular numerals on meta time tags, and font-semibold progression buttons.
+    3. `StageStepsRail.tsx`: Detents elevated with bold tabular numerals (`<span className="font-mono tabular-nums">{stage.id}.</span>`), stroke width 2.5 on completion checkmarks, Swiss micro tracking on rail header, hover plate styling, and uppercase tracking on proof trigger button.
+    4. `conversation/ConversationPane.tsx`: Customer avatar in monospace tabular typography, customer name in `font-bold text-ink`, online/offline pills with Swiss tracking, quick replies replaced banned pills with restrained ergonomic buttons (`rounded-trim border border-edge bg-board-plate px-2.5 py-1 text-label font-medium hover:border-board-field hover:bg-board-ground`), font-semibold green Send button (`bg-go text-white hover:bg-go-deep`), font-bold empty feed title (`text-panel font-bold text-ink`), and crisp read-only banner.
+    5. `stages/Stage2PinStores.tsx`: Fee breakdown elevated with uppercase tracking labels, tabular prices (`formatPeso`), Deliver To card with crisp hairline border, map error fallback and delivery alert with crisp borders, replaced raw HTML `&times;` with Lucide `<X size={12} />`, and font-semibold Continue CTA.
+    6. `stages/Stage3ConfirmItems.tsx`: Catalog Menu Helper drawer with crisp plate borders and font-semibold Add buttons, editable item rows with tabular monospace quantity and price inputs (`tabular-nums font-mono text-data font-bold`), tabular quantity multiplier (`tabular-nums font-mono`), uppercase tracking Add button, and font-semibold Send/Undo actions.
+    7. `stages/Stage4Payment.tsx`: Proof trigger button with Swiss micro tracking, settled notice with crisp border plate, unprompted alert box with font-semibold Ask CTA, and inline banner.
+    8. `stages/Stage5SendRider.tsx`: Requirement checklist with stroke width 2.5 checkmarks, font-bold Assign Rider CTA with `bg-go` / `shadow-plate`, and missing requirements card with crisp borders.
+    9. `PaymentLedgerPanel.tsx`: Figure labels with Swiss micro tracking and bold monospace tabular figures, AttestationForm with tabular numerals and font-semibold action buttons.
+    10. `PaymentProofPanel.tsx`: Image row buttons with medium font weights and tabular capture timestamps; replaced banned `rounded-full` pill button on photo viewer close action with restrained `rounded-trim` button (`grid size-9 place-items-center rounded-trim bg-white/10 text-white`); and HalfPaymentSteps action buttons with font-semibold.
+    11. `RiderAvailabilityList.tsx`: Header with Swiss micro tracking (`text-micro font-bold uppercase tracking-[0.06em] text-ink-muted`), font-semibold rider names, status pills with uppercase tracking, and tabular load counts (`font-mono text-label font-bold tabular-nums`).
+    12. `StorePredictionCard.tsx`: Header with bold font, store name with font-semibold, confidence scores with tabular numerals; replaced raw HTML unicode `Pinned &#10003;` with Lucide `<Check size={11} strokeWidth={2.5} />`; passed `icon={<RotateCw size={13} />}` directly to `DispatcherButton` on retry action; and font-semibold Pin/Dismiss/Yes/No action buttons.
+    13. `DeclineOrderDialog.tsx`: Dialog container with crisp border plate (`border border-edge bg-board-plate shadow-plate`), calibrated `text-panel font-bold text-ink` title, font-medium radio options, alert with crisp border, and font-bold red confirm button (`variant="primary"`).
+    14. `ItemAutocompleteInput.tsx`: Dropdown elevated with crisp plate styling (`border border-edge bg-board-plate shadow-plate`), uppercase tracking suggestions header, font-semibold item names, uppercase tracking category badges; resolved WCAG AA contrast failure on selected item text (`text-board-plate` dynamic text instead of hardcoded `text-ink` on navy `bg-board-field`); replaced raw HTML entity `&times;` with Lucide `<X size={13} />`; and replaced banned pill styling with restrained `rounded-trim` toggle button.
+    15. `WaitingCard.tsx`: Crisp border plate styling (`border border-status-waiting-ink/25 bg-status-waiting-fill`), bold title, and font-semibold action buttons.
+    16. `StageList.tsx`: Detents aligned with StageStepsRail (bold tabular numerals, stroke width 2.5 checkmarks), uppercase tracking stage labels, bold stage panel titles, tabular numerals on status lines (`text-label font-medium tabular-nums`), and uppercase tracking toggle button.
+    17. `CustomerLocationModal.tsx`: Swiss uppercase micro tracking on provider tabs (`text-micro font-semibold uppercase tracking-[0.06em]`), `text-panel font-bold text-board-plate` title, micro tracking on Map header label, and replaced unbranded `text-emerald-400` with design system tokens (`bg-status-done-fill text-status-done-ink border border-status-done-ink/30 rounded-trim font-mono text-micro font-bold uppercase tracking-[0.06em]`).
+    18. `UnauthorizedErrandScreen.tsx`: Enforced bold tabular monospace Errand ID contract (`font-mono text-data font-bold tabular-nums tracking-wide text-ink`); copied formatted ID (`formattedId`) to clipboard; and added Swiss uppercase micro tracking to "Order" and "Assigned to" metadata headers.
+    19. `hooks/useOrderDetails.ts`: Removed redundant `#` prefix before `formatErrandId(orderId)` (`reference ID ${formatErrandId(orderId)}` instead of `#SGO-#####`).
+    20. `hooks/useOrderChat.ts`: Removed decorative emojis (`📍`, `📋`, `💳`) from push notification message templates.
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all titles, headers, stage labels, system notices, badge text, inputs, and button names; button placements stay in their exact existing positions; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`) in bold tabular monospace; Anti-AI-slop invariants strictly enforced (zero purple gradients, zero glowing halos, zero emoji structural icons, zero pill action buttons).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (3602 modules transformed, production bundles generated in 19.34s).
+
+* **Errand Transaction Screen UI Polish (2026-10-07, Antigravity 2.0)**:
+  - **Component Directory**: `src/portals/dispatcher/components/history/*` (`DispatcherHistoryPanel.tsx`, `HistoryErrandDetail.tsx`, `HistoryProofPhotos.tsx`, `historyModel.ts`).
+  - **Touched Files**:
+    1. `DispatcherHistoryPanel.tsx`:
+       - `HistoryRow`: Upgraded selected state to an unmistakable 4px solid SUGO Red left accent stripe (`border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field shadow-sm text-board-plate`), passing the squint test; customer name in bold uppercase tracking (`text-title font-bold uppercase tracking-tight`); bold monospace tabular Errand ID contract (`font-mono text-data font-bold tabular-nums tracking-wide`); bold tabular delivery fee; and tabular closed timestamp and distance.
+       - Filter Pills (`All`, `Delivered`, `Cancelled`): Styled with crisp hairline borders (`border border-edge hover:border-board-trim`) and bold tabular count badges (`font-mono tabular-nums font-bold`).
+       - Sort Dropdown: Styled with Swiss uppercase micro tracking (`text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted`) and crisp hover border.
+       - Mobile Pane Switcher: Refined "Transactions" and "The order" switcher with border-edge container and Swiss micro tracking.
+       - Pagination Controls: Tabular monospace figures (`font-mono text-label tabular-nums`) and clean border-edge container.
+    2. `HistoryErrandDetail.tsx`:
+       - Header: Prominent bold monospace tabular Errand ID (`formatErrandId(errand.id)` with `font-mono text-panel font-bold tabular-nums tracking-wide text-ink`) with emerald check feedback on copy (`text-emerald-500`), tabular closed timestamp, and font-semibold secondary conversation button.
+       - Section Headers & Facts: Swiss micro uppercase tracking on section headings (`text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted`) and metadata fact labels (`<dt className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">`).
+       - Monetary Breakdown (`MoneyRow`): High-contrast bold tabular figures for item subtotal, delivery fee, tip, total quoted, customer paid, and amount paid.
+       - Rider Earnings Box: Styled with clean border-edge container (`border border-edge bg-board-ground/60 p-3`) and bold tabular share calculations.
+       - Decline Reasons: Styled with clean border-edge container (`border border-edge bg-board-ground/60 px-3 py-2.5`).
+    3. `HistoryProofPhotos.tsx`:
+       - Photo Tiles: Clean border-edge containers (`border border-edge bg-board-ground/60 px-2.5 py-2 hover:border-board-field hover:bg-board-plate`), Swiss uppercase micro tracking on photo kinds, bold tabular figures on declared/extracted amounts, and tabular capture timestamps.
+       - Photo Modal: Replaced banned `rounded-full` close button with restrained ergonomic 8–12px radius (`grid size-9 place-items-center rounded-trim bg-white/10 text-white transition hover:bg-white/20`).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (3602 modules transformed, built in 21.92s).
+  - **Production Deployment (Contabo VPS `109.123.239.182`)**:
+    - Fresh build and deployment completed via `scripts/deploy-web.sh --no-build` at 2026-10-08 02:16 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (37 old chunks safely parked in `/root/deploy-backups/web-20261008-021613`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+    - Live probe: Direct nginx probe to `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **Help Desk (Exceptions Queue) Screen UI Polish (2026-10-08, Antigravity 2.0)**:
+  - **Component Files**:
+    1. `src/portals/dispatcher/components/ExceptionQueuePanel.tsx`:
+       - Canonical Errand ID contract: Replaced truncated `e.errandId.slice(0, 8)` with `formatErrandId(e.errandId)` (`SGO-#####`) in bold tabular monospace (`font-mono text-data font-bold tabular-nums tracking-wide text-ink`) embedded in a copy button container (`group/copy inline-flex items-center gap-1.5 rounded-trim bg-board-ground/60 px-2 py-0.5 border border-edge`) with instant copy feedback and green check icon (`Check size={11}`).
+       - Tactile Selection Indicator: Active row resolving exception elevated with 4px solid SUGO Red left indicator stripe (`border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-plate shadow-sm`), passing the squint test. Normal state uses crisp plate borders (`border border-edge bg-board-plate hover:border-board-trim`).
+       - Swiss Typography & Hierarchy: Prominent bold kind title (`text-panel font-bold text-ink`), rider name with `<User size={12} />` indicator, timestamp with defensive NaN parsing (`formatTimestamp`) and `<Clock size={12} />`, and "At risk" figure elevated with uppercase micro tracking (`tracking-[0.06em] text-micro uppercase font-semibold text-ink-muted`) and bold tabular figures (`font-mono text-data font-bold tabular-nums text-status-act-ink`).
+       - Resolve Form & AI Suggestions: Styled with Swiss uppercase micro tracking, tabular percentage figures (`tabular-nums font-mono`), styled `<kbd className="rounded-trim border border-edge bg-board-ground px-1.5 py-0.5 font-mono text-micro text-ink shadow-sm">Tab</kbd>`, and solid red action button (`DispatcherButton variant="primary"` with `font-bold`).
+    2. `src/portals/dispatcher/components/ExceptionEvidence.tsx`:
+       - Trigger button: Elevated with clean button styling (`rounded-trim border border-edge bg-board-ground/50 px-2.5 py-1 text-label font-semibold text-ink-muted`).
+       - Evidence thumbnails: Styled with `w-[124px] rounded-trim border border-edge bg-board-ground/70 p-2`, Swiss micro uppercase tracking on kind badges (`tracking-[0.06em] text-micro font-semibold uppercase text-ink-muted`), and bold tabular monetary figures (`font-mono text-data font-bold tabular-nums text-ink`).
+       - Anti-AI-slop Compliance: Replaced banned `rounded-full` pill button on photo viewer close action with restrained `rounded-trim` (8–12px) button (`grid size-9 place-items-center rounded-trim bg-white/10 text-white hover:bg-white/20 transition cursor-pointer`).
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all titles, enum kind labels, hints, disclaimers, and button names (`"Help Desk"`, `"Resolve"`, `"Show the evidence"`, `"Generate suggestion"`, `"Update"`, `"Cancel"`, `"Use this instead"`, etc.); button placements preserved; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`) in bold tabular monospace; Anti-AI-slop invariants strictly enforced (zero purple gradients, zero glowing drop shadows, zero emoji structural icons, zero pill action buttons).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (3602 modules transformed, built in 14.00s).
+
+* **Rider Messages Screen UI Polish (2026-10-08, Antigravity 2.0)**:
+  - **Component File**: `src/portals/dispatcher/components/DispatcherRiderMessagesPanel.tsx`.
+  - **Left Rider Conversation List**:
+    - Header: Prominent bold title (`text-panel font-bold text-ink`) with tabular monospace rider count badge (`font-mono text-label font-bold tabular-nums text-ink-muted`).
+    - Filter Tabs (`Active / On Duty` & `All Fleet`): Upgraded with Swiss micro uppercase tracking (`text-micro font-semibold uppercase tracking-[0.06em]`) and crisp border-edge plate styling.
+    - Bento Rider Card Selection: Upgraded selected state to an unmistakable 4px solid SUGO Red left accent stripe (`border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field text-board-plate shadow-sm`), passing the squint test.
+    - Unread Badges: Replaced banned generic SaaS sky-500 pill with solid SUGO Red indicator chip (`bg-signal text-white rounded-trim px-1.5 py-0.5 font-mono text-micro font-bold tabular-nums`).
+    - Tabular Figures: Timestamps formatted in tabular monospace (`font-mono text-micro tabular-nums`).
+  - **Right Messenger Chat Pane**:
+    - Rider Header: Prominent bold rider name, "On Duty" / "Offline" status chip with Swiss micro tracking, and phone number with tabular numerals.
+    - Multi-Errand Switcher: Refined tabs with `rounded-trim` and solid SUGO Red when active (`border-signal bg-signal text-white shadow-sm`).
+    - Active Errand Banner with Canonical Errand ID: Embedded `formatErrandId(currentErrand.id)` (`SGO-#####`) in bold tabular monospace (`font-mono text-data font-bold tabular-nums tracking-wide`) with instant click-to-copy button and emerald check feedback (`Check size={11}`).
+    - Progress Breadcrumbs Stepper: Replaced unbranded sky/emerald pills with design tokens (`bg-board-field text-board-plate` for current stage with pulse icon, `bg-status-done-fill text-status-done-ink` for completed stages) and Swiss micro uppercase tracking.
+    - Message Bubbles: Elevated with restrained `rounded-plate` radius, crisp border hygiene, tabular timestamps, and solid field/plate fills.
+    - Input Composer & Send Action: Ergonomic `rounded-trim` (8–12px) inputs and solid SUGO Red Send CTA (`bg-signal hover:bg-signal-deep`).
+    - Image Zoom Modal: Replaced banned `rounded-full` close button with restrained `rounded-trim` (8–12px) button (`grid size-9 place-items-center rounded-trim bg-white/20 text-white hover:bg-white/40 cursor-pointer transition`).
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all titles, filter tags, breadcrumbs, placeholder strings, and button names; button placements preserved; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`) in bold tabular monospace; Anti-AI-slop invariants strictly enforced (zero purple gradients, zero glowing drop shadows, zero emoji structural icons, zero pill action buttons).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (3602 modules transformed, built in 12.79s).
+
+* **Recent Customer Chats Screen UI Polish (2026-10-08, Antigravity 2.0)**:
+  - **Component File**: `src/portals/dispatcher/components/RecentChatsPanel.tsx`.
+  - **Status Filter Segment**: Upgraded all filter buttons (`"All"`, `"Assigned"`, `"In transit"`, `"Delivered"`, `"Cancelled"`) with Swiss micro uppercase tracking (`text-micro font-semibold uppercase tracking-[0.06em] px-3.5 py-1.5 rounded-trim`), solid Deep Navy plate when active (`bg-board-field text-board-plate border border-board-field shadow-sm`), and crisp plate hover border.
+  - **Canonical Errand ID & Click-to-Copy Contract**:
+    - Embedded `formatErrandId(e.id)` (`SGO-#####`) in bold tabular monospace (`font-mono text-label font-bold tabular-nums tracking-wide text-ink` on desktop table, `font-mono text-body font-bold text-ink tabular-nums tracking-wide` on mobile table).
+    - Integrated instant click-to-copy action with visual checkmark feedback (`Check size={12/13} text-signal-success`) on both desktop table and mobile responsive card headers.
+  - **Swiss Typography & Layout Densities**:
+    - Table Headers: Elevated with Swiss micro uppercase tracking (`px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted`) across all columns (Route, Customer, Category, Status, Payment).
+    - Table Rows: Elevated with `px-4 py-3.5`, crisp hairline borders, high-contrast typography, and smooth surface hover transition (`hover:bg-board-ground/60`).
+    - Pagination Controls: Styled numbers with bold tabular figures (`font-mono tabular-nums font-semibold text-ink`), crisp icon buttons, and balanced spacing.
+  - **Anti-AI-Slop & Action Ergonomics**:
+    - Inspector Modal CTA: Replaced banned oversized `rounded-plate` button with restrained ergonomic 8–12px radius (`rounded-trim bg-signal text-board-plate font-semibold hover:bg-signal-deep`).
+    - Zero purple gradients, zero glowing halos, zero emoji icons.
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all headers, titles, filter labels, and button names; button placements preserved; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`) in bold tabular monospace; Anti-AI-slop invariants strictly enforced.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (`DispatcherPortal-CN2T-sCp.js`, built in 12.71s).
+
+* **Rider Fleet Tracking & Roster Screen UI Polish (2026-10-08, Antigravity 2.0)**:
+  - **Component Files**:
+    1. `src/portals/dispatcher/components/RiderFleetRoster.tsx`:
+       - Status Filters: Upgraded filter chips (`"All riders"`, `"Available Online"`, `"On delivery"`, `"Available Signal Lost"`, `"Offline"`) with Swiss micro uppercase tracking (`text-micro font-semibold uppercase tracking-[0.06em] px-3.5 py-1.5 rounded-trim`), bold tabular counts (`font-mono tabular-nums font-bold`), solid Deep Navy plate when active (`bg-board-field text-board-plate border border-board-field shadow-sm`), and crisp plate hover border.
+       - Floating Map Rider Card: Redesigned with `rounded-plate border border-edge bg-board-plate/95 backdrop-blur-sm p-3.5 shadow-sm`, prominent bold rider name (`text-body font-bold text-ink`), tabular rider ID (`font-mono text-label font-bold tabular-nums text-ink-muted`), `rounded-trim` status badge with Swiss micro tracking, tabular phone and errand numbers (`font-mono tabular-nums font-bold`), and tabular battery percentage.
+       - Roster Stream & Bento Cards: Stamped header with bold tabular figures (`filteredRiders.length of counts.ALL`), 4px solid SUGO Red left indicator stripe on the selected rider card (`border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field text-board-plate shadow-sm`), passing the squint test; unselected cards styled with crisp borders (`border border-edge bg-board-plate hover:border-board-trim hover:bg-board-ground/60`), bold tabular rider IDs, and tabular battery indicators.
+    2. `src/components/LiveFleetMap.tsx`:
+       - Floating Map Controls: Upgraded "Offline Hidden" / "Hide Offline" and "Fit All" buttons with Swiss micro uppercase tracking (`text-micro font-semibold uppercase tracking-[0.06em] h-9 px-3.5 rounded-trim border shadow-sm cursor-pointer`), eliminating generic styling.
+       - Live Active Pill: Redesigned with `rounded-trim border border-slate-200/80 bg-white/95 px-3.5 py-2 text-micro font-semibold text-slate-800 shadow-sm`, bold tabular counts (`font-mono tabular-nums font-bold text-slate-900` for online, on delivery, and signal lost), and stylized Reconnecting badge.
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all filter labels, map controls, headers, and rider attributes; button placements preserved; Errand ID contract strictly preserved as `formatErrandId(id)` (`SGO-#####`) in bold tabular monospace; Anti-AI-slop invariants strictly enforced.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (`DispatcherPortal-CMPt3oSm.js`, built in 13.86s).
+
+* **Profile & Settings Screen UI Polish (2026-10-08, Antigravity 2.0)**:
+  - **Component Files**:
+    1. `src/portals/dispatcher/components/DispatcherProfilePanel.tsx`:
+       - Sub-Tab Navigation: Upgraded "Profile Information" and "Account Logs & Security" with Swiss micro uppercase tracking (`text-micro font-semibold uppercase tracking-[0.06em] px-3.5 py-1.5 rounded-trim`), solid Deep Navy plate when active (`bg-board-field text-board-plate border border-board-field shadow-sm`), and crisp plate hover border.
+       - Avatar Container: Styled with restrained `rounded-trim` (8–12px) radius and bold tabular monospace initials (`grid size-16 shrink-0 place-items-center rounded-trim bg-board-field text-title font-mono font-bold text-board-plate shadow-xs`).
+       - Account Record List: Monospace bold figures on username (`font-mono text-label font-bold text-ink`) and roster join date (`font-mono text-label font-bold tabular-nums text-ink`).
+       - Form Inputs & Actions: Retained 100% verbatim copy across all titles and buttons (`"Save these details"`, `"Update the password"`, `"Change the photo"`, `"Remove"`, `"Show the passwords"`, `"Hide the passwords"`).
+    2. `src/components/account/AccountSecurityLogsView.tsx`:
+       - Action Buttons: Replaced `rounded-plate` on "Sign Out All Other Devices", "Cancel", and "Confirm Sign Out" with restrained ergonomic 8–12px radius (`rounded-trim`).
+       - Table Headers & Logs: Upgraded audit log table headers with Swiss micro uppercase tracking (`text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted`), monospace tabular figures on timestamps and IP addresses, and `rounded-trim` on the Refresh control.
+  - **Constraints Fully Honored**: 100% verbatim copy preserved across all profile fields, security descriptions, and button names; button placements preserved; Errand ID contract strictly preserved; Anti-AI-slop invariants strictly enforced.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (`DispatcherPortal-DOs6DEUL.js`, built in 11.69s).
+  - **Live VPS Deployment (Contabo VPS `109.123.239.182`)**:
+    - Deployed via `scripts/deploy-web.sh --no-build` at 2026-10-08 05:10 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (22 old chunks safely parked in `/root/deploy-backups/web-20261008-051019`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+* **Dispatch Management Header Scoped Strictly to Queue Screen (2026-10-08, Antigravity 2.0, DEPLOYED 05:20, rollback `web-20261008-051957`)**:
+  - **User Directive**: "The Dispatch Management Header shall be hidden in all screen except in its own screen."
+  - **Target File**: `src/portals/dispatcher/DispatcherPortal.tsx`.
+  - **Resolution**:
+    - The top pinned Destination Band (lines 825–905) previously rendered unconditionally across all views, causing vertical stacking collisions with panels that declare their own headers (`PanelShell` used by Active Errands, Help Desk, Roster, Messages, Recent Chats, History, and Profile).
+    - Wrapped the entire Destination Band inside `{activeTab === "queue" && ( ... )}` so it renders exclusively on the Dispatch Management ("queue") board where dynamic order signing is active.
+    - Eliminated redundant `&& activeTab !== "exceptions"` inside the narrowed block to resolve TS2367 (`unintentional comparison between '"queue"' and '"exceptions'"`).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited code 0 cleanly (zero type errors).
+    - `npm run build` exited code 0 cleanly (`DispatcherPortal-Bwzv4ry7.js`, built in 11.24s).
+  - **Production Deployment (Contabo VPS `109.123.239.182`)**:
+    - Deployed via `scripts/deploy-web.sh --no-build` at 2026-10-08 05:20 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (23 old chunks safely parked in `/root/deploy-backups/web-20261008-051957`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+    - Live probe: Direct nginx probe to `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **Pabili step 1 "Merchant | Location": customer-picked stores, auto-pinned in Stage 1 (2026-10-08, Claude, SERVER + WEB DEPLOYED 06:17/06:19, rollbacks `server-20261008-061647`, `web-20261008-061918`)**:
+  - **User request**: in the customer app's step 1, a "Merchant" button (the existing category picking) and a
+    "Location" button (pick real establishments: 10 from Google Maps Places, plus a search over Google and the owner's
+    Location Stores). Step 2 lists items per store as before. The picked stores arrive pinned in the dispatcher's
+    Stage 1, with the system working out each one's merchant category.
+  - **No Prisma schema change.** Picked stores become ordinary `errand_pinpoints_tbl` rows (name, position,
+    `categoryId`, catalogue `placeId` only; a Google place id has no column and is not stored).
+  - **Server** (`C:\Capstone_Server\server`):
+    - `GET /api/places/establishments?q=&lat=&lng=` (CUSTOMER, DISPATCHER, OWNER; own `establishmentSearchLimiter`,
+      30/min) in `routes/placeRoutes.ts`, above `/:id`. `services/establishmentService.ts` merges Location Stores
+      with Google; `lib/places/googlePlacesClient.ts` calls **Places API (New)** (`searchNearby` 3 km, `searchText`
+      restricted to the service-area box), never caches, answers null on any failure, and the search then serves
+      Location Stores alone with `google: "unavailable"`. Key: new env `GOOGLE_PLACES_API_KEY`, defaulting to
+      `GOOGLE_MAPS_API_KEY`; that key's project must have "Places API (New)" enabled.
+    - `lib/places/establishmentCategory.ts`: Google type first, matched to ACTIVE categories by keyword (production
+      names differ from seed names), the category model (`inferStoreCategory`) only for generic types, one 1.5 s budget.
+    - `createErrandSchema` gains `stores[]` (1-3: name, lat/lng, placeId?, categoryId?) and item `storeIndex`.
+      `createErrand` checks every store with `checkStoreLocation` first (422, nothing written), creates the pins in
+      the same write as the errand, files the working copy (`pabiliDetails`) as "Store N - Name | Category" and
+      keeps the plain category on `pabiliItemRequests` (the fee rule reads it, so the price matches the quote).
+      No `recalculateFee` at creation: the distance fee is still priced when the dispatcher presses Continue.
+    - **Ownership fix** in `controllers/errandController.ts`: a CUSTOMER's order is always their own (body
+      `customerId` ignored); OWNER must name the customer; every other role gets 403. Before this any signed-in
+      account could file an errand under another customer, and a dispatcher's id was taken as a customer's.
+    - Tests: `tests/customerPickedStores.test.ts` (16), `tests/establishments.test.ts` (13),
+      `tests/placeRoutesAuth.test.ts` extended.
+  - **CustomerApp**: `components/pabili/StoreModeToggle.tsx`, `components/pabili/EstablishmentPicker.tsx`,
+    `hooks/useEstablishmentSearch.ts`, `services/establishments.ts`; draft gains optional `mode` and `stores`
+    (`withStores`, `storeKeysFor`, `storeCategoryOf`, `storeKeyForCategory`; version stays 1); payload sends
+    `stores` and `storeIndex`; hub and editor read the picked store's category. Ships AFTER the server: an older
+    server's zod strips `stores` silently.
+  - **Web**: `order-chat/stages/Stage2PinStores.tsx` shows "The customer chose these N stores. Check them, then
+    continue." while the errand's description starts "Pabili Stores:" and no "pinpoints" card was sent, and does not
+    ask for store suggestions then. Copy appended to `copy.ts` (`stage2.customerPicked`).
+  - `mergeEstablishments` interleaves the two sources (Location Stores first in each pair), drops a Google row
+    that duplicates a Location Stores row, and checks every pick against those already chosen.
+  - **Live checks (VPS)**: nothing was unbuilt in `/var/www/server/src` before the build; tsc and build clean;
+    health 200; the route answers 401 without a token. **Places API (New) is enabled on the server key**: nearby
+    returned 10 shops with categories in about 1 s, "mercury" the 4 Tacurong branches as Pharmacy. Web chunk
+    `DispatcherPortal-BZNcnbMr.js` carries the Stage 1 note. No test order was placed (it would alert live
+    dispatchers): the creation path is covered by `tests/customerPickedStores.test.ts` only.
+  - **Not shipped**: the CustomerApp build. Nothing changes for customers until it is released.
+
+* **Step 2 (Confirm items) grouped by store, with item duplication (2026-10-08, Claude, DEPLOYED 06:53, rollback `web-20261008-065259`)**:
+  - **User request**: replace the long item list with groups by store. Each store heading is a button (opens a dialog
+    of every item, ticked where that store buys it) plus a select-all check button; each row is
+    [tick] [item name, editable] [unit] [qty, editable]. A tick means that store buys the item, and one item may be
+    bought at more than one store.
+  - **Decided with the user**: every store lists every item, ticked or not; an item unticked from its last store waits
+    under "Not assigned yet" (the list cannot be sent until it is ticked somewhere; removing an item from the order
+    stays a separate action that tells the customer); unit stays editable; a copy ticked at a second store starts at 1.
+  - **No server change.** A copy is a second line with its own `storeCategory` and quantity, which the PATCH items
+    route, the rider's per-stop list and the customer's approval card already handle. Max 50 lines per order.
+  - **Files** (`src/portals/dispatcher/components/order-chat/`):
+    - `itemOwnership.ts` (new, pure): `itemIdentity` (name + unit, normalised; notes stay per line), `withItemKeys`
+      (copies found again on load, aligned to the first copy's spelling; two lines of one item at one store stay
+      two items), `itemLines`, `setOwned`, `setOwnedAll`, `editItem`, `removeItemLines`, `storeTickState`.
+    - `ItemsByStore.tsx` (new): `ItemsByStore`, `StoreItemsDialog`, `TickBox` (role=checkbox, mixed state).
+    - `hooks/useOrderItems.ts`: client-only `itemKey` on lines; `storeIndexOf` (by "Store N" first, then name, so a
+      label `clean()` changed still matches); store suggestions now keyed by item; `addItem(storeIndex)`;
+      `removeItem(key)` removes every copy and posts one chat notice; new `setItemOwned`, `setStoreOwnsAll`,
+      `editItemFields`, `lines`.
+    - `stages/Stage3ConfirmItems.tsx`: the per-row store and category dropdowns, "Bought at X?" question and
+      per-row suggestion are gone; suggestions and "Store needed" now show under "Not assigned yet" only. The
+      read-only list is grouped by store too. `types.ts`: `EditableItem.itemKey`. Copy appended to `copy.ts` (`stage3`).
+  - **Verified** in a throwaway harness with the real `useOrderItems`: saved copies regroup on load (Coke ticked at
+    both stores, own quantities); copy at a second store starts at 1 and sits beside its item; untick with another
+    copy left removes the line; untick of the last moves it to "Not assigned yet"; "Buy at" chips, select-all and
+    clear-all, the dialog, a rename reaching every copy, and removal with one chat notice. No overflow at 440 px.
+    tsc clean. Harness deleted.
+  - **Wording (user, same day)**: "Select", never "Tick", in every visible string ("Select every item",
+    "Unselect every item", "Select a store for every item first"). The explanatory sentences under "Not assigned yet"
+    and in the store dialog were removed.
+
+* **Help Desk Exception Detail Highlight in Red (2026-10-08, Antigravity 2.0)**:
+  - **User Directive**: "In the help desk where the label sentence "Collected ₱158 against ₱26 — ₱132 over. Rider said: Reported short by the rider at handover." shall be highlighted in RED".
+  - **Consultation Gate**: User selected Option 1 (Clean Red Text: `font-semibold text-status-act-ink`) to ensure high signal-to-noise ratio and zero container clutter.
+  - **Target File**: `src/portals/dispatcher/components/ExceptionQueuePanel.tsx` (line 165).
+  - **Change**: Updated `<p className="text-body text-ink leading-relaxed">{e.detail}</p>` to `<p className="text-body font-semibold text-status-act-ink leading-relaxed">{e.detail}</p>`, rendering the exception/variance detail sentence in high-contrast authentic SUGO status-act red (`#A81E1A`, WCAG AA 6.33:1).
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` passed with exit code 0 (zero errors).
+    - `npm run build` completed cleanly in 11.64s (`DispatcherPortal-DJyc5OYe.js`).
+  - **Live VPS Deployment (Contabo VPS `109.123.239.182`)**:
+    - Deployed via `scripts/deploy-web.sh --no-build` at 2026-10-08 07:11 (+08).
+    - 82 files staged and synced to `/var/www/web/dist` with `--delete-after` (23 old chunks safely parked in `/root/deploy-backups/web-20261008-071100`).
+    - Server-side verification: Every referenced chunk resolves cleanly.
+    - Live probe: Direct nginx probe to `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **SMS OTP White Canvas Redesign, Human-Readable Copy, Card Removal, and Resend Countdown (2026-10-08, Antigravity 2.0)**:
+  - **User Directive**: "Based on Dribble.com /browser: Redesign the SMS OTP DESIGN LAYOUT INTO WHITE Background and used Human-Readable text labels and message. Add Resend countdown or countdown. Remove the cards."
+  - **Dribbble Design Research via Browser Subagent**: Analyzed top minimal fintech/auth patterns (Linear, Stripe, Cash App, Airbnb). Findings incorporated: pure flat white canvas (`#FFFFFF`) with generous vertical breathing room, card-free layout, human-readable copy with inline "Edit number" action, 6 segmented input slots in 3+3 chunking, and 60-second active countdown timer transitioning to an interactive resend action.
+  - **Target Files**:
+    1. `src/pages/PhoneVerificationPage.tsx`: Live customer/rider phone verification flow.
+    2. `src/pages/TestPhoneVerificationPage.tsx`: Phone auth testing lab.
+    3. `src/components/ui/input-otp.tsx`: Added `activeClassName?: string` to `InputOTPSlot` for brand red focus ring styling.
+  - **Key Implementations**:
+    1. **Card Removal & White Canvas**: Replaced dark background (`bg-[#0B132B]`) and floating elevated cards (`bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xl`) with a pure white flat layout (`bg-white text-slate-900 min-h-screen`) and borderless content column (`max-w-md mx-auto px-6 py-10 sm:py-16`).
+    2. **Human-Readable Copy & Labels**: Replaced robotic messages with clear guidance:
+       - Phone Step: "Verify your phone number" · "Enter your mobile number to receive a 6-digit verification code via SMS."
+       - Code Step: "Enter verification code" · "We sent a 6-digit code to [phone] · Edit number" (allows 1-click phone editing).
+       - Success Step: "Phone verified!" · "Your mobile number has been authenticated."
+    3. **Segmented 6-Digit OTP Code Input**: Integrated `@/components/ui/input-otp` (`InputOTP`, `InputOTPGroup`, `InputOTPSlot`, `InputOTPSeparator`) with 3+3 chunking and red focus ring (`activeClassName="z-10 border-red-600 ring-2 ring-red-600/20 bg-white"`).
+    4. **Active Resend Countdown**: 60-second timer (`resendCountdown`) starting upon SMS dispatch. Counting down renders "Didn't receive the code? Resend in 0:45" (muted, non-clickable tabular figures). Upon expiry, transforms into an active interactive action: "Didn't receive the code? Resend SMS" in bold red text.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` passed with exit code 0 (zero errors).
+    - `npm run build` completed cleanly in 1m 14s (`PhoneVerificationPage-D3RjiRHN.js`, `TestPhoneVerificationPage-rudypJZ7.js`).
+  - **Live VPS Deployment (Contabo VPS `109.123.239.182`)**:
+    - Deployed via `scripts/deploy-web.sh --no-build` at 2026-10-08 09:29 (+08).
+    - 84 files staged and synced to `/var/www/web/dist` with `--delete-after` (18 old chunks parked in `/root/deploy-backups/web-20261008-092851`).
+    - Staged preview assets: `/preview/sms_otp_preview.html`, `/preview/sms_otp_white_preview.jpg`.
+
+* **SMS OTP Verification Immediate Link Expiration & Anti-Replay Security (2026-10-08, Antigravity 2.0)**:
+  - **User Directive**: "add a security in verifying a SMS otp. When the link for the SMS OTP is now done and verified, it must expire immediately once success."
+  - **Security Problem Solved**: Previously, once a verification link (`/verify-phone?phone=...&redirect=...`) was opened and verified, if the user or a third party re-visited, reloaded, or accessed browser history, the page would re-render the phone input or code entry form, allowing potential session confusion or token replay attempts.
+  - **Architecture & Invalidation Mechanism**:
+    1. **Immediate Invalidation on Success (`handleVerifyCode`)**:
+       - Upon `confirmationResultRef.current.confirm(cleanCode)` succeeding:
+         a) Writes expiration records with timestamps to both `sessionStorage` and `localStorage` keyed by normalized phone number (`sugo_otp_consumed_${cleanPhone}`) and marks `sugo_current_otp_session_expired = "true"`.
+         b) Instantly nullifies `confirmationResultRef.current = null` to block code re-submission.
+         c) Clears and destroys `recaptchaVerifierRef.current = null`.
+         d) Revokes the web origin's temporary Firebase auth session (`await signOut(auth)`) to eradicate credential leakage from IndexedDB/localStorage on the web domain.
+         e) Sanitizes sensitive query parameters from browser address bar and history using `window.history.replaceState`.
+    2. **On-Mount Link Expiration Check**:
+       - On mount of `PhoneVerificationPage`, inspects `sessionStorage` and `localStorage` for consumed records within a 2-hour validity window. If found, initializes directly to `step = "EXPIRED"`.
+    3. **Dedicated Card-Free Security Expired State UI**:
+       - Designed with pure white background, uncarded layout, amber `ShieldAlert` badge, human-readable security explanation ("This one-time verification link has already been used and is now expired for your security"), safe CTA back to `redirectUrl` ("Return to Sugo Express App"), and optional reset link to verify a different number.
+    4. **Applied Consistently across Web Flow, Test Lab & HTML Preview**:
+       - `src/pages/PhoneVerificationPage.tsx`: Production verification page.
+       - `src/pages/TestPhoneVerificationPage.tsx`: Testing lab with "Reset Expired State & Test Again" control.
+       - `public/preview/sms_otp_preview.html`: Added Step 4 "Link Expired (Security Invalidation)" card to interactive preview.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit` exited with code 0 (zero errors).
+    - `npm run build` completed cleanly in 55.32s (`PhoneVerificationPage-TE3Zn35O.js`, `TestPhoneVerificationPage-CNj_WpbO.js`).
+  - **Live VPS Deployment (Contabo VPS `109.123.239.182`)**:
+    - Deployed via `scripts/deploy-web.sh --no-build` at 2026-10-08 09:45 (+08).
+    - 84 files staged and synced to `/var/www/web/dist` with `--delete-after` (23 superseded chunks parked in `/root/deploy-backups/web-20261008-094500`).
+    - Live probe: Direct nginx probe to `https://portal.sugo-express.org` returned `HTTP 200 OK`.
+
+* **Dual-Channel Authentication (Email / Gmail OTP & Phone SMS OTP) for User Management & Staff Login (2026-10-08, Antigravity 2.0)**:
+  - **User Directive**: "In the user management in the owner portal, where the new user authenticated themselves with Gmail or Phone number. Now, when the new user is created, now, when they logged In, they choose whether to choose Email or SMS OTP to authenticate."
+  - **Key Implementations**:
+    1. **Backend Dual-Channel Auth Engine (`c:\Capstone_Server\server`)**:
+       - `src/validators/authValidators.ts`: Extended `verifyLoginOtpSchema` to accept either `code` (Email OTP) or `firebaseIdToken` (Google Cloud SMS OTP).
+       - `src/repositories/userRepository.ts`: Added `markPhoneVerified(id: number)`.
+       - `src/services/loginChallengeService.ts`: Added `maskedPhone` and `phone` to `LoginChallenge`. Updated `evaluateGate(user)` to satisfy authentication when either `emailVerified` or `phoneVerified` is true. Added `maskPhone` utility.
+       - `src/services/authService.ts`: In `completeLoginOtp`, accepts `firebaseIdToken` alongside `code`. Verifies token via Firebase Admin (`verifyFirebaseIdToken`), validates phone ownership against registered staff phone, marks `userRepository.markPhoneVerified`, and establishes the session.
+       - `src/controllers/authController.ts`: Dispatches `maskedPhone` and `phone` in challenge responses and passes `firebaseIdToken` into `completeLoginOtp`.
+    2. **Web Portal Multi-Factor Channel Switcher (`c:\Capstone_Project_Web`)**:
+       - `src/services/apiService.ts`: Updated `LoginChallengeResponse` with `maskedPhone` and `phone`. Updated `verifyLoginOtp(challengeToken, code?, firebaseIdToken?)`.
+       - `src/components/login/OtpStep.tsx`: Implemented interactive channel switcher:
+         - `[ ✉️ Email (Gmail) ]`: 6-digit code entry with Nodemailer SMTP delivery and countdown.
+         - `[ 📱 SMS OTP ]`: Firebase Phone Auth integration (`signInWithPhoneNumber`, invisible reCAPTCHA, 60s active resend timer, 6-digit input, auto-submit).
+         - Restrained, anti-AI-slop styling: Deep Navy canvas, solid Red CTAs, tabular numbers, zero purple gradients.
+       - `src/components/LoginPage.tsx`: Updated state to capture `maskedPhone` and `phone` from login challenges, integrated `handleFirebasePhoneSubmit`, and updated header to "Two-Factor Authentication".
+    3. **Owner Portal User Management Clarity**:
+       - `src/portals/owner/modules/users/components/AddUserModal.tsx`: Added "Dual-Channel Authentication Ready" informational card under Contact Details explaining that created users can authenticate via either Email or SMS OTP.
+       - `src/portals/owner/modules/users/UserManagementModule.tsx`: Added "SMS OTP Ready" indicators in table and "Email & SMS OTP (Dual-Channel)" channels in mobile preview and desktop inspector.
+  - **Empirical Verification & Deployments**:
+    - Backend: `npx tsc --noEmit` passed (0 errors), `npm run build` passed.
+    - Web: `npx tsc --noEmit` passed (0 errors), `npm run build` passed in 46.70s.
+    - Deployed to Contabo VPS (`109.123.239.182`):
+      - Backend: Deployed via `scripts/deploy-server.sh` (Prisma sync, TS build, PM2 restart, health checks 200 OK at `https://api.sugo-express.org`).
+      - Web: Deployed via `scripts/deploy-web.sh --no-build` (HTTP 200 OK at `https://portal.sugo-express.org`).
+
+* **50% downpayment retired: GCash/PayMaya and Bank Transfer pay at the door like COD (2026-10-08, Claude, SERVER LIVE ~11:05 with Antigravity's deploy, WEB DEPLOYED 11:43, rollback `web-20261008-114253`)**:
+  - **User request**: retire the 50% on GCash/PayMaya, Bank Transfer and Card. The rider collects the whole bill at
+    delivery, like COD. No dispatcher step: the system records it.
+  - **Decided with the user**: at the door the rider photographs the customer's GCash, PayMaya or bank confirmation,
+    or takes cash, and everything is recorded. A photo the system cannot confirm means the rider collects cash
+    instead. Card stays unavailable. A receipt above the estimate no longer holds the goods (same as COD).
+  - **Server** (`C:\Capstone_Server\server`):
+    - `services/patterns/paymentLedger.ts`: `DOWNPAYMENT_RATE` removed; states are `AWAITING_BALANCE | SETTLED |
+      REFUNDED`; `summarisePaymentPlan` returns `dueUpFront: 0`. An errand that already paid the half keeps it, so only
+      the rest is due at the door.
+    - `services/patterns/paymentModes.ts`: `isDownpaymentPlan` removed; `hasPaymentLedger` = GCash/PayMaya or Bank.
+    - `services/errandPaymentService.ts`: NEW `confirmBalanceFromRiderProof` (a RIDER_BALANCE_PROOF that passes
+      `validateTransferReceipt` becomes a FINAL entry with `confirmedByUserId` null; a reference number already used on
+      another errand is refused). `confirmUpfrontPayment` and `requestHalfPayment` answer 409 `DOWNPAYMENT_RETIRED`
+      with a sentence, so old app builds say why. `checkReceiptOverage` only logs; `assertGoodsReleasable` no longer
+      holds goods, which also releases any errand held under the old rule.
+    - `services/proofImageService.ts`: every RIDER_BALANCE_PROOF refusal ends "collect the payment in cash instead";
+      an accepted photo records the payment itself.
+    - `services/paymentProofService.ts`: a customer's own receipt upload is refused with how to pay at the door;
+      reading an old one still works. Controllers and routes trimmed to match; `settlementService` and
+      `errandService.derivePaymentPlan` updated.
+    - Tests: `paymentLedger` (12, rewritten), `doorPayment` (11, new), `paymentProofValidation` (10, rewritten),
+      `riderTransferProof` (4, new); `halfPaymentRequest.test.ts` deleted. Full suite 1225 passed, 9 failed; all 9
+      failed before this change (categoryWarm, exceptionReasonSuggestion, exceptionSecondOpinion, firebaseUid,
+      passwordReset).
+  - **Web** (`src/portals/dispatcher/`): `PaymentLedgerPanel` and `PaymentProofPanel` are read-only (paid, to collect,
+    how each payment was recorded, the photos); a refund is the only action left. `hooks/useOrderPayments.ts` reads
+    the ledger and records refunds only. `isUpfrontConfirmed` is gone from `useStageModel` and Stage 5. The
+    half-payment toast in `hooks/useDispatcherPortal.ts` is removed. `copy.ts` payments block rewritten.
+    - Trap found while verifying: in Tailwind v4 `space-y-*` puts its gap on the children through a
+      zero-specificity `:where()`, so an `m-0` on a child silently cancels the gap. Removed from these panels only;
+      preflight already zeroes those margins.
+  - **Deploy note**: `scripts/deploy-server.sh` ships the whole shared server working tree, so the server half went
+    live with Antigravity's OTP deploy at ~11:05. Rollback `server-20261008-110520` would undo their change too.
+    Verified 11:41: prod `src` hashes identical to local, `DOWNPAYMENT_RETIRED` and `confirmBalanceFromRiderProof`
+    in `dist`, health 200. Web: the chunks the live entry loads carry the new panel copy and none of the
+    half-payment strings. Verified in a throwaway harness first (4 states, 12 px spacing, no horizontal page overflow); harness deleted.
+  - **Not shipped (app builds)**: CustomerApp (`paymentMethodStrategy` label "GCash / PayMaya" without "(50%)" and
+    pay-at-the-door hints; `FeeBreakdownCard` drops the "Send now" row; `CustomerChatScreen` no longer offers a
+    receipt upload; `PaymentPlan.state` narrowed) and RiderMobileApp ("Photograph their GCash, Maya or bank
+    receipt"). Until then, installed CustomerApp builds still label GCash "(50%)" and show a "Send now (50% of items)
+    ₱0.00" row, but the server never asks for the half, and the installed rider app's door step already offers the
+    photo or cash. The old half-payment UI in both apps is unreachable but still in the code.
+
+---
+
+* **Session Log (2026-10-08 13:48 — SysAdmin App Releases, APK Upload & Landing Page Live Release Sync)**:
+  - **Driver**: Antigravity 2.0 (Gemini 3.8 Flash High)
+  - **Scope**: Implemented full-stack App Releases management in SysAdmin Portal with streaming binary APK uploads and dynamic landing page sync:
+    1. **Backend Service & Streaming Binary Uploads (`c:\Capstone_Server\server`)**:
+       - `src/services/appReleaseService.ts`: Low-memory streaming APK upload pipeline using `application/octet-stream` directly to disk (`/var/www/landing/dist/downloads` on VPS and local downloads), with ZIP magic byte verification (`PK\x03\x04`), SHA256 checksum computation, and byte counting.
+       - Stored metadata in `config/app-releases.json` with atomic disk writes (`fs.promises.writeFile` with `.tmp` swap) preserving the locked 3NF Prisma schema.
+       - `src/controllers/appReleaseController.ts`: Implemented `getPublicReleasesHandler` (public with caching), `getSysAdminReleasesHandler`, `updateReleaseDetailsHandler`, `uploadApkHandler`, and direct streaming `downloadApkHandler`.
+       - `src/routes/sysAdminRoutes.ts`: Mounted public `GET /api/app-releases/public`, `GET /api/app-releases/download/:target`, and authenticated sysadmin endpoints.
+       - Nginx on VPS: Configured `location /api/sysadmin/app-releases/upload/` with `client_max_body_size 350M;` and `proxy_request_buffering off;` for 300MB+ streaming uploads.
+    2. **SysAdmin Portal (`c:\Capstone_Project_Web`)**:
+       - `src/types/sysAdmin.ts`: Added `AppReleaseTarget`, `AppReleaseInfo`, `AppReleasesResponse`, `AppReleaseUpdateInput`.
+       - `src/services/sysAdminApiService.ts`: Added `getAppReleases()`, `updateAppRelease()`, and `uploadAppReleaseApk()` with `XMLHttpRequest.upload.onprogress` live byte tracking.
+       - `src/portals/sysadmin/modules/devops/AppReleasesTab.tsx`: Built dual-app management console (Sugo Express and Sugo Rider) with editable Version, Min Android OS, multiline/bullet-point "What's New" editor, drag-and-drop APK uploader with live progress bar (0-100%), and live simulated landing page preview card.
+       - `src/portals/sysadmin/modules/devops/DevOpsModule.tsx`: Added `releases` sub-tab with `Smartphone` icon.
+       - `src/portals/sysadmin/i18n/sysAdminI18n.ts`: Added English and Chinese translations for the App Releases module.
+    3. **Landing Page Dynamic Sync (`c:\Capstone_Landing_Page`)**:
+       - `src/components/AppDownloadGrid.tsx`: Dynamic client fetch against `https://api.sugo-express.org/api/app-releases/public`. Dynamically displays current version numbers, file sizes, minimum Android OS, and dynamic "What's New" bullet points, with graceful fallback to bundled baseline.
+    4. **Empirical Verification & Production Deployment**:
+       - Backend: `npx tsc --noEmit` passed (0 errors). Deployed to VPS via `scripts/deploy-server.sh`. Verified: `curl http://127.0.0.1:5000/api/app-releases/public` -> HTTP 200.
+       - Web Portal: `npx tsc --noEmit` passed (0 errors), `npm run build` succeeded (0 errors, 46.19s). Deployed to VPS via `scripts/deploy-web.sh --no-build` -> HTTP 200.
+       - Landing Page: `npm run build` succeeded (0 errors, 9.15s). Deployed to VPS via `scripts/deploy-landing.sh --no-build` -> HTTP 200.
+       - VPS Nginx: Syntax test passed, reloaded successfully.
+
+* **Location list: 4 nearby stores, green distance, no Plus Codes, "Merchant Categories" (2026-10-08, Claude, SERVER DEPLOYED 18:54, rollback `server-20261008-185406`)**:
+  - **User request**: in CustomerApp step 1 Location, list 4 stores instead of 10; show the distance in green; drop
+    the Plus Code ("MMJ7+HC9") at the front of addresses; rename "Store Categories" to "Merchant Categories".
+  - **Server** (`src/services/establishmentService.ts`): NEW `NEARBY_LIMIT = 4` for the list shown before anything is
+    typed (Google and the owner's-stores fallback alike); a typed search keeps `ESTABLISHMENT_LIMIT = 10`. Google is
+    still asked for 10 nearby, since closed and out-of-city shops are dropped before the 4 are taken. NEW
+    `withoutPlusCode` strips a leading Plus Code (4 to 8 code characters, "+", 2 to 3) from both sources' addresses,
+    so the address saved on the order is clean too. `tests/establishments.test.ts` 13 to 19, all pass; tsc clean.
+  - **CustomerApp**: `components/pabili/EstablishmentPicker.tsx` renders the distance as a nested bold Text in
+    `colors.success` (#065F46 light, #34D399 dark); `screens/ErrandFormScreen.tsx` heading "Merchant Categories" and
+    the same term in its subtitle, limit, validation and loading copy. "Pabili Store Categories:" in the errand
+    description is a format the server and portal parse, so it is unchanged. `ErrandFormScreen.test.tsx` 9 pass.
+  - **Deploy**: only `establishmentService.ts` differed from prod; built on the VPS, health 200, the route still 401
+    without a token. One live nearby search returned 4 shops with clean addresses. CustomerApp build not shipped.
+
+* **Location list ranked like a recommendation feed (2026-10-08, Claude, SERVER DEPLOYED 19:16, rollback `server-20261008-191557`)**:
+  - **User request**: when a search matches many stores, recommend the closest first, then the next; "we used the
+    YouTube, TikTok algorithm". **Decided with the user**: a score with distance heaviest (plus the customer's own
+    past orders, everyone's orders, and the name match), used for the 4 nearby stores too.
+  - **Server**:
+    - NEW `src/lib/places/storeRanking.ts` (pure): two stages like YouTube/TikTok. Candidates: up to 20 per source
+      (Google page maximum, `googlePlacesClient` `RESULT_LIMIT` 10 to 20, same price per request). Ranking:
+      `RANKING_WEIGHTS` proximity 0.5 (`exp(-d/1000)`), personal 0.25 (own orders, half-life 60 days), popularity
+      0.15 (other customers' orders in 90 days, half-life 30 days), name match 0.1. For a typed search a name
+      match of 0.6 or more (`NAME_MATCH_GATE`) is a gate before the score, so a corner store 100 m away cannot beat
+      the Mercury Drug that was typed. Ties keep the sources' order.
+    - `services/establishmentService.ts`: `searchEstablishments({ query, near, customerId })` merges every candidate
+      (`mergeEstablishments(..., Infinity)`), reads past pins near them once (`loadStoreHistory`: errand_pinpoints in
+      a padded box, errands not CANCELLED, last 365 days, max 5000), tallies them per store (`tallyStoreHistory`:
+      same placeId, or same `normalizeStoreName` within 40 m; one errand counts once), ranks, slices (4 or 10), and
+      only then categorises the Google rows shown, so model calls fall from up to 20 to at most 4 or 10. A history
+      read failure is logged and ranks on distance and name. NEW field `orderedBefore` on each row.
+    - `controllers/establishmentController.ts`: passes `customerId` only for a CUSTOMER caller (customer and staff
+      ids overlap).
+    - Tests: NEW `storeRanking.test.ts` (12), NEW `establishmentController.test.ts` (3), `establishments.test.ts`
+      19 to 24 (prisma mocked). Full suite 1263 passed, 9 failed, the same 9 as before.
+  - **CustomerApp** (not shipped): `services/establishments.ts` `orderedBefore?`; `EstablishmentPicker` shows "You
+    ordered here before" under such a row, so a usual store ranked above a closer one does not look like a bug.
+  - **Live check**: "mercury" near Poblacion lists the four Tacurong branches at 213 m, 234 m, 253 m, 1.4 km. Rollback
+    also needs `src/lib/places/storeRanking.ts` removed (noted in the backup's NOTES).
+
+* **Customer chat refused after a Google sign-in (2026-10-08, Claude, CustomerApp fix, NOT SHIPPED: needs a new APK)**:
+  - **Report**: chat messages not working in the customer app.
+  - **Cause**: `src/services/googleAuth.ts` (Google sign-in, 2026-10-05) calls `signInWithCredential` on the same
+    Firebase `auth` the Realtime Database uses, to get the ID token `/customers/google-login` verifies. That leaves
+    the Google account signed in with Google's uid. `firebase/realtimeSession.ts` `ensureRealtimeSession` took any
+    `auth.currentUser` as signed in, so it never minted `customer_<id>`, and the rules (`chat_access/<errandId>/
+    customer`, `locations/customers/<id>`, `rider_watchers`) refused chat, the live rider pin and location sharing
+    until the app was restarted. Evidence: nginx shows `POST /api/customers/google-login 200` from okhttp at 12:29
+    CEST, then no `/api/auth/firebase-token` call from any phone all day (22 the day before). Server side healthy:
+    the 8 newest errands all have a correct `chat_access` entry; no write failures logged.
+  - **Fix**: `ensureRealtimeSession` now counts only a `customer_` uid as signed in (`hasCustomerIdentity`);
+    otherwise it mints, and `signInWithCustomToken` replaces the Google user. Password logins were never affected.
+    `src/__tests__/realtimeSession.test.ts` +2 (keeps an existing customer identity; replaces a Google one).
+    tsc clean; realtimeSession and CustomerChatScreen suites 17 pass.
+  - **Until the new APK**: a customer who signed in with Google gets chat back by fully closing and reopening the
+    app (the relaunch path mints the right identity), or by signing in with a password.
+
+* **Home tab "Stores near you" row, foodpanda style (2026-10-08, Claude, CustomerApp only, NOT SHIPPED: needs a new APK)**:
+  - **User request**: on the Home screen, beside the Merchant Categories bento, a horizontally scrolling row of store
+    establishments chosen by the ranking algorithm, laid out like foodpanda.
+  - **No server change**: the row is `GET /places/establishments` without `q`, so it is the same 4 stores, in the same
+    ranked order, as step 1's Location list (`lib/places/storeRanking.ts` on the server).
+  - **Files** (CustomerApp):
+    - NEW `src/components/NearbyStoresRow.tsx`: header "Stores near you" with an arrow to See all; cards (about 58%
+      of the column, max 220 px) with the owner's category photo or a category icon, an "Ordered before" chip,
+      name, category and distance in green (`colors.success`), address; a "See all stores" end card. Loading
+      shimmer, error with Try again, and empty with Search stores. The row runs to the screen edges.
+    - A card starts an order in one tap, like a category tile: `ErrandItems` with that store already picked.
+      See all opens `ErrandForm` with NEW param `initialMode: 'location'` (`navigation/types.ts`, ErrandFormScreen).
+    - `screens/portal/HomeTab.tsx`: the row sits between the category bento and Recent Activity.
+    - `services/establishments.ts`: opt-in 2-minute nearby cache (`maxAgeMs`, about 100 m keys), because HomeTab
+      remounts on every tab switch and each nearby fetch is a billed Google request. Step 1 does not opt in, and a
+      retry after an error always reaches the server. `storeDistanceLabel` moved here from EstablishmentPicker.
+    - `services/pabiliDraft.ts`: NEW `toPickedStores`, shared by step 1 and the row.
+  - **Tests**: NEW `NearbyStoresRow.test.tsx` (6: cards and green distance, one-tap order, See all, error and retry,
+    empty, cache); `HomeTab.test.tsx` mocks `useDefaultDeliveryLocation` (useFocusEffect throws outside a navigator)
+    and checks the section; `ErrandFormScreen.test.tsx` +1 (`initialMode`). Full suite 519 of 520 pass; the 4
+    failing suites failed before (RNGoogleSignin native module not mocked in 3, one SettingsScreen test).
+  - **Not verified on a device**: there is no Android emulator on this machine; layout is covered by jest only.
+
+* **Home "Stores near you": real shop photos, and moved above the categories (2026-10-08, Claude, SERVER DEPLOYED 20:27, rollback `server-20261008-202742`; CustomerApp NOT SHIPPED)**:
+  - **User request**: the cards show the establishment's actual photo; layout is Pabili banner, then "Stores near
+    you", then the Merchant Categories bento (real stores first).
+  - **Server**: `googlePlacesClient` field mask adds `places.photos` (same price tier as the fields already asked
+    for); `GooglePlace.photo` = first photo's name and author. `Establishment` gains `photoName` and
+    `photoAttribution` (null for Location Stores). NEW `src/lib/places/placePhotos.ts` `resolvePhotoUri` asks Google
+    (`/v1/<photo>/media?maxWidthPx=480&skipHttpRedirect=true`) with the server key, remembers the image address 30
+    min (max 500), accepts https only, never throws. NEW `GET /api/places/photo?name=` (signed-in CUSTOMER,
+    DISPATCHER, OWNER; NEW `placePhotoLimiter` 60/min; `placePhotoSchema` checks the name strictly before it reaches
+    a Google URL) redirects 302 to the image address, so the Places key never ships in the APK. Placed above
+    `/:id`; `placeRoutesAuth.test.ts` updated (10 routes, all behind authentication).
+  - **CustomerApp**: `storePhotoSource` (services/establishments.ts) builds the request with the customer's token;
+    OkHttp drops the Authorization header when it follows the redirect to Google's host. `NearbyStoresRow` cards
+    step down from the shop's photo to the category photo to the icon when one fails to load, credit the
+    photographer on the image ("Photo: <author>", Google requires it) and say "Places and photos from Google Maps"
+    under the row. `HomeTab`: the row moved between the Pabili banner and the bento, and the bento gained a
+    "Merchant Categories" heading (empty state text renamed to match).
+  - **Tests**: server NEW `placePhotos.test.ts` (5), `establishmentController.test.ts` +3, `establishments.test.ts`
+    +1; full suite 1273 pass, same 9 failing as before. App `NearbyStoresRow.test.tsx` +3 (photo source and credit,
+    fallback chain, Location Store), `HomeTab.test.tsx` checks the order; 522 of 523 pass, same 4 suites failing.
+  - **Live check**: 2 of the 4 nearest shops had a Google photo; one resolved to `lh3.googleusercontent.com`, a 76 KB
+    JPEG. Shops with no Google photo (common for small stores) show their category photo.
+
+* **Home store photos fixed; two labels removed (2026-10-08, Claude, SERVER DEPLOYED 20:57, rollback `server-20261008-205751`; CustomerApp NOT SHIPPED)**:
+  - **Report**: in the user's 20:34 APK, "Stores near you" showed category pictures, not the shops' photos.
+  - **Cause**: every `GET /api/places/photo` from the phone was a 401 with a 49-byte body, "Access token required":
+    the image request reached the server with no Authorization header (the image loader did not send the
+    `source.headers` the card set, or the token getter was empty). Each card then fell back to its category photo.
+  - **Fix, no header needed**: the photo route, `placePhotoLimiter` and `placePhotoSchema` are removed again. The Home
+    row now asks `GET /places/establishments?...&photos=1`; the server resolves each shown row's image address
+    (`placePhotos.resolvePhotoUris`, 2.5 s budget, 30-minute memory) and returns it as `photoUrl`, which loads from
+    `lh3.googleusercontent.com` with no key and no sign-in. Without `photos` (step 1) nothing is looked up. App:
+    `storePhotoSource` uses `photoUrl`; `useEstablishmentSearch(q, near, ready, { maxAgeMs, withPhotos })`; the
+    nearby cache key includes the photos flag. Live: 2 of the 4 nearest shops returned a Google image address.
+  - **Removed on request**: step 1's subtitle under "Where should we shop?" (both modes), and Home's "Places and photos
+    from Google Maps" line. Note for the record: Google's Places terms ask for a Google Maps attribution where Places
+    content is shown without a map; the per-photo "Photo: <author>" credit on each card remains.
+  - **Tests**: server place files 91 pass (placePhotos 7, establishments 28, controller 5, route auth back to 9
+    routes); app 522 of 523, same 4 suites failing as before.
+
+* **Home "Popular Stores" row and screen (2026-10-09, Claude, SERVER DEPLOYED 10:17, rollback `server-20261009-101724`; CustomerApp NOT SHIPPED)**:
+  - **User request**: a "Popular Stores" section on Home, ranked by Google Maps rating first, in the same layout as
+    "Stores near you", with a "See all popular stores" button opening a new screen of 6 stores.
+  - **Server**: `googlePlacesClient.searchPopularPlaces(centre)` = searchNearby, `rankPreference: POPULARITY`, 5 km
+    circle, 20 results, with `places.rating,places.userRatingCount` in its own field mask (ratings are a higher price
+    tier, so the nearby list and typed searches never ask for them). `GooglePlace.rating/ratingCount`.
+    `storeRanking.rankByRating`: stores with at least `MIN_RATINGS_TO_LEAD` (5) ratings first, highest stars first;
+    then fewer-rated; then unrated; ties by rating count, then Google's order. `establishmentService.popularEstablishments`
+    (6 = `POPULAR_LIMIT`; shares a new `finishRows` with the search: categories, ordered-before, photos for the rows
+    shown only). No Location Stores fallback: they have no ratings, so the app says the list is unavailable.
+    NEW `GET /api/places/establishments/popular?lat&lng&photos=1` (signed in, `establishmentSearchLimiter`), above `/:id`.
+  - **CustomerApp**: the card and row moved to NEW `components/stores/StoreCard.tsx` (photo fallback chain, credits,
+    NEW rating chip "4.9 (1.2k)" top right of the photo) and `components/stores/StoreCardRow.tsx`; `NearbyStoresRow`
+    is now a thin wrapper (test ids unchanged). NEW `PopularStoresRow` (4 cards + "See all popular stores" card;
+    empty state offers store search), NEW `hooks/usePopularStores.ts`, NEW `screens/PopularStoresScreen.tsx` (6
+    full-width cards, back, loading/error/empty), route `PopularStores` in `navigation/types.ts` and AppNavigator.
+    `fetchPopularEstablishments` shares the 2-minute cache, so the screen shows Home's answer without asking again.
+    Home order: Pabili, Stores near you, Popular Stores, Merchant Categories.
+  - **Tests**: server storeRanking 16, establishments 32, controller 7, route auth 24 (10 routes); full suite 1286
+    pass, same 9 failing. App NEW `PopularStores.test.tsx` (9), HomeTab order; 557 of 558 pass (SettingsScreen only).
+  - **Live check**: 6 rows near Poblacion, all rated with photos, best Decent Cup Coffee Shop 5.0 (14). All six were
+    cafes and restaurants: food places dominate Google's ratings in Tacurong.
+
+* **"Popular Stores" mixed: the best-rated store of each merchant category (2026-10-09, Claude, SERVER DEPLOYED 10:25, rollback `server-20261009-102324`; no app change)**:
+  - **User request**: after the first version came back as six cafes and restaurants, "mix it: best-rated store from
+    each merchant category".
+  - **Server**: `googlePlacesClient` NEW `KIND_SEARCH_TYPES` (vetted Table A types per kind of shop, matching
+    `establishmentCategory`'s kinds), `POPULAR_FOOD_TYPES`, `POPULAR_SHOP_TYPES`; `searchPopularPlaces(centre, types)`.
+    `storeRanking.bestRatedPerGroup(rows, groupOf, limit)`: the first row of each group in `rankByRating` order wins
+    (so the 5-ratings rule applies inside a category), unrated or ungrouped rows never win, winners best rated first.
+    `popularEstablishments`: two popularity searches (food, everything else), then one more per active category with
+    no rated shop among them, over the kinds that file under it (`categoryForGoogleTypes` on the kind's types); the
+    best of each category, 6 shown. Ratings are the dearest Places tier, so this is usually 2 requests, not 7.
+  - **Tests**: `storeRanking.test.ts` 19 (+3), `establishments.test.ts` popular block rewritten (one per category,
+    2 searches when covered and one extra per missing category, unrated never wins); place suites 83 pass.
+  - **Live check** near Poblacion, 3 Google searches: Rogelio's Bakery Cafe (Bakery 5.0/20), Decent Cup (Restaurant
+    5.0/14), 7-Eleven Roundball (Convenience 4.6/15), MR.DIY (Retail 4.5/8), Mercury Drug Buenaflor (Pharmacy 4.2/6),
+    Jollibee (Fast Food 4.1/539). The seventh category's winner rated lower and is left out of the six.
+
+* **Home account reminders, location spotlight, keyboard-safe Edit Account (2026-10-09, Claude, SERVER DEPLOYED 23:23, rollback `server-20261009-232324`; CustomerApp NOT SHIPPED)**:
+  - **User request**: Home reminders: "Your Mobile Number is not verified yet. Want to verify it?" with a Verify
+    button for manual sign-ups, "You did not provide your birthdate! Provide it now!" for Google sign-ups instead;
+    "You did not provide a mobile number. Provide immediately!" opening Edit Account at the mobile number; Edit
+    Account keyboard-safe; a new customer gets a focusing warning to set their location first.
+  - **Server**: `services/patterns/customerFactory.flattenCustomerAccount` adds `signUpMethod`: "password" when the
+    account has a password hash, else "google" (Google sign-ups are created with `passwordHash: null`; a manual
+    account keeps its password after Google is linked, so `googleId` alone cannot tell). The hash is still stripped.
+    NEW `tests/customerSignUpMethod.test.ts` (3). Only this file deployed: the server tree also holds another
+    session's unfinished Feedback feature (`feedbackRoutes/Service/Validators`, `routes/index.ts`, `env.ts`), left alone.
+  - **CustomerApp**:
+    - NEW `components/home/AccountReminder.tsx`: reads `GET /customers/:id` on mount and on each focus; one reminder,
+      most urgent first (`accountReminderFor`): no phone (everyone) > unverified phone (manual) > no birthdate
+      (Google); old servers fall back to `googleId`. Verify runs SMS verification right on Home and clears on success.
+    - NEW `services/phoneVerification.ts` `verifyPhoneBySms`: the portal verify-phone flow lifted out of
+      EditAccountScreen, which now uses it (token kept even if the server's confirmation fails, as before).
+    - NEW `components/home/LocationRequiredSpotlight.tsx`: a Modal dimming everything but the measured "Delivering
+      to" card (four scrim panels and a ring), "Set your delivery location first" with "Set my location"; no close,
+      Back does not skip it. `CustomerPortalScreen` gains `locationStatus` ('none' only when the load SUCCEEDED and
+      was empty; a failed load never locks anyone out) and focus/blur tracking, so the Modal does not sit on top of
+      Saved Locations. `HomeTab` prop `requireLocation`.
+    - `EditAccountScreen`: KeyboardAvoidingView + ScrollView replaced by `KeyboardAwareScrollView` (bottomOffset =
+      dock height minus inset) and the Save dock in `KeyboardStickyView` (opened offset = inset); route param
+      `focusField: 'phone' | 'birthdate'` focuses the number or opens the date picker with the field ringed.
+  - **Tests**: NEW `AccountReminder.test.tsx` (13); EditAccountScreen +3; HomeTab +1, and its category test now
+    answers by URL instead of `mockResolvedValueOnce` (Home's request order changed). App 574 of 575 (SettingsScreen
+    only, being edited by another session); server 1366 pass, same 9 failing.
+  - **Not verified on a device** (no emulator here): the keyboard behaviour and the spotlight's measured position.
+
+* **Deploy record: Antigravity's Customer Feedback server feature (2026-10-09 23:29, deployed by Claude on the user's instruction, rollback `server-20261009-232924`)**:
+  - **What shipped**: the six files listed in the server repo's AGENT_HANDSHAKE.md entry "Customer Feedback & Review
+    System Pipeline": `prisma/schema.prisma`, `src/config/env.ts`, `src/routes/index.ts`, NEW
+    `src/routes/feedbackRoutes.ts`, `src/services/feedbackService.ts`, `src/validators/feedbackValidators.ts`.
+    Production `src` now matches the local tree exactly.
+  - **Database**: `prisma migrate diff` against production first showed only `CREATE TABLE customer_feedbacks` and two
+    foreign keys on it (customer_accounts, users; ON DELETE SET NULL). Applied with `prisma db push` (no
+    `--accept-data-loss`). Rolling back fully also means dropping that table (noted in the backup's NOTES).
+  - **Checks**: health 200; `GET /api/feedback` without a token 401; `POST /api/feedback {}` 400 with the validator's
+    message; `customer_feedbacks` count 0; pm2 online.
+  - **Flagged, not changed**: `DEVELOPER_FEEDBACK_EMAIL` defaults to the user's personal Gmail address in source
+    (`env.ts`). The repos are public, so committing it publishes the address; setting it in the production `.env`
+    and dropping the default would keep it out of the repo. Staff list filters cast `status`/`category` without
+    checking them, so an unknown value is a 500 rather than a 400.
+
+* **In-App Update System & SysAdmin Release Management (2026-10-10, Antigravity 2.0, Gemini 3.8 Flash High)**:
+  - **User request**: Integrate the download section in `sugoonthego.online` into Customer App (`Sugo Express`) to catch the latest updates (version, features added, fixes, logs). Expand sysadmin uploading of release APK with dynamic line inputs for features added, fixes, and logs. Pre-fill with active release and display update alerts in both Settings and Account screen.
+  - **SysAdmin Portal (`c:\Capstone_Project_Web`)**:
+    - `src/types/sysAdmin.ts`: Expanded `AppReleaseInfo` & `AppReleaseUpdateInput` with `features?: string[]`, `fixes?: string[]`, `logs?: string[]`.
+    - `src/portals/sysadmin/modules/devops/AppReleasesTab.tsx`: Added 3 dedicated dynamic line editors for Features Added, Fixes & Stability, and Release Logs with Add/Remove buttons and counters. Pre-fills on load from the active release. Saves metadata alongside chunked APK uploads. `npx tsc --noEmit` verified clean.
+  - **Server Backend (`c:\Capstone_Server\server`)**:
+    - `src/services/appReleaseService.ts`: Added `features`, `fixes`, `logs` support with automatic `whatsNew` backward-compatibility synthesis.
+    - `src/controllers/appReleaseController.ts`: Ingests and saves release line items.
+    - `config/app-releases.json`: Persists structured items for customer and rider releases. `npx tsc --noEmit` verified clean.
+  - **Landing Page (`c:\Capstone_Landing_Page`)**:
+    - `src/components/AppDownloadGrid.tsx`: Renders structured Features and Fixes cards with graceful fallback to `whatsNew`. Build verified clean (`npm run build` in 1.34s).
+  - **Customer Mobile App (`c:\Capstone_Project_Mobile_App\CustomerApp`)**:
+    - NEW `src/services/appUpdateService.ts`: Strict semver comparator, runtime version check against `${API_BASE_URL}/api/app-releases/public`, offline caching via `AsyncStorage`, direct APK download manager launch (`Linking.openURL`), and mirror link to `sugoonthego.online/#download`.
+    - NEW `src/components/AppUpdatesModal.tsx`: High-fidelity `TrueNativeModal` with version progression hero, technical specs chips (file size, Android version, date), categorized Features / Fixes / Logs lists, and direct download CTA with spinner.
+    - `src/screens/AccountScreen.tsx`: Dismissible top notification banner leading to `AppUpdatesModal`.
+    - `src/screens/SettingsScreen.tsx`: "About & Operations" -> "Application Version" row with dynamic update badge.
+    - NEW `src/__tests__/appUpdateService.test.ts`: 9 tests covering semver comparisons, network checks, caching, and download handlers.
+    - Verification: `npx tsc --noEmit` 0 errors. Full Jest test suite 58 test suites passed, 615 tests passed.
+  - **Production Deployment (Contabo VPS 109.123.239.182 - 2026-10-10 ~14:31 +08)**:
+    - Server: Deployed to `/var/www/server`. Remote `tsc` clean, built, restarted pm2 `capstone-backend`. Health 200 (`/api/health`), `/api/app-releases/public` answers 200 with `features`/`fixes`/`logs`. Backup: `/root/deploy-backups/server-20261010-082702-app-releases`.
+    - Landing Page: Deployed via `scripts/deploy-landing.sh`. Synced to `/var/www/landing/dist/`. Live check: `https://sugoonthego.online` -> HTTP 200. Backup: `/root/deploy-backups/landing-20261010-142921`.
+    - Web Portal: Deployed via `scripts/deploy-web.sh`. Synced to `/var/www/web/dist/`. Live check: `https://portal.sugo-express.org` -> HTTP 200. Backup: `/root/deploy-backups/web-20261010-143124`.
+
+
+
+* **Popular Stores paging and sort, Home rows of 3, and the store search as step 1 (2026-10-10, Claude)**:
+  - **User request**: Popular Stores screen gets sort settings and loads more on scroll up to 20; Home's "Stores near
+    you" and "Popular Stores" show 3 cards, not 4; Home's "What would you like to buy?" heading and Pabili banner
+    become a Search button opening a NEW store search screen that replaces step 1 of Errand Details and goes to the
+    Shopping list once 1 to 3 stores are picked; the bottom bar's "+" opens that screen too.
+  - **Server** (deployed 2026-10-10 ~16:10 +08, backup `/root/deploy-backups/server-20261010-081000` (UTC stamp), 5 files,
+    no schema change):
+    - `GET /api/places/establishments/popular` takes `offset` (0-100), `limit` (1-20, default 6) and `sort`
+      (`recommended` default | `rating` | `distance` | `reviews`), and answers `{ items, google, total, hasMore }`.
+      Older apps send none of these and get the same first six as before.
+    - `establishmentService.popularEstablishments`: the set is the best-rated store of each merchant category, then
+      every other rated store with a category, best rated first, capped at `POPULAR_MAX = 20`; `sort` reorders that
+      same set (`lib/places/storeRanking.ts orderPopular`). Only the page's rows get categories, history and photos.
+      The Google searches behind the set are kept in memory for 2 minutes per ~100 m (`popularPlaces`), so paging
+      and re-sorting cost no new billed search (`clearPopularPool()` for tests).
+    - Live check: 20 stores, pages of 6/6/6/2, `hasMore` false on the last; later pages ~50 ms; Nearest sorts by
+      distance (297 m, 470 m, ...), Most reviews puts Jollibee (540) first. Health 200; no token 401.
+    - Tests: storeRanking +5, establishments +4 (pool cleared in beforeEach), establishmentController +2.
+      Full suite 1384 pass, the same 9 known failures.
+  - **CustomerApp** (not built; the user builds the APK):
+    - NEW `screens/StoreSearchScreen.tsx` (route `StoreSearch: { user }`): StepPills step 1 (StepPills now takes
+      1 | 2 | 3), EstablishmentPicker with new `autoFocus` prop, max 3 stores, a KeyboardStickyView Continue dock;
+      Continue opens `ErrandItems` with the picked stores, as Home's store cards do.
+    - Entry points moved from `ErrandForm` to `StoreSearch`: Home's new Search button (`home-store-search`), the
+      bottom bar's "+" (CustomerPortalScreen), NearbyStoresRow See all and empty action, PopularStoresRow and
+      PopularStoresScreen empty actions, ServiceListScreen Continue, WaitingForDispatcher's "Place a new errand".
+      `ErrandFormScreen` is unchanged and now reached only by My Errands' "Order again" (it carries categories).
+      **User's call (2026-10-10): keep every one of these on the new store search; do not route them back.**
+    - `HomeTab`: heading and "Pabili - Any Store" banner removed (with their now-unused imports and styles); the
+      empty-categories copy lost its em dash.
+    - Home rows: `maxCards` 3 for both (`NearbyStoresRow`, `PopularStoresRow`).
+    - `PopularStoresScreen`: sort row (Recommended, Top rated, Nearest, Most reviews) above a FlatList that loads
+      6 more at its end up to 20 (`usePopularStoresPages` in hooks/usePopularStores.ts); a failed page keeps the
+      cards and waits for Try again; an end note. `services/establishments.fetchPopularEstablishments` takes
+      offset/limit/sort; Recommended's first page shares Home's cached answer.
+    - Tests: NEW `StoreSearchScreen.test.tsx` (6); PopularStores +3 and updated; NearbyStoresRow +1; HomeTab and
+      ServiceListScreen updated. Full suite 59 suites, 632 tests, all pass. `tsc --noEmit` clean.
+  - **No `[LOCKED]` contract touched.** Nothing committed.
+
+* **"Order again" opens the store search with the past errand's stores picked (2026-10-10, Claude, on the user's "yes")**:
+  - `ErrandsTab.handleReorder` now opens `StoreSearch` with `reorderFrom: { errandId, stores }` instead of
+    `ErrandForm` with categories. The stores come from the errand's own stops (`pinpoints` in
+    `/customers/:id/transactions`: storeName, latitude, longitude, categoryId, placeId), so nothing is searched
+    again: `services/establishments.ts establishmentsFromStops` (skips stops with no name or spot, counts a shop
+    pinned twice once, keeps 3). A Location Store gets the server's `catalogue:<id>` key; any other stop is matched
+    to the nearby/search list by `isSameStore` (same name, within 60 m), which `EstablishmentPicker` now uses to
+    hide a picked shop from its results.
+  - `StoreSearchScreen`: opens with them picked and the keyboard down, a note ("The stores from your past order are
+    picked. Continue, or change them first."; or, when the order had no usable stops, "We couldn't find the stores
+    from that order. Search for them by name." with the keyboard up), and fills a missing category name from the
+    catalogue by id before Continue.
+  - **`ErrandFormScreen` is now unreachable**: no `navigate('ErrandForm')` remains in the app. Its route and tests
+    are left in place; delete them only when the user agrees.
+  - Tests: StoreSearchScreen +6 (12 in all). App 59 suites, 638 tests, all pass; `tsc --noEmit` clean. No server
+    change. Nothing committed.
+
+* **Home's merchant category tiles open the store search on that category's stores (2026-10-10, Claude)**:
+  - **User request**: tapping a Merchant Categories tile on Home opens the new store search screen listing every
+    store that belongs to that category.
+  - **Server** (deployed 2026-10-10 ~17:18 and ~17:21 +08; backups `server-20261010-091833-category-stores` and
+    `server-20261010-092148-cafe-kind`, UTC stamps; no schema change):
+    - `GET /api/places/establishments?categoryId=` (validator: positive whole number). `establishmentService.
+      categoryEstablishments`: Google searchNearby over that category's kinds of shop only (`googleTypesFor`, the
+      helper Popular Stores' gap-fill now shares), nearest first within `CATEGORY_RADIUS_METERS` 5 km; a typed `q`
+      inside a category is a text search. A Google shop is kept only if its own types file it under the category; a
+      category no Google kind maps to is text-searched by its name, keeping shops no other category claims. The
+      category's Location Stores are merged in; ranked like the plain list; `CATEGORY_LIMIT` 20. Unknown or inactive
+      category: empty list. `finishRows` no longer re-categorizes rows that already have a category (no model call).
+    - `searchNearbyPlaces(centre, includedTypes?, radiusMeters?)`, defaults unchanged.
+    - **Cafe kind**: production has a "Cafe" category (id 8) now, and Google's `cafe`/`coffee_shop` shops were filing
+      under Restaurant, so the Cafe list found 7 oddities. `establishmentCategory.ts` gains a `cafe` kind (keywords
+      cafe/coffee, falling through to restaurant/food where a site has no Cafe category), and `KIND_SEARCH_TYPES`
+      splits `cafe: ["cafe"]` from `restaurant` (`POPULAR_FOOD_TYPES` still sends the same five types). Effect beyond
+      this feature: a cafe a customer picks, and Popular Stores' winners, now carry Cafe (Decent Cup moved from
+      Restaurant to Cafe on Popular Stores).
+    - Live check, all 8 active categories near the city centre: Fast Food 19, Pharmacy 20, Supermarket & Grocery 20,
+      Retail 19, Bakery 20, Convenience 20, Restaurant 16, Cafe 20 (Baby Doll's 105 m, Sweet Aroma Blend Cafe 110 m...),
+      each nearest first; Pharmacy + "mercury" = the four Mercury Drug branches only. Health 200; no token 401.
+    - Tests: establishments +9, establishmentController +2. Suite 1394 pass, the same 9 known failures.
+  - **CustomerApp**:
+    - `HomeTab.handleSelectCategory` (bento tiles and the See More sheet) opens `StoreSearch` with
+      `category: { id, name }`, looked up by name in the loaded categories; without an id (offline fallback list),
+      the plain store search.
+    - `EstablishmentPicker`: `category`, `onClearCategory`, `onLetRiderPick` props; a category chip with an X to
+      search every store, "Pharmacy stores near you" / "Pharmacy stores matching ..." labels, placeholder "Search
+      Pharmacy stores". When the category list is empty: "No Pharmacy stores found near your saved location." and
+      "Let your rider pick a Pharmacy store", which opens the Shopping list in merchant mode, the tiles' old
+      behaviour, so "any store of this kind" is still possible.
+    - `StoreSearchScreen`: route param `category`; keyboard stays down when opened on a category.
+    - `services/establishments.searchEstablishments` and `useEstablishmentSearch` take `categoryId` (part of the
+      cache key).
+    - Tests: StoreSearchScreen +6, HomeTab updated. App 59 suites, 644 tests, all pass; `tsc --noEmit` clean.
+  - **No `[LOCKED]` contract touched.** Nothing committed.
+
+* **Google shop types now follow the owner's categories automatically (2026-10-10, Claude, on the user's instruction:
+  "when a newly added merchant [category] is added it will adapt our ML and AI automatically")**:
+  - **Why a code change was needed for "Cafe"**: the category model (ML sidecar) and its Gemini second opinion already
+    adapt on their own (retrain 30 s after any category edit, live category list in the prompt). But the store lists
+    (nearby, search, Popular Stores, category lists) file Google shops by Google's TYPE first, through a hand-written
+    table in `lib/places/establishmentCategory.ts` that only knew the built-in names, and only ask the model about
+    plain "store" shops. A new category the table did not know got no Google shops.
+  - **Now** (`categoryForGoogleTypes`): for each of a place's types, primary first, the live categories claim it
+    before the built-in table does: a category whose NAME holds the type's words ("Cafe" for `cafe`; "Pet Supplies"
+    for `pet_store`) or, next, whose DESCRIPTION does (production's Cafe: "coffee, tea" for `coffee_shop`,
+    `tea_house`). Plurals and accents are handled; Google's own synonyms are listed once (`TYPE_ALIASES`: cafe/coffee,
+    pharmacy/drugstore/botika, supermarket/grocery...); generic types (`store`, `food`, ...) never claim. A tie goes
+    to the shorter name, a true tie to the built-in kinds. The built-in kinds remain the fallback; the hand-written
+    `cafe` kind added earlier today is removed. `activeCategories()` now carries descriptions.
+  - **Category store lists** search every type that files under the category (`SEARCHABLE_TYPES`: the Pabili types
+    plus 29 Table A shop types, all accepted together by one live searchNearby; not `market`, which pulled flower
+    and vape shops into Supermarket & Grocery). A category no type names (e.g. "Pasalubong") is text-searched by its
+    name; a refused type search falls back to the same.
+  - **Production result** (live, near the city centre): unchanged for the built-in categories (tested type by type
+    against production's names and descriptions), and Cafe gets its 20 cafes from its own name and description.
+    Retail & General Merchandise now also lists pet, clothing, furniture... shops and Fast Food pizza places, the
+    kinds the built-in table already filed there. A category added later (Pet Supplies, Hardware, Milk Tea, Flowers
+    & Gifts in the tests) takes its shops from its first save.
+  - Deployed 2026-10-10 ~17:47 and ~17:49 +08, backups `server-20261010-094735-auto-category-claims` and
+    `server-20261010-094938-no-market-search` (UTC stamps). Tests: establishments +6 (51). Suite 1400 pass, the same
+    9 known failures. No app change; no schema change. Nothing committed.
+
+* **Home rows swapped; Find stores and Popular Stores pick up to 3 stores as photo cards (2026-10-10, Claude)**:
+  - **User request**: Home shows Popular Stores, then Stores near you; Find stores lists stores as photo cards like
+    the Popular Stores screen; the Popular Stores screen picks up to 3 stores (it started an order from one) with a
+    bottom button "Proceed with this store (n)"; Find stores loses "Where should we shop?" and "Pick up to 3".
+  - **CustomerApp only** (no server change: `/places/establishments` already answers `photos=1` for nearby, search
+    and category lists):
+    - `HomeTab`: `<PopularStoresRow>` now before `<NearbyStoresRow>`. **Antigravity was editing HomeTab at the same
+      time** (18:14 and 18:24: row-component comments already said "swapped", and the Search button moved into a
+      separate header block); its restructure kept the swap. HomeTab.test asserts search < popular < nearby <
+      Merchant Categories.
+    - `components/stores/StoreCard.tsx`: `selectable` / `selected` props (a plus or tick beside the name, a red
+      2 px border when picked, `accessibilityState.selected`, label ends "Tap to pick it" / "Picked. Tap to remove
+      it"); the "Ordered before" chip gets a testID.
+    - NEW `components/stores/ProceedDock.tsx`: hidden until a store is picked, then "Proceed with this store (1)" /
+      "Proceed with these stores (n)"; pads for the navigation bar itself.
+    - NEW `hooks/useStorePicks.ts`: the pick-up-to-3 logic both screens share (`MAX_PICKED_STORES` 3, the "Store
+      Limit (Max 3)" alert and an inline `limitError`); StoreSearchScreen's own copy and `MAX_STORES` removed.
+    - `EstablishmentPicker`: icon rows replaced by full-width StoreCards (140 px photo, testIDPrefix
+      `establishment`, so `establishment-<key>` ids are unchanged), card-shaped shimmer, asks with `withPhotos`, new
+      `categoryImages` prop. Each list on Find stores now costs a photo lookup per row shown (nearby 4, search up to
+      10, category up to 20), cached 30 min on the server.
+    - `StoreSearchScreen`: heading and "Pick up to 3" badge removed (step pills kept); `ProceedDock` in the
+      KeyboardStickyView replaces the always-visible Continue (`store-search-proceed`); reorder note says "Proceed".
+    - `PopularStoresScreen`: cards pick (`selectable`), picks survive a sort change, `ProceedDock`
+      (`popular-stores-proceed`) opens the Shopping list with them; limit error line under the sort row.
+  - Tests: StoreSearchScreen +1 and updated (19), PopularStores +1 and updated, HomeTab and ErrandFormScreen updated.
+    App 59 suites, 646 tests, all pass. `tsc --noEmit` clean for these files; it reports 2 errors in
+    `navigation/AppNavigator.tsx` (`NavigationBar.setBackgroundColorAsync` / `setPositionAsync` not in
+    expo-navigation-bar's types), which is Antigravity's in-progress edit, not this work. Nothing committed.
+
+* **Home's active errand card replaced by a liquid glass FAB and a NEW Active Errands screen (2026-10-10, Claude)**:
+  - **User request**: no active errand card at the top of Home; a liquid glass FAB instead, hidden when nothing is
+    active, opening a NEW screen of active errands only: one errand shows its Errand Details, two or more show as
+    liquid glass cards (errand ID as the heading, then the estimated fee and the status) with a ">" to the details.
+  - **CustomerApp only** (no server change; the screen reads `GET /customers/:id/transactions` like the portal):
+    - NEW `components/glass/LiquidGlass.tsx`: the bottom bar's glass recipe as a surface (expo-blur BlurView,
+      translucent tint, top specular sheen, slate rim with a bright top edge, deep shadow on an outer view so the
+      clip does not cut it). Real blur on Android only with `blurTarget` (a `BlurTargetView` ref, expo-blur's rule);
+      without one, tint and sheen only.
+    - NEW `components/home/ActiveErrandsFab.tsx`: 60 px glass circle with a Bike icon and a count badge, bottom
+      right above the floating bottom bar (`max(insets.bottom, 12) + 68 + 14`), renders nothing at count 0.
+    - `HomeTab`: the "1. ACTIVE ERRAND SECTION" (single card and carousel, 193 lines) and what only it used
+      (carousel state, `getStatusStep`, FlatList/Bike/Shadows/useRateConfig imports, 18 styles) removed; the
+      ScrollView is wrapped in a `BlurTargetView` the FAB blurs; FAB opens `ActiveErrands` with Home's active list.
+      Track Live and "See more..." from the old card: tracking stays on the Track tab, details through the FAB.
+    - NEW `screens/ActiveErrandsScreen.tsx` (route `ActiveErrands: { user, errands? }`): opens on Home's list, reads
+      again on mount and on returning from details; one active errand renders `ErrandDetailsScreen` inline (its back
+      button pops this screen); 2+ render glass cards over a `BlurTargetView` backdrop with two soft brand glows;
+      loading shimmer, error with Try again, empty with Back to Home, pull to refresh.
+    - NEW `utils/activeErrands.ts`: `ACTIVE_ERRAND_STATUSES` (AVAILABLE, PENDING, ASSIGNED, IN_TRANSIT),
+      `isActiveErrand`, `estimatedFeeOf` (grandTotal, else totalCost, else estimatedCost, else the base fee; zero
+      counts as unpriced, as the old card did), `pesos`.
+    - `jest.setup.js`: the expo-blur mock gains `BlurTargetView`.
+  - Tests: NEW `ActiveErrandsScreen.test.tsx` (9); HomeTab: the card test replaced by FAB present/absent tests.
+    App 60 suites, 656 tests, all pass; `tsc --noEmit` clean. Not seen on a device (no emulator). Nothing committed.
+
+* **Home: room between the sticky search bar and "Popular Stores" (2026-10-11, Claude)**: `HomeTab`
+  `categoriesSectionWrapper` gains `paddingTop: Spacing.lg` (18 px), so the gap under the search bar is 24 px (its
+  wrapper's 6 px plus 18) instead of 6 px. Only the resting gap changes; the stuck bar's height is untouched.
+  HomeTab tests pass, `tsc` clean. CustomerApp only, nothing to deploy, nothing committed.
+
+* **Home header: location button in place of Help "?"; the search bar floats (2026-10-11, Claude)**:
+  - **User request**: hide the header's "?" and put a location icon there, moving the "Delivering to" there too; the
+    search bar takes the card's place and floats, staying visible when Home is scrolled up under the header.
+  - **Why the search bar scrolled away**: `stickyHeaderIndices={[1]}` never applied. Home's sections sit in one
+    fragment, so the ScrollView had a single child and no index 1; the bar scrolled up under the header.
+  - **CustomerApp only** (no server change):
+    - NEW `components/home/HeaderLocationButton.tsx`: pin, "Delivering to", and the saved location's label (else its
+      address, else "Set address"), chevron; opens `CustomerLocation`. It now owns the new-customer
+      `LocationRequiredSpotlight` (measures itself; centred fallback after 1.2 s), so the ring lands on it.
+    - `CustomerPortalScreen`: header right group is HeaderLocationButton + NotificationBell; the Help button is gone
+      (the modal, its state and its Back handling are kept; Help is still reached from Account and the Chat tab);
+      HomeTab no longer gets `requireLocation`.
+    - `HomeTab`: the "Delivering to" card and the spotlight wiring removed (`requireLocation` prop dropped, 10 card
+      styles, MapPin/ChevronDown/useCallback imports); the search bar moved out of the ScrollView into an absolute
+      `floatingSearchSlot` (same bar and the same 0.95 strip, testIDs unchanged, touches pass through the strip);
+      ScrollView `paddingTop` = measured slot height + 8; `stickyHeaderIndices` removed;
+      `categoriesSectionWrapper.paddingTop` 18 -> 10 so "Popular Stores" still sits 24 px under the bar.
+  - Tests: NEW `HeaderLocationButton.test.tsx` (4, including the spotlight test moved from HomeTab); HomeTab: the
+    address and spotlight tests replaced by a floating-bar test; Antigravity's Dark/LightModeSubstrates tests pass
+    unchanged. App 63 suites, 679 tests, all pass; `tsc` clean. Not seen on a device. Nothing committed.
+
+* **Home's store rows open their own screens, a tapped store already picked; NEW "Stores near you" screen
+  (2026-10-11, Claude)**:
+  - **User request** (two inconsistencies): the "Stores near you" arrow opened Find stores instead of behaving like
+    Popular Stores' arrow; and tapping a store on either Home row jumped straight to step 2 (the Shopping list).
+    Fix: the arrow opens a screen like Popular Stores, and a tapped store opens its row's screen with it selected.
+  - **Server** (deployed 2026-10-11 ~10:25 +08, backup `server-20261011-022536-nearby-pages` (UTC stamp), 3 files,
+    no schema change): `GET /api/places/establishments` takes `offset` (0-100) and `limit` (1-20) for the nearby
+    list (no `q`): rows `offset..offset+limit` of the ranked list, at most `NEARBY_MAX` 20, with `hasMore`. Without
+    them it still answers Home's 4. Google's nearby answer is kept 2 minutes per ~100 m (`nearbyPlaces`, cleared by
+    `clearPopularPool` in tests), so the row and every page read one search. Typed and category searches unchanged.
+    Live: row 4 + pages 6/6/4 = 20 unique, `hasMore` false on the last, ~1 s for all four. Tests +5 (establishments
+    4, controller 1); suite 1405 pass, the same 9 known failures.
+  - **CustomerApp**:
+    - NEW `hooks/usePagedStores.ts`: the paging logic lifted out of `usePopularStoresPages` (first page may come from
+      Home's cache, then 6 at a time up to 20, `moreFailed` waits for Try again); `usePopularStoresPages` is now a
+      thin wrapper; NEW `hooks/useNearbyStoresPages.ts` (first page = the row's cached 4).
+    - NEW `components/stores/StorePickScreen.tsx`: the Popular Stores screen's body (header, shimmer/error/empty,
+      FlatList of selectable StoreCards, load-more footer, limit error, ProceedDock), parameterised by title,
+      testID prefix (`popular-stores` keeps every old id), copy, optional subheader and `initialPicks`.
+    - `PopularStoresScreen`: the sort row plus StorePickScreen; route param `selected` arrives picked.
+    - NEW `screens/NearbyStoresScreen.tsx` (route `NearbyStores: { user, selected? }`): StorePickScreen with no sort
+      row (the order is distance first by design).
+    - `PopularStoresRow` / `NearbyStoresRow`: a card opens `PopularStores` / `NearbyStores` with `selected`; the
+      nearby arrow and See all card open `NearbyStores` ("See all stores near you"); the nearby empty state still
+      offers Search stores. StoreCard/StoreCardRow gain `actionLabel` / `cardActionLabel` for the spoken label.
+    - Tests: NEW `NearbyStoresScreen.test.tsx` (4); PopularStores +1 and the row test updated; NearbyStoresRow
+      updated. App 64 suites, 684 tests, all pass; `tsc` clean. Nothing committed.
+
+* **CustomerApp palette: soft grey / soft charcoal pages instead of pure white / pure black (2026-10-11, Claude)**:
+  - **User request**: no #FFFFFF / #000000 grounds; something lighter, as foodpanda and Grab use.
+  - `config/theme.ts`: Light `bgApp` #FFFFFF -> #F6F7F8 (cards stay #FFFFFF, so they now stand on the page);
+    Dark `bgApp` #000000 -> #121212, `bgDark` -> #121212, `card`/`bgWhite` #121212 -> #1E1E1E, `bgGray` #1E1E1E ->
+    #2A2A2A, `border` #262626 -> #333333, `borderLight` #1A1A1A -> #262626. NEW token `bgAppTranslucent` (the page at
+    0.95) for see-through strips. Text tokens unchanged; textLight still clears 4.5:1 on both new grounds
+    (about 5:1 light, 6.6:1 on dark bgGray).
+  - Hard-coded pure black routed to the palette: `isDark ? '#000000' : colors.bgApp` in AccountScreen (2),
+    EditAccountScreen (2), AccountTab (1) is now `colors.bgApp`; the 0.95 black/white strips in HomeTab (search),
+    ProceedDock and EditAccountScreen (Save dock) are `colors.bgAppTranslucent`. Scrims and photo viewers keep black.
+  - Antigravity's Light/DarkModeSubstrates tests: the search strip's expected colour updated to the new values.
+    App 64 suites, 684 tests, all pass; `tsc` clean. CustomerApp only. Nothing committed.
+
+* **Light mode: plain header location button, Route icon for Track, liquid (not frosted) glass on the FAB and the
+  bottom bar (2026-10-11, Claude)**:
+  - `HeaderLocationButton`: light mode has no fill and no border (was pink #FFF5F7 / #FBD5DF), pin and chevron in
+    `textGray` (were primary). Dark mode unchanged.
+  - `BottomNav`: Track's icon is lucide `Route` (was `MapPin`, which now means "your location" in the header).
+  - `components/glass/LiquidGlass.tsx`: NEW `GlassClarity` ('frosted' default | 'liquid'), `GlassLayers` (blur,
+    tint, top sheen, and for liquid a bottom glow) and `glassRim`, shared by LiquidGlass and BottomNav. Liquid, light
+    mode only: blur 14 (was 40), tint white 0.22 with blur / 0.50 without (was 0.55 / 0.86), sheen white 0.85 over
+    the top 45%, a bottom glow to white 0.38, rim white 0.80 with a white top and a slate 0.12 bottom hairline,
+    shadow 0.12. Frosted (Active Errands cards) unchanged.
+  - `ActiveErrandsFab`: `clarity="liquid"`. `BottomNav` light: the capsule is transparent with the liquid rim, and
+    GlassLayers sit in an absolute clip inside it (`bottom-nav-glass`); NEW prop `blurTarget`.
+    `CustomerPortalScreen` wraps the tab content (`mainContent`) in a `BlurTargetView` and passes it, so the bar
+    really blurs on Android 12+ (nested with Home's own target for the FAB). Dark mode bar unchanged.
+  - Tests: DarkModeSubstrates' light capsule expectation now `transparent` plus the liquid tint; HeaderLocationButton
+    +1. App 64 suites, 685 tests, all pass; `tsc` clean. Not seen on a device. Nothing committed.
+
+* **Bottom bar legible over photos on light-mode liquid glass (2026-10-11, Claude)**: the user saw the tab icons and
+  labels vanish over store images under the clear glass. Causes: expo-blur divides Android intensity by
+  `blurReductionFactor` (4), so liquid glass at 14 blurred by ~3.5 and photos stayed sharp; and a 0.22 tint.
+  `GlassLayers` liquid: intensity 30 with `blurReductionFactor` 2 (~15 on Android), tint white 0.42 with blur / 0.78
+  without (rim, sheen and bottom glow unchanged; applies to the active errands FAB too). `BottomNav` light colours one
+  step darker: active #0F172A (was #1E293B), inactive #334155 (was #64748B), and labels get a white text halo.
+  DarkModeSubstrates' liquid tint expectation updated. App: 701 of 702 pass; the 1 failure is Navigation.test's
+  "renders initial route OnboardingLocation" (text "Allow location access for:"), another session's new onboarding
+  work (src/screens/onboarding, 13:26), not this change. `tsc` clean. Nothing committed.
+
+* **Figma Prototype (Designprototypecreation) Transaction Process Alignment (2026-10-12, Antigravity 2.0)**:
+  - **Adviser & Coordinator Alignment**: Aligned the running Figma prototype on `localhost:5173` (`/owner`, `/dispatcher`, `/rider`, `/customer`, `/`) with Capstone Attachment B transaction specification.
+  - `src/app/components/mockData.ts`: Added `declineLogs` (`DEC-001`), simulated pending multi-store errands `SGO-011` (Pabili: SM Supermarket & Mercury Drug) and `SGO-012`, rich dispatcher-customer and dispatcher-rider chat logs. Exported `getLiveErrands()` and `getLiveConflicts()` to dynamically combine static presets with `localStorage` mutations (`simulated_errands`, `completed_errands`, `prototype_conflicts`).
+  - `src/app/components/DispatcherPortal.tsx`: Restored `customers` and `history` nav items and titles. Brand text updated to "Sugo on the Go". Preserved queue persistence on refresh. Full 2-way reactive coordination (`requestOverviewSent`, `customerPaymentUnlock`, `riderAssignedGroup`). In `ConflictManagementSection`, added storage event listener for `prototype_conflicts`. In Errand Transaction (`history`), connected reactive `historyErrands` dynamically listing completed errands.
+  - `src/app/components/OwnerPortal.tsx`: Updated sidebar brand to "Sugo on the Go" and "OWNER PORTAL". Connected live reactive state (`liveErrands`, `liveConflicts`) across Dashboard KPIs, Recent Activity, Errands Section, all 6 Reports tabs (Sales, Rider Performance, Commission, Settlement, Transaction Summary, Conflicts), and GPS Tracking. Added "Account Security Logs" (`security`) module with `ShieldCheck` icon, active device sessions card grid, revocation actions, and access audit table, establishing 1:1 parity with the main web portal (`AccountSecurityLogsView`).
+  - `src/app/components/RiderPortal.tsx`: Updated brand to "Sugo on the Go". Fixed runtime `customerRider?.id` ReferenceError crash on decline. Logged decline reasons into `prototype_conflicts`. Relaxed `riderAssignedGroup` handler so dispatched errands show the 45s "New Task!" alert. In `advanceStatus`, auto-filled `collectedAmount` during COD demo and persisted delivered errand into `completed_errands`. Added 1-tap "Verify All (Demo)" button for `At Store` subtask photo uploads.
+  - `src/app/components/CustomerPortal.tsx`: Updated brand to "Sugo on the Go". Expanded `serviceTypes` to full suite (Pabili, Padala, Bills Payment). Added "Instant Pabili Request (1-Tap Demo)" action banner. Directly opened `setShowServiceReqModal(true)` from floating continue action. Fixed modal unmount in "Approve & Confirm Breakdown". Auto-triggered digital receipt and rating modals on `Delivered` status.
+  - `src/app/components/LoginPage.tsx`: Updated brand to "SUGO ON THE GO" and "TACURONG CITY LOGISTICS & FLEET MANAGEMENT". Added 4 one-tap demo role launcher buttons (`Owner`, `Dispatcher`, `Customer`, `Rider`).
+  - Empirical Verification: `npm run build` in `Designprototypecreation` succeeded with 0 errors (3,179 modules transformed, dist generated in 40.56s). Active Vite process PID 2104 running on `localhost:5173`.
+* **Figma Prototype (Designprototypecreation) 1:1 Layout & System Design Invariant (2026-10-12, Antigravity 2.0)**:
+  - **Identical UI Layout & Process Enforcement**: Refactored the prototype to eliminate visual discrepancies and generic AI card scaffolds, matching the exact layouts, typographic hierarchies, and state machines of `Capstone_Project_Web` and mobile apps.
+  - `src/app/components/OwnerPortal.tsx`:
+    - Eliminated the generic 2x3 `MetricCard` grid in favor of the authentic painted `StandingFigures` strip (`bg-[#0F2035]`, three readings divided by white hairline vertical rules: `Riders on duty`, `Errands pending`, `Errands active`).
+    - Added structured "This Period" section with `Today`, `Week`, `Month`, `Year` period tabs, tabular figures for Gross Revenue, SUGO Share (Commission & Surcharges), and Rider Share (Service Fees) with all-time completed errand footnote.
+    - Upgraded workspace header to the typography-first layout with `h1` screen title, subtitle, clock pill (`11:32 AM`), and notification bell matching `OwnerPanelShell.tsx`.
+  - `src/app/components/CustomerPortal.tsx`:
+    - Replaced fabricated 7-step tracker with the authentic 5-stage roadmap matching `CustomerApp/src/utils/errandProgress.ts` (`Errand Received by the Rider`, `Traveling to store`, `Items Purchased`, `In route to you`, `Delivered`).
+    - Re-indexed status listeners to the 5-stage array (`0` to `4`).
+* **Figma Prototype 1:1 System UI Copy & Crash Elimination (2026-10-13, Antigravity 2.0)**:
+  - **1:1 UI & System Design Alignment**: Copied the exact structure, layout, typography, and controls from `Capstone_Project_Web` (`src/portals/owner/` and `src/portals/dispatcher/`) into the prototype codebase.
+  - **Fatal Runtime Bug Fixes**:
+    - Fixed fatal `ReferenceError: openList is not defined` in `DispatcherPortal.tsx` by lifting conflict state to the root component.
+    - Fixed fatal `ReferenceError: endOfToday is not defined` in `OwnerPortal.tsx` by switching to `endOfDay(now)`.
+    - Resolved 17 TypeScript compiler errors (`ChatRole`, `ErrandType`, `UserAccount`, `MerchantCategory`, Leaflet module declarations).
+  - **Anti-AI-Slop Strict Hygiene**:
+    - Zero Emojis (Ban #7): Eliminated all star and decorative Unicode emojis (`⭐ ${viewRider.rating}` -> typographic `${viewRider.rating} / 5.0`).
+    - Zero Em Dashes (Ban #14): Sanitized 25+ occurrences of em dashes across `NotificationPanel.tsx`, `DispatcherPortal.tsx`, `OwnerPortal.tsx`, and `CustomerPortal.tsx`.
+  - **Empirical Verification**:
+    - Programmatic TypeScript compiler scan: 0 errors across all `.ts`/`.tsx` files.
+    - Full AST regex scan: 0 emojis, 0 em dashes found.
+    - `npm run build`: Exit code 0 (3,179 modules transformed in 12.16s).
+    - Live server PID 2104 running; all endpoints (`/`, `/owner`, `/dispatcher`, `/rider`, `/customer`) respond 200 OK.
+* **Figma Prototype Customer App 1-by-1 Full Screen Suite Replication (2026-10-13, Antigravity 2.0)**:
+  - **Full 24-Screen Replication**: Analyzed `c:\Capstone_Project_Mobile_App\CustomerApp\src\` and replicated all 24 screens into `src/app/components/customer/` with exact components, theme, and layouts.
+  - **Interactive 1-by-1 Matching Navigator**: Integrated top `[1/24]` quick selector bar with sequential `◀ Prev` / `Next ▶` steppers and full dropdown.
+  - **Empirical Verification**: `npx tsc --noEmit` 0 errors; `npm run build` exit code 0 (3,207 modules transformed in 20.80s).
+* **Figma Prototype Rider App 1-by-1 Full Screen Suite Replication (2026-10-13, Antigravity 2.0)**:
+  - **Full 30-Screen Replication**: Analyzed `c:\Capstone_Project_Mobile_App\RiderMobileApp\src\` and replicated all 30 screens into `src/app/components/rider/`:
+    1. `RiderSplashScreen.tsx`: Animated tactical boot sequence.
+    2. `RiderLoginScreen`: Auth hero, credential form.
+    3. `RiderOtpChallengeScreen`: 6-digit SMS verification.
+    4. `RiderRestrictedModalScreen`: Account restriction/suspension dialog.
+    5. `RiderLocationPermissionScreen`: Background GPS telemetry permission.
+    6. `RiderHomeScreen` (Online/On-Duty): Live stats, shift toggles.
+    7. `RiderHomeScreen` (Waiting): Standby radar screen.
+    8. `RiderHomeScreen` (Incoming Task Modal): 45-second countdown accept/decline.
+    9. `RiderHomeScreen` (Decline Reason): Reason picker & conflict dispatch.
+    10. `RiderTaskMapScreens` (Traveling): Single active leg GPS map to store.
+    11. `RiderQueueSwitcherScreen`: Batched multi-errand queue switcher.
+    12. `RiderTaskAtStoreScreen`: Checklist, subtask verification, Slide-to-Confirm.
+    13. `ReceiptCameraViewScreen`: Camera viewfinder simulation with guide box.
+    14. `ReceiptOcrScanScreen`: Real-time OCR receipt total extractor.
+    15. `ReceiptConfirmScreen`: OCR itemization verification & price adjust.
+    16. `NoReceiptCaptureScreen`: Handwritten store receipt proof.
+    17. `RiderTaskMapScreens` (Delivering): Blue-line delivery navigation to customer.
+    18. `HalfPaymentSettledModalScreen`: Partial payment confirmation.
+    19. `PaymentProofViewerScreen`: Customer GCash reference viewer.
+    20. `CashCollectionDrawerScreen`: COD cash entry & change calculator.
+    21. `HandoverPhotoScreen`: Doorstep handover proof photo.
+    22. `TaskCompletedCardScreen`: Errand delivered earnings breakdown card.
+    23. `RiderWaybillModalScreen`: Digital waybill with items and customer info.
+    24. `RiderDispatcherChatScreen`: Dispatcher chat messages & quick replies.
+    25. `RiderHistoryListScreen`: Today, this week, and all-time completed list.
+    26. `RiderErrandDetailsScreen`: Past errand itemized audit view.
+    27. `RiderProfileScreen`: Rider credentials, vehicle specs, rating.
+    28. `RiderEditProfileScreen`: Phone & emergency contact editor.
+    29. `RiderGpsCalibrationScreen`: GPS accuracy test & geofence diagnostic.
+    30. `RiderHomeScreen` (Offline): Shift off standby state.
+  - **1-by-1 Matching Navigator**: Top `[1/30]` quick selector bar with sequential `◀ Prev` / `Next ▶` steppers, Day/Night shift theme switcher (`Sun`/`Moon`), and exit to prototype hub.
+  - **Empirical Verification**: `npx tsc --noEmit` 0 errors; `npm run build` exit code 0 (3,222 modules transformed in 14.23s). Live server serves `/rider` with HTTP 200.
+* **Figma Prototype Dispatcher Portal 1-by-1 Full Screen Suite Replication (2026-10-13, Antigravity 2.0)**:
+  - **Full 33-View Replication**: Analyzed `c:\Capstone_Project_Web\src\portals\dispatcher\` and replicated all 33 views into `src/app/components/dispatcher/`:
+    - Dispatcher Management (Queue Overview, Claimed Errand Inspect, Order Breakdown Verification, Rider Assignment Modal, Fee Breakdown Review Modal, Decline Order Modal).
+    - Order Chat & Verification (Stage 1 Item Verification, Stage 2 Assignment, Stage 3 Payment Unlock, Live Customer Chat).
+    - Active Errands Monitoring (Active All, Heading to Store, At Merchant, Out for Delivery, Customer Delivery Map Pin).
+    - Help Desk & Conflict Management (Help Desk Queue, Exp-101 Declined Task, Exp-102 Price Discrepancy, Resolution Drawer Overlay).
+    - Fleet & GPS Telemetry (Fleet Map, Rider Focus, Telemetry Hardware Inspector Sheet, Direct Radio Ping).
+    - Communications (Rider Radio Dispatch, Customer Chat List, Live Customer Transcript).
+    - Errand Transactions History (Transaction Summary Table, Full Errand Receipt & Stops Audit).
+    - Profile, Settings & Audio (Profile Overview, Audio Bell Settings, Security Sessions Audit, Sign Out Modal).
+  - **Interactive 1-by-1 Matching Navigator**: Top `[1/33]` quick selector bar with sequential `◀ Prev` / `Next ▶` steppers, full category dropdown, and exit button.
+  - **Empirical Verification**: `npx tsc --noEmit` 0 errors; `npm run build` exit code 0 (3,235 modules transformed in 12.80s). Live server serves `/dispatcher` with HTTP 200.
+* **Figma Prototype Owner Portal 1-by-1 Full Screen Suite Replication (2026-10-13, Antigravity 2.0)**:
+  - **Full 41-Screen Replication**: Analyzed `c:\Capstone_Project_Web\src\portals\owner\` and replicated all 41 views and modals into `src/app/components/owner/`:
+    - Executive Dashboard (#1 Dashboard Overview, #2 Today Period, #3 Week Period, #4 Month Period, #5 Year Period).
+    - Errand Records & Master Ledger (#6 Master Table, #7 Paid Filter, #8 Pending Filter, #9 Delivered Filter, #10 Inspector Modal, #11 Export CSV Modal).
+    - User Management (#12 Master Users, #13 Add/Edit User Modal, #14 Status Confirm Modal).
+    - Rider Fleet Management (#15 Master Fleet, #16 Rider Inspector Modal, #17 Shift Toggle Modal).
+    - Merchant Categories & Directory (#18 Category Directory, #19 Places Directory, #20 Active Filter, #21 Inactive Filter, #22 Archived Directory, #23 Category Filtered Places, #24 Category Modal, #25 Place Modal).
+    - Dynamic Service Rates Engine (#26 Rates View, #27 Rates Edit, #28 Confirm Rates Modal).
+    - Executive Reports & Analytics (#29 Sales Report, #30 Rider Performance, #31 Commission Report, #32 Settlement Report, #33 Errand Transactions Summary, #34 Conflict Resolution Analysis, #35 Digital Report Review Modal).
+    - Live GPS Fleet Tracking (#36 Leaflet Live Tracking, Active Filter, On Errand Filter, Offline Filter).
+    - Account Security Logs (#37 Security Sessions, #38 Login Audit Trail, #39 Revoke Session Modal).
+    - Platform Settings & Exit (#40 Settings, #41 Sign Out Modal).
+  - **Interactive 1-by-1 Matching Navigator**: Top `[1/41]` quick selector bar with sequential `◀ Prev` / `Next ▶` steppers, full category dropdown, and exit button.
+  - **Empirical Verification**: `npx tsc --noEmit` 0 errors; `npm run build` exit code 0 (2,348 modules transformed in 13.18s). Live server serves all 5 endpoints (`/`, `/owner`, `/dispatcher`, `/rider`, `/customer`) with HTTP 200 OK.
+* **Full Prototype Error Audit, Surgical Remediation & Soundness Invariant (2026-10-13, Antigravity 2.0)**:
+  - **Identified & Remediated 6 Specific Defects**:
+    1. `RiderTaskAtStoreScreen.tsx`: Added `onOpenPaymentProof` to destructured props list (eliminated runtime `ReferenceError`).
+    2. `ErrandsTabScreen.tsx`: Added missing `Star` import from `lucide-react` (eliminated runtime `ReferenceError`).
+    3. `DispatcherManagementView.tsx`: Added missing `ClipboardList` import from `lucide-react` (eliminated empty state `ReferenceError`).
+    4. `OwnerDashboardView.tsx`: Wrapped `onNavigateToReports("sales")` in arrow function to avoid passing `MouseEvent` into tab state.
+    5. `types.ts` & `OwnerModals.tsx` & `OwnerPortal.tsx`: Aligned `MerchantCategoryRecord` (`code`, `handlingFeeMode`, `storeCount`, `createdAt`) and `MerchantPlaceRecord` (`rating: data.rating ?? 4.8`).
+    6. `CustomerPortal.tsx`: Provided fallback store in Screen #12 (`store-editor`) to eliminate blank canvas edge-case.
+    7. `OwnerModals.tsx`: Sanitized 3 numeric en dashes (`–`) to standard hyphens (`-`).
+    8. Created dedicated `Designprototypecreation/tsconfig.json` with `"skipLibCheck": true` resolving the silent pass trap.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit`: 0 diagnostics, exited code 0 across all 138 prototype source files.
+    - `npm run build`: Exit code 0 (2,348 modules transformed in 10.45s).
+    - Live server PID 2104 running; all 5 endpoints (`/`, `/owner`, `/dispatcher`, `/rider`, `/customer`) respond 200 OK.
+* **Defensive Numeric Hardening (.toLocaleString / .toFixed) + Anti-Slop Route Error Boundary (2026-10-13, Antigravity 2.0)**:
+  - **Root Cause Identified**: Fixed `TypeError: Cannot read properties of undefined (reading 'toLocaleString')` triggered when `localStorage` errands lacked standard `amount`/`serviceFee` properties or contained corrupted/null elements.
+  - **Surgical Remediations Delivered**:
+    1. `mockOwnerData.ts`: Defensive JSON parsing and object-filtering in `getLiveOwnerErrands()`, guaranteeing numeric properties are sanitized (`isNaN` guarded) and never undefined.
+    2. `OwnerDashboardView.tsx`: Filtered `safeErrands` and `safeRiders` for non-objects, guarded table mapping loops, and wrapped every `.toLocaleString()` in `Number(x || 0).toLocaleString()`.
+    3. `ErrandRecordsView.tsx`: Guarded `safeErrands` against non-objects; protected table rows with optional chaining and fallback keys.
+    4. `ReportsModuleView.tsx`: Protected `safeRiders` and `safeErrands`, guarded trips calculation, and protected `.toFixed(2)` and `.toLocaleString()` calls across commission and settlement reports.
+    5. `ServiceRatesView.tsx`: Replaced unshielded `.toFixed()` on `baseFee`, `baseDistanceKm`, `distanceRate`, `multiStoreFee`, and `.toLocaleString()` on thresholds with defensive `Number(x ?? 0)` expressions.
+    6. `OwnerModals.tsx`: Guarded rate delta calculations in `RatesConfirmModal` against undefined properties before calling `.toFixed(2)`.
+    7. `UserManagementView.tsx`, `RiderManagementView.tsx`, `LiveRiderTrackingView.tsx`, `MerchantCategoriesView.tsx`, `AccountSecurityLogsView.tsx`: Added `safeUsers`, `safeRiders`, `safeCategories`, `safePlaces`, `safeSessions`, `safeLogs` array sanitization and optional chaining on string operations (`toLowerCase()`, `includes()`).
+    8. `DispatcherManagementView.tsx` & `ErrandTransactionHistoryView.tsx`: Guarded `totalCost.toFixed(2)` and fee calculations.
+    9. `CustomerModals.tsx`, `ErrandsTabScreen.tsx`, `ChatTabScreen.tsx`, `ErrandDetailsScreen.tsx`, `RiderTaskDeliveryScreens.tsx`, `RiderQueueAndProofScreens.tsx`: Guarded grand totals, delivery fees, balance due, and proof payments.
+    10. `RouteErrorBoundary.tsx` & `routes.ts`: Refactored `RouteErrorBoundary` to comply with Anti-AI-slop flat design surface purity (pure solid flat navy `#0F2035`, zero blurred drop shadows, brand SUGO red `#DC2626`, WCAG AA contrast, Try Again & Back to Home CTAs). Added wildcard catch-all route `{ path: "*", Component: RouteErrorBoundary, ErrorBoundary: RouteErrorBoundary }` in `routes.ts`.
+  - **Empirical Verification**:
+    - `npx tsc --noEmit`: 0 diagnostics, clean exit code 0.
+    - `npm run build`: Vite bundled 2,349 modules cleanly with exit code 0.
+
+
+
+
+
+
+### Google Places kept inside the free tier (2026-10-13, Claude)
+- **Why:** Places API (New) billed USD 23.88 by 2026-10-13. Every search asked for opening hours, which bills the Enterprise tier (1,000 free a month) instead of Pro (5,000); Popular Stores fanned out one Enterprise search per category; typed searches and category lists were not cached; photo addresses were kept 30 minutes.
+- **Server (`C:\Capstone_Server\server`, deployed, backup `/root/deploy-backups/server-20261013-092143-places-budget`):**
+  - NEW `src/lib/places/placesBudget.ts`: counts every Places request per SKU and billing month (Pacific time) in `var/places-usage.json` (gitignored), and refuses one past 90% of the free allowance built up so far that month. A refusal answers null, so lists fall back as when Google is down.
+  - `googlePlacesClient.ts`: nearby, typed and category searches use the Pro field mask (no opening hours, no ratings). Only `searchPopularPlaces` asks for ratings and hours (adds `nextCloseTime`), and falls back to Pro when the Enterprise allowance is used. New `googleOpenNowAt(place, now)` turns a cached open-now at Google's next opening or closing time.
+  - `placePhotos.ts`: each lookup spends the `photo` SKU; image addresses kept 6 hours.
+  - `establishmentService.ts`: popular kept 1 hour on a ~1 km grid; nearby, typed (per word, 3 letters minimum for Google) and category lists kept 30 minutes; gap-fill searches are Pro (no ratings); popular and popular-by-category list Google's popularity order when no rating could be paid for.
+  - October 2026 seeded as used up for `nearbyEnterprise`, `textEnterprise` and `photo`, so for the rest of October Popular shows no star ratings and cards show category pictures. The counts reset on 1 November (Pacific). To lift the pause early, delete `var/places-usage.json` on the VPS and restart (that will bill).
+- **Do not** add opening hours or ratings to `FIELD_MASK`, or call Google outside `post()` / `resolvePhotoUri()`: either bypasses the ceiling or moves every search back to the Enterprise tier.
+
+### Location Stores: Google Maps places, opening hours, storefront photos, duplicate checks (2026-10-13, Claude)
+- **Touches a `[LOCKED]` contract** (Prisma schema), additive only, on the user's direct instruction ("put image on that store", "schedule of opening/closing", "valid into the google maps"): `verified_places` + `googlePlaceId` (VARCHAR 255, UNIQUE, nullable), `openingHours` (JSON), `photoUpdatedAt`; NEW table `verified_place_photo` (placeId PK/FK cascade, MEDIUMBLOB). Applied with `prisma db push` (SQL previewed first: 3 ADD COLUMN, 1 CREATE TABLE, 1 unique index, 1 FK; nothing dropped).
+- **Rules (server, `services/placeService.ts`):** a new store needs `googlePlaceId`; the server confirms it with Google Place Details (`lib/places/googlePlaceConfirm.ts`, kept 30 min) and refuses a pin more than `PIN_MAX_FROM_GOOGLE_METERS` (100) from Google's position. An unlinked pre-2026-10-13 row can be retired or edited while retired, nothing else. Duplicates (`lib/places/placeDuplicates.ts`): the same Google place is always 409; the same name, or a related name within 40 m, is 409 `canConfirm: true` until the owner sends `confirmDuplicate`.
+- **New routes (`routes/placeRoutes.ts`):** `GET /places/google?q=|categoryId=` and `GET /places/google/:googlePlaceId` (OWNER, establishment limiter, billed Pro/Enterprise and counted by `placesBudget.ts`), `GET /places/duplicates` (OWNER/DISPATCHER), `PUT|DELETE /places/:id/photo` (OWNER), and `GET /places/:id/photo` with **no auth on purpose** (the app's image loader sends none; CORP cross-origin; `?v=` versioned, immutable cache).
+- **Customer lists (`establishmentService.finishRows`):** a row that is a Location Store (by id, or by the Google place the owner registered) takes the store's id, the owner's photo (`https://<api>/api/places/:id/photo?v=`, never a billed Google photo) and the owner's hours (`lib/places/storeHours.ts` isOpenByHours / nextOpeningNotice, Manila time). Controllers pass `photoOrigin` (https unless a local host).
+- **Data:** `src/scripts/linkLocationStoresToGoogle.ts --apply` linked 26 of 37 rows in production and moved their pins to Google's (most 0 to 12 m; guessed rows Rose Pharmacy 229 m, Public Market 565 m). Unmatched: Arabian Spice Restaurant and Le Gre Cakeshop (both ACTIVE; Google lists "Le Gree"), plus 9 retired rows. Not linked as duplicates: Jollibee Tacurong Center (Main), Jollibee Tacurong Drive-Thru (DT), Tacurong Fitmart.
+- **Web (`PlacesTab.tsx`, deployed, backup `/root/deploy-backups/web-20261013-181913`):** NEW `GooglePlaceFinder.tsx`, `WeeklyHoursEditor.tsx`, `StorePhotoField.tsx`, `utils/storeHours.ts`, `utils/storePhoto.ts`. The form starts from a Google Maps search; coordinates are read-only (Google plus a drag inside the 100 m ring); photo uploads after the save; duplicate and unlinked banners over the list; table shows photo, hours, Google link.
+- **Server deploy backup:** `/root/deploy-backups/server-20261013-101558-location-stores`. Tests: `tests/locationStores.test.ts` (17) plus updated `establishments`, `establishmentController`, `placeRoutesAuth`, `categoryRename`; full suite 1501+ pass, the 9 known unrelated failures unchanged. Nothing committed.
+- **Follow-up (2026-10-13):** on the user's instruction, restored `Jollibee`, `Jollibee Tacurong DT` and `FitMart Tacurong` (all Google-linked) through `placeService.updatePlace({ isActive: true })` on the VPS. Their unlinked duplicates (`Jollibee Tacurong Center (Main)`, `Jollibee Tacurong Drive-Thru (DT)`, `Tacurong Fitmart`) stay retired. `getDuplicateGroups()` returns none.
+- **Fix (2026-10-13):** saving FitMart Tacurong's hours answered 409 twice (nginx 12:36). `placeService.updatePlace` read the form's six-decimal pin as a move (exact float compare) and then matched the retired "Tacurong Fitmart". Now a move is over 1 m, and an edit's name/nearby duplicate check ignores retired rows (the same Google place still counts). `PlacesTab` mirrors this and shows the refusal beside Save, not only at the top of the scrolled form. Tests +2 in `locationStores.test.ts`. Server backup `server-20261013-103943-hours-save-fix`, web backup `web-20261013-184110`.
+
+### Location Stores Google Maps does not list: the owner pins them (2026-10-13, Claude)
+- **User request:** "/places shall can add a places that isn't visible in the Google Maps but existing in the Tacurong city." **Touches `[LOCKED]` Prisma schema**, additive, on that instruction: `verified_places.ownerPinned BOOLEAN NOT NULL DEFAULT false` (SQL previewed: one ADD COLUMN).
+- **Server (`placeService`):** create takes `googlePlaceId` OR `ownerPinned: true`. `checkOwnerPin`: `storeLocationGuard.checkStoreLocation` must not be `blocked` (inside Tacurong, within 1 km of a road); then one Pro text search: a related-name Google shop within `OWNER_PIN_GOOGLE_MATCH_METERS` (150) answers 409 `{ reason: "on_google", googleMatch, canConfirm: true }` until `confirmDuplicate`. A Google outage never blocks it. Update: an unlinked active row needs `ownerPinned`; linking to Google sets `ownerPinned` false; the Google question runs when a row becomes owner-pinned or is renamed, the place check on every move.
+- **Customer lists:** `searchEstablishments` with no query now merges the owner's active Location Stores within `NEARBY_CATALOGUE_METERS` (3000) into Google's nearby shops, so a store Google does not list appears in "Stores near you" (it already did in typed searches and category lists).
+- **Web (`PlacesTab`):** "Not on Google Maps? Pin the store on the map yourself" under the finder; the save needs a pin the owner clicked or dragged (`pinTouched`) unless the store was already owner-pinned; status "Pinned by owner"; the unlinked banner excludes owner pins. Harness-checked (toggle, untouched-pin refusal, click, confirm, payload `ownerPinned: true`).
+- **Deploys:** server backup `server-20261013-110800-owner-pinned`, web deployed after. Tests: `locationStores.test.ts` +7, `establishments.test.ts` +1; suite 1513 pass, the 9 known unrelated failures. Nothing committed.
+
+### Archive: restore unlinked stores, and Restore selected (2026-10-13, Claude)
+- **Bug:** the Archive's Restore (`PUT /places/:id { isActive: true }`) was refused for a store with no Google Maps link ("Link this store to its Google Maps place first...").
+- **Server:** `placeService.updatePlace` hands a pure `{ isActive: true }` on a retired row to NEW `restorePlace(id)`: a linked or owner-pinned store just comes back; an unlinked one is matched on the way (NEW `lib/places/googlePlaceMatch.ts matchGooglePlace`, the link script's rule: related name within 400 m or the only related answer, place not already taken) and linked with Google's pin, else restored unlinked (`linked: false`). NEW `POST /places/restore { ids }` (OWNER, `placeRestoreSchema`, up to 200) returns `{ id, name, restored, linked, error }` per store. `scripts/linkLocationStoresToGoogle.ts` now uses the shared matcher. Tests +4 (`locationStores.test.ts`), route count 16.
+- **Web (`ArchiveTab.tsx`):** a checkbox per retired store, a Select all checkbox (indeterminate when partly ticked), "Restore selected (n)"; a notice names any store that came back without a Google Maps link, kept on screen even when the Archive empties. Harness-checked.
+- **Deploys:** server backup `server-20261013-112246-archive-restore`, web backup `web-20261013-192521`. Suite 1519 pass, the 9 known unrelated failures. Nothing committed.
+- **Data (2026-10-13, user's instruction "delete the three duplicate stores permanently"):** deleted the retired, unlinked duplicates `Jollibee Tacurong Center (Main)`, `Jollibee Tacurong Drive-Thru (DT)` and `Tacurong Fitmart` through `placeService.deletePlace` on the VPS. None had errand pins, observations, crawled items or a photo. Rows saved first to `/root/deploy-backups/data-20261013-120931-duplicate-stores/verified_places.json`. `getDuplicateGroups()` returns none.
+
+### Prototype Alignment & Anti-AI-Slop Clean (2026-10-14, Antigravity 2.0)
+- **User Mandates Addressed**:
+  1. **Order Chat Modal (`OrderChatScreenView.tsx`)**: Reorganized stepper: Step 1 (Store Items) -> Step 2 (Payment Ledger) -> Step 3 (Rider Assignment). In Step 1, rendered Tacurong City route visual map + store list with item names and quantities (zero catalog prices).
+  2. **Itemized Order Checklist (`DispatcherManagementView.tsx`)**: Removed all item unit prices and subtotals (items show name + `{item.quantity}x` badge only). Replaced estimated goods in fee computation with notice that item costs settle against the physical store receipt uploaded by the rider.
+  3. **Rider Communications (`RiderMessagesView.tsx`)**: Removed the fabricated "Simulate Call" button.
+  4. **Header Scoping (`DispatcherPortal.tsx`)**: Scoped `<DispatcherHeader />` exclusively to `activeTab === "queue"`.
+  5. **Surface Purity & Light Theme**: Converted Dispatcher Portal screens and modals (`OrderChatScreenView`, `DispatcherManagementView`, `ActiveErrandsView`, `HelpDeskView`, `CustomerChatView`, `FleetTrackingView`, `ErrandTransactionHistoryView`, `ProfileSettingsView`, `DispatcherModals`) from dark navy to clean white light theme (`bg-white`, `bg-slate-50`, `border-slate-200`, `text-slate-900`).
+  6. **Customer App Clean-up**: Removed "Profile Complete Reminder", removed floating "Active Errand (2)" pill, and removed all star ratings and fabricated "20-30 mins" / "12 mins" ETA chips across `HomeTabScreen`, `CustomerBottomNav`, `ActiveErrandsScreen`, `ErrandDetailsScreen`, `ErrandsTabScreen`, `MerchantCategoryStoresScreen`, `NearbyStoresScreen`, `PopularStoresScreen`, `StoreSearchScreen`, and `TrackTabScreen`.
+- **Empirical Verification**:
+  - `npx tsc --noEmit` in `Designprototypecreation` passed with 0 errors.
+  - `npm run build` succeeded with exit code 0 (`dist/assets/index-*.js` bundled).
+  - All routes (`/dispatcher`, `/customer`, `/rider`, `/owner`) live and verified with HTTP 200 OK on `localhost:5173`.
+
+### Help Desk: one row per errand and kind (2026-10-15, Claude)
+- **Bug (latent):** `ExceptionQueuePanel` keyed rows `${errandId}:${kind}`, but the server raises several of a kind per errand (one UNVERIFIED_PURCHASE per receiptless proof, WRONG_BRANCH / MISSING_RECEIPT per stop, RECEIPT_DIVERGENCE per receipt, STALLED_STOP per dwell). Duplicate React keys; "Resolve" opened every sibling's form; one shared draft; and since `ExceptionReview` has no proof or stop id, clearing one silently cleared all.
+- **Fix, no schema change (`[LOCKED]` untouched):** `hooks/useOpenExceptions.ts` NEW `groupExceptions` / `ExceptionGroup`: one row per errand and kind, amounts summed, re-ranked by the server's rule on the sums; `openCount` now counts rows so the sidebar badge matches the list. `ExceptionQueuePanel`: a group shows "N on this errand", every detail line with its own time, "At risk, all", "Resolve all N"; the form says the reason clears all N and that a suggestion describes only the first; the resolve sends the summed amount. Also fixed: in dev StrictMode the form's `mounted` ref stayed false after the double mount, so every suggestion was discarded.
+- **Owner report (`ExceptionReportView`)**: keys include the index and it has no per-row state; no collision. Siblings both show "Cleared by" with the one reason, which is true.
+- **Server (same date, see server handshake):** OVERAGE_PENDING and UNPAID_BALANCE are now clearable (their "Resolve" answered 400).
+- **Verified:** `tsc --noEmit` 0 errors; harness page (deleted after): 7 exceptions to 4 rows, unique keys, badge 4, one form open at a time, drafts kept per row, suggestion asked for the first member, one resolve call with the ₱200 sum, 375 px no overflow.
+- **Deployed 2026-10-15 ~05:18 +08 (server first), NOT committed.** Before building: live `index.html` and local `dist/index.html` matched (entry `index-BRGm5DLw.js`, built 2026-10-13 19:26 +08), and the only files newer than it were `useOpenExceptions.ts` and `ExceptionQueuePanel.tsx`, so nobody else's work shipped. `scripts/deploy-web.sh`: HTTP 200, every chunk resolves; entry now `index-BaSfQqdj.js`, which loads `DispatcherPortal-m4bTtZ07.js`, the only chunk with "Resolve all", "This reason clears all" and "At risk, all". Rollback: `/root/deploy-backups/web-20261015-051755`.
+- **Fixed server-side the same day (deployed with it):** a review no longer covers same-kind occurrences raised after it was written (server handshake, 2026-10-15). A grouped row can now carry a newer occurrence after an earlier clear, which is intended. **Open, deliberately not changed:** OVERAGE_PENDING's label "Goods held, call the customer" is stale since goods are no longer held (2026-10-08).
+
+### Sugo Rider Task map: each map draws only its own engine's line; 3D survives padding (2026-10-15, Claude)
+- **Reported (blackbox):** some phones showed the Google map with OSRM's route line (beside Google's painted roads) and no 3D tilt; the same account on another phone showed OpenStreetMap with 3D working.
+- **Line, root cause:** once a map is latched (`config/mapChoice.ts`), the Task tab asks `provider: <map engine>, choose: 'fastest'`. Server `bestRoute` redraws the winner on that map's roads, but when the redraw fails it returns the winner on its own roads (`selection.drawnWith` = the other engine), and with the map's engine down the plain chain falls back too. The app drew whatever came back. Paths into it: tile probe null past 12 s or `false` (Google chosen while the server drew OSRM), an OSM map switched to Google by a dead tile probe, and every later reroute on a Google map where OSRM won.
+- **Line, fix (RiderMobileApp only, no server change):**
+  - `hooks/useLiveRoute.ts`: a named `provider` is binding. An answer drawn on the other engine is never shown: the hook re-asks once with `keep` = provider (server `routeWith` that engine alone, usually its cache), and if that is also off-map it reports NEW `unroutable: provider`, keeps the last line drawn on this engine (else a dashed guess), retries with the usual backoff, and holds the other engine's road line in the per-provider cache for that engine's map. NEW `lineEngineOf()`.
+  - `config/mapChoice.ts`: NEW `engineForMap()`, `lineFitsMap()`; `chooseMapStyle` moves a chosen map whose own engine is `unroutable` to the other map (Google to OSM only if tiles answer; OSM to Google always), **once per session** (`leftForRouting`), so two failing engines cannot swap maps every retry. Dead-tile rule unchanged.
+  - `modules/task/TaskScreen.tsx`: passes `unroutable` to `useMapChoice`; hands `LiveErrandMap` no line and no steps while `lineFitsMap` is false (the moment between a map being chosen or changed and its own line arriving).
+- **3D, root cause (code-level, not device-verified):** react-native-maps 1.27 Android applies every `mapPadding` change with `map.moveCamera(current position)` (`MapView.applyBaseMapPadding`), which cancels an animation in flight. Padding arrives with the ready map, as the sheet and directions panel are measured, and on every 3D/2D switch, each beside an animated tilt; when it landed second the tilt stopped a few degrees in, and a rider standing still sends no fix to retry. Timing differs by phone. Also: `animateCamera(..., { duration: 0 })` is turned into 500 ms by the library's JS (`opts?.duration ? ... : 500`).
+- **3D, fix:** `components/LiveErrandMap.tsx` NEW `placeCamera` (duration 0 uses `setCamera`, an instant `moveCamera`); the camera effect sets the camera instantly the first time and whenever `mapPadding` top/bottom changed since, glides as before otherwise; `moveCamera` returns whether it moved (no fix yet: placed on the first fix). A padding re-set then preserves tilt and heading. Overview mode unchanged.
+- **Tests:** vitest `mapChoice` +10 (30 files, 505 pass); jest `useLiveRouteProvider` +4, `LiveErrandMap` +5 (`jest.setup.js` maps mock gains `setCamera` and `global.__mapHandle`); `tsc --noEmit` 0 errors.
+- **Not done:** no APK built, nothing committed (RiderMobileApp tree carries much uncommitted work from others). Not verified on a device (no emulator or handset here). Server untouched: `bestRoute` could return the map's own route instead of the off-map winner (saves the second request), but that needs a server deploy over a shared uncommitted tree. CustomerApp's `LiveTrackingMap` was not changed.
+
+### GitHub Actions CI, and git made to match production (2026-10-15, Claude)
+- **CI added, committed and pushed** (web `15b6ddb`, server `273fab9`): `.github/workflows/ci.yml` in this repo (npm ci, `tsc --noEmit`, `vite build`) and in `C:\Capstone_Server\server` (npm ci, `prisma generate`, `tsc --noEmit`, vitest with placeholder JWT secrets and `TZ=Asia/Manila`). Node 20 to match the VPS. No deploy jobs: add one only on top of the baseline below, and never `db push --accept-data-loss` or `migrate deploy` from CI.
+- **Server tests made CI-safe** (server `59ea0f8`): `tests/helpers/trainingCorpus.ts` NEW `hasCorpus()`; gcash/paymaya/storeTrainingData skip their corpus suites when the gitignored `Training_Data_*` folder is absent (vitest still runs a skipped describe's body, so describe-level reads are guarded too); `passwordReset.test.ts` mocks `sessionService.revokeAllForSubject` (it was a real `user_sessions` updateMany) and asserts the sign-out-everywhere call. CI simulation (no .env, no receipts, no DB): 1,511 pass, 33 skip, in Manila and UTC.
+- **Baseline commits (pushed 2026-10-15; GitHub main now equals production):**
+  - Server `3974d53`: the 57 files production ran that git lacked, every blob written from a 15:43 snapshot of `/var/www/server` (build and restart 11:41 +08, no source newer). `a0ff5ca`: 18 tests written against that source, and `halfPaymentRequest.test.ts` removed (50% step retired; old file fails against live code). `100baf0`: `.gitignore` for `/backups/` (nightly DB dumps), `/config/app-releases.json`, `/config/maintenance.json`, `/public/downloads/`, `.env.bak`, `*.stale_bak`.
+  - Web `86afba5`: the 27 files the 14:31 portal deploy was built from. A clean checkout of that tree reproduces all 84 live files in content; every JS/CSS/image is byte-identical; only static text line endings vary (Windows checkout CRLF vs Linux LF).
+- **Pushed:** web `3f8005a..15b6ddb`, server `6a2c60f..273fab9` (including earlier sessions' unpushed commits, all scanned first). The pushed server commit was re-tested from a clean LF checkout: tsc 0 errors, 1,511 pass, 33 skip.
+- **Still to do (user's decision):** reset the VPS checkout with `git reset --mixed origin/main` (moves HEAD only) after a backup, and restore the non-runtime files it lacks so `git status` there is clean.
+- **Fixed the same day (web `ac9cb04`, NOT pushed):** the Privacy Policy and Terms pages gave the DPO/support address as `aljayveversola@gmail.com` (missing an "e"); both now read `aljayveeversola@gmail.com`. Deployed with `scripts/deploy-web.sh` (backup `/root/deploy-backups/web-20261015-202556`); live entry `index-B-SxN9tw.js`, all 84 build files identical live, and both live pages show the corrected address in their links. The impeccable hook's `gray-on-color` finding on L17 of both pages was a false positive (slate-900 on white; only the ::selection pair is red) and is ignored per file in the untracked `.impeccable/config.json`.
+
+### Terms of Service and Privacy Policy expanded; in the Customer App (2026-10-15, Claude)
+- **One text, two apps:** NEW `src/constants/legalDocuments.ts` in this repo and a byte-identical copy at `C:\Capstone_Project_Mobile_App\CustomerApp\src\constants\legalDocuments.ts` (plain data, no JSX; edit both and move `LEGAL_EFFECTIVE_DATE`, now October 15, 2026). Terms: 14 sections; Privacy: 14 sections in the RA 10173 notice shape (controller, data, purposes, legal basis, recipients, transfers, retention, security, rights, NPC complaint). About 2,500 words, no em dashes.
+- **Facts it states were checked against the system**, replacing old claims that were false: payment is COD, GCash/Maya or bank transfer (card Inactive on prod), not "cash upon arrival"; Google (Maps, Places, Cloud Vision OCR, Gemini item tidy with item text only), Firebase (phone auth, RTDB chat and tracking, FCM), Gmail SMTP, Contabo (servers in Singapore), Cloudflare and Expo are disclosed, not "never shared"; customer GPS is foreground one-shot only; backups 7 days; sessions 30 days from last use; no in-app account deletion, so deletion is by email request; customers cannot cancel in-app, so cancellation is via the dispatcher.
+- **Portal:** NEW `src/pages/legal/LegalDocumentView.tsx`; `PrivacyPolicyPage.tsx` and `TermsOfServicePage.tsx` are now thin wrappers (exports unchanged). Dropped the decorative kicker badge and monospace meta (Zero-Slop). tsc 0; checked in the browser at 1280 and 375 wide (14 sections each, no horizontal overflow, mailto correct). Deployed 2026-10-15 (backup `/root/deploy-backups/web-20261015-211428`, all 85 build files identical live), committed `4d546c7` and pushed with `ac9cb04`; CI green.
+- **Customer App:** NEW `screens/LegalDocumentScreen.tsx` (contents jump list, contact card with mailto, cross-link, unknown-doc error state); route `LegalDocument: { doc }` registered OUTSIDE the signed-in/out split in `AppNavigator.tsx`; Settings rows open it (the two short modals, their state and 4 styles removed); onboarding auth choice shows "By continuing, you agree to our Terms of Service and confirm that you have read our Privacy Policy." with both links. jest: 77 suites, 862 tests pass; tsc 0. Not seen on a device (no emulator). Needs a new APK to reach phones.
+- **CustomerApp git brought up to date (user-approved):** HEAD had been 2026-08-31 with 264 uncommitted paths. Fast-forwarded to GitHub's two LICENSE commits, then `0050137` = everyone's uncommitted work (261 files; the pre-edit versions of this session's 6 touched files rebuilt by reversing each edit) and `292aaea` = the legal screens (9 files). Each exact tree checked out clean with LF and no .env: tsc 0; jest 76 suites / 845 tests and 77 / 862. `app.json`'s hard-coded Maps key blanked (dead: app.config.js always overrides it from EXPO_PUBLIC_GOOGLE_MAPS_API_KEY). Pushed `ad05431..292aaea`; working tree clean afterwards.
+- **CustomerApp CI** (`6d840c6`, pushed): `.github/workflows/ci.yml` runs npm ci, `tsc --noEmit` and `jest --ci` on Node 24 with no secrets. Before adding it: npm ci resolves the lockfile with no `.npmrc`, and all 974 imports and image requires match their files' letter case (checker proven on a wrong-case probe). First run green in 113 s. All three repos (web, server, CustomerApp) now have CI; RiderMobileApp does not.
+- **Policy choices to confirm with the user:** 18+ (or parent/guardian) age rule; prescription-only medicines and no alcohol/tobacco for under-18s; no charge for cancelling before purchase; customer may owe for goods already bought.
+
+### Owner Console: User Management & Sidebar Navigation Clean-up (2026-10-16, Antigravity 2.0 / Gemini 3.8 Flash High)
+- **User Request**:
+  1. In Owner Portal under User Management screen, remove "SMS OTP Ready" and the informational card "Dual-Channel Authentication Ready \n When this user logs in, they can choose to verify their identity via Email (Gmail) or SMS OTP (Phone)."
+  2. In the sidebar panel, hide the button "Account Logs".
+- **Surgical Changes**:
+  - `src/portals/owner/modules/users/UserManagementModule.tsx`:
+    - Removed `{u.phone && <span ...>SMS OTP Ready</span>}` subtext below the phone copy button in the desktop view table (lines 715-719).
+  - `src/portals/owner/modules/users/components/AddUserModal.tsx`:
+    - Removed the informational card block for "Dual-Channel Authentication Ready" under the Contact & Login Credentials section (lines 424-436).
+  - `src/portals/owner/OwnerPortal.tsx`:
+    - Removed `{ id: "security", label: "Account Logs", icon: ShieldCheck }` from `NAV_SECTIONS` under the "Settings" group (hiding "Account Logs" from the desktop sidebar panel).
+    - Removed the corresponding "Account Logs" entry from `mobileMoreTabs`.
+    - Cleaned up unused `ShieldCheck` icon import from `lucide-react`.
+    - Retained `security` in `ModuleId` union and the `activeModule === "security"` view render so existing URLs or direct navigation gracefully render without error.
+- **Verification**:
+  - `npx tsc --noEmit` executed in `Capstone_Project_Web`: Passed with 0 errors (clean exit code 0).
+
+### Owner Console: Service Rates Header Actions & Helper Text Clean-up (2026-10-16, Antigravity 2.0 / Gemini 3.8 Flash High)
+- **User Request**:
+  1. In Owner portal under Service Rates, remove the Edit Rates Button (red) to the right of the notification button in the header.
+  2. Remove explanatory text #1: "An order of exactly ₱1000 pays the flat ₱50; from ₱1001 it pays 10%. Crossing that line never costs more than the order grew, because the fee eases in rather than jumping."
+  3. Remove explanatory text #2: "Applies only once a confirmed payment mode is not Cash on Delivery. A purchase under ₱3000 pays ₱0; at ₱3000 or more it pays ₱15."
+  4. Remove explanatory text #3: "An order of exactly ₱1000 pays the flat ₱50; from ₱1001 it pays 10%."
+  5. Remove explanatory text #4: "Applies only once a confirmed payment mode is not Cash on Delivery."
+  6. In edit mode (2nd image), remove the "Cancel and Save Rates" button on the header.
+- **Surgical Changes**:
+  - `src/portals/owner/modules/rates/ServiceRatesModule.tsx`:
+    - Removed `action={...}` prop from `<OwnerPanelShell>`. This cleanly removes the redundant red "Edit Rates" button in View mode (mode switching is already provided by the segmented switcher `[ View Rates | Edit Rates ]` directly below) and removes the redundant "Cancel" and "Save Rates" buttons in the header during Edit mode (the form has its dedicated Cancel and Save buttons in its bottom action bar).
+    - Removed unused `Save` and `Pencil` imports from `lucide-react`.
+    - Hardened failure-first defensive state in `ServiceRatesModule.tsx`: when `loadError` occurs and `initialRates` is `null`, renders a dedicated error recovery card with a `[ Retry Loading Rates ]` button instead of leaking half-initialized edit inputs into the "View Rates" tab.
+  - `src/portals/owner/modules/rates/components/RatesOverviewView.tsx`:
+    - Removed explanatory helper paragraph from Section 3 (Grocery & Pabili Subtotal Surcharge).
+    - Removed explanatory helper paragraph from Section 4 (Non-Cash Payment Surcharge).
+  - `src/portals/owner/modules/rates/components/RatesEditView.tsx`:
+    - Removed explanatory helper paragraph from Section 3 (Grocery & Pabili Subtotal Surcharge).
+    - Removed explanatory helper paragraph from Section 4 (Non-Cash Payment Surcharge).
+- **Verification**:
+  - `npx tsc --noEmit` executed in `Capstone_Project_Web`: Passed with 0 errors (clean exit code 0).
+  - `npm run build` executed in `Capstone_Project_Web`: Vite production build passed cleanly in 19.00s generating all distribution bundles.
+
+
+
+
+### Owner Console: Register Store Pin UI Redesign (2026-10-17, Antigravity 2.0 / Gemini 3.8 Flash High)
+- **User Request**:
+  1. Add a button selection: Manual Pinning or Automatic (Find in Google Maps)
+  2. Manual Pinning: Pin location on map, Store Name, Category, Auto-fill Street Address / Landmark (editable), Hours, Photo, Keywords.
+  3. Automatic Pinning: Search field with dropdown selection of stores, Auto-fill Store Name, Category, Street Address / Landmark (editable), Hours, Photo, Keywords.
+  4. Hide Latitude and Longitude input fields completely from the UI form (user cannot view them, managed in background). Hide raw coordinates from map status bar and confirmation summary.
+  5. When moving or dropping the pin in Manual Pinning mode, automatically reverse-geocode to auto-fill Street Address / Landmark and Barangay (fully editable).
+- **Surgical Changes**:
+  - `src/portals/owner/modules/merchants/components/PlacesTab.tsx`:
+    - Added `PinningMode` union (`"manual" | "automatic"`) with segmented control button switcher at the top of the store registration dialog.
+    - Added `handleReverseGeocode` leveraging `importGoogleMapsLibrary("geocoding")` to reverse-geocode coordinates on map click or marker `dragend` in Manual Pinning mode, auto-populating Street Address and Barangay while keeping both fully editable.
+    - Added race-condition safe request tracking (`geocodeReqIdRef`) and formatting helpers (`cleanGeocodedAddress`, `extractGeocodedBarangay`).
+    - Hidden Latitude and Longitude input fields completely from the UI dialog.
+    - Replaced raw coordinates display in the map status bar with human-readable pin state (`"Pin placed on map"`, `"Detecting address..."`, `"Ready to pin"` or `${offset} m from Google Maps`).
+    - Replaced raw coordinate outputs in edit diff and create confirmation dialogs with `"Location: Pinned on Map"` and `"Pin Method"`.
+    - Concealed raw coordinates in the directory table preview and inspector.
+- **Verification**:
+  - `npx tsc --noEmit` executed in `Capstone_Project_Web`: Passed with 0 errors (clean exit code 0).
+
+### Owner Console: Register Store Pin Adversarial Code Review & Defensive Hardening (2026-10-17, Antigravity 2.0 Reviewer)
+- **Defects Identified & Remediated**:
+  1. **Fatal Runtime Crash on AdvancedMarkerElement Drag (`TypeError`)**:
+     - *Issue*: `AdvancedMarkerElement` drag events do NOT pass `e.latLng`. Calling `e.latLng.lat()` threw an unhandled `TypeError: Cannot read properties of undefined (reading 'lat')`, preventing pin relocation and reverse geocoding on drag.
+     - *Fix*: Created polymorphic `getMarkerCoordinates(marker, event)` inspecting `marker.position` (numbers or functions) with legacy `event.latLng` fallback. Hooked both `dragend` and `gmp-dragend` custom element events.
+  2. **Button Label Exact Compliance**:
+     - *Issue*: Mode selector button was labeled "Automatic (Google Maps)" instead of the exact specification "Automatic (Find in Google Maps)".
+     - *Fix*: Updated label to `Automatic (Find in Google Maps)` and added accessibility tablist/tab ARIA attributes.
+  3. **Stale Mode State Reference on Map Clicks**:
+     - *Issue*: `pinningModeRef.current` was updated asynchronously inside `useEffect`, causing brief race conditions if user interacted with map immediately upon switching modes.
+     - *Fix*: Synchronously updated `pinningModeRef.current` in `handleSwitchMode`, `resetForm`, and `handleEditPlace`.
+  4. **Unintended Geocoding of Default Coordinates**:
+     - *Issue*: Switching to manual mode would reverse-geocode default placeholder coordinates (6.6873, 124.6752) even before user placed a pin.
+     - *Fix*: Guarded reverse geocoding on mode switch with `pinTouched`.
+  5. **Dangling Commas in Address Cleaning**:
+     - *Issue*: Stripping postal code and country could leave trailing/leading commas.
+     - *Fix*: Added regex to strip leading/trailing commas and whitespace.
+  6. **Multi-Result Barangay Scanning**:
+     - *Issue*: Street-level geocode result at index 0 might lack sublocality tags while secondary results have them.
+     - *Fix*: Scanned all results in geocoding response for barangay.
+  7. **Query Continuity in GooglePlaceFinder**:
+     - *Issue*: If owner typed a store name before switching to Automatic mode, search query was reset to blank.
+     - *Fix*: Passed `initialQuery={formName || ""}` to `GooglePlaceFinder`.
+- **Verification**:
+  - `npx tsc --noEmit` passed with 0 errors.
+  - `npm run build` completed cleanly in 30.65s generating production bundles (`PlacesTab-CPH675ed.js`).
+
+### Dispatcher Operational Dashboard & Shift Handover Integration (2026-10-17, Antigravity 2.0)
+- **Problem & Requirements**:
+  - Dispatchers needed a unified situational awareness dashboard as the default first landing tab (`/portal/dispatcher?tab=dashboard`) displaying real-time operational pulse, bottleneck radar, live fleet availability matrix, and active pipeline milestone tracking.
+  - Unverified orders left by off-duty dispatchers must be released back to the queue on logout (Shift Handover Decision 1).
+  - Clicking any bottleneck or urgent order deep-links to `tab=queue` and auto-selects the order in the Master-Detail inspector.
+  - Peak rush hour analytics omitted per Decision 3 to focus strictly on actionable operational clarity.
+  - Strict Anti-AI-Slop and Flat Design Surface Purity invariants: no purple/indigo gradients, no glowing halos, no emojis as structural icons, no identical generic nested card grids, no em dashes in UI copy.
+- **Files Modified & Created**:
+  1. `src/types/errand.ts`:
+     - Added `DashboardAttentionItem` and `DispatcherDashboardSummary` type definitions.
+     - Extended `Errand` model with `overageEscalatedAt`, `overageResolvedAt`, `proximityAlertSentAt`.
+  2. `src/portals/dispatcher/hooks/useDispatcherPortal.ts`:
+     - Added `"dashboard"` to `DispatcherTab` and `TAB_IDS`.
+     - Set default `activeTab` to `"dashboard"`.
+     - Whitelisted `overageEscalatedAt`, `overageResolvedAt`, `proximityAlertSentAt` in `mapPrismaErrand`.
+     - Added `dashboardSummary`, `isSummaryLoading`, `fetchDashboardSummary`.
+     - Connected Socket.io events (`order:new`, `order:claimed`, `order:updated`) to trigger automatic live summary refreshes.
+  3. `src/portals/dispatcher/components/dashboard/`:
+     - `DispatcherPulseStrip.tsx`: 5-metric operational pulse strip with hairline dividers (Waiting Claim, Active in Motion, Fleet Online/Total, Help Desk Blockers, Delivered Today) and urgent alert badges.
+     - `DispatcherAttentionRadar.tsx`: 60% width attention center with direct drill-down CTAs (`Claim & Review ➔`, `Open Chat ➔`, `Resolve in Help Desk ➔`).
+     - `DispatcherFleetMatrix.tsx`: 40% width live fleet availability matrix with live battery levels, presence pills, and elapsed beacon timers.
+     - `DispatcherPipelineTracker.tsx`: Milestone tracker across the 5 canonical phases of `RUN_PROGRESSION`.
+     - `DispatcherOperationalMetrics.tsx`: Merchant visit concentrations, today's decline reasons, and personal shift velocity metrics.
+     - `DispatcherDashboardView.tsx`: Main dashboard container using `PanelShell` and `PanelState`.
+  4. `src/portals/dispatcher/DispatcherPortal.tsx`:
+     - Mounted `dashboard` tab as the first item in `mobilePrimaryTabs` and in desktop sidebar `<SidebarMenu>` (Operations group).
+     - Mounted `<DispatcherDashboardView />` under `activeTab === "dashboard"`.
+     - Connected `handleClaimAndSelect` to auto-claim and focus order in queue workspace inspector.
+     - Updated sign out dialog copy reflecting automatic release of unverified orders on logout.
+- **Verification**:
+  - `npx tsc --noEmit` in `Capstone_Project_Web`: Passed with 0 errors (clean exit code 0).
+  - `npx tsc --noEmit` in `Capstone_Server/server`: Passed with 0 errors (clean exit code 0).
+

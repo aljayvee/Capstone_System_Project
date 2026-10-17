@@ -47,6 +47,67 @@ import { metresBetween } from "../../../../../utils/geo";
  */
 const PIN_MAX_FROM_GOOGLE_METERS = 100;
 
+/** Cleans a reverse-geocoded formatted address into a clean, human-readable street/landmark string. */
+function cleanGeocodedAddress(raw: string): string {
+  let address = (raw || "").trim();
+  // Strip leading plus code if present (e.g. MMF7+6G8, Tacurong City)
+  address = address.replace(/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}(?:,\s*|\s+)/i, "");
+  // Strip trailing Philippines/Pilipinas
+  address = address.replace(/,?\s*(Philippines|Pilipinas)$/i, "").trim();
+  // Strip trailing postal code like 9800
+  address = address.replace(/,?\s*9800\s*/g, " ").trim();
+  // Clean up any double commas or double spaces
+  address = address.replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+  // Clean leading or trailing commas
+  address = address.replace(/^,\s*/, "").replace(/,\s*$/, "").trim();
+  return address;
+}
+
+/** Extracts barangay name from Google Maps geocoding address_components. */
+function extractGeocodedBarangay(components: any[] | undefined): string | null {
+  if (!components || !Array.isArray(components)) return null;
+  const bgyComp = components.find((c: any) =>
+    c.types?.some((t: string) =>
+      ["sublocality_level_1", "sublocality", "neighborhood", "administrative_area_level_5", "administrative_area_level_4"].includes(t)
+    )
+  );
+  if (bgyComp?.long_name) {
+    const clean = bgyComp.long_name.replace(/^(Barangay|Brgy\.?)\s+/i, "").trim();
+    if (clean) return clean;
+  }
+  return null;
+}
+
+/** Safely extracts latitude and longitude from an AdvancedMarkerElement or legacy Marker drag event. */
+function getMarkerCoordinates(marker: any, event?: any): { lat: number; lng: number } | null {
+  const pos = marker?.position;
+  if (pos) {
+    const lat = typeof pos.lat === "function" ? pos.lat() : typeof pos.lat === "number" ? pos.lat : null;
+    const lng = typeof pos.lng === "function" ? pos.lng() : typeof pos.lng === "number" ? pos.lng : null;
+    if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+  if (event?.latLng) {
+    const lat = typeof event.latLng.lat === "function" ? event.latLng.lat() : event.latLng.lat;
+    const lng = typeof event.latLng.lng === "function" ? event.latLng.lng() : event.latLng.lng;
+    if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+  if (typeof marker?.getPosition === "function") {
+    const p = marker.getPosition();
+    if (p) {
+      const lat = typeof p.lat === "function" ? p.lat() : p.lat;
+      const lng = typeof p.lng === "function" ? p.lng() : p.lng;
+      if (typeof lat === "number" && typeof lng === "number" && !isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+  }
+  return null;
+}
+
 /** Active Location Stores that look registered more than once (GET /places/duplicates). */
 interface DuplicateGroup {
   reason: "google_place" | "name" | "nearby";
@@ -145,6 +206,17 @@ export default function PlacesTab({
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** Pinning Mode: 'manual' (Pin on Map) or 'automatic' (Find in Google Maps) */
+  type PinningMode = "manual" | "automatic";
+  const [pinningMode, setPinningMode] = useState<PinningMode>("manual");
+  const pinningModeRef = useRef<PinningMode>("manual");
+  useEffect(() => {
+    pinningModeRef.current = pinningMode;
+  }, [pinningMode]);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [addressAutoDetected, setAddressAutoDetected] = useState(false);
+  const geocodeReqIdRef = useRef(0);
+
   const [formName, setFormName] = useState("");
   const [formCategoryId, setFormCategoryId] = useState<number | "">("");
   const [formAddress, setFormAddress] = useState("");
@@ -179,7 +251,7 @@ export default function PlacesTab({
    * map themselves. `pinTouched` is whether they actually did, this time: the
    * map's starting point is never a store's location.
    */
-  const [formOwnerPinned, setFormOwnerPinned] = useState(false);
+  const [formOwnerPinned, setFormOwnerPinned] = useState(true);
   const [pinTouched, setPinTouched] = useState(false);
   const [formHours, setFormHours] = useState<WeeklyHours | null>(null);
   const [formHoursSource, setFormHoursSource] = useState<string | null>(null);
@@ -253,6 +325,73 @@ export default function PlacesTab({
     fetchCategories();
   }, []);
 
+  /**
+   * Reverse-geocodes coordinates in Manual Pinning mode to automatically
+   * populate the Street Address / Landmark and Barangay fields.
+   */
+  const handleReverseGeocode = async (lat: number, lng: number) => {
+    const reqId = ++geocodeReqIdRef.current;
+    setIsGeocoding(true);
+    try {
+      const geocodingLib = await importGoogleMapsLibrary("geocoding");
+      const GeocoderClass = geocodingLib?.Geocoder || (window as any).google?.maps?.Geocoder;
+      if (!GeocoderClass) {
+        if (reqId === geocodeReqIdRef.current) setIsGeocoding(false);
+        return;
+      }
+      const geocoder = new GeocoderClass();
+      geocoder.geocode({ location: { lat, lng } }, (results: any, status: any) => {
+        if (reqId !== geocodeReqIdRef.current) return;
+        setIsGeocoding(false);
+        if (status === "OK" && results && results.length > 0) {
+          const best = results.find((r: any) => !r.types?.includes("plus_code")) || results[0];
+          const rawAddress = best.formatted_address || "";
+          const cleaned = cleanGeocodedAddress(rawAddress);
+          if (cleaned) {
+            setFormAddress(cleaned);
+            setAddressAutoDetected(true);
+          }
+          let detectedBarangay: string | null = null;
+          for (const r of results) {
+            detectedBarangay = extractGeocodedBarangay(r.address_components);
+            if (detectedBarangay) break;
+          }
+          if (detectedBarangay) {
+            setFormBarangay(detectedBarangay);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn("Reverse geocode failed:", err);
+      if (reqId === geocodeReqIdRef.current) {
+        setIsGeocoding(false);
+      }
+    }
+  };
+
+  const handleSwitchMode = (mode: PinningMode) => {
+    setPinningMode(mode);
+    pinningModeRef.current = mode;
+    setFormError(null);
+    if (mode === "manual") {
+      setFormOwnerPinned(true);
+      setFormGooglePlaceId(null);
+      setFormGoogleName(null);
+      setFormGooglePos(null);
+      if (googleCircleRef.current) {
+        googleCircleRef.current.setMap(null);
+        googleCircleRef.current = null;
+      }
+      const lat = parseFloat(formLatitude);
+      const lng = parseFloat(formLongitude);
+      if (!isNaN(lat) && !isNaN(lng) && !formAddress.trim() && pinTouched) {
+        void handleReverseGeocode(lat, lng);
+      }
+    } else {
+      setFormOwnerPinned(false);
+    }
+  };
+
   // Initialize Google Map when Modal opens
   useEffect(() => {
     if (!showForm) {
@@ -294,12 +433,16 @@ export default function PlacesTab({
         const map = new MapClass(mapRef.current, mapOptions);
 
         map.addListener("click", (e: any) => {
-          const lat = e.latLng.lat();
-          const lng = e.latLng.lng();
+          const lat = typeof e?.latLng?.lat === "function" ? e.latLng.lat() : e?.latLng?.lat;
+          const lng = typeof e?.latLng?.lng === "function" ? e.latLng.lng() : e?.latLng?.lng;
+          if (typeof lat !== "number" || typeof lng !== "number" || isNaN(lat) || isNaN(lng)) return;
           setFormLatitude(lat.toFixed(6));
           setFormLongitude(lng.toFixed(6));
           setPinTouched(true);
           updateActiveMarker(map, lat, lng);
+          if (pinningModeRef.current === "manual") {
+            void handleReverseGeocode(lat, lng);
+          }
         });
 
         googleMapInstance.current = map;
@@ -309,10 +452,7 @@ export default function PlacesTab({
         drawGoogleZone(map, formGooglePos);
       } catch (err) {
         console.warn("Map initialization error:", err);
-        // The pin box is a blank grey rectangle under a label that promises
-        // an interactive map. Saying so beats leaving the owner to guess
-        // whether they are supposed to click it.
-        setMapError("The map did not load. Enter the coordinates by hand below.");
+        setMapError("The map did not load. Please check your network connection and reload.");
       }
     }
 
@@ -354,13 +494,21 @@ export default function PlacesTab({
         gmpDraggable: true,
       });
 
-      activeMarkerRef.current.addListener("dragend", (e: any) => {
-        const newLat = e.latLng.lat();
-        const newLng = e.latLng.lng();
-        setFormLatitude(newLat.toFixed(6));
-        setFormLongitude(newLng.toFixed(6));
+      const handleMarkerDragEnd = (e?: any) => {
+        const coords = getMarkerCoordinates(activeMarkerRef.current, e);
+        if (!coords) return;
+        setFormLatitude(coords.lat.toFixed(6));
+        setFormLongitude(coords.lng.toFixed(6));
         setPinTouched(true);
-      });
+        if (pinningModeRef.current === "manual") {
+          void handleReverseGeocode(coords.lat, coords.lng);
+        }
+      };
+
+      activeMarkerRef.current.addListener("dragend", handleMarkerDragEnd);
+      if (typeof activeMarkerRef.current.addEventListener === "function") {
+        activeMarkerRef.current.addEventListener("gmp-dragend", (e: any) => handleMarkerDragEnd(e));
+      }
     } else {
       activeMarkerRef.current = new g.maps.Marker({
         map: map,
@@ -370,11 +518,14 @@ export default function PlacesTab({
       });
 
       activeMarkerRef.current.addListener("dragend", (e: any) => {
-        const newLat = e.latLng.lat();
-        const newLng = e.latLng.lng();
-        setFormLatitude(newLat.toFixed(6));
-        setFormLongitude(newLng.toFixed(6));
+        const coords = getMarkerCoordinates(activeMarkerRef.current, e);
+        if (!coords) return;
+        setFormLatitude(coords.lat.toFixed(6));
+        setFormLongitude(coords.lng.toFixed(6));
         setPinTouched(true);
+        if (pinningModeRef.current === "manual") {
+          void handleReverseGeocode(coords.lat, coords.lng);
+        }
       });
     }
   };
@@ -408,15 +559,18 @@ export default function PlacesTab({
 
   /** A Google Maps store picked in the finder fills the form with what Google knows of it. */
   const handlePickGooglePlace = (place: GooglePlaceDetails) => {
+    setPinningMode("automatic");
     setFormOwnerPinned(false);
     setFormGooglePlaceId(place.googlePlaceId);
     setFormGoogleName(place.name);
     setFormGooglePos({ lat: place.latitude, lng: place.longitude });
     setFormName(place.name);
     setFormAddress(place.address);
+    setAddressAutoDetected(true);
     if (place.barangay) setFormBarangay(place.barangay);
     setFormLatitude(place.latitude.toFixed(6));
     setFormLongitude(place.longitude.toFixed(6));
+    setPinTouched(true);
     if (place.categoryId && categories.some((c) => c.id === place.categoryId)) {
       setFormCategoryId(place.categoryId);
     }
@@ -449,6 +603,8 @@ export default function PlacesTab({
   const resetForm = () => {
     setIsEditing(false);
     setEditingId(null);
+    setPinningMode("manual");
+    pinningModeRef.current = "manual";
     setFormName("");
     setFormAddress("");
     setFormBarangay("Poblacion");
@@ -461,8 +617,9 @@ export default function PlacesTab({
     setFormGooglePlaceId(null);
     setFormGoogleName(null);
     setFormGooglePos(null);
-    setFormOwnerPinned(false);
+    setFormOwnerPinned(true);
     setPinTouched(false);
+    setAddressAutoDetected(false);
     setFormHours(null);
     setFormHoursSource(null);
     setPhotoChange({ kind: "keep" });
@@ -486,6 +643,9 @@ export default function PlacesTab({
   const handleEditPlace = (place: VerifiedPlace) => {
     setIsEditing(true);
     setEditingId(place.id);
+    const hasGoogle = Boolean(place.googlePlaceId);
+    setPinningMode(hasGoogle ? "automatic" : "manual");
+    pinningModeRef.current = hasGoogle ? "automatic" : "manual";
     setFormName(place.name);
     setFormCategoryId(place.categoryId);
     setFormAddress(place.address);
@@ -501,8 +661,9 @@ export default function PlacesTab({
     // The store was confirmed on Google Maps at its saved pin, so the ring
     // starts there; choosing the place again in the finder re-reads Google's.
     setFormGooglePos(place.googlePlaceId ? { lat: place.latitude, lng: place.longitude } : null);
-    setFormOwnerPinned(Boolean(place.ownerPinned) && !place.googlePlaceId);
+    setFormOwnerPinned(!hasGoogle);
     setPinTouched(false);
+    setAddressAutoDetected(false);
     setFormHours(readWeek(place.openingHours));
     setFormHoursSource(null);
     setPhotoChange({ kind: "keep" });
@@ -553,9 +714,9 @@ export default function PlacesTab({
     }
     if (Math.abs(latNum - current.latitude) > 0.00001 || Math.abs(lngNum - current.longitude) > 0.00001) {
       changes.push({
-        label: "Pin Coordinates",
-        from: `${current.latitude.toFixed(4)}, ${current.longitude.toFixed(4)}`,
-        to: `${latNum.toFixed(4)}, ${lngNum.toFixed(4)}`,
+        label: "Pin Location",
+        from: "Previous pin",
+        to: "Updated on map",
       });
     }
     if (formIsActive !== current.isActive) {
@@ -566,15 +727,15 @@ export default function PlacesTab({
       });
     }
     const linkLabel = (googleId: string | null | undefined, pinned: boolean, name?: string | null) =>
-      googleId ? name ?? "Linked" : pinned ? "Pinned by you, not on Google Maps" : "Not linked";
+      googleId ? name ?? "Google Maps" : pinned ? "Manual Map Pin" : "Not linked";
     if (
       (formGooglePlaceId ?? null) !== (current.googlePlaceId ?? null) ||
       (!formGooglePlaceId && formOwnerPinned !== Boolean(current.ownerPinned))
     ) {
       changes.push({
-        label: "Google Maps place",
+        label: "Pin Method",
         from: linkLabel(current.googlePlaceId, Boolean(current.ownerPinned)),
-        to: linkLabel(formGooglePlaceId, formOwnerPinned, formGoogleName),
+        to: linkLabel(pinningMode === "automatic" ? formGooglePlaceId : null, pinningMode === "manual", formGoogleName),
       });
     }
     const currentHours = readWeek(current.openingHours);
@@ -612,24 +773,27 @@ export default function PlacesTab({
       return;
     }
     if (isNaN(latNum) || isNaN(lngNum)) {
-      setFormError("Please click on the map to set valid GPS coordinates.");
+      setFormError("Please click on the map to set a valid pin location.");
       return;
     }
-    // A store stays a Google Maps place. A retired store from before linking
-    // may stay unlinked while it is retired; the server holds the same rule.
-    if (!formGooglePlaceId && !formOwnerPinned && formIsActive) {
+    // A store stays a Google Maps place or manual pin.
+    if (pinningMode === "automatic" && !formGooglePlaceId && formIsActive) {
       setFormError(
         isEditing
-          ? "Link this store to its Google Maps place first: search for it above and choose it. If Google Maps does not have it, pin it yourself."
-          : "Find the store on Google Maps first: search for it above and choose it. If Google Maps does not have it, pin it yourself.",
+          ? "Link this store to its Google Maps place first: search for it above and choose it. Or switch to Manual Pinning to pin it directly on the map."
+          : "Find the store on Google Maps first: search for it above and choose it. Or switch to Manual Pinning to pin it directly on the map.",
       );
       return;
     }
     // A store the owner pins needs a pin they placed, not the map's starting
     // point or a pin nobody confirmed. One already pinned by them may stay put.
     const current = isEditing ? places.find((p) => p.id === editingId) : undefined;
-    if (formOwnerPinned && !formGooglePlaceId && !pinTouched && !current?.ownerPinned) {
-      setFormError("Click the map at the store's door, or drag the pin there, to place it yourself.");
+    if (pinningMode === "manual" && !pinTouched && !current?.ownerPinned) {
+      if (mapError) {
+        setFormError("The map did not load. Please check your network connection and reload to place the pin.");
+        return;
+      }
+      setFormError("Click the map at the store's door, or drag the pin there, to place it on the map.");
       return;
     }
     if (pinOffsetMetres !== null && pinOffsetMetres > PIN_MAX_FROM_GOOGLE_METERS) {
@@ -690,8 +854,8 @@ export default function PlacesTab({
         longitude: lngNum,
         keywords: formKeywords.trim() || null,
         isActive: formIsActive,
-        googlePlaceId: formGooglePlaceId,
-        ownerPinned: !formGooglePlaceId && formOwnerPinned,
+        googlePlaceId: pinningMode === "automatic" ? formGooglePlaceId : null,
+        ownerPinned: pinningMode === "manual",
         openingHours: formHours,
         // The owner already saw a duplicate warning (the browser's or the
         // server's) and pressed Save again: it is another branch.
@@ -1107,8 +1271,8 @@ export default function PlacesTab({
                     <span className="text-ink font-medium">{place.barangay || "Tacurong City"}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-ink-muted">Coordinates:</span>
-                    <span className="font-mono text-ink">{place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}</span>
+                    <span className="text-ink-muted">Location:</span>
+                    <span className="text-ink font-medium">Pinned on Map</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-ink-muted">Hours:</span>
@@ -1157,12 +1321,11 @@ export default function PlacesTab({
                   ],
                 },
                 {
-                  title: "Location & Coordinates",
+                  title: "Location Details",
                   items: [
                     { label: "Barangay", value: place.barangay || "Tacurong City" },
                     { label: "Address", value: place.address, fullWidth: true },
-                    { label: "Latitude", value: place.latitude.toFixed(6) },
-                    { label: "Longitude", value: place.longitude.toFixed(6) },
+                    { label: "Location", value: "Pinned on Map" },
                     { label: "Google Maps", value: place.googlePlaceId ? "Linked" : "Not linked", fullWidth: true },
                   ],
                 },
@@ -1269,8 +1432,8 @@ export default function PlacesTab({
                   <span>
                     {mapError
                       ? "Map unavailable"
-                      : formOwnerPinned && !formGooglePlaceId
-                        ? "Click the map at the store's door"
+                      : pinningMode === "manual"
+                        ? "Click the map or drag the pin to the store's door"
                         : !formGooglePlaceId
                         ? "Find the store on Google Maps first"
                         : isMapReady
@@ -1279,13 +1442,19 @@ export default function PlacesTab({
                   </span>
                 </span>
                 <span
-                  className={`font-mono text-label ${
+                  className={`text-label ${
                     pinOffsetMetres !== null && pinOffsetMetres > PIN_MAX_FROM_GOOGLE_METERS
-                      ? "text-status-act-ink"
+                      ? "text-status-act-ink font-semibold"
                       : "text-ink-muted"
                   }`}
                 >
-                  {pinOffsetMetres !== null ? `${pinOffsetMetres} m from Google Maps` : `${formLatitude}, ${formLongitude}`}
+                  {pinOffsetMetres !== null
+                    ? `${pinOffsetMetres} m from Google Maps`
+                    : isGeocoding
+                    ? "Detecting address..."
+                    : pinTouched
+                    ? "Pin placed on map"
+                    : "Ready to pin"}
                 </span>
               </div>
               <div ref={mapRef} className="flex-1 w-full h-full min-h-[240px]" />
@@ -1298,7 +1467,7 @@ export default function PlacesTab({
                 </div>
               ) : !isMapReady ? (
                 <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-plate bg-status-closed-fill px-3 py-2 text-label text-status-closed-ink">
-                  Loading the map. The coordinate fields work either way.
+                  Loading interactive map...
                 </div>
               ) : null}
             </div>
@@ -1356,65 +1525,98 @@ export default function PlacesTab({
                 className="space-y-4 flex-1 flex flex-col justify-between"
               >
                 <div className="space-y-3.5">
-                  {/* Google Maps place (2026-10-13): the store is found there, never typed in. */}
+                  {/* Mode Selector */}
                   <div>
-                    <label className="block text-label font-medium text-ink mb-1">Google Maps place *</label>
-                    {formGooglePlaceId ? (
-                      <p className="m-0 mb-2 flex items-center gap-1.5 rounded-plate bg-status-done-fill px-3 py-2 text-label text-status-done-ink">
-                        <BadgeCheck size={14} className="shrink-0" />
-                        <span className="min-w-0 truncate">
-                          {formGoogleName ?? formName}: on Google Maps. Search again to choose another.
-                        </span>
-                      </p>
-                    ) : formOwnerPinned ? (
-                      <div className="m-0 mb-2 rounded-plate border border-edge bg-board-ground px-3 py-2 text-label text-ink">
-                        <p className="m-0 flex items-center gap-1.5 font-medium">
-                          <MapPin size={14} className="shrink-0" />
-                          Pinned by you: not on Google Maps
-                        </p>
-                        <p className="m-0 mt-1 text-ink-muted">
-                          {pinTouched || (isEditing && places.find((p) => p.id === editingId)?.ownerPinned)
-                            ? "The pin is where you put it. The store must be inside Tacurong and beside a road."
-                            : "Click the map at the store's door, or drag the pin there. Then fill in the name and address below."}
-                        </p>
-                      </div>
-                    ) : isEditing ? (
-                      <p className="m-0 mb-2 flex items-start gap-1.5 rounded-plate bg-status-waiting-fill px-3 py-2 text-label text-status-waiting-ink">
-                        <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                        <span>
-                          Registered before stores were linked to Google Maps. Find it below so its pin is
-                          Google's, not a guess.
-                        </span>
-                      </p>
-                    ) : null}
-                    <GooglePlaceFinder
-                      initialQuery={isEditing && !formGooglePlaceId ? formName : ""}
-                      categories={categories}
-                      editingId={isEditing ? editingId : null}
-                      selectedGooglePlaceId={formGooglePlaceId}
-                      onPick={handlePickGooglePlace}
-                    />
-                    {/* A real Tacurong store Google Maps does not list (2026-10-13). */}
-                    {!formGooglePlaceId ? (
+                    <label className="block text-micro uppercase tracking-wider font-semibold text-ink-muted mb-1.5">
+                      Pinning Method
+                    </label>
+                    <div
+                      role="tablist"
+                      aria-label="Pinning Method"
+                      className="grid grid-cols-2 p-1 bg-board-ground border border-edge rounded-plate gap-1"
+                    >
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = !formOwnerPinned;
-                          setFormOwnerPinned(next);
-                          setFormError(null);
-                          if (next) {
-                            setFormGooglePos(null);
-                            drawGoogleZone(googleMapInstance.current, null);
-                          }
-                        }}
-                        className="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-plate px-1 text-label text-ink-muted underline underline-offset-2 transition-colors hover:text-ink"
+                        role="tab"
+                        aria-selected={pinningMode === "manual"}
+                        onClick={() => handleSwitchMode("manual")}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3 min-h-[42px] text-label rounded-plate transition-colors ${
+                          pinningMode === "manual"
+                            ? "bg-board-field text-white font-semibold shadow-sm"
+                            : "text-ink-muted hover:text-ink hover:bg-board-plate"
+                        }`}
                       >
-                        {formOwnerPinned
-                          ? "Search Google Maps instead"
-                          : "Not on Google Maps? Pin the store on the map yourself"}
+                        <MapPin size={14} />
+                        <span>Manual Pinning</span>
                       </button>
-                    ) : null}
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={pinningMode === "automatic"}
+                        onClick={() => handleSwitchMode("automatic")}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 px-3 min-h-[42px] text-label rounded-plate transition-colors ${
+                          pinningMode === "automatic"
+                            ? "bg-board-field text-white font-semibold shadow-sm"
+                            : "text-ink-muted hover:text-ink hover:bg-board-plate"
+                        }`}
+                      >
+                        <Search size={14} />
+                        <span>Automatic (Find in Google Maps)</span>
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Mode-Specific Context Banner or Search */}
+                  {pinningMode === "manual" ? (
+                    <div className="rounded-plate border border-edge bg-board-ground p-3 text-label text-ink space-y-1">
+                      <p className="m-0 flex items-center gap-1.5 font-medium text-ink">
+                        <MapPin size={14} className="text-board-field shrink-0" />
+                        <span>Manual Map Pinning Active</span>
+                      </p>
+                      <p className="m-0 text-micro text-ink-muted">
+                        Click on the map or drag the pin to the store's door. The street address will auto-fill below and remains fully editable.
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-label font-medium text-ink mb-1">
+                        Find Store in Google Maps *
+                      </label>
+                      {formGooglePlaceId ? (
+                        <div className="m-0 mb-2 flex items-center justify-between rounded-plate bg-status-done-fill px-3 py-2 text-label text-status-done-ink">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <BadgeCheck size={14} className="shrink-0" />
+                            <span className="min-w-0 truncate font-medium">
+                              {formGoogleName ?? formName}: Selected from Google Maps
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormGooglePlaceId(null);
+                              setFormGoogleName(null);
+                              setFormGooglePos(null);
+                              drawGoogleZone(googleMapInstance.current, null);
+                            }}
+                            className="text-micro underline hover:opacity-80 ml-2 shrink-0"
+                          >
+                            Change
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="m-0 mb-2 text-micro text-ink-muted">
+                          Search for the store on Google Maps to automatically fill its details.
+                        </p>
+                      )}
+                      <GooglePlaceFinder
+                        initialQuery={formName || ""}
+                        categories={categories}
+                        editingId={isEditing ? editingId : null}
+                        selectedGooglePlaceId={formGooglePlaceId}
+                        onPick={handlePickGooglePlace}
+                      />
+                    </div>
+                  )}
 
                   {/* Store Name */}
                   <div>
@@ -1464,50 +1666,35 @@ export default function PlacesTab({
 
                   {/* Street Address */}
                   <div>
-                    <label className="block text-label font-medium text-ink mb-1">
-                      Street Address / Landmark *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-label font-medium text-ink">
+                        Street Address / Landmark *
+                      </label>
+                      {isGeocoding ? (
+                        <span className="flex items-center gap-1 text-micro text-board-field font-medium">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Detecting address...</span>
+                        </span>
+                      ) : addressAutoDetected ? (
+                        <span className="text-micro text-ink-muted">
+                          Auto-filled from map (editable)
+                        </span>
+                      ) : null}
+                    </div>
                     <input
                       type="text"
                       required
                       placeholder="e.g. Alunan Highway corner Bonifacio St"
                       value={formAddress}
-                      onChange={(e) => setFormAddress(e.target.value)}
+                      onChange={(e) => {
+                        setFormAddress(e.target.value);
+                        setAddressAutoDetected(false);
+                      }}
                       className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
                     />
                   </div>
 
-                  {/* Coordinates (Lat / Lng) */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-label font-medium text-ink mb-1">
-                        Latitude *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        readOnly
-                        placeholder="From Google Maps"
-                        value={formLatitude}
-                        title="Set by Google Maps and the pin on the map"
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink-muted"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-label font-medium text-ink mb-1">
-                        Longitude *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        readOnly
-                        placeholder="From Google Maps"
-                        value={formLongitude}
-                        title="Set by Google Maps and the pin on the map"
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-label font-mono text-ink-muted"
-                      />
-                    </div>
-                  </div>
+                  {/* Coordinates (Lat / Lng) hidden per requirement */}
 
                   {/* Opening hours: what the customer app shows as open or closed. */}
                   <WeeklyHoursEditor
@@ -1693,17 +1880,15 @@ export default function PlacesTab({
                   <span className="text-ink">{formBarangay.trim() || "Poblacion"}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-muted">Coordinates:</span>
-                  <span className="text-ink font-mono text-micro">
-                    {parseFloat(formLatitude || "0").toFixed(4)},{" "}
-                    {parseFloat(formLongitude || "0").toFixed(4)}
-                  </span>
+                  <span className="text-ink-muted">Location:</span>
+                  <span className="text-ink font-medium">Pinned on Map</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-ink-muted shrink-0">Google Maps:</span>
+                  <span className="text-ink-muted shrink-0">Pin Method:</span>
                   <span className="text-ink text-right">
-                    {formGoogleName ?? (formOwnerPinned ? "Not listed, pinned by you" : "Not linked")}
-                    {pinOffsetMetres !== null ? `, pin ${pinOffsetMetres} m from it` : ""}
+                    {pinningMode === "automatic" && formGoogleName
+                      ? `Google Maps (${formGoogleName}${pinOffsetMetres !== null ? `, pin ${pinOffsetMetres} m from it` : ""})`
+                      : "Manual Map Pin"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">

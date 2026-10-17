@@ -131,6 +131,9 @@ export interface Errand {
   acceptedAt?: string | null;
   deliveredAt?: string | null;
   completedAt?: string | null;
+  overageEscalatedAt?: string | null;
+  overageResolvedAt?: string | null;
+  proximityAlertSentAt?: string | null;
   estimatedCost: number;
   deliveryFee: number;
   tip: number;
@@ -143,6 +146,39 @@ export interface Errand {
   riderName?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DashboardAttentionItem {
+  id: string;
+  errandId: string;
+  kind: "UNCLAIMED_STALE" | "STALLED_STOP" | "OVERAGE_DISPUTE" | "CANCELLED_AFTER_PURCHASE";
+  title: string;
+  detail: string;
+  severity: "critical" | "warning";
+  action: "claim" | "chat" | "exceptions";
+  createdAt: string;
+}
+
+export interface DispatcherDashboardSummary {
+  unclaimedCount: number;
+  urgentUnclaimedCount: number;
+  activeInMotionCount: number;
+  deliveredTodayCount: number;
+  helpDeskCount: number;
+  pipeline: {
+    claimed: number;
+    toStore: number;
+    bought: number;
+    onTheWay: number;
+    delivered: number;
+  };
+  attentionItems: DashboardAttentionItem[];
+  topMerchantsToday: Array<{ name: string; count: number }>;
+  todayDeclines: Array<{ reason: string; count: number }>;
+  myShiftStats: {
+    myHandledToday: number;
+    myAvgClaimLatencySeconds: number | null;
+  };
 }
 
 // Strict legal state transitions matrix for anti-happy-path validation

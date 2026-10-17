@@ -135,3 +135,42 @@ Integrity mode: benchmark
 - [ ] Incoming assignment bottom-sheet modal renders properly with store waypoints, earnings, and 45s auto-reassign countdown.
 - [ ] Multi-task queue renders up to 3 sequenced errands cleanly.
 - [ ] Zero TypeScript compilation errors (`npx tsc --noEmit`) across both `Capstone_Project_Web` and `RiderMobileApp`.
+
+
+## Follow-up — 2026-10-13T13:46:29Z
+
+Align the Sugo Figma prototype across all four portals (Customer, Rider, Dispatcher, Owner) with our actual system design: remove hardcoded item catalog prices from the customer errand ordering screens so customers specify item names and quantities only (retaining distance-based delivery fees), and align all button text, labels, and transaction steps verbatim with the production codebase.
+
+Working directory: c:\Capstone_Project_Web\FigmaPrototype\FigmaPrototype\Designprototypecreation
+Integrity mode: demo
+
+## Requirements
+
+### R1. Errand Item Ordering & Pricing Alignment
+Remove all hardcoded item catalog prices (e.g., ₱85, ₱140) from the Customer App ordering screens and store menus. In accordance with the actual Sugo Pabili system (`CustomerApp/src/screens/ErrandItemsScreen.tsx`), customers specify item names and quantities only. The item purchase subtotal must display as ₱0.00 (or pending receipt verification) during order creation, while base distance delivery fees remain automatically computed. The actual item purchase cost is recorded only when the rider uploads the physical store receipt at the store.
+
+### R2. Verbatim UI Labels and Action Buttons Alignment
+Audit and update all button copy, screen headers, tab labels, status chips, and form placeholders across all four portals (`/customer`, `/rider`, `/dispatcher`, `/owner`) so they match verbatim the text labels used in our actual system:
+- **Customer App**: Match labels from `c:\Capstone_Project_Mobile_App\CustomerApp\src\` (e.g., "Add to Errand List", "Submit Errand Request", "View Active Errand", "Chat with Rider").
+- **Rider App**: Match labels from `c:\Capstone_Project_Mobile_App\RiderMobileApp\src\` (e.g., "Accept Task", "Decline Task", "I Have Arrived at Store", "Upload Official Receipt", "Slide to Confirm Delivery").
+- **Dispatcher Console**: Match labels from `c:\Capstone_Project_Web\src\portals\dispatcher\` (e.g., "Assign Rider", "Review Fee Breakdown", "Reassign Errand", "Resolve Conflict").
+- **Owner Portal**: Match labels from `c:\Capstone_Project_Web\src\portals\owner\` (e.g., "Standing Figures", "Sugo Share", "Rider Share", "Errand Settlement").
+
+### R3. Interactive Transaction Workflow Continuity
+Preserve the end-to-end interactive simulation across all 4 portals. An errand created in the Customer App without item catalog prices must flow seamlessly into the Dispatcher queue, trigger the Rider dispatch alert, allow the rider to enter the actual receipt cost during the store stage, and reflect accurate final fee settlements in the Owner Portal.
+
+## Acceptance Criteria
+
+### Pricing & Item Flow
+- [ ] No store catalog items in the Customer App display pre-assigned prices; items show only name, quantity, and category.
+- [ ] Customer errand creation summary shows estimated delivery fee based on distance, with item cost clearly indicated as pending receipt upload or ₱0.00.
+- [ ] Rider at-store progression screen allows entering the actual receipt purchase amount, which then updates the total errand cost.
+
+### Verbatim Labels & Button Text
+- [ ] Primary CTAs and action buttons across `/customer`, `/rider`, `/dispatcher`, and `/owner` match the exact wording of the corresponding screens in the production codebase.
+- [ ] Status badges, navigation tab titles, and modal headers use verbatim terminology from the actual system.
+
+### Build & System Integrity
+- [ ] TypeScript typecheck (`npx tsc --noEmit`) passes with 0 errors in `Designprototypecreation`.
+- [ ] Vite build (`npm run build`) succeeds with exit code 0.
+- [ ] All routes (`/`, `/customer`, `/rider`, `/dispatcher`, `/owner`) load cleanly on `http://localhost:5173` without runtime errors or console exceptions.
