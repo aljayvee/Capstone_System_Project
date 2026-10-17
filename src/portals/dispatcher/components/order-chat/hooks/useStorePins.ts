@@ -756,7 +756,18 @@ export function useStorePins({
       const lng = parseFloat(String(last.longitude));
       if (!isNaN(lat) && !isNaN(lng)) mapInstance.current.panTo({ lat, lng });
     }
-  }, [pinpoints, orderDetails, customerDisplayName, mapReady]);
+    // The drop-off fields, not the whole errand: it now arrives live
+    // (useOrderDetails), and a rider marking an item bought must not redraw
+    // the markers and pan the map out from under the dispatcher.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pinpoints,
+    orderDetails?.deliveryLatitude,
+    orderDetails?.deliveryLongitude,
+    orderDetails?.deliveryAddress,
+    customerDisplayName,
+    mapReady,
+  ]);
 
   // ── actions ─────────────────────────────────────────────────────────────
   const removePin = useCallback((index: number) => {

@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { apiClient } from "../../../../../services/apiClient";
+import { io, Socket } from "socket.io-client";
+import { apiClient, getMemoryAccessToken } from "../../../../../services/apiClient";
 import { formatErrandId } from "../../../../../utils/formatErrandId";
 import type { PanelError, StorePinpoint, MerchantCategory } from "../types";
+
+const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
+  ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
+  : "http://localhost:5000";
 
 interface UseOrderDetailsResult {
   orderDetails: any;
@@ -145,6 +150,45 @@ export function useOrderDetails(orderId: string, dispatcher: any): UseOrderDetai
     // `detailsToken` is the one sanctioned way back in: a counter this screen
     // bumps deliberately, after an action it performed itself.
   }, [orderId, detailsToken]);
+
+  // Live, not on reload. What the rider does while this screen is open (an
+  // item marked out of stock, the items bought) reached the queue list but
+  // never this screen, which kept the errand it fetched on open until the
+  // page was refreshed. The server sends the whole errand, the same shape
+  // GET /errands/:id returns. Only orderDetails takes it: the pins are not
+  // re-hydrated, for the reason given on the fetch above.
+  //
+  // Authenticated, because order:updated goes to the errand's parties and
+  // the staff role rooms only (useOrderPayments has the same note).
+  useEffect(() => {
+    if (!orderId) return;
+    const socket: Socket = io(BACKEND_URL, {
+      // Re-read at every handshake, so a reconnect after the 15-minute token
+      // has rotated is still authenticated.
+      auth: (cb) => cb({ token: getMemoryAccessToken() ?? undefined }),
+    });
+    socket.on("order:updated", (errand: any) => {
+      if (errand?.id != null && String(errand.id) === String(orderId)) setOrderDetails(errand);
+    });
+    // Anything missed while disconnected. Not on the first connect: the
+    // fetch above has just read the errand.
+    let connectedBefore = false;
+    socket.on("connect", () => {
+      if (connectedBefore) {
+        apiClient
+          .get(`/errands/${orderId}`)
+          .then((res) => {
+            const errand = res.data?.errand || res.data || null;
+            if (errand) setOrderDetails(errand);
+          })
+          .catch((err) => console.warn("Failed to re-read the errand after reconnecting:", err));
+      }
+      connectedBefore = true;
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, [orderId]);
 
   return {
     orderDetails,

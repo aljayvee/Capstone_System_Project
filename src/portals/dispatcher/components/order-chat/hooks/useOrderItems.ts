@@ -346,6 +346,39 @@ export function useOrderItems({
   }, []);
 
   /**
+   * What the rider reports, carried onto the open list as it arrives.
+   *
+   * The list is copied from the saved items once, when it opens, and an open
+   * draft is never replaced. So an item the rider marked out of stock while it
+   * was open showed in the banner (read from the saved items) but not on its
+   * own line (read from the draft) until a reload. Only the status moves
+   * across, matched by item id: the dispatcher's edits to the line stay.
+   */
+  const fulfillmentSignature = savedItems
+    .map((d: any) => `${d.id ?? ""}:${d.fulfillmentStatus ?? ""}`)
+    .join("|");
+  useEffect(() => {
+    if (!isEditing) return;
+    const statusById = new Map<number, string | undefined>();
+    savedItems.forEach((d: any) => {
+      if (d.id != null) statusById.set(Number(d.id), d.fulfillmentStatus || undefined);
+    });
+    setEditableItems((prev) => {
+      let changed = false;
+      const next = prev.map((row) => {
+        if (row.id == null || !statusById.has(row.id)) return row;
+        const status = statusById.get(row.id);
+        if (row.fulfillmentStatus === status) return row;
+        changed = true;
+        return { ...row, fulfillmentStatus: status };
+      });
+      return changed ? next : prev;
+    });
+    // savedItems is represented by fulfillmentSignature: only a status change matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, fulfillmentSignature]);
+
+  /**
    * A new, empty item, bought at the store whose group it was added in. With no
    * store named it waits under "Not assigned yet", unless one store is pinned.
    */
