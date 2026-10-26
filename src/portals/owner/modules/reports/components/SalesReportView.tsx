@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import { ReportState } from "./ReportState";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
+import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
-import { useReportPdf } from "../../../hooks/useReportPdf";
-import { apiService } from "../../../../../services/apiService";
+import { useReportPrint } from "../../../hooks/useReportPrint";
+import { apiService, type ApiSalesTimelinePoint } from "../../../../../services/apiService";
 import type { DateRange } from "../../../../../components/DateRangePicker";
 import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
@@ -26,13 +26,12 @@ const getCategoryColor = (name: string, index: number) => {
 };
 
 export const SalesReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
-  const [reviewOpen, setReviewOpen] = useState(false);
   const { data, isLoading, error, reload } = useReport(apiService.getSalesReport, apiRange);
-  const pdf = useReportPdf("sales", apiRange);
+  const printer = useReportPrint("sales", apiRange);
 
   // Retained and still wired, though the button that calls it is hidden — see
   // SHOW_CSV_EXPORT in ReportPeriodToolbar.
@@ -41,12 +40,12 @@ export const SalesReportView: React.FC = () => {
     downloadCSV(
       `Sugo_Sales_Report_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
-        "Category",
+        "Store Type",
         "Orders",
-        "Item Cost (PHP)",
+        "Cost of Items Bought (PHP)",
         "Delivery Fees (PHP)",
         "Tips (PHP)",
-        "Revenue (PHP)",
+        "Total Sales (PHP)",
       ],
       data.byCategory.map((c) => [
         c.category,
@@ -66,10 +65,11 @@ export const SalesReportView: React.FC = () => {
         onPresetChange={setPreset}
         range={range}
         onRangeChange={setRange}
-        onPreview={() => setReviewOpen(true)}
+        onPrint={printer.print}
         onExportCSV={handleExportCSV}
         exportDisabled={!data}
-        isGeneratingPdf={pdf.isGenerating}
+        isPreparingPrint={printer.isPreparing}
+        printError={printer.error}
       />
       <ReportState
         isLoading={isLoading}
@@ -89,14 +89,33 @@ export const SalesReportView: React.FC = () => {
               plates above a table that computes the same totals is the
               arrangement this redesign refuses; the totals belong to the
               tables that add them up. */}
-          <p className="text-label text-ink-muted">{data.rangeLabel}</p>
+          <p className="text-label text-ink-muted">{data.coverageLabel ?? data.rangeLabel}</p>
 
-          {data.byCategory.length === 0 ? (
-            <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
-              No sales recorded for this period.
-            </div>
-          ) : (
-            <>
+          {/* 1. PERIOD BREAKDOWN: Sunday to Saturday for Daily, and so on.
+              The same rows the printout opens with. */}
+          <PeriodBreakdownTable<ApiSalesTimelinePoint>
+            subject="Sales"
+            unit={data.breakdownUnit}
+            points={data.timelineBreakdown}
+            figures={[
+              { header: "Orders", format: "count", value: (t) => t.orderCount },
+              { header: "Cost of items bought", format: "money", value: (t) => t.itemCost },
+              { header: "Delivery fees", format: "money", value: (t) => t.deliveryFee },
+              { header: "Tips", format: "money", value: (t) => t.tip },
+              { header: "Total sales", format: "money", value: (t) => t.revenue, primary: true },
+            ]}
+          />
+
+          {/* 2. CATEGORY BREAKDOWN SECTION */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-panel text-ink">Sales by store type</h3>
+
+            {data.byCategory.length === 0 ? (
+              <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
+                No sales were recorded for these dates.
+              </div>
+            ) : (
+              <>
               <div className="bg-board-plate border border-edge rounded-plate p-6">
                 <ResponsiveContainer width="100%" height={240}>
                   <BarChart data={data.byCategory}>
@@ -110,10 +129,10 @@ export const SalesReportView: React.FC = () => {
                       textAnchor="end"
                     />
                     <YAxis tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }} />
-                    <Tooltip formatter={(v: number) => [formatPeso(v), "Revenue"]} />
+                    <Tooltip formatter={(v: number) => [formatPeso(v), "Total sales"]} />
                     <Bar
                       dataKey="revenue"
-                      name="Revenue"
+                      name="Total sales"
                       radius={[4, 4, 0, 0]}
                     >
                       {data.byCategory.map((c, index) => (
@@ -132,13 +151,13 @@ export const SalesReportView: React.FC = () => {
                         <thead className="bg-board-ground text-ink-muted">
                           <tr>
                             <th scope="col" className="text-left px-5 py-2 font-semibold">
-                              Merchant category
+                              Store type
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
                               Orders
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Item cost
+                              Cost of items bought
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
                               Delivery fees
@@ -147,7 +166,7 @@ export const SalesReportView: React.FC = () => {
                               Tips
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Revenue
+                              Total sales
                             </th>
                           </tr>
                         </thead>
@@ -159,9 +178,9 @@ export const SalesReportView: React.FC = () => {
                                 {c.touchedOrderCount > c.orderCount && (
                                   <span
                                     className="ml-1.5 text-body text-ink-muted"
-                                    title={`${c.touchedOrderCount} errands touched this category; ${c.orderCount} are counted here, each errand counting once in the category holding most of its money.`}
+                                    title={`${c.touchedOrderCount} orders bought something from this store type. ${c.orderCount} are counted here, because each order is counted once, under the store type where most of its money went.`}
                                   >
-                                    touched by {c.touchedOrderCount}
+                                    {c.touchedOrderCount} orders bought here
                                   </span>
                                 )}
                               </td>
@@ -203,8 +222,8 @@ export const SalesReportView: React.FC = () => {
                     data={data.byCategory}
                     keyExtractor={(c) => c.category}
                     desktopView={desktopTable}
-                    primaryHeader="Merchant Category"
-                    secondaryHeader="Revenue & Orders"
+                    primaryHeader="Store type"
+                    secondaryHeader="Total sales and orders"
                     renderPrimary={(c) => (
                       <div className="min-w-0">
                         <div className="font-semibold text-ink text-xs truncate">
@@ -212,7 +231,7 @@ export const SalesReportView: React.FC = () => {
                         </div>
                         {c.touchedOrderCount > c.orderCount && (
                           <div className="text-[10px] text-ink-muted">
-                            touched by {c.touchedOrderCount} errands
+                            {c.touchedOrderCount} orders bought here
                           </div>
                         )}
                       </div>
@@ -230,21 +249,21 @@ export const SalesReportView: React.FC = () => {
                     renderPreview={(c) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Item Cost:</span>
+                          <span className="text-ink-muted">Cost of items bought</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.itemCost)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Delivery Fees:</span>
+                          <span className="text-ink-muted">Delivery fees</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.deliveryFee)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Tips:</span>
+                          <span className="text-ink-muted">Tips</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.tip)}</span>
                         </div>
                       </div>
                     )}
                     inspectorTitle={(c) => c.category}
-                    inspectorSubtitle={(c) => `${c.orderCount} Total Orders`}
+                    inspectorSubtitle={(c) => `${c.orderCount} order${c.orderCount === 1 ? "" : "s"}`}
                     inspectorStatusBadge={(c) => (
                       <span className="font-mono font-bold text-xs text-ink">
                         {formatPeso(c.revenue)}
@@ -252,20 +271,20 @@ export const SalesReportView: React.FC = () => {
                     )}
                     inspectorSections={(c) => [
                       {
-                        title: "Category Sales Performance",
+                        title: "Sales",
                         items: [
-                          { label: "Merchant Category", value: c.category },
-                          { label: "Total Orders", value: `${c.orderCount}` },
-                          { label: "Touched Orders", value: `${c.touchedOrderCount}` },
-                          { label: "Total Revenue", value: formatPeso(c.revenue) },
+                          { label: "Store type", value: c.category },
+                          { label: "Orders", value: `${c.orderCount}` },
+                          { label: "Orders that bought here", value: `${c.touchedOrderCount}` },
+                          { label: "Total sales", value: formatPeso(c.revenue) },
                         ],
                       },
                       {
-                        title: "Cost & Fee Allocation",
+                        title: "Costs and fees",
                         items: [
-                          { label: "Item Cost Subtotal", value: formatPeso(c.itemCost) },
-                          { label: "Delivery Fees", value: formatPeso(c.deliveryFee) },
-                          { label: "Tips Collected", value: formatPeso(c.tip) },
+                          { label: "Cost of items bought", value: formatPeso(c.itemCost) },
+                          { label: "Delivery fees", value: formatPeso(c.deliveryFee) },
+                          { label: "Tips", value: formatPeso(c.tip) },
                         ],
                       },
                     ]}
@@ -277,62 +296,22 @@ export const SalesReportView: React.FC = () => {
                   stops reconciling, it shows up here instead of in an audit. */}
               {data.reconciliation.difference === 0 ? (
                 <p className="text-body text-status-done-ink">
-                  Category revenue reconciles exactly to the total above.
+                  The store type amounts add up exactly to the total sales.
                 </p>
               ) : (
                 <p className="text-label text-status-act-ink" role="alert">
-                  Category revenue is out by {formatPeso(data.reconciliation.difference)} against
-                  the total. Treat this report as provisional.
+                  The store type amounts are off by {formatPeso(data.reconciliation.difference)} from
+                  the total sales. Treat this report as unconfirmed.
                 </p>
               )}
             </>
           )}
+          </div>
 
           <ReportNotes notes={data.notes} />
         </>
       )}
 
-      <DigitalReportReviewModal
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        reportName="Sales Report"
-        rangeLabel={data?.rangeLabel ?? ""}
-        onDownloadPdf={pdf.generate}
-        isGenerating={pdf.isGenerating}
-        generateError={pdf.error}
-      >
-        {data && (
-          <table className="w-full text-label">
-            <thead>
-              <tr className="text-left text-ink-muted border-b border-hairline">
-                <th scope="col" className="py-2">
-                  Merchant category
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  Orders
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  Revenue
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.byCategory.map((c) => (
-                <tr key={c.category} className="border-b border-hairline">
-                  <td className="py-2">{c.category}</td>
-                  <td className="py-2 text-right">{c.orderCount}</td>
-                  <td className="py-2 text-right">{formatPeso(c.revenue)}</td>
-                </tr>
-              ))}
-              <tr className="font-bold text-ink">
-                <td className="py-2">Total</td>
-                <td className="py-2 text-right">{data.totalOrders}</td>
-                <td className="py-2 text-right">{formatPeso(data.totalRevenue)}</td>
-              </tr>
-            </tbody>
-          </table>
-        )}
-      </DigitalReportReviewModal>
     </div>
   );
 };

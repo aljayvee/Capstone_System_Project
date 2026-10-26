@@ -3,30 +3,47 @@ import { ReportState } from "./ReportState";
 import { AlertTriangle, ShieldCheck, Banknote, UserSearch } from "lucide-react";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
+import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
-import { useReportPdf } from "../../../hooks/useReportPdf";
-import { apiService, type ExceptionKind } from "../../../../../services/apiService";
+import { useReportPrint } from "../../../hooks/useReportPrint";
+import {
+  apiService,
+  type ApiExceptionReport,
+  type ExceptionKind,
+} from "../../../../../services/apiService";
 import type { DateRange } from "../../../../../components/DateRangePicker";
+import { formatErrandId } from "../../../../../utils/formatErrandId";
 import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatPeso } from "../../../../../utils/format";
-import { MobileResponsiveTable } from "../../../../../components/table";
+import { MobileResponsiveTable, TablePagination } from "../../../../../components/table";
+import { usePagination } from "../../../../../hooks/usePagination";
 
-/** Plain names, because a reader should not need the enum to read the report. */
+/**
+ * Plain names, because a reader should not need the enum to read the report.
+ * The printed report uses the same words (server reportPdfService KIND_LABEL).
+ */
 const KIND_LABEL: Record<ExceptionKind, string> = {
-  CASH_VARIANCE: "Cash variance",
-  RECEIPT_DIVERGENCE: "Receipt divergence",
-  UNVERIFIED_PURCHASE: "Unverified purchase",
-  WRONG_BRANCH: "Wrong branch",
-  MISSING_RECEIPT: "No receipt at a stop",
-  STALLED_STOP: "Long stop",
-  // Named for what the reader has to do about it. "Goods held" says a rider is
+  CASH_VARIANCE: "Cash short or over",
+  RECEIPT_DIVERGENCE: "Receipt amount does not match",
+  UNVERIFIED_PURCHASE: "Purchase with no receipt",
+  WRONG_BRANCH: "Bought at a different store",
+  MISSING_RECEIPT: "No receipt for a stop",
+  STALLED_STOP: "Rider stayed too long at a store",
+  // Named for what the reader has to do about it. "Items held" says a rider is
   // waiting; "Balance never collected" says the money is simply gone.
-  OVERAGE_PENDING: "Goods held, overage unapproved",
-  UNPAID_BALANCE: "Balance never collected",
-  CANCELLED_AFTER_PURCHASE: "Cancelled after purchase",
+  OVERAGE_PENDING: "Items held: extra cost not approved yet",
+  UNPAID_BALANCE: "Balance not paid",
+  CANCELLED_AFTER_PURCHASE: "Cancelled after items were bought",
 };
+
+type ProblemPoint = NonNullable<ApiExceptionReport["timelineBreakdown"]>[number];
+
+/**
+ * The details are written for the dispatcher's queue and join their clauses
+ * with " — ". The report reads them with a comma, the same as its printout.
+ */
+const plainDetail = (detail: string) => detail.replace(/\s+—\s+/g, ", ");
 
 /**
  * Errands that did not reconcile, across a period.
@@ -37,20 +54,20 @@ const KIND_LABEL: Record<ExceptionKind, string> = {
  * the part that has teeth in a dispute.
  */
 export const ExceptionReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
-  const [reviewOpen, setReviewOpen] = useState(false);
   const { data, isLoading, error, reload } = useReport(apiService.getExceptionReport, apiRange);
-  const pdf = useReportPdf("exceptions", apiRange);
+  const printer = useReportPrint("exceptions", apiRange);
+  const exceptionsPagination = usePagination(data?.exceptions, 25, [preset, range]);
 
   const handleExportCSV = () => {
     if (!data) return;
     downloadCSV(
       // Exceptions nests its window under `meta`, unlike the other five.
       `Sugo_Help_Desk_Report_${(data.meta?.rangeLabel ?? "report").replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
-      ["Errand", "Kind", "At Risk (PHP)", "Rider", "Occurred", "Detail", "Resolved By", "Reason"],
+      ["Order", "Problem", "Money Involved (PHP)", "Rider", "When", "What Happened", "Cleared By", "Reason"],
       data.exceptions.map((e) => [
         e.errandId,
         KIND_LABEL[e.kind],
@@ -71,10 +88,11 @@ export const ExceptionReportView: React.FC = () => {
         onPresetChange={setPreset}
         range={range}
         onRangeChange={setRange}
-        onPreview={() => setReviewOpen(true)}
+        onPrint={printer.print}
         onExportCSV={handleExportCSV}
         exportDisabled={!data}
-        isGeneratingPdf={pdf.isGenerating}
+        isPreparingPrint={printer.isPreparing}
+        printError={printer.error}
       />
       <ReportState
         isLoading={isLoading}
@@ -86,6 +104,13 @@ export const ExceptionReportView: React.FC = () => {
 
       {data && (
         <>
+          {/* Exceptions nests its window under `meta`, unlike the other five. */}
+          {data.meta && (
+            <p className="text-label text-ink-muted">
+              {data.meta.coverageLabel ?? data.meta.rangeLabel}
+            </p>
+          )}
+
           <div className="bg-board-plate border border-edge rounded-plate divide-y sm:divide-y-0 sm:divide-x divide-hairline grid grid-cols-1 sm:grid-cols-3">
             <div className="p-5 flex items-start gap-4">
               <div className="p-2.5 rounded-lg bg-status-act-fill text-status-act-ink shrink-0">
@@ -97,7 +122,7 @@ export const ExceptionReportView: React.FC = () => {
                   {data.summary.openCount}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5">
-                  Requires action / decision
+                  Someone needs to decide
                 </div>
               </div>
             </div>
@@ -112,7 +137,7 @@ export const ExceptionReportView: React.FC = () => {
                   {data.summary.resolvedCount}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5">
-                  Resolved & reconciled
+                  Checked and closed
                 </div>
               </div>
             </div>
@@ -122,30 +147,42 @@ export const ExceptionReportView: React.FC = () => {
                 <Banknote className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-body text-ink-muted">Total at risk</div>
+                <div className="text-body text-ink-muted">Money involved</div>
                 <div className="text-xl font-bold font-mono text-status-waiting-ink mt-1 tabular-nums">
                   {formatPeso(data.summary.totalAtRisk)}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5">
-                  Disputed amount
+                  Amount in question
                 </div>
               </div>
             </div>
           </div>
+
+          <PeriodBreakdownTable<ProblemPoint>
+            subject="Problems"
+            unit={data.meta?.breakdownUnit}
+            points={data.timelineBreakdown}
+            figures={[
+              { header: "Problems", format: "count", value: (p) => p.count, primary: true },
+              { header: "Still open", format: "count", value: (p) => p.openCount },
+              { header: "Cleared", format: "count", value: (p) => p.resolvedCount },
+              { header: "Money involved", format: "money", value: (p) => p.atRisk },
+            ]}
+          />
 
           {data.summary.openCount === 0 && data.summary.resolvedCount === 0 ? (
             <div
               className="rounded-plate border border-status-done-ink/20 bg-status-done-fill p-6 text-body text-status-done-ink"
               data-testid="exceptions-all-clear"
             >
-              Every errand in this period reconciled. Nothing needed a decision.
+              Every order in these dates checked out. Nothing needed a decision.
             </div>
           ) : (
             <>
               {data.summary.byKind.length > 0 && (
                 <div className="bg-board-plate border border-edge rounded-plate p-6">
                   <div className="text-body font-semibold text-ink mb-4">
-                    Exceptions by Category
+                    Problems by type
                   </div>
                   <ResponsiveContainer width="100%" height={240}>
                     <BarChart
@@ -165,10 +202,10 @@ export const ExceptionReportView: React.FC = () => {
                         textAnchor="end"
                       />
                       <YAxis tick={{ fontSize: 12, fill: "var(--color-ink-muted)" }} />
-                      <Tooltip formatter={(v: number, name: string) => [v, "Exceptions"]} />
+                      <Tooltip formatter={(v: number) => [v, "Problems"]} />
                       <Bar
                         dataKey="count"
-                        name="Exceptions"
+                        name="Problems"
                         radius={[4, 4, 0, 0]}
                       >
                         {data.summary.byKind.map((k, idx) => (
@@ -193,13 +230,13 @@ export const ExceptionReportView: React.FC = () => {
                     <thead className="bg-board-ground text-ink-muted">
                       <tr>
                         <th scope="col" className="text-left px-5 py-2 font-semibold">
-                          Kind
+                          Problem
                         </th>
                         <th scope="col" className="text-right px-5 py-2 font-semibold">
                           Count
                         </th>
                         <th scope="col" className="text-right px-5 py-2 font-semibold">
-                          At risk
+                          Money involved
                         </th>
                       </tr>
                     </thead>
@@ -234,15 +271,15 @@ export const ExceptionReportView: React.FC = () => {
                   <MobileResponsiveTable<typeof data.riders[number]>
                     data={data.riders}
                     keyExtractor={(r) => String(r.riderId)}
-                    primaryHeader="Rider & Volume"
-                    secondaryHeader="At Risk & Frequency"
+                    primaryHeader="Rider and orders"
+                    secondaryHeader="Money involved and problems"
                     renderPrimary={(r) => (
                       <div className="min-w-0">
                         <div className="font-semibold text-ink text-xs truncate">
                           {r.riderName ?? `Rider ${r.riderId}`}
                         </div>
                         <div className="text-[10px] text-ink-muted">
-                          {r.errandCount} errand{r.errandCount === 1 ? "" : "s"}
+                          {r.errandCount} order{r.errandCount === 1 ? "" : "s"}
                         </div>
                       </div>
                     )}
@@ -252,43 +289,43 @@ export const ExceptionReportView: React.FC = () => {
                           {r.atRisk > 0 ? formatPeso(r.atRisk) : "--"}
                         </div>
                         <div className="text-[10px] text-ink-muted">
-                          {r.exceptionCount} exc ({r.rate.toFixed(2)}/run)
+                          {r.exceptionCount} problem{r.exceptionCount === 1 ? "" : "s"}, {r.rate.toFixed(2)} per order
                         </div>
                       </div>
                     )}
                     renderPreview={(r) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Errands:</span>
+                          <span className="text-ink-muted">Orders</span>
                           <span className="font-mono text-ink font-medium">{r.errandCount}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Exceptions:</span>
+                          <span className="text-ink-muted">Problems</span>
                           <span className="font-mono text-ink font-medium">{r.exceptionCount}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Rate:</span>
-                          <span className="font-mono text-ink font-medium">{r.rate.toFixed(2)}/errand</span>
+                          <span className="text-ink-muted">Problems per order</span>
+                          <span className="font-mono text-ink font-medium">{r.rate.toFixed(2)}</span>
                         </div>
                       </div>
                     )}
                     inspectorTitle={(r) => r.riderName ?? `Rider ${r.riderId}`}
-                    inspectorSubtitle={(r) => `${r.errandCount} errands · ${r.exceptionCount} exceptions`}
+                    inspectorSubtitle={(r) => `${r.errandCount} orders · ${r.exceptionCount} problems`}
                     inspectorSections={(r) => [
                       {
-                        title: "Rider Details",
+                        title: "Rider",
                         items: [
                           { label: "Rider ID", value: `#${r.riderId}` },
-                          { label: "Rider Name", value: r.riderName ?? `Rider ${r.riderId}` },
-                          { label: "Completed Errands", value: String(r.errandCount) },
+                          { label: "Name", value: r.riderName ?? `Rider ${r.riderId}` },
+                          { label: "Orders", value: String(r.errandCount) },
                         ],
                       },
                       {
-                        title: "Exception Metrics",
+                        title: "Problems",
                         items: [
-                          { label: "Total Exceptions", value: String(r.exceptionCount) },
-                          { label: "Exceptions per Errand", value: r.rate.toFixed(2) },
-                          { label: "Total at Risk", value: r.atRisk > 0 ? formatPeso(r.atRisk) : "₱0.00" },
+                          { label: "Problems", value: String(r.exceptionCount) },
+                          { label: "Problems per order", value: r.rate.toFixed(2) },
+                          { label: "Money involved", value: r.atRisk > 0 ? formatPeso(r.atRisk) : "₱0.00" },
                         ],
                       },
                     ]}
@@ -301,16 +338,16 @@ export const ExceptionReportView: React.FC = () => {
                                 Rider
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Errands
+                                Orders
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Exceptions
+                                Problems
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Per errand
+                                Per order
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                At risk
+                                Money involved
                               </th>
                             </tr>
                           </thead>
@@ -345,17 +382,17 @@ export const ExceptionReportView: React.FC = () => {
               {/* ── every exception ─────────────────────────────────────── */}
               <section className="bg-board-plate border border-edge rounded-plate overflow-hidden">
                 <header className="px-5 py-3 border-b border-edge">
-                  <h3 className="text-label text-ink">Every exception in this period</h3>
+                  <h3 className="text-label text-ink">Every problem in these dates</h3>
                 </header>
                 <MobileResponsiveTable<typeof data.exceptions[number]>
-                  data={data.exceptions}
+                  data={exceptionsPagination.paginatedItems}
                   keyExtractor={(e, i) => `${e.errandId}-${e.kind}-${i}`}
-                  primaryHeader="Errand & Kind"
-                  secondaryHeader="Status & At Risk"
+                  primaryHeader="Order and problem"
+                  secondaryHeader="Status and money involved"
                   renderPrimary={(e) => (
                     <div className="min-w-0">
                       <div className="font-mono font-semibold text-ink text-xs">
-                        {e.errandId.slice(0, 8)}
+                        {formatErrandId(e.errandId)}
                       </div>
                       <div className="text-[10px] text-ink-muted truncate">
                         {KIND_LABEL[e.kind]}
@@ -381,44 +418,44 @@ export const ExceptionReportView: React.FC = () => {
                   renderPreview={(e) => (
                     <div className="space-y-1.5 pt-1 text-ink-muted">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">At Risk:</span>
+                        <span className="text-ink-muted">Money involved</span>
                         <span className="font-mono text-ink font-medium">{e.amountAtRisk > 0 ? formatPeso(e.amountAtRisk) : "None"}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">Status:</span>
+                        <span className="text-ink-muted">Status</span>
                         <span className="text-ink">{e.resolvedAt ? `Cleared by ${e.resolvedBy}` : "Open"}</span>
                       </div>
                       <div className="text-[11px] text-ink-muted line-clamp-1">
-                        <span className="text-ink-muted">Detail:</span> <span className="text-ink">{e.detail}</span>
+                        <span className="text-ink-muted">What happened:</span> <span className="text-ink">{plainDetail(e.detail)}</span>
                       </div>
                     </div>
                   )}
-                  inspectorTitle={(e) => e.errandId}
-                  inspectorSubtitle={(e) => `${KIND_LABEL[e.kind]} · ${e.resolvedAt ? "Resolved" : "Open"}`}
+                  inspectorTitle={(e) => formatErrandId(e.errandId)}
+                  inspectorSubtitle={(e) => `${KIND_LABEL[e.kind]} · ${e.resolvedAt ? "Cleared" : "Open"}`}
                   inspectorSections={(e) => [
                     {
-                      title: "Exception Summary",
+                      title: "Problem",
                       items: [
-                        { label: "Errand ID", value: e.errandId, copyable: true, copyValue: e.errandId },
-                        { label: "Category / Kind", value: KIND_LABEL[e.kind] },
-                        { label: "Amount at Risk", value: e.amountAtRisk > 0 ? formatPeso(e.amountAtRisk) : "None" },
-                        { label: "Occurred At", value: new Date(e.occurredAt).toLocaleString() },
+                        { label: "Order number", value: formatErrandId(e.errandId), copyable: true, copyValue: e.errandId },
+                        { label: "Type", value: KIND_LABEL[e.kind] },
+                        { label: "Money involved", value: e.amountAtRisk > 0 ? formatPeso(e.amountAtRisk) : "None" },
+                        { label: "When it happened", value: new Date(e.occurredAt).toLocaleString() },
                       ],
                     },
                     {
-                      title: "Incident Detail",
+                      title: "What happened",
                       items: [
-                        { label: "Detail", value: e.detail, fullWidth: true },
+                        { label: "Details", value: plainDetail(e.detail), fullWidth: true },
                       ],
                     },
                     {
-                      title: "Resolution Information",
+                      title: "How it was cleared",
                       items: e.resolvedAt ? [
-                        { label: "Resolved By", value: e.resolvedBy ?? "N/A" },
-                        { label: "Resolved At", value: new Date(e.resolvedAt).toLocaleString() },
-                        { label: "Resolution Reason", value: e.resolutionReason || "N/A", fullWidth: true },
+                        { label: "Cleared by", value: e.resolvedBy ?? "N/A" },
+                        { label: "Cleared on", value: new Date(e.resolvedAt).toLocaleString() },
+                        { label: "Reason given", value: e.resolutionReason || "N/A", fullWidth: true },
                       ] : [
-                        { label: "Status", value: "Unresolved — Pending Action", fullWidth: true },
+                        { label: "Status", value: "Still open: someone needs to decide", fullWidth: true },
                       ],
                     },
                   ]}
@@ -428,13 +465,13 @@ export const ExceptionReportView: React.FC = () => {
                         <thead className="bg-board-ground text-ink-muted">
                           <tr>
                             <th scope="col" className="text-left px-5 py-2 font-semibold">
-                              Errand
+                              Order
                             </th>
                             <th scope="col" className="text-left px-5 py-2 font-semibold">
-                              Kind
+                              Problem
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              At risk
+                              Money involved
                             </th>
                             <th scope="col" className="text-left px-5 py-2 font-semibold">
                               What happened
@@ -445,13 +482,13 @@ export const ExceptionReportView: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {data.exceptions.map((e, i) => (
+                          {exceptionsPagination.paginatedItems.map((e, i) => (
                             <tr
                               key={`${e.errandId}-${e.kind}-${i}`}
                               className="border-t border-hairline align-top"
                             >
                               <td className="px-5 py-2.5 font-mono text-label text-ink-muted">
-                                {e.errandId.slice(0, 8)}
+                                {formatErrandId(e.errandId)}
                               </td>
                               <td className="px-5 py-2.5 font-semibold text-ink whitespace-nowrap">
                                 {KIND_LABEL[e.kind]}
@@ -459,10 +496,10 @@ export const ExceptionReportView: React.FC = () => {
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                                 {e.amountAtRisk > 0 ? formatPeso(e.amountAtRisk) : "--"}
                               </td>
-                              <td className="px-5 py-2.5 text-ink-muted max-w-md">{e.detail}</td>
+                              <td className="px-5 py-2.5 text-ink-muted max-w-md">{plainDetail(e.detail)}</td>
                               <td className="px-5 py-2.5">
                                 {e.resolvedAt ? (
-                                  <div className="space-y-0.5">
+                                   <div className="space-y-0.5">
                                     <span className="inline-block px-2 py-0.5 rounded-trim bg-status-done-fill text-status-done-ink font-semibold">
                                       Cleared by {e.resolvedBy}
                                     </span>
@@ -481,42 +518,21 @@ export const ExceptionReportView: React.FC = () => {
                     </div>
                   }
                 />
+                <TablePagination
+                  currentPage={exceptionsPagination.currentPage}
+                  totalPages={exceptionsPagination.totalPages}
+                  totalItems={exceptionsPagination.totalItems}
+                  startIndex={exceptionsPagination.startIndex}
+                  endIndex={exceptionsPagination.endIndex}
+                  onPageChange={exceptionsPagination.setCurrentPage}
+                  itemName="problems"
+                />
               </section>
             </>
           )}
         </>
       )}
 
-      <DigitalReportReviewModal
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        reportName="Exception Report"
-        rangeLabel={data?.meta?.rangeLabel ?? ""}
-        onDownloadPdf={pdf.generate}
-        isGenerating={pdf.isGenerating}
-        generateError={pdf.error}
-      >
-        {data && (
-          <div className="space-y-2 text-label">
-            <p>
-              Still open: <span className="font-bold">{data.summary.openCount}</span>
-            </p>
-            <p>
-              Cleared: <span className="font-bold">{data.summary.resolvedCount}</span>
-            </p>
-            <p>
-              Total at risk:{" "}
-              <span className="font-bold">{formatPeso(data.summary.totalAtRisk)}</span>
-            </p>
-            {data.summary.byKind.map((k) => (
-              <p key={k.kind}>
-                {KIND_LABEL[k.kind]}: <span className="font-bold">{k.count}</span>
-                {k.atRisk > 0 && <> · {formatPeso(k.atRisk)}</>}
-              </p>
-            ))}
-          </div>
-        )}
-      </DigitalReportReviewModal>
     </div>
   );
 };

@@ -8,3 +8,5 @@ export type {
 } from "./RecordInspectorView";
 export { TableFilterDrawer } from "./TableFilterDrawer";
 export type { TableFilterDrawerProps } from "./TableFilterDrawer";
+export { TablePagination } from "./TablePagination";
+export type { TablePaginationProps } from "./TablePagination";

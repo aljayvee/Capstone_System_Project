@@ -1,30 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ChevronsLeftRight, Maximize2, Minimize2 } from "lucide-react";
 import { ReportState } from "./ReportState";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
+import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
-import { useReportPdf } from "../../../hooks/useReportPdf";
+import { useReportPrint } from "../../../hooks/useReportPrint";
 import { apiService, type ApiTransactionSummaryReport } from "../../../../../services/apiService";
 import type { DateRange } from "../../../../../components/DateRangePicker";
 import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatErrandId } from "../../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../../utils/format";
-import { MobileResponsiveTable } from "../../../../../components/table";
+import { MobileResponsiveTable, TablePagination } from "../../../../../components/table";
+import { usePagination } from "../../../../../hooks/usePagination";
 
 type Transaction = ApiTransactionSummaryReport["transactions"][number];
+type TransactionPoint = NonNullable<ApiTransactionSummaryReport["timelineBreakdown"]>[number];
+
+/** DELIVERED -> Delivered, IN_TRANSIT -> In transit. */
+const plainStatus = (status: string) =>
+  status.charAt(0).toUpperCase() + status.slice(1).toLowerCase().replace(/_/g, " ");
+
+const proofFrom = (source: Transaction["paymentEvidenceSource"]) =>
+  source === "customer" ? "Customer's upload" : source === "rider" ? "Rider's photo" : "—";
 
 const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transactions }) => (
   <table className="w-full text-label min-w-[1100px] border-collapse">
     <thead>
       <tr className="text-left text-ink-muted border-b border-hairline">
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
-          Errand
+          Order
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
-          Category
+          Store type
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Rider
@@ -39,7 +48,7 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
           Amount
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium text-right whitespace-nowrap">
-          Delivery Fee
+          Delivery fee
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Payment
@@ -49,10 +58,10 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
             rider's door-side photo. Null on COD, where there's no receipt to
             reference at all. */}
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
-          Payment Ref #
+          Payment reference
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
-          Evidence
+          Proof from
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium text-center whitespace-nowrap">
           Status
@@ -76,7 +85,7 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
               </span>
             )}
           </td>
-          <td className="px-3 py-2.5 whitespace-nowrap">{t.riderName ?? "Unassigned"}</td>
+          <td className="px-3 py-2.5 whitespace-nowrap">{t.riderName ?? "Not assigned"}</td>
           <td className="px-3 py-2.5 whitespace-nowrap">{t.customerName ?? "--"}</td>
           <td className="px-3 py-2.5 text-ink-muted max-w-[180px] truncate" title={t.deliveryAddress}>
             {t.deliveryAddress}
@@ -90,15 +99,11 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
           <td className="px-3 py-2.5 whitespace-nowrap">{t.paymentMethod}</td>
           <td className="px-3 py-2.5 font-mono text-ink-muted whitespace-nowrap">{t.paymentReferenceNo ?? "—"}</td>
           <td className="px-3 py-2.5 text-ink-muted whitespace-nowrap">
-            {t.paymentEvidenceSource === "customer"
-              ? "Customer upload"
-              : t.paymentEvidenceSource === "rider"
-                ? "Rider photo"
-                : "—"}
+            {proofFrom(t.paymentEvidenceSource)}
           </td>
           <td className="px-3 py-2.5 text-center whitespace-nowrap">
             <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
-              {t.errandStatus}
+              {plainStatus(t.errandStatus)}
             </span>
           </td>
         </tr>
@@ -107,7 +112,7 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
   </table>
 );
 
-/** A compact subtotal block — same shape for payment method and errand status. */
+/** A compact subtotal block — same shape for payment method and order status. */
 const SubtotalTable: React.FC<{
   title: string;
   rows: Array<{ name: string; count: number; amount: number }>;
@@ -135,16 +140,34 @@ const SubtotalTable: React.FC<{
 );
 
 export const TransactionSummaryReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
   const apiRange = toApiRange(preset, range);
-  const [reviewOpen, setReviewOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const { data, isLoading, error, reload } = useReport(apiService.getTransactionSummary, apiRange);
-  const pdf = useReportPdf("transactions", apiRange);
+  const printer = useReportPrint("transactions", apiRange);
+
+  const filteredTransactions = useMemo(() => {
+    if (!data) return [];
+    return data.transactions.filter((t) => {
+      const matchesSearch =
+        !tableSearch ||
+        t.errandId.toLowerCase().includes(tableSearch.toLowerCase()) ||
+        formatErrandId(t.errandId).toLowerCase().includes(tableSearch.toLowerCase()) ||
+        t.category.toLowerCase().includes(tableSearch.toLowerCase()) ||
+        (t.riderName && t.riderName.toLowerCase().includes(tableSearch.toLowerCase())) ||
+        (t.customerName && t.customerName.toLowerCase().includes(tableSearch.toLowerCase())) ||
+        (t.deliveryAddress && t.deliveryAddress.toLowerCase().includes(tableSearch.toLowerCase()));
+
+      const matchesStatus = statusFilter === "ALL" || t.errandStatus === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [data, tableSearch, statusFilter]);
+
+  const txPagination = usePagination(filteredTransactions, 25, [preset, range, statusFilter, tableSearch]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -159,23 +182,27 @@ export const TransactionSummaryReportView: React.FC = () => {
 
   const handleExportCSV = () => {
     if (!data) return;
+    const exportList =
+      filteredTransactions.length > 0 || statusFilter !== "ALL" || tableSearch
+        ? filteredTransactions
+        : data.transactions;
     downloadCSV(
       `Sugo_Transaction_Summary_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
-        "Errand ID",
-        "Category",
+        "Order Number",
+        "Store Type",
         "Rider",
         "Customer",
         "Location",
         "Amount (PHP)",
         "Delivery Fee (PHP)",
         "Payment Method",
-        "Payment Ref #",
-        "Evidence",
-        "Errand Status",
+        "Payment Reference",
+        "Proof From",
+        "Order Status",
         "Date",
       ],
-      data.transactions.map((t) => [
+      exportList.map((t) => [
         t.errandId,
         t.categories.join(" | "),
         t.riderName ?? "",
@@ -203,10 +230,11 @@ export const TransactionSummaryReportView: React.FC = () => {
         onPresetChange={setPreset}
         range={range}
         onRangeChange={setRange}
-        onPreview={() => setReviewOpen(true)}
+        onPrint={printer.print}
         onExportCSV={handleExportCSV}
         exportDisabled={!data}
-        isGeneratingPdf={pdf.isGenerating}
+        isPreparingPrint={printer.isPreparing}
+        printError={printer.error}
       />
       <ReportState
         isLoading={isLoading}
@@ -219,13 +247,24 @@ export const TransactionSummaryReportView: React.FC = () => {
       {data && (
         <>
           <p className="text-label text-ink-muted">
-            {data.rangeLabel} · {data.totals.count} transaction{data.totals.count === 1 ? "" : "s"}{" "}
-            · {formatPeso(data.totals.amount)}
+            {data.coverageLabel ?? data.rangeLabel} · {data.totals.count} transaction
+            {data.totals.count === 1 ? "" : "s"} · {formatPeso(data.totals.amount)}
           </p>
+
+          <PeriodBreakdownTable<TransactionPoint>
+            subject="Transactions"
+            unit={data.breakdownUnit}
+            points={data.timelineBreakdown}
+            figures={[
+              { header: "Transactions", format: "count", value: (p) => p.count },
+              { header: "Amount", format: "money", value: (p) => p.amount, primary: true },
+              { header: "Delivery fees", format: "money", value: (p) => p.deliveryFee },
+            ]}
+          />
 
           {data.transactions.length === 0 ? (
             <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
-              No transactions recorded for this period.
+              No transactions were recorded for these dates.
             </div>
           ) : (
             <>
@@ -239,9 +278,9 @@ export const TransactionSummaryReportView: React.FC = () => {
                   }))}
                 />
                 <SubtotalTable
-                  title="By errand status"
+                  title="By order status"
                   rows={data.byErrandStatus.map((r) => ({
-                    name: r.status,
+                    name: plainStatus(r.status),
                     count: r.count,
                     amount: r.amount,
                   }))}
@@ -249,24 +288,11 @@ export const TransactionSummaryReportView: React.FC = () => {
               </div>
 
               {(() => {
-                const filteredTransactions = data.transactions.filter((t) => {
-                  const matchesSearch =
-                    !tableSearch ||
-                    t.errandId.toLowerCase().includes(tableSearch.toLowerCase()) ||
-                    t.category.toLowerCase().includes(tableSearch.toLowerCase()) ||
-                    (t.riderName && t.riderName.toLowerCase().includes(tableSearch.toLowerCase())) ||
-                    (t.customerName && t.customerName.toLowerCase().includes(tableSearch.toLowerCase())) ||
-                    (t.deliveryAddress && t.deliveryAddress.toLowerCase().includes(tableSearch.toLowerCase()));
-
-                  const matchesStatus = statusFilter === "ALL" || t.errandStatus === statusFilter;
-                  return matchesSearch && matchesStatus;
-                });
-
                 const desktopTable = (
                   <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
                     <div className="px-5 py-3 border-b border-edge flex items-center justify-between bg-board-plate">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-label text-ink font-semibold">Transactions Log</h4>
+                        <h4 className="text-label text-ink font-semibold">Every transaction</h4>
                         <span className="text-label text-ink-muted">
                           ({filteredTransactions.length})
                         </span>
@@ -283,18 +309,28 @@ export const TransactionSummaryReportView: React.FC = () => {
                       </button>
                     </div>
                     <div className="p-6 overflow-x-auto">
-                      <TransactionTable transactions={filteredTransactions} />
+                      <TransactionTable transactions={txPagination.paginatedItems} />
                     </div>
+                    <TablePagination
+                      currentPage={txPagination.currentPage}
+                      totalPages={txPagination.totalPages}
+                      totalItems={txPagination.totalItems}
+                      startIndex={txPagination.startIndex}
+                      endIndex={txPagination.endIndex}
+                      onPageChange={txPagination.setCurrentPage}
+                      itemName="transactions"
+                    />
                   </div>
                 );
 
                 return (
-                  <MobileResponsiveTable<Transaction>
-                    data={filteredTransactions}
-                    keyExtractor={(t) => t.transactionId}
-                    desktopView={desktopTable}
-                    primaryHeader="Errand & Category"
-                    secondaryHeader="Amount & Status"
+                  <div className="space-y-3">
+                    <MobileResponsiveTable<Transaction>
+                      data={txPagination.paginatedItems}
+                      keyExtractor={(t) => t.transactionId}
+                      desktopView={desktopTable}
+                    primaryHeader="Order and store type"
+                    secondaryHeader="Amount and status"
                     renderPrimary={(t) => (
                       <div className="min-w-0">
                         <div className="font-mono font-medium text-ink text-xs flex items-center gap-1.5">
@@ -315,23 +351,23 @@ export const TransactionSummaryReportView: React.FC = () => {
                         <div className="font-mono font-semibold text-ink text-xs tabular-nums">
                           {formatPeso(t.amount)}
                         </div>
-                        <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full bg-board-ground text-ink-muted text-[10px] uppercase font-medium">
-                          {t.errandStatus}
+                        <span className="inline-block px-2 py-0.5 mt-0.5 rounded-full bg-board-ground text-ink-muted text-[10px] font-medium">
+                          {plainStatus(t.errandStatus)}
                         </span>
                       </div>
                     )}
                     renderPreview={(t) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Rider:</span>
-                          <span className="font-medium text-ink">{t.riderName ?? "Unassigned"}</span>
+                          <span className="text-ink-muted">Rider</span>
+                          <span className="font-medium text-ink">{t.riderName ?? "Not assigned"}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Customer:</span>
+                          <span className="text-ink-muted">Customer</span>
                           <span className="text-ink">{t.customerName ?? "--"}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Delivery Fee:</span>
+                          <span className="text-ink-muted">Delivery fee</span>
                           <span className="font-mono font-medium text-ink tabular-nums">
                             {formatPeso(t.deliveryFee)} ({t.paymentMethod})
                           </span>
@@ -342,41 +378,33 @@ export const TransactionSummaryReportView: React.FC = () => {
                     inspectorSubtitle={(t) => `${t.category} · ${t.paymentMethod}`}
                     inspectorStatusBadge={(t) => (
                       <span className="px-2.5 py-0.5 rounded-full bg-board-ground text-ink text-xs font-medium">
-                        {t.errandStatus}
+                        {plainStatus(t.errandStatus)}
                       </span>
                     )}
                     inspectorSections={(t) => [
                       {
-                        title: "Order & Route Details",
+                        title: "Order",
                         items: [
-                          { label: "Errand ID", value: t.errandId, copyable: true, copyValue: t.errandId },
-                          { label: "Category", value: t.categories.join(", ") },
+                          { label: "Order number", value: formatErrandId(t.errandId), copyable: true, copyValue: t.errandId },
+                          { label: "Store type", value: t.categories.join(", ") },
                           { label: "Customer", value: t.customerName ?? "—" },
-                          { label: "Assigned Rider", value: t.riderName ?? "Unassigned" },
-                          { label: "Delivery Address", value: t.deliveryAddress, fullWidth: true },
+                          { label: "Rider", value: t.riderName ?? "Not assigned" },
+                          { label: "Delivered to", value: t.deliveryAddress, fullWidth: true },
                         ],
                       },
                       {
-                        title: "Financial Breakdown",
+                        title: "Payment",
                         items: [
-                          { label: "Total Amount", value: formatPeso(t.amount) },
-                          { label: "Delivery Fee", value: formatPeso(t.deliveryFee) },
-                          { label: "Payment Method", value: t.paymentMethod },
+                          { label: "Amount", value: formatPeso(t.amount) },
+                          { label: "Delivery fee", value: formatPeso(t.deliveryFee) },
+                          { label: "Paid by", value: t.paymentMethod },
                           {
-                            label: "Payment Ref #",
+                            label: "Payment reference",
                             value: t.paymentReferenceNo ?? "—",
                             copyable: !!t.paymentReferenceNo,
                             copyValue: t.paymentReferenceNo ?? "",
                           },
-                          {
-                            label: "Evidence Source",
-                            value:
-                              t.paymentEvidenceSource === "customer"
-                                ? "Customer upload"
-                                : t.paymentEvidenceSource === "rider"
-                                ? "Rider photo"
-                                : "—",
-                          },
+                          { label: "Proof from", value: proofFrom(t.paymentEvidenceSource) },
                         ],
                       },
                     ]}
@@ -390,25 +418,37 @@ export const TransactionSummaryReportView: React.FC = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                            Errand Status
+                            Order status
                           </label>
                           <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                             className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:border-red-500 focus:outline-hidden"
                           >
-                            <option value="ALL">All Statuses</option>
-                            <option value="COMPLETED">COMPLETED</option>
-                            <option value="DELIVERED">DELIVERED</option>
-                            <option value="CANCELLED">CANCELLED</option>
-                            <option value="IN_TRANSIT">IN_TRANSIT</option>
-                            <option value="ASSIGNED">ASSIGNED</option>
-                            <option value="PENDING">PENDING</option>
+                            <option value="ALL">All statuses</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="DELIVERED">Delivered</option>
+                            <option value="CANCELLED">Cancelled</option>
+                            <option value="IN_TRANSIT">In transit</option>
+                            <option value="ASSIGNED">Assigned</option>
+                            <option value="PENDING">Pending</option>
                           </select>
                         </div>
                       </div>
                     }
                   />
+                  <div className="md:hidden">
+                    <TablePagination
+                      currentPage={txPagination.currentPage}
+                      totalPages={txPagination.totalPages}
+                      totalItems={txPagination.totalItems}
+                      startIndex={txPagination.startIndex}
+                      endIndex={txPagination.endIndex}
+                      onPageChange={txPagination.setCurrentPage}
+                      itemName="transactions"
+                    />
+                  </div>
+                </div>
                 );
               })()}
             </>
@@ -430,7 +470,7 @@ export const TransactionSummaryReportView: React.FC = () => {
               <div className="flex items-center gap-3">
                 <h3 className="text-body font-semibold text-ink">Transaction Summary</h3>
                 <span className="text-label px-2.5 py-0.5 rounded-full bg-board-ground text-ink font-medium">
-                  {data.rangeLabel}
+                  {data.coverageLabel ?? data.rangeLabel}
                 </span>
                 <span className="text-label text-ink-muted">
                   {data.totals.count} transaction{data.totals.count === 1 ? "" : "s"} · {formatPeso(data.totals.amount)}
@@ -459,13 +499,24 @@ export const TransactionSummaryReportView: React.FC = () => {
 
             {/* Content Table */}
             <div className="flex-1 overflow-auto p-6 bg-board-plate">
-              <TransactionTable transactions={data.transactions} />
+              <TransactionTable transactions={txPagination.paginatedItems} />
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-3 border-t border-edge bg-board-plate flex items-center justify-between text-label text-ink-muted">
-              <div>Showing all {data.transactions.length} transaction records</div>
-              <div className="flex items-center gap-2">
+            {/* Footer with Pagination */}
+            <div className="border-t border-edge bg-board-plate flex flex-col sm:flex-row items-center justify-between">
+              <div className="flex-1 w-full">
+                <TablePagination
+                  currentPage={txPagination.currentPage}
+                  totalPages={txPagination.totalPages}
+                  totalItems={txPagination.totalItems}
+                  startIndex={txPagination.startIndex}
+                  endIndex={txPagination.endIndex}
+                  onPageChange={txPagination.setCurrentPage}
+                  itemName="transactions"
+                  className="border-t-0"
+                />
+              </div>
+              <div className="hidden lg:flex items-center gap-2 pr-6 text-label text-ink-muted shrink-0">
                 <span>Press</span>
                 <kbd className="font-mono text-xs bg-board-ground px-1.5 py-0.5 rounded border border-edge">Esc</kbd>
                 <span>or click Exit to return</span>
@@ -475,21 +526,6 @@ export const TransactionSummaryReportView: React.FC = () => {
         </div>
       )}
 
-      <DigitalReportReviewModal
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        reportName="Transaction Summary"
-        rangeLabel={data?.rangeLabel ?? ""}
-        onDownloadPdf={pdf.generate}
-        isGenerating={pdf.isGenerating}
-        generateError={pdf.error}
-      >
-        {data && (
-          <div className="overflow-x-auto">
-            <TransactionTable transactions={data.transactions} />
-          </div>
-        )}
-      </DigitalReportReviewModal>
     </div>
   );
 };

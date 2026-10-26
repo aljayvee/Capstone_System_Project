@@ -1,18 +1,28 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ReportState } from "./ReportState";
 import { Star, Bike, Timer, Target, Wallet, ChevronRight } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { DigitalReportReviewModal } from "./DigitalReportReviewModal";
 import { ReportNotes } from "./ReportNotes";
+import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
-import { useReportPdf } from "../../../hooks/useReportPdf";
-import { apiService, type ApiRiderMetrics } from "../../../../../services/apiService";
+import { useReportPrint } from "../../../hooks/useReportPrint";
+import {
+  apiService,
+  type ApiDeliveryCheck,
+  type ApiRiderDecline,
+  type ApiRiderDelivery,
+  type ApiRiderMetrics,
+  type ApiRiderPerformanceReport,
+} from "../../../../../services/apiService";
+import { formatErrandId } from "../../../../../utils/formatErrandId";
 import type { DateRange } from "../../../../../components/DateRangePicker";
 import { toApiRange, type RangePreset } from "../../../../../components/RangeSelector";
 import { downloadCSV } from "../../../../../utils/downloadCSV";
 import { formatPeso } from "../../../../../utils/format";
-import { MobileResponsiveTable } from "../../../../../components/table";
+import { MobileResponsiveTable, TablePagination } from "../../../../../components/table";
+import { usePagination } from "../../../../../hooks/usePagination";
+import { RiderSearchPicker } from "./RiderSearchPicker";
 
 /**
  * An absent metric, with the reason attached.
@@ -34,15 +44,22 @@ const pct = (v: number | null, why: string) =>
 const mins = (v: number | null, why: string) =>
   v === null ? <Absent why={why} /> : `${v.toFixed(1)} min`;
 
+// A server from before declines were recorded sends no count at all; that is
+// shown as a dash, not as a rider who never declined.
+const DECLINES_ABSENT = "This server does not record declined offers yet.";
+const count = (v: number | undefined, why: string) => (v === undefined ? <Absent why={why} /> : v);
+
 type MetricGroup = "all" | "throughput" | "reliability" | "earnings" | "quality";
 
 const GROUPS: Array<{ id: MetricGroup; label: string }> = [
   { id: "all", label: "All" },
-  { id: "throughput", label: "Throughput" },
-  { id: "reliability", label: "Reliability" },
-  { id: "earnings", label: "Earnings" },
-  { id: "quality", label: "Quality" },
+  { id: "throughput", label: "Work done" },
+  { id: "reliability", label: "On time, declines and cancellations" },
+  { id: "earnings", label: "Pay" },
+  { id: "quality", label: "Ratings and problems" },
 ];
+
+type FleetPoint = NonNullable<ApiRiderPerformanceReport["timelineBreakdown"]>[number];
 
 /** One labelled figure inside an expanded rider panel, with its denominator. */
 const Stat: React.FC<{ label: string; value: React.ReactNode; context?: string }> = ({
@@ -57,98 +74,119 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; context?: string }
   </div>
 );
 
-const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
+const RiderDetail: React.FC<{ rider: ApiRiderMetrics; onOpenReport?: () => void }> = ({
+  rider,
+  onOpenReport,
+}) => {
   const { throughput: t, reliability: r, earnings: e, quality: q } = rider;
 
   return (
     <div className="bg-board-ground border-t border-hairline px-5 py-4 space-y-4">
       <div>
-        <h5 className="text-micro uppercase text-ink-muted mb-2">Throughput</h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Work done</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Stat label="Completed" value={t.completedCount} />
+          <Stat label="Delivered" value={t.completedCount} />
           <Stat
-            label="Accepted to delivered"
+            label="Average delivery time"
             value={mins(
               t.avgDeliveryMinutes,
-              "No errand in this period recorded both an accept and a delivery time.",
+              "No order in these dates has both an accepted time and a delivered time.",
             )}
-            context={t.deliveryTimedCount > 0 ? `over ${t.deliveryTimedCount} errands` : undefined}
+            context={t.deliveryTimedCount > 0 ? `from ${t.deliveryTimedCount} orders` : undefined}
           />
           <Stat
-            label="Assigned to accepted"
+            label="Average time to accept"
             value={mins(
               t.avgAcceptMinutes,
-              "No errand in this period recorded both an assign and an accept time.",
+              "No order in these dates has both an assigned time and an accepted time.",
             )}
-            context={t.acceptTimedCount > 0 ? `over ${t.acceptTimedCount} errands` : undefined}
+            context={t.acceptTimedCount > 0 ? `from ${t.acceptTimedCount} orders` : undefined}
           />
           <Stat
-            label="Per active hour"
+            label="Orders per hour online"
             value={
               t.errandsPerActiveHour === null ? (
-                <Absent why="This rider recorded no signed-in time in this period." />
+                <Absent why="This rider was not online in these dates." />
               ) : (
                 t.errandsPerActiveHour.toFixed(2)
               )
             }
-            context={t.activeHours > 0 ? `${t.activeHours.toFixed(1)} h signed in` : undefined}
+            context={t.activeHours > 0 ? `${t.activeHours.toFixed(1)} h online` : undefined}
           />
         </div>
       </div>
 
       <div>
-        <h5 className="text-micro uppercase text-ink-muted mb-2">Reliability</h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">On time and cancellations</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
             label="On time"
-            value={pct(r.onTimeRate, "No errand in this period carried an ETA to measure against.")}
+            value={pct(r.onTimeRate, "No delivery in these dates could be checked against a promised arrival time.")}
             context={
               r.onTimeDenominator > 0
-                ? `over ${r.onTimeDenominator} with an ETA` +
-                  (r.degradedEtaCount > 0 ? ` · ${r.degradedEtaCount} estimated` : "")
-                : undefined
+                ? `out of ${r.onTimeDenominator} checked` +
+                  ((r.notCheckedCount ?? 0) > 0 ? `, ${r.notCheckedCount} not checked` : "")
+                : (r.notCheckedCount ?? 0) > 0
+                  ? `${r.notCheckedCount} not checked`
+                  : undefined
             }
           />
           <Stat
             label="Cancelled"
-            value={pct(r.cancellationRate, "No errand reached this rider in this period.")}
+            value={pct(r.cancellationRate, "No order was given to this rider in these dates.")}
             context={
-              r.reachedCount > 0 ? `${r.cancelledCount} of ${r.reachedCount} reached` : undefined
+              r.reachedCount > 0 ? `${r.cancelledCount} of ${r.reachedCount} given to them` : undefined
             }
           />
-          <Stat label="Signal drops" value={r.connectivityDrops} />
+          <Stat label="Times offline" value={r.connectivityDrops} />
           <Stat
-            label="Never reconnected"
+            label="Still offline"
             value={r.unresolvedDrops}
-            context={r.unresolvedDrops > 0 ? "still open" : undefined}
+            context={r.unresolvedDrops > 0 ? "not back online yet" : undefined}
           />
         </div>
       </div>
 
       <div>
-        <h5 className="text-micro uppercase text-ink-muted mb-2">Earnings and cash</h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Offers turned down</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
-            label="Earned"
-            value={formatPeso(e.riderShareEarned)}
-            context={e.commissionCount > 0 ? `${e.commissionCount} payouts` : undefined}
+            label="Declined"
+            value={count(r.declinedCount, DECLINES_ABSENT)}
+            context={r.declinedCount !== undefined ? "pressed Decline" : undefined}
           />
           <Stat
-            label="Cash variance"
+            label="Let lapse"
+            value={count(r.expiredOfferCount, DECLINES_ABSENT)}
+            context={r.expiredOfferCount !== undefined ? "did not answer in time" : undefined}
+          />
+        </div>
+      </div>
+
+      <div>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Pay and cash</h5>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Stat
+            label="Pay"
+            value={formatPeso(e.riderShareEarned)}
+            context={e.commissionCount > 0 ? `from ${e.commissionCount} orders` : undefined}
+          />
+          <Stat
+            label="Cash short or over"
             value={
               <span className={e.settlementVarianceTotal < 0 ? "text-status-act-ink" : undefined}>
                 {formatPeso(e.settlementVarianceTotal)}
               </span>
             }
-            context={e.settlementCount > 0 ? `over ${e.settlementCount} settlements` : undefined}
+            context={e.settlementCount > 0 ? `over ${e.settlementCount} cash handovers` : undefined}
           />
-          <Stat label="Short settlements" value={e.shortageCount} />
-          <Stat label="Settlements" value={e.settlementCount} />
+          <Stat label="Times short" value={e.shortageCount} />
+          <Stat label="Cash handovers" value={e.settlementCount} />
         </div>
       </div>
 
       <div>
-        <h5 className="text-micro uppercase text-ink-muted mb-2">Service quality</h5>
+        <h5 className="text-micro uppercase text-ink-muted mb-2">Ratings and problems</h5>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Stat
             label="Rating (all time)"
@@ -164,41 +202,279 @@ const RiderDetail: React.FC<{ rider: ApiRiderMetrics }> = ({ rider }) => {
             }
             context={q.ratingCountAllTime > 0 ? `from ${q.ratingCountAllTime} ratings` : undefined}
           />
-          <Stat label="Exceptions" value={q.exceptionCount} />
+          <Stat label="Problems" value={q.exceptionCount} />
           <Stat
-            label="Per errand"
+            label="Problems per order"
             value={
               q.exceptionRate === null ? (
-                <Absent why="This rider has no errands with reconciliation evidence in this period." />
+                <Absent why="This rider had no orders to check in these dates." />
               ) : (
                 q.exceptionRate.toFixed(2)
               )
             }
             context={
-              q.exceptionErrandCount > 0 ? `over ${q.exceptionErrandCount} errands` : undefined
+              q.exceptionErrandCount > 0 ? `over ${q.exceptionErrandCount} orders` : undefined
             }
           />
-          <Stat label="At risk" value={formatPeso(q.exceptionsAtRisk)} />
+          <Stat label="Money involved" value={formatPeso(q.exceptionsAtRisk)} />
         </div>
       </div>
+
+      {onOpenReport && (
+        <button
+          type="button"
+          onClick={onOpenReport}
+          className="inline-flex items-center gap-1.5 rounded-plate border border-edge bg-board-plate px-3 py-1.5 text-label text-ink hover:bg-board-ground transition"
+        >
+          Open {rider.name}'s report <ChevronRight size={13} />
+        </button>
+      )}
     </div>
   );
 };
 
+const NOT_CHECKED_REASON: Record<string, string> = {
+  NO_PROMISE: "no promise was saved",
+  PROMISE_TOO_LATE: "promise made too late",
+  PROMISE_TOO_CLOSE: "promise made just before delivery",
+  TIME_DOES_NOT_ADD_UP: "delivery time does not add up",
+  NO_GPS_AT_DELIVERY: "no GPS near the delivery time",
+  FAR_FROM_ADDRESS: "marked delivered away from the address",
+};
+
+/** The same words the printout uses for each verdict. */
+function deliveryResult(check: ApiDeliveryCheck | null): { text: string; tone: string } {
+  if (!check) return { text: "-", tone: "text-ink-muted" };
+  if (check.result === "ON_TIME") return { text: "On time", tone: "text-status-done-ink" };
+  if (check.result === "LATE") return { text: `Late by ${check.minutesLate} min`, tone: "text-status-act-ink" };
+  if (check.reason === "FAR_FROM_ADDRESS" && typeof check.nearestMeters === "number") {
+    const far =
+      check.nearestMeters >= 1000
+        ? `${(check.nearestMeters / 1000).toFixed(1)} km`
+        : `${Math.round(check.nearestMeters)} m`;
+    return { text: `Not checked: marked delivered ${far} from the address`, tone: "text-ink-muted" };
+  }
+  return { text: `Not checked: ${NOT_CHECKED_REASON[check.reason] ?? "no reason recorded"}`, tone: "text-ink-muted" };
+}
+
+const stamp = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    : "—";
+
+/** One rider's deliveries, each with its On Time verdict: what the rate rests on. */
+const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliveries }) => {
+  if (deliveries.length === 0) {
+    return (
+      <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
+        No deliveries in these dates.
+      </div>
+    );
+  }
+
+  const desktopTable = (
+    <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-label">
+          <thead className="bg-board-ground text-ink-muted">
+            <tr>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Order</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Accepted</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Delivered</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Promised by</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">On time?</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deliveries.map((d) => {
+              const verdict = deliveryResult(d.check);
+              return (
+                <tr key={d.errandId} className="border-t border-hairline">
+                  <td className="px-5 py-2.5 font-mono text-ink whitespace-nowrap">
+                    {d.referenceNo ?? formatErrandId(d.errandId)}
+                  </td>
+                  <td className="px-5 py-2.5 text-ink-muted whitespace-nowrap">{stamp(d.acceptedAt)}</td>
+                  <td className="px-5 py-2.5 text-ink whitespace-nowrap">{stamp(d.deliveredAt)}</td>
+                  <td className="px-5 py-2.5 text-ink-muted whitespace-nowrap">{stamp(d.promisedBy)}</td>
+                  <td className={`px-5 py-2.5 font-semibold ${verdict.tone}`}>{verdict.text}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <MobileResponsiveTable<ApiRiderDelivery>
+      data={deliveries}
+      keyExtractor={(d) => d.errandId}
+      desktopView={desktopTable}
+      primaryHeader="Order"
+      secondaryHeader="On time?"
+      renderPrimary={(d) => (
+        <div className="min-w-0">
+          <div className="font-mono font-semibold text-ink text-xs truncate">
+            {d.referenceNo ?? formatErrandId(d.errandId)}
+          </div>
+          <div className="text-[10px] text-ink-muted">Delivered {stamp(d.deliveredAt)}</div>
+        </div>
+      )}
+      renderSecondary={(d) => {
+        const verdict = deliveryResult(d.check);
+        return (
+          <div className={`text-right shrink-0 text-xs font-semibold max-w-[9rem] ${verdict.tone}`}>
+            {verdict.text}
+          </div>
+        );
+      }}
+      renderPreview={(d) => (
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-ink-muted">Accepted</span>
+            <span className="text-ink">{stamp(d.acceptedAt)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-ink-muted">Promised by</span>
+            <span className="text-ink">{stamp(d.promisedBy)}</span>
+          </div>
+        </div>
+      )}
+      inspectorTitle={(d) => d.referenceNo ?? formatErrandId(d.errandId)}
+      inspectorSubtitle={(d) => deliveryResult(d.check).text}
+      inspectorSections={(d) => [
+        {
+          title: "Delivery",
+          items: [
+            { label: "Accepted", value: stamp(d.acceptedAt) },
+            { label: "Delivered", value: stamp(d.deliveredAt) },
+            { label: "Promised by", value: stamp(d.promisedBy) },
+            { label: "On time?", value: deliveryResult(d.check).text, fullWidth: true },
+          ],
+        },
+      ]}
+    />
+  );
+};
+
+const declineHow = (d: ApiRiderDecline) => (d.kind === "EXPIRED" ? "Let lapse" : "Declined");
+const declineReason = (d: ApiRiderDecline) => (d.kind === "EXPIRED" ? "No answer before the timer ran out" : d.reason ?? "No reason given");
+
+/** One rider's declined and lapsed offers: what their decline count rests on. */
+const RiderDeclines: React.FC<{ declines: ApiRiderDecline[] }> = ({ declines }) => {
+  if (declines.length === 0) {
+    return (
+      <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
+        No offers declined or let lapse in these dates.
+      </div>
+    );
+  }
+
+  const desktopTable = (
+    <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-label">
+          <thead className="bg-board-ground text-ink-muted">
+            <tr>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Order</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Offered</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Turned down</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">How</th>
+              <th scope="col" className="text-left px-5 py-2 font-semibold">Reason given</th>
+            </tr>
+          </thead>
+          <tbody>
+            {declines.map((d) => (
+              <tr key={d.id} className="border-t border-hairline">
+                <td className="px-5 py-2.5 font-mono text-ink whitespace-nowrap">
+                  {d.referenceNo ?? formatErrandId(d.errandId)}
+                </td>
+                <td className="px-5 py-2.5 text-ink-muted whitespace-nowrap">{stamp(d.offeredAt)}</td>
+                <td className="px-5 py-2.5 text-ink whitespace-nowrap">{stamp(d.declinedAt)}</td>
+                <td className="px-5 py-2.5 font-semibold text-ink whitespace-nowrap">{declineHow(d)}</td>
+                <td className="px-5 py-2.5 text-ink-muted break-words">{declineReason(d)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <MobileResponsiveTable<ApiRiderDecline>
+      data={declines}
+      keyExtractor={(d) => d.id}
+      desktopView={desktopTable}
+      primaryHeader="Order"
+      secondaryHeader="How"
+      renderPrimary={(d) => (
+        <div className="min-w-0">
+          <div className="font-mono font-semibold text-ink text-xs truncate">
+            {d.referenceNo ?? formatErrandId(d.errandId)}
+          </div>
+          <div className="text-[10px] text-ink-muted">Turned down {stamp(d.declinedAt)}</div>
+        </div>
+      )}
+      renderSecondary={(d) => (
+        <div className="text-right shrink-0 text-xs font-semibold text-ink">{declineHow(d)}</div>
+      )}
+      renderPreview={(d) => (
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-start justify-between gap-3 text-[11px]">
+            <span className="text-ink-muted shrink-0">Reason</span>
+            <span className="text-ink text-right break-words min-w-0">{declineReason(d)}</span>
+          </div>
+        </div>
+      )}
+      inspectorTitle={(d) => d.referenceNo ?? formatErrandId(d.errandId)}
+      inspectorSubtitle={(d) => declineHow(d)}
+      inspectorSections={(d) => [
+        {
+          title: "Offer",
+          items: [
+            { label: "Offered", value: stamp(d.offeredAt) },
+            { label: "Turned down", value: stamp(d.declinedAt) },
+            { label: "Reason given", value: declineReason(d), fullWidth: true },
+          ],
+        },
+      ]}
+    />
+  );
+};
+
 export const RiderPerformanceReportView: React.FC = () => {
-  const [preset, setPreset] = useState<RangePreset>("MONTH");
+  const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
+  // One rider, or null for the whole fleet. Carried in the report query, so
+  // the screen and the printout are narrowed by the same server call.
+  const [riderId, setRiderId] = useState<number | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
-  const apiRange = toApiRange(preset, range);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const apiRange = { ...toApiRange(preset, range), ...(riderId ? { riderId } : {}) };
   const [group, setGroup] = useState<MetricGroup>("all");
   const [expanded, setExpanded] = useState<number | null>(null);
+  // Kept across reloads: the report empties while a new window loads, and the
+  // picker must not vanish under the owner's hand while it does.
+  const [riderOptions, setRiderOptions] = useState<Array<{ riderId: number; name: string }>>([]);
 
   const { data, isLoading, error, reload } = useReport(
     apiService.getRiderPerformanceReport,
     apiRange,
   );
-  const pdf = useReportPdf("rider-performance", apiRange);
+  const printer = useReportPrint("rider-performance", apiRange);
+  const ridersPagination = usePagination(data?.riders, 25, [preset, range, riderId, group]);
+
+  useEffect(() => {
+    if (data?.riderOptions) setRiderOptions(data.riderOptions);
+  }, [data]);
+
+  const chooseRider = (id: number | null) => {
+    setRiderId(id);
+    setExpanded(null);
+  };
+
+  const riderPicker = <RiderSearchPicker options={riderOptions} value={riderId} onChange={chooseRider} />;
 
   const handleExportCSV = () => {
     if (!data) return;
@@ -213,6 +489,8 @@ export const RiderPerformanceReportView: React.FC = () => {
         "On-Time Rate",
         "On-Time Denominator",
         "Cancellation Rate",
+        "Offers Declined",
+        "Offers Let Lapse",
         "Rider Share Earned",
         "Settlement Variance",
         "Average Rating",
@@ -228,6 +506,8 @@ export const RiderPerformanceReportView: React.FC = () => {
         r.reliability.onTimeRate ?? "",
         r.reliability.onTimeDenominator,
         r.reliability.cancellationRate ?? "",
+        r.reliability.declinedCount ?? "",
+        r.reliability.expiredOfferCount ?? "",
         r.earnings.riderShareEarned,
         r.earnings.settlementVarianceTotal,
         r.quality.averageRatingAllTime ?? "",
@@ -249,10 +529,13 @@ export const RiderPerformanceReportView: React.FC = () => {
         onPresetChange={setPreset}
         range={range}
         onRangeChange={setRange}
-        onPreview={() => setReviewOpen(true)}
+        onPrint={printer.print}
         onExportCSV={handleExportCSV}
         exportDisabled={!data}
-        isGeneratingPdf={pdf.isGenerating}
+        isPreparingPrint={printer.isPreparing}
+        printError={printer.error}
+        filters={riderPicker}
+        printLabel={riderId ? "Print rider report" : "Print"}
       />
       <ReportState
         isLoading={isLoading}
@@ -264,7 +547,22 @@ export const RiderPerformanceReportView: React.FC = () => {
 
       {data && (
         <>
-          <p className="text-label text-ink-muted">{data.rangeLabel}</p>
+          <p className="text-label text-ink-muted">
+            {data.rider && <span className="font-semibold text-ink">{data.rider.name} · </span>}
+            {data.coverageLabel ?? data.rangeLabel}
+            {data.rider && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={() => chooseRider(null)}
+                  className="underline underline-offset-2 hover:text-ink"
+                >
+                  Show all riders
+                </button>
+              </>
+            )}
+          </p>
 
           <div className="bg-board-plate border border-edge rounded-plate divide-y sm:divide-y-0 sm:divide-x divide-hairline grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             <div className="p-5 flex items-start gap-3.5">
@@ -272,12 +570,12 @@ export const RiderPerformanceReportView: React.FC = () => {
                 <Bike className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-body text-ink-muted">Completed Errands</div>
+                <div className="text-body text-ink-muted">Orders delivered</div>
                 <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                   {data.fleet.completedCount}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5 truncate">
-                  {data.fleet.riderCount} riders
+                  {data.rider ? data.rider.name : `${data.fleet.riderCount} riders`}
                 </div>
               </div>
             </div>
@@ -287,7 +585,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                 <Timer className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-body text-ink-muted">Avg Delivery Time</div>
+                <div className="text-body text-ink-muted">Average delivery time</div>
                 <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                   {data.fleet.avgDeliveryMinutes === null
                     ? "--"
@@ -295,8 +593,8 @@ export const RiderPerformanceReportView: React.FC = () => {
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5 truncate">
                   {data.fleet.deliveryTimedCount > 0
-                    ? `over ${data.fleet.deliveryTimedCount} timed errands`
-                    : "no timed errands"}
+                    ? `from ${data.fleet.deliveryTimedCount} timed orders`
+                    : "no timed orders"}
                 </div>
               </div>
             </div>
@@ -306,7 +604,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                 <Target className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-body text-ink-muted">On-Time Rate</div>
+                <div className="text-body text-ink-muted">On time</div>
                 <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                   {data.fleet.onTimeRate === null
                     ? "--"
@@ -314,8 +612,11 @@ export const RiderPerformanceReportView: React.FC = () => {
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5 truncate">
                   {data.fleet.onTimeDenominator > 0
-                    ? `over ${data.fleet.onTimeDenominator} with an ETA`
-                    : "no errand carried an ETA"}
+                    ? `out of ${data.fleet.onTimeDenominator} checked` +
+                      ((data.fleet.notCheckedCount ?? 0) > 0
+                        ? `, ${data.fleet.notCheckedCount} not checked`
+                        : "")
+                    : "no delivery could be checked yet"}
                 </div>
               </div>
             </div>
@@ -325,21 +626,61 @@ export const RiderPerformanceReportView: React.FC = () => {
                 <Wallet className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <div className="text-body text-ink-muted">Rider Earnings</div>
+                <div className="text-body text-ink-muted">Rider pay</div>
                 <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                   {formatPeso(data.fleet.riderShareEarned)}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5 truncate">
-                  {formatPeso(data.fleet.settlementVarianceTotal)} cash variance
+                  {formatPeso(data.fleet.settlementVarianceTotal)} cash short or over
                 </div>
               </div>
             </div>
           </div>
 
+          <PeriodBreakdownTable<FleetPoint>
+            subject={data.rider ? "Work" : "Riders' work"}
+            unit={data.breakdownUnit}
+            points={data.timelineBreakdown}
+            figures={[
+              { header: "Orders delivered", format: "count", value: (p) => p.completedCount, primary: true },
+              { header: "Cancelled", format: "count", value: (p) => p.cancelledCount },
+              { header: "Rider pay", format: "money", value: (p) => p.riderShareEarned },
+              {
+                header: "Cash short or over",
+                format: "money",
+                value: (p) => p.settlementVarianceTotal,
+                signed: true,
+              },
+            ]}
+          />
+
+          {data.rider ? (
+            <>
+              {data.riders[0] && (
+                <section className="space-y-3">
+                  <h3 className="text-panel text-ink">{data.rider.name}: all figures</h3>
+                  <div className="rounded-plate border border-edge overflow-hidden">
+                    <RiderDetail rider={data.riders[0]} />
+                  </div>
+                </section>
+              )}
+              <section className="space-y-3">
+                <h3 className="text-panel text-ink">Every delivery in these dates</h3>
+                <RiderDeliveries deliveries={data.deliveries ?? []} />
+              </section>
+              {data.declines && (
+                <section className="space-y-3">
+                  <h3 className="text-panel text-ink">Every offer declined or let lapse in these dates</h3>
+                  <RiderDeclines declines={data.declines} />
+                </section>
+              )}
+            </>
+          ) : (
+          <>
           {data.riders.length > 0 && (
             <div className="bg-board-plate border border-edge rounded-plate p-6">
               <div className="text-body font-semibold text-ink mb-4">
-                Completed Errands & Rider Earnings by Rider
+                Orders delivered and pay, by rider
               </div>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart
@@ -366,7 +707,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                   />
                   <Tooltip
                     formatter={(v: number, name: string) => [
-                      name === "Earnings (PHP)" ? formatPeso(v) : v,
+                      name === "Pay (PHP)" ? formatPeso(v) : v,
                       name,
                     ]}
                   />
@@ -374,14 +715,14 @@ export const RiderPerformanceReportView: React.FC = () => {
                   <Bar
                     yAxisId="left"
                     dataKey="completed"
-                    name="Completed Errands"
+                    name="Orders delivered"
                     fill="#2563EB"
                     radius={[4, 4, 0, 0]}
                   />
                   <Bar
                     yAxisId="right"
                     dataKey="earned"
-                    name="Earnings (PHP)"
+                    name="Pay (PHP)"
                     fill="#10B981"
                     radius={[4, 4, 0, 0]}
                   />
@@ -422,13 +763,13 @@ export const RiderPerformanceReportView: React.FC = () => {
                           {showThroughput && (
                             <>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Completed
+                                Delivered
                               </th>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Avg delivery
+                                Avg delivery time
                               </th>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Per active hr
+                                Orders per hour online
                               </th>
                             </>
                           )}
@@ -440,15 +781,18 @@ export const RiderPerformanceReportView: React.FC = () => {
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
                                 Cancelled
                               </th>
+                              <th scope="col" className="text-right px-4 py-2 font-semibold">
+                                Declined
+                              </th>
                             </>
                           )}
                           {showEarnings && (
                             <>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Earned
+                                Pay
                               </th>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Cash variance
+                                Cash short or over
                               </th>
                             </>
                           )}
@@ -458,7 +802,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                                 Rating
                               </th>
                               <th scope="col" className="text-right px-4 py-2 font-semibold">
-                                Exceptions
+                                Problems
                               </th>
                             </>
                           )}
@@ -469,7 +813,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.riders.map((r) => {
+                        {ridersPagination.paginatedItems.map((r) => {
                           const isOpen = expanded === r.riderId;
                           return (
                             <React.Fragment key={r.riderId}>
@@ -488,12 +832,12 @@ export const RiderPerformanceReportView: React.FC = () => {
                                     <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                       {mins(
                                         r.throughput.avgDeliveryMinutes,
-                                        "No errand in this period recorded both an accept and a delivery time.",
+                                        "No order in these dates has both an accepted time and a delivered time.",
                                       )}
                                     </td>
                                     <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                       {r.throughput.errandsPerActiveHour === null ? (
-                                        <Absent why="This rider recorded no signed-in time in this period." />
+                                        <Absent why="This rider was not online in these dates." />
                                       ) : (
                                         r.throughput.errandsPerActiveHour.toFixed(2)
                                       )}
@@ -505,7 +849,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                                     <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                       {pct(
                                         r.reliability.onTimeRate,
-                                        "No errand in this period carried an ETA to measure against.",
+                                        "No delivery in these dates could be checked against a promised arrival time.",
                                       )}
                                       {r.reliability.onTimeDenominator > 0 && (
                                         <span className="ml-1 text-label text-ink-muted">
@@ -516,7 +860,18 @@ export const RiderPerformanceReportView: React.FC = () => {
                                     <td className="px-4 py-2.5 text-right font-mono tabular-nums">
                                       {pct(
                                         r.reliability.cancellationRate,
-                                        "No errand reached this rider in this period.",
+                                        "No order was given to this rider in these dates.",
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                                      {count(r.reliability.declinedCount, DECLINES_ABSENT)}
+                                      {(r.reliability.expiredOfferCount ?? 0) > 0 && (
+                                        <span
+                                          className="ml-1 text-label text-ink-muted"
+                                          title="Offers this rider let run out without answering"
+                                        >
+                                          +{r.reliability.expiredOfferCount} lapsed
+                                        </span>
                                       )}
                                     </td>
                                   </>
@@ -578,7 +933,7 @@ export const RiderPerformanceReportView: React.FC = () => {
                               {isOpen && (
                                 <tr>
                                   <td colSpan={12} className="p-0">
-                                    <RiderDetail rider={r} />
+                                    <RiderDetail rider={r} onOpenReport={() => chooseRider(r.riderId)} />
                                   </td>
                                 </tr>
                               )}
@@ -588,23 +943,33 @@ export const RiderPerformanceReportView: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                  <TablePagination
+                    currentPage={ridersPagination.currentPage}
+                    totalPages={ridersPagination.totalPages}
+                    totalItems={ridersPagination.totalItems}
+                    startIndex={ridersPagination.startIndex}
+                    endIndex={ridersPagination.endIndex}
+                    onPageChange={ridersPagination.setCurrentPage}
+                    itemName="riders"
+                  />
                 </div>
               );
 
               return (
-                <MobileResponsiveTable<ApiRiderMetrics>
-                  data={data.riders}
-                  keyExtractor={(r) => r.riderId}
-                  desktopView={desktopTable}
+                <div className="space-y-3">
+                  <MobileResponsiveTable<ApiRiderMetrics>
+                    data={ridersPagination.paginatedItems}
+                    keyExtractor={(r) => r.riderId}
+                    desktopView={desktopTable}
                   primaryHeader="Rider"
-                  secondaryHeader="Completed & Earnings"
+                  secondaryHeader="Delivered and pay"
                   renderPrimary={(r) => (
                     <div className="min-w-0">
                       <div className="font-semibold text-ink text-xs truncate">
                         {r.name}
                       </div>
                       <div className="text-[10px] text-ink-muted">
-                        {r.throughput.completedCount} completed · {r.quality.averageRatingAllTime ? `${r.quality.averageRatingAllTime.toFixed(1)} ★` : "No rating"}
+                        {r.throughput.completedCount} delivered · {r.quality.averageRatingAllTime ? `${r.quality.averageRatingAllTime.toFixed(1)} ★` : "No rating"}
                       </div>
                     </div>
                   )}
@@ -614,26 +979,32 @@ export const RiderPerformanceReportView: React.FC = () => {
                         {formatPeso(r.earnings.riderShareEarned)}
                       </div>
                       <div className="text-[10px] text-ink-muted">
-                        {r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(0)}% on-time` : "No ETA"}
+                        {r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(0)}% on time` : "Not checked"}
                       </div>
                     </div>
                   )}
                   renderPreview={(r) => (
                     <div className="space-y-1.5 pt-1 text-ink-muted">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">Avg Delivery:</span>
+                        <span className="text-ink-muted">Average delivery time</span>
                         <span className="font-mono font-medium text-ink tabular-nums">
                           {r.throughput.avgDeliveryMinutes !== null ? `${r.throughput.avgDeliveryMinutes.toFixed(1)} min` : "—"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">Cancellation Rate:</span>
+                        <span className="text-ink-muted">Cancelled</span>
                         <span className="font-mono font-medium text-ink tabular-nums">
                           {r.reliability.cancellationRate !== null ? `${(r.reliability.cancellationRate * 100).toFixed(1)}%` : "—"}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">Cash Variance:</span>
+                        <span className="text-ink-muted">Declined / let lapse</span>
+                        <span className="font-mono font-medium text-ink tabular-nums">
+                          {r.reliability.declinedCount ?? "—"} / {r.reliability.expiredOfferCount ?? "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-ink-muted">Cash short or over</span>
                         <span className={`font-mono font-medium tabular-nums ${r.earnings.settlementVarianceTotal < 0 ? "text-status-act-ink" : "text-ink"}`}>
                           {formatPeso(r.earnings.settlementVarianceTotal)}
                         </span>
@@ -641,100 +1012,64 @@ export const RiderPerformanceReportView: React.FC = () => {
                     </div>
                   )}
                   inspectorTitle={(r) => r.name}
-                  inspectorSubtitle={(r) => `Fleet Performance Telemetry`}
+                  inspectorSubtitle={() => "Rider summary"}
                   inspectorStatusBadge={(r) => (
                     <span className="font-mono font-bold text-xs text-ink">
-                      {r.throughput.completedCount} Runs
+                      {r.throughput.completedCount} delivered
                     </span>
                   )}
                   inspectorSections={(r) => [
                     {
-                      title: "Throughput",
+                      title: "Work done",
                       items: [
-                        { label: "Completed Runs", value: `${r.throughput.completedCount}` },
-                        { label: "Avg Delivery Time", value: r.throughput.avgDeliveryMinutes !== null ? `${r.throughput.avgDeliveryMinutes.toFixed(1)} mins` : "—" },
-                        { label: "Avg Accept Time", value: r.throughput.avgAcceptMinutes !== null ? `${r.throughput.avgAcceptMinutes.toFixed(1)} mins` : "—" },
-                        { label: "Per Active Hour", value: r.throughput.errandsPerActiveHour !== null ? r.throughput.errandsPerActiveHour.toFixed(2) : "—" },
+                        { label: "Orders delivered", value: `${r.throughput.completedCount}` },
+                        { label: "Average delivery time", value: r.throughput.avgDeliveryMinutes !== null ? `${r.throughput.avgDeliveryMinutes.toFixed(1)} mins` : "—" },
+                        { label: "Average time to accept", value: r.throughput.avgAcceptMinutes !== null ? `${r.throughput.avgAcceptMinutes.toFixed(1)} mins` : "—" },
+                        { label: "Orders per hour online", value: r.throughput.errandsPerActiveHour !== null ? r.throughput.errandsPerActiveHour.toFixed(2) : "—" },
                       ],
                     },
                     {
-                      title: "Reliability & Quality",
+                      title: "On time and ratings",
                       items: [
-                        { label: "On-Time Delivery Rate", value: r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(1)}%` : "—" },
-                        { label: "Cancellation Rate", value: r.reliability.cancellationRate !== null ? `${(r.reliability.cancellationRate * 100).toFixed(1)}%` : "—" },
-                        { label: "Average Rating", value: r.quality.averageRatingAllTime !== null ? `${r.quality.averageRatingAllTime.toFixed(1)} ★ (${r.quality.ratingCountAllTime} ratings)` : "No ratings" },
-                        { label: "Disputes / Exceptions", value: `${r.quality.exceptionCount}` },
+                        { label: "On time", value: r.reliability.onTimeRate !== null ? `${(r.reliability.onTimeRate * 100).toFixed(1)}%` : "—" },
+                        { label: "Cancelled", value: r.reliability.cancellationRate !== null ? `${(r.reliability.cancellationRate * 100).toFixed(1)}%` : "—" },
+                        { label: "Offers declined", value: r.reliability.declinedCount !== undefined ? `${r.reliability.declinedCount}` : "—" },
+                        { label: "Offers let lapse", value: r.reliability.expiredOfferCount !== undefined ? `${r.reliability.expiredOfferCount}` : "—" },
+                        { label: "Average rating", value: r.quality.averageRatingAllTime !== null ? `${r.quality.averageRatingAllTime.toFixed(1)} ★ (${r.quality.ratingCountAllTime} ratings)` : "No ratings" },
+                        { label: "Problems", value: `${r.quality.exceptionCount}` },
                       ],
                     },
                     {
-                      title: "Earnings & Cash Balance",
+                      title: "Pay and cash",
                       items: [
-                        { label: "Rider Net Share Earned", value: formatPeso(r.earnings.riderShareEarned) },
-                        { label: "Cash Variance Total", value: formatPeso(r.earnings.settlementVarianceTotal) },
+                        { label: "Pay", value: formatPeso(r.earnings.riderShareEarned) },
+                        { label: "Cash short or over", value: formatPeso(r.earnings.settlementVarianceTotal) },
                       ],
                     },
                   ]}
                 />
-              );
-            })()
+                <div className="md:hidden">
+                  <TablePagination
+                    currentPage={ridersPagination.currentPage}
+                    totalPages={ridersPagination.totalPages}
+                    totalItems={ridersPagination.totalItems}
+                    startIndex={ridersPagination.startIndex}
+                    endIndex={ridersPagination.endIndex}
+                    onPageChange={ridersPagination.setCurrentPage}
+                    itemName="riders"
+                  />
+                </div>
+              </div>
+            );
+          })()
+          )}
+          </>
           )}
 
           <ReportNotes notes={data.notes} />
         </>
       )}
 
-      <DigitalReportReviewModal
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        reportName="Rider Performance Report"
-        rangeLabel={data?.rangeLabel ?? ""}
-        onDownloadPdf={pdf.generate}
-        isGenerating={pdf.isGenerating}
-        generateError={pdf.error}
-      >
-        {data && (
-          <table className="w-full text-label">
-            <thead>
-              <tr className="text-left text-ink-muted border-b border-hairline">
-                <th scope="col" className="py-2">
-                  Rider
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  Completed
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  Avg delivery
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  On time
-                </th>
-                <th scope="col" className="py-2 text-right">
-                  Earned
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.riders.map((r) => (
-                <tr key={r.riderId} className="border-b border-hairline">
-                  <td className="py-2 font-semibold text-ink">{r.name}</td>
-                  <td className="py-2 text-right">{r.throughput.completedCount}</td>
-                  <td className="py-2 text-right">
-                    {r.throughput.avgDeliveryMinutes === null
-                      ? "--"
-                      : `${r.throughput.avgDeliveryMinutes.toFixed(1)} min`}
-                  </td>
-                  <td className="py-2 text-right">
-                    {r.reliability.onTimeRate === null
-                      ? "--"
-                      : `${(r.reliability.onTimeRate * 100).toFixed(0)}% (${r.reliability.onTimeDenominator})`}
-                  </td>
-                  <td className="py-2 text-right">{formatPeso(r.earnings.riderShareEarned)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </DigitalReportReviewModal>
     </div>
   );
 };
