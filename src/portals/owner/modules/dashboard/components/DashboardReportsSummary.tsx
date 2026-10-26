@@ -9,8 +9,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useDashboardReportsSummary } from "../../../hooks/useDashboardReportsSummary";
-import { CategorySalesChart } from "./CategorySalesChart";
-import { FinancialChannelMixChart } from "./FinancialChannelMixChart";
+import { DeferredSummaryCharts } from "./DeferredSummaryCharts";
+import { ReportsSummarySkeleton } from "../../../components/OwnerSkeletons";
 import type { ApiDateRange } from "../../../../../services/apiService";
 
 export type ReportTab =
@@ -40,14 +40,11 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
 
   const placeholder = isLoading ? "…" : "--";
 
-  // Category data for Chart 1
-  const categoryChartData = metrics.sales?.categoryBreakdown || [];
-
   // Computed values
   const onTimeText =
     metrics.riders?.onTimeRate != null
-      ? `${Math.round(metrics.riders.onTimeRate * 100)}% on-time`
-      : "ETA unrecorded";
+      ? `${Math.round(metrics.riders.onTimeRate * 100)}% on time`
+      : "On time not checked yet";
 
   return (
     <section className="space-y-4 pt-2">
@@ -55,15 +52,19 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
       <div className="rounded-plate border border-edge bg-board-plate overflow-hidden">
         <header className="px-5 py-3 border-b border-edge flex items-center justify-between">
           <div>
-            <h3 className="text-panel text-ink">Reports & Analytics Overview</h3>
+            <h3 className="text-panel text-ink">Reports at a glance</h3>
             <p className="text-micro text-ink-muted mt-0.5">
-              High-level domain telemetry and operational reconciliation ({timeframe.toLowerCase()})
+              The main number from each report ({timeframe}). Open one to see the details.
             </p>
           </div>
         </header>
 
         <div className="divide-y divide-hairline">
-          {/* 1. Sales Report */}
+          {isLoading ? (
+            <ReportsSummarySkeleton count={6} />
+          ) : (
+            <>
+              {/* 1. Sales Report */}
           <div className="p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-board-ground/40 transition-colors">
             <div className="flex items-center gap-3">
               <span className="p-2 rounded-lg bg-board-ground text-ink-muted shrink-0">
@@ -73,10 +74,10 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="text-label font-semibold text-ink">Sales Report</div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.sales
-                    ? `${metrics.sales.totalOrders} total orders${
-                        metrics.sales.topCategory ? ` · Top: ${metrics.sales.topCategory}` : ""
+                    ? `${metrics.sales.totalOrders} orders${
+                        metrics.sales.topCategory ? ` · Best seller: ${metrics.sales.topCategory}` : ""
                       }`
-                    : "Gross merchandise revenue"}
+                    : "What customers paid"}
                 </div>
               </div>
             </div>
@@ -85,7 +86,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="font-mono text-base font-bold text-ink tabular-nums">
                   {metrics.sales ? formatPeso(metrics.sales.totalRevenue) : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Gross Revenue</div>
+                <div className="text-[11px] text-ink-muted">Total sales</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -110,17 +111,17 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="text-label font-semibold text-ink">Rider Performance</div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.riders
-                    ? `${onTimeText} · ${metrics.riders.riderCount} active riders`
-                    : "Fleet fulfillment throughput"}
+                    ? `${onTimeText} · ${metrics.riders.riderCount} riders worked`
+                    : "How riders did"}
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pl-11 sm:pl-0">
               <div className="text-right">
                 <div className="font-mono text-base font-bold text-ink tabular-nums">
-                  {metrics.riders ? `${metrics.riders.completedCount} Deliveries` : placeholder}
+                  {metrics.riders ? `${metrics.riders.completedCount} delivered` : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Fulfillment Volume</div>
+                <div className="text-[11px] text-ink-muted">Orders delivered</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -145,8 +146,8 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="text-label font-semibold text-ink">Commission</div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.commission
-                    ? `From ${formatPeso(metrics.commission.totalDeliveryFees)} total delivery fees`
-                    : "Platform earnings split"}
+                    ? `Taken from ${formatPeso(metrics.commission.totalDeliveryFees)} in delivery fees`
+                    : "How delivery fees are split"}
                 </div>
               </div>
             </div>
@@ -155,7 +156,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="font-mono text-base font-bold text-board-field tabular-nums">
                   {metrics.commission ? formatPeso(metrics.commission.businessShare) : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Business Net Share</div>
+                <div className="text-[11px] text-ink-muted">Sugo's share</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -180,10 +181,18 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="text-label font-semibold text-ink">Settlement</div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.settlement
-                    ? `Variance: ${formatPeso(metrics.settlement.varianceTotal)} · ${
-                        metrics.settlement.shortageCount
-                      } shortage flags`
-                    : "Cash collected & reconciled"}
+                    ? [
+                        metrics.settlement.varianceTotal < 0
+                          ? `${formatPeso(-metrics.settlement.varianceTotal)} short`
+                          : metrics.settlement.varianceTotal > 0
+                            ? `${formatPeso(metrics.settlement.varianceTotal)} over`
+                            : "Cash matched",
+                        `${metrics.settlement.shortageCount} ${metrics.settlement.shortageCount === 1 ? "time" : "times"} short`,
+                        ...(metrics.settlement.stillOwed > 0
+                          ? [`${formatPeso(metrics.settlement.stillOwed)} still owed`]
+                          : []),
+                      ].join(" · ")
+                    : "Cash riders handed over"}
                 </div>
               </div>
             </div>
@@ -192,7 +201,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="font-mono text-base font-bold text-ink tabular-nums">
                   {metrics.settlement ? formatPeso(metrics.settlement.collectedTotal) : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Cash Reconciled</div>
+                <div className="text-[11px] text-ink-muted">Cash collected</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -217,17 +226,17 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                 <div className="text-label font-semibold text-ink">Transactions</div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.transactions
-                    ? `${formatPeso(metrics.transactions.totalAmount)} gross settled transaction volume`
-                    : "Payment gateway & COD orders"}
+                    ? `${formatPeso(metrics.transactions.totalAmount)} paid in all`
+                    : "Orders paid by cash or GCash"}
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pl-11 sm:pl-0">
               <div className="text-right">
                 <div className="font-mono text-base font-bold text-ink tabular-nums">
-                  {metrics.transactions ? `${metrics.transactions.totalCount} Settled` : placeholder}
+                  {metrics.transactions ? `${metrics.transactions.totalCount} paid` : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Settled Errands</div>
+                <div className="text-[11px] text-ink-muted">Orders paid</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -259,16 +268,16 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                   <span className="text-label font-semibold text-ink">Help Desk Report</span>
                   {metrics.conflicts && metrics.conflicts.openCount > 0 && (
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-status-act-fill text-status-act-ink">
-                      Needs Review
+                      Needs a look
                     </span>
                   )}
                 </div>
                 <div className="text-xs text-ink-muted mt-0.5">
                   {metrics.conflicts
-                    ? `${formatPeso(metrics.conflicts.totalAtRisk)} at risk · ${
+                    ? `${formatPeso(metrics.conflicts.totalAtRisk)} involved · ${
                         metrics.conflicts.resolvedCount
                       } cleared`
-                    : "Disputes & unreconciled runs"}
+                    : "Problems with orders and cash"}
                 </div>
               </div>
             </div>
@@ -281,9 +290,9 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
                       : "text-ink"
                   }`}
                 >
-                  {metrics.conflicts ? `${metrics.conflicts.openCount} Open` : placeholder}
+                  {metrics.conflicts ? `${metrics.conflicts.openCount} open` : placeholder}
                 </div>
-                <div className="text-[11px] text-ink-muted">Unresolved Conflicts</div>
+                <div className="text-[11px] text-ink-muted">Problems not cleared</div>
               </div>
               {onNavigateToReport && (
                 <button
@@ -297,23 +306,13 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
               )}
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Dual Professional Standard UI Graphs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 pt-2">
-        <CategorySalesChart
-          data={categoryChartData}
-          timeframe={timeframe}
-          isLoading={isLoading}
-        />
-        <FinancialChannelMixChart
-          commission={metrics.commission}
-          transactions={metrics.transactions}
-          timeframe={timeframe}
-          isLoading={isLoading}
-        />
-      </div>
+      {/* The two charts under the summary */}
+      <DeferredSummaryCharts metrics={metrics} timeframe={timeframe} isLoading={isLoading} />
     </section>
   );
 };

@@ -37,6 +37,8 @@ export interface DashboardReportMetrics {
     varianceTotal: number;
     shortageCount: number;
     settlementCount: number;
+    /** What is left of the shorts as of today, after later payments and write-offs. */
+    stillOwed: number;
   } | null;
   transactions: {
     totalCount: number;
@@ -171,6 +173,7 @@ export function useDashboardReportsSummary(
           varianceTotal: report.cash?.varianceTotal ?? 0,
           shortageCount: report.cash?.shortageCount ?? 0,
           settlementCount: report.cash?.settlementCount ?? 0,
+          stillOwed: report.cash?.stillOwedTotal ?? 0,
         };
       } else {
         newErrors.settlement = "Settlement report unavailable";

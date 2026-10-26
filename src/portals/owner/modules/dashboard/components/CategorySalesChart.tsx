@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { useDeviceTier } from "../../../../../hooks/useDeviceTier";
+import { SummaryChartSkeleton } from "../../../components/OwnerSkeletons";
 
 interface CategorySalesChartProps {
   data: Array<{ name: string; revenue: number; orders: number }>;
@@ -46,22 +47,20 @@ export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
     <div className="space-y-3 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-panel text-ink">Category Sales Breakdown</h3>
+          <h3 className="text-panel text-ink">Sales by store type</h3>
           <p className="text-micro text-ink-muted mt-0.5">
-            Revenue volume across merchant categories ({timeframe.toLowerCase()})
+            How much was sold from each kind of store ({timeframe})
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex h-[240px] flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <p className="text-label text-ink-muted">Loading category sales data…</p>
-        </div>
+        <SummaryChartSkeleton type="bars" />
       ) : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <p className="text-label text-ink font-semibold">No category sales recorded</p>
+          <p className="text-label text-ink font-semibold">No sales in these dates</p>
           <p className="text-micro text-ink-muted">
-            No merchant orders were placed during this period.
+            No store orders were placed in these dates.
           </p>
         </div>
       ) : (
@@ -140,7 +139,7 @@ export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
                   );
                 }}
               />
-              <Bar dataKey="revenue" radius={isPhone ? [0, 4, 4, 0] : [4, 4, 0, 0]}>
+              <Bar dataKey="revenue" isAnimationActive={false} radius={isPhone ? [0, 4, 4, 0] : [4, 4, 0, 0]}>
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${entry.name}-${index}`}

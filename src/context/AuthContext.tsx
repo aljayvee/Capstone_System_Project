@@ -287,6 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+/** useAuth for shared chrome that may render outside the provider (a test harness): null there. */
+export const useOptionalAuth = (): AuthContextType | null => useContext(AuthContext) ?? null;
+
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {

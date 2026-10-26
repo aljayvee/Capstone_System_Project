@@ -211,6 +211,9 @@ export interface ApiVerifiedPlace {
   isActive: boolean;
 }
 
+/** Server's NotificationPriority. Ordered lowest first. */
+export type NotificationPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+
 export interface ApiNotification {
   id: number;
   type: string;
@@ -218,6 +221,22 @@ export interface ApiNotification {
   body: string;
   isRead: boolean;
   createdAt: string;
+  /** Rows written before 2026-10-21 on a server without the column have none. */
+  priority?: NotificationPriority;
+  /** `errand:<id>` or `rider:<id>`: what the row opens. */
+  refKey?: string | null;
+}
+
+export type NotificationSort = "newest" | "oldest" | "priority";
+
+export interface NotificationListParams {
+  q?: string;
+  sort?: NotificationSort;
+  priority?: NotificationPriority[];
+  type?: string[];
+  unread?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export interface ApiRateConfig {
@@ -284,6 +303,8 @@ export interface ApiErrandException {
   kind: ExceptionKind;
   amountAtRisk: number;
   detail: string;
+  /** Cash short or over only: the handover's figures and what is still owed now. */
+  cash?: { expected: number; collected: number; short: number; stillOwed: number };
   riderId: number | null;
   riderName: string | null;
   occurredAt: string;
@@ -442,7 +463,18 @@ export interface ApiDeclineReason {
 }
 
 export interface ApiExceptionReport {
-  meta?: { period: ReportPeriod | "CUSTOM"; rangeLabel: string; start: string; end: string };
+  meta?: {
+    period: ReportPeriod | "CUSTOM";
+    rangeLabel: string;
+    coverageLabel?: string;
+    breakdownUnit?: BreakdownUnit;
+    start: string;
+    end: string;
+  };
+  /** Owner report only; the dispatcher's open queue has no breakdown. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & { count: number; openCount: number; resolvedCount: number; atRisk: number }
+  >;
   exceptions: ApiErrandException[];
   summary: {
     openCount: number;
@@ -497,6 +529,8 @@ export interface ApiDateRange {
   date?: string;
   start?: string;
   end?: string;
+  /** Rider Performance only: narrows the report, and its printout, to one rider. */
+  riderId?: number;
 }
 
 /** Drops undefined keys so axios does not serialise `?start=undefined`. */
@@ -508,6 +542,7 @@ function rangeParams(range: ApiDateRange): Record<string, string> {
     params.start = range.start;
     params.end = range.end;
   }
+  if (range.riderId) params.riderId = String(range.riderId);
   return params;
 }
 
@@ -515,8 +550,30 @@ interface ReportMeta {
   /** "CUSTOM" when the caller drew its own range. */
   period: ReportPeriod | "CUSTOM";
   rangeLabel: string;
+  /**
+   * The window in one plain sentence, naming the days:
+   * "This week, by day: Sunday, Oct 18, 2026 to Saturday, Oct 24, 2026".
+   * Optional so a server that predates it still renders.
+   */
+  coverageLabel?: string;
+  /** What each timelineBreakdown row is. */
+  breakdownUnit?: BreakdownUnit;
   start: string;
   end: string;
+}
+
+export type BreakdownUnit = "day" | "week" | "month" | "year";
+
+/**
+ * One row of a report's period breakdown: a day (Sunday to Saturday), a week,
+ * a month or a year. Each report adds its own figures; the printed PDF opens
+ * with the same rows.
+ */
+export interface ApiPeriodPoint {
+  /** "Sunday", "Week 2", "January", "2026". */
+  label: string;
+  /** The dates the row covers: "Oct 18", "Oct 8 to 14". */
+  dateLabel?: string;
 }
 
 /**
@@ -539,9 +596,18 @@ export interface ApiCategoryBreakdown {
   touchedOrderCount: number;
 }
 
+export interface ApiSalesTimelinePoint extends ApiPeriodPoint {
+  orderCount: number;
+  revenue: number;
+  itemCost: number;
+  deliveryFee: number;
+  tip: number;
+}
+
 export interface ApiSalesReport extends ReportMeta {
   totalRevenue: number;
   totalOrders: number;
+  timelineBreakdown?: ApiSalesTimelinePoint[];
   byCategory: ApiCategoryBreakdown[];
   /** `difference` must be 0. Rendered, so a regression is visible on the page. */
   reconciliation: { totalRevenue: number; allocatedRevenue: number; difference: number };
@@ -562,15 +628,26 @@ export interface ApiRiderMetrics {
     errandsPerActiveHour: number | null;
   };
   reliability: {
+    /** Delivered by the promise frozen when the rider set out for the door. */
     onTimeRate: number | null;
-    /** Errands that carried an ETA — the only fair denominator, so it is shown. */
+    /** Deliveries that could be checked: the only fair denominator, so it is shown. */
     onTimeDenominator: number;
+    onTimeCount?: number;
+    /** Left out of On time: no usable promise, or no GPS at the door. */
+    notCheckedCount?: number;
+    noPromiseCount?: number;
+    unverifiedCount?: number;
+    /** Always 0 since 2026-10-22; a fallback estimate is never frozen as a promise. */
     degradedEtaCount: number;
     cancellationRate: number | null;
     reachedCount: number;
     cancelledCount: number;
     connectivityDrops: number;
     unresolvedDrops: number;
+    /** Offers turned down with Decline. Absent from a server older than 2026-10-25. */
+    declinedCount?: number;
+    /** Offers left to run out unanswered. */
+    expiredOfferCount?: number;
   };
   earnings: {
     riderShareEarned: number;
@@ -593,7 +670,61 @@ export interface ApiRiderMetrics {
   averageRating: number | null;
 }
 
+/** One delivery's On Time verdict, as the server judged it. */
+export type ApiDeliveryCheck =
+  | { result: "ON_TIME"; minutesLate: number; nearestMeters: number }
+  | { result: "LATE"; minutesLate: number; nearestMeters: number }
+  | {
+      result: "NOT_CHECKED";
+      reason:
+        | "NO_PROMISE"
+        | "PROMISE_TOO_LATE"
+        | "PROMISE_TOO_CLOSE"
+        | "TIME_DOES_NOT_ADD_UP"
+        | "NO_GPS_AT_DELIVERY"
+        | "FAR_FROM_ADDRESS";
+      nearestMeters: number | null;
+    };
+
+export interface ApiRiderDelivery {
+  errandId: string;
+  referenceNo: string | null;
+  acceptedAt: string | null;
+  deliveredAt: string;
+  /** The frozen promise, or null when none was saved. */
+  promisedBy: string | null;
+  check: ApiDeliveryCheck | null;
+}
+
+/** One offer a rider declined or let run out, kept permanently since 2026-10-25. */
+export interface ApiRiderDecline {
+  id: number;
+  errandId: string;
+  referenceNo: string | null;
+  kind: "DECLINED" | "EXPIRED";
+  reason: string | null;
+  offeredAt: string | null;
+  declinedAt: string;
+}
+
 export interface ApiRiderPerformanceReport extends ReportMeta {
+  /** Every rider, for the rider picker, whichever one is being shown. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for the whole fleet. */
+  rider?: { riderId: number; name: string } | null;
+  /** One rider's report only: every delivery in the window, newest first. */
+  deliveries?: ApiRiderDelivery[];
+  /** One rider's report only: every offer declined or let lapse, newest first. */
+  declines?: ApiRiderDecline[];
+  /** The whole fleet per day / week / month / year. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & {
+      completedCount: number;
+      cancelledCount: number;
+      riderShareEarned: number;
+      settlementVarianceTotal: number;
+    }
+  >;
   riders: ApiRiderMetrics[];
   fleet: {
     riderCount: number;
@@ -602,12 +733,15 @@ export interface ApiRiderPerformanceReport extends ReportMeta {
     deliveryTimedCount: number;
     onTimeRate: number | null;
     onTimeDenominator: number;
+    notCheckedCount?: number;
     degradedEtaCount: number;
     riderShareEarned: number;
     settlementVarianceTotal: number;
     shortageCount: number;
     exceptionCount: number;
     connectivityDrops: number;
+    declinedCount?: number;
+    expiredOfferCount?: number;
   };
   notes: string[];
 }
@@ -618,6 +752,9 @@ export interface ApiCommissionReport extends ReportMeta {
   orderCount: number;
   /** The rider's fraction of delivery fees. Captions derive from this. */
   commissionRate: number;
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & { orderCount: number; deliveryFee: number; businessShare: number; riderShare: number }
+  >;
   byCategory: Array<{
     category: string;
     orderCount: number;
@@ -627,11 +764,38 @@ export interface ApiCommissionReport extends ReportMeta {
     businessShare: number;
     riderShare: number;
   }>;
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
+  /** One rider's report only: each order in the window and how its fee was split. */
+  orders?: Array<{
+    errandId: string;
+    referenceNo: string | null;
+    placedAt: string;
+    deliveryFee: number;
+    tip: number;
+    businessShare: number;
+    riderShare: number;
+  }>;
   notes: string[];
+}
+
+/** Money recorded against a short handover after the fact. */
+export type SettlementAdjustmentKind = "RIDER_PAID_BACK" | "CUSTOMER_PAID_GCASH" | "WRITTEN_OFF";
+
+export interface ApiSettlementFollowUp {
+  kind: SettlementAdjustmentKind;
+  label: string;
+  amount: number;
+  reference: string | null;
+  recordedAt: string;
+  recordedBy: string;
 }
 
 export interface ApiSettlementLine {
   errandId: string;
+  referenceNo?: string | null;
   riderName: string | null;
   expected: number;
   collected: number;
@@ -639,6 +803,49 @@ export interface ApiSettlementLine {
   status: string;
   shortReason: string | null;
   settledAt: string;
+  /** What happened to a short since the handover, as of today. */
+  short?: number;
+  paidBackLater?: number;
+  writtenOff?: number;
+  stillOwed?: number;
+  followUps?: ApiSettlementFollowUp[];
+}
+
+/** Help Desk "Money still owed": one short handover with something left to pay. */
+export interface ApiMoneyOwed {
+  errandId: string;
+  referenceNo: string | null;
+  riderId: number;
+  riderName: string;
+  settledAt: string;
+  expected: number;
+  collected: number;
+  shortReason: string | null;
+  short: number;
+  paidSoFar: number;
+  writtenOff: number;
+  stillOwed: number;
+  adjustments: Array<{
+    id: number;
+    kind: SettlementAdjustmentKind;
+    label: string;
+    amount: number;
+    reference: string | null;
+    note: string | null;
+    recordedAt: string;
+    recordedBy: string;
+    /** Undone by the person who recorded it. Shown, struck through, for the record. */
+    voided: boolean;
+    /** The asking user recorded it within the last 10 minutes. */
+    canUndo: boolean;
+  }>;
+}
+
+/** What happened to a short, as chosen in the Resolve box. */
+export interface ApiCashOutcome {
+  kind: SettlementAdjustmentKind | "NOT_PAID_YET";
+  amount?: number;
+  reference?: string | null;
 }
 
 /**
@@ -651,6 +858,17 @@ export interface ApiSettlementLine {
  */
 export interface ApiSettlementReport extends ReportMeta {
   commissionRate: number;
+  /** Cash handed over per day / week / month / year, on the settlement clock. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & {
+      settlementCount: number;
+      expected: number;
+      collected: number;
+      variance: number;
+      shortageCount: number;
+      stillOwed?: number;
+    }
+  >;
   revenue: {
     basis: string;
     grossRevenue: number;
@@ -674,6 +892,14 @@ export interface ApiSettlementReport extends ReportMeta {
     varianceTotal: number;
     settlementCount: number;
     shortageCount: number;
+    /** Over handovers, apart from short ones. overTotal - shortTotal = varianceTotal. */
+    overTotal?: number;
+    overCount?: number;
+    /** shortTotal = paidBackLaterTotal + writtenOffTotal + stillOwedTotal. */
+    shortTotal?: number;
+    paidBackLaterTotal?: number;
+    writtenOffTotal?: number;
+    stillOwedTotal?: number;
     byRider: Array<{
       riderId: number;
       riderName: string | null;
@@ -682,9 +908,16 @@ export interface ApiSettlementReport extends ReportMeta {
       collected: number;
       variance: number;
       shortageCount: number;
+      paidBackLater?: number;
+      writtenOff?: number;
+      stillOwed?: number;
     }>;
     lines: ApiSettlementLine[];
   };
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
   // Flat mirrors of the revenue block, kept so nothing breaks mid-migration.
   grossRevenue: number;
   collectedRevenue?: number;
@@ -697,6 +930,7 @@ export interface ApiSettlementReport extends ReportMeta {
 }
 
 export interface ApiTransactionSummaryReport extends ReportMeta {
+  timelineBreakdown?: Array<ApiPeriodPoint & { count: number; amount: number; deliveryFee: number }>;
   transactions: Array<{
     transactionId: number;
     errandId: string;
@@ -1199,10 +1433,34 @@ export const apiService = {
   /** Records that a person considered an exception and what they concluded. */
   async resolveException(
     errandId: string,
-    body: { kind: ExceptionKind; reason: string; amountAtRisk: number }
+    body: { kind: ExceptionKind; reason: string; amountAtRisk: number; cashOutcome?: ApiCashOutcome | null }
   ): Promise<boolean> {
     await apiClient.post(`/errands/${errandId}/exceptions/resolve`, body);
     return true;
+  },
+
+  /** Help Desk "Money still owed". Null when the request failed. */
+  async getMoneyStillOwed(): Promise<ApiMoneyOwed[] | null> {
+    try {
+      const response = await apiClient.get<ApiMoneyOwed[]>("/errands/settlements/owed");
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /** Records money that came in (or was written off) after a short handover. Throws on refusal. */
+  async recordSettlementPayment(
+    errandId: string,
+    body: { kind: SettlementAdjustmentKind; amount: number; reference?: string | null; note?: string | null }
+  ): Promise<void> {
+    await apiClient.post(`/errands/${errandId}/settlement/adjustments`, body);
+  },
+
+  /** Undoes one the caller recorded within the last 10 minutes. Throws on refusal. */
+  async undoSettlementPayment(errandId: string, adjustmentId: number): Promise<void> {
+    await apiClient.post(`/errands/${errandId}/settlement/adjustments/${adjustmentId}/void`);
   },
 
   /**
@@ -1242,10 +1500,28 @@ export const apiService = {
   },
 
   // Notifications API
-  async getNotifications(): Promise<ApiNotification[] | null> {
+  /**
+   * One page of the caller's notifications, searched and sorted on the server.
+   * `total` is how many match in all (X-Total-Count), for "Load more".
+   */
+  async getNotifications(
+    params: NotificationListParams = {}
+  ): Promise<{ items: ApiNotification[]; total: number } | null> {
     try {
-      const response = await apiClient.get<ApiNotification[]>("/notifications");
-      return response.data;
+      const response = await apiClient.get<ApiNotification[]>("/notifications", {
+        params: {
+          q: params.q?.trim() || undefined,
+          sort: params.sort ?? "newest",
+          priority: params.priority?.length ? params.priority.join(",") : undefined,
+          type: params.type?.length ? params.type.join(",") : undefined,
+          unread: params.unread ? "1" : undefined,
+          limit: params.limit ?? 50,
+          offset: params.offset ?? 0,
+        },
+      });
+      const items = Array.isArray(response.data) ? response.data : [];
+      const header = Number(response.headers?.["x-total-count"]);
+      return { items, total: Number.isFinite(header) ? header : items.length };
     } catch (err) {
       console.warn("API unavailable", err);
       return null;

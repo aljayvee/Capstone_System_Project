@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { useDeviceTier } from "../../../../../hooks/useDeviceTier";
+import { SummaryChartSkeleton } from "../../../components/OwnerSkeletons";
 
 interface FinancialChannelMixChartProps {
   commission: {
@@ -67,14 +68,14 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
 
   const chartData = [
     {
-      domain: "Fee Allocation",
-      "Business Share": businessShare,
-      "Rider Payout": riderShare,
+      domain: "Delivery fees",
+      "Sugo's share": businessShare,
+      "Rider's share": riderShare,
     },
     {
-      domain: "Payment Channels",
-      "Cash (COD)": codAmount,
-      "Digital (GCash/Maya)": digitalAmount,
+      domain: "How customers paid",
+      "Cash on delivery": codAmount,
+      "GCash or Maya": digitalAmount,
     },
   ];
 
@@ -84,22 +85,20 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
     <div className="space-y-3 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-panel text-ink">Financial & Channel Allocation</h3>
+          <h3 className="text-panel text-ink">Who gets the fees, and how customers paid</h3>
           <p className="text-micro text-ink-muted mt-0.5">
-            Fee splits and payment collection channels ({timeframe.toLowerCase()})
+            The delivery fee split, and cash against GCash or Maya ({timeframe})
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="flex h-[240px] flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <p className="text-label text-ink-muted">Loading financial allocation data…</p>
-        </div>
+        <SummaryChartSkeleton type="mix" />
       ) : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <p className="text-label text-ink font-semibold">No allocation data recorded</p>
+          <p className="text-label text-ink font-semibold">No fees or payments in these dates</p>
           <p className="text-micro text-ink-muted">
-            No fee settlements or transactions occurred during this period.
+            No order was paid for in these dates.
           </p>
         </div>
       ) : (
@@ -160,10 +159,10 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
                 iconType="circle"
                 iconSize={8}
               />
-              <Bar dataKey="Business Share" fill="#1E3A5F" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Rider Payout" fill="#10B981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Cash (COD)" fill="#D97706" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Digital (GCash/Maya)" fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Sugo's share" isAnimationActive={false} fill="#1E3A5F" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Rider's share" isAnimationActive={false} fill="#10B981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Cash on delivery" isAnimationActive={false} fill="#D97706" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="GCash or Maya" isAnimationActive={false} fill="#2563EB" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
