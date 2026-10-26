@@ -2,25 +2,30 @@ import React from "react";
 import {
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { useDeviceTier } from "../../../../../hooks/useDeviceTier";
 import { SummaryChartSkeleton } from "../../../components/OwnerSkeletons";
+import {
+  FINANCIAL_CHART_COPY,
+  feeBars,
+  paymentBars,
+  type Commission,
+  type FinancialChartView,
+  type MixBar,
+  type Transactions,
+} from "./financialMixModel";
 
 interface FinancialChannelMixChartProps {
-  commission: {
-    businessShare: number;
-    riderShare: number;
-  } | null;
-  transactions: {
-    paymentMethods: Array<{ name: string; count: number; amount: number }>;
-  } | null;
+  view: FinancialChartView;
+  commission: Commission;
+  transactions: Transactions;
   timeframe: string;
   isLoading?: boolean;
 }
@@ -30,65 +35,24 @@ function formatPeso(amount: number): string {
 }
 
 export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> = ({
+  view,
   commission,
   transactions,
   timeframe,
   isLoading = false,
 }) => {
   const { isPhone } = useDeviceTier();
-  // 1. Calculate Delivery Share Split
-  const businessShare = commission?.businessShare ?? 0;
-  const riderShare = commission?.riderShare ?? 0;
-
-  // 2. Calculate Payment Channels: COD vs Digital
-  let codAmount = 0;
-  let digitalAmount = 0;
-
-  (transactions?.paymentMethods || []).forEach((p) => {
-    const rawName = p.name || (p as unknown as { paymentMethod?: string })?.paymentMethod || "";
-    const nameLower = rawName.toLowerCase().trim();
-
-    // Critical: Check digital payment methods (GCash, PayMaya, etc.) first.
-    // "gcash" contains "cash", so checking for "cash" first mistakenly classifies GCash as COD!
-    const isDigital =
-      nameLower.includes("gcash") ||
-      nameLower.includes("maya") ||
-      nameLower.includes("online") ||
-      nameLower.includes("digital") ||
-      nameLower.includes("bank") ||
-      nameLower.includes("card") ||
-      nameLower.includes("wallet");
-
-    if (isDigital) {
-      digitalAmount += p.amount;
-    } else {
-      codAmount += p.amount;
-    }
-  });
-
-  const chartData = [
-    {
-      domain: "Delivery fees",
-      "Sugo's share": businessShare,
-      "Rider's share": riderShare,
-    },
-    {
-      domain: "How customers paid",
-      "Cash on delivery": codAmount,
-      "GCash or Maya": digitalAmount,
-    },
-  ];
-
-  const hasData = businessShare > 0 || riderShare > 0 || codAmount > 0 || digitalAmount > 0;
+  const copy = FINANCIAL_CHART_COPY[view];
+  const chartData = view === "fees" ? feeBars(commission) : paymentBars(transactions);
+  const total = chartData.reduce((sum, bar) => sum + bar.amount, 0);
+  const hasData = chartData.some((bar) => bar.amount > 0);
 
   return (
     <div className="space-y-3 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-panel text-ink">Who gets the fees, and how customers paid</h3>
-          <p className="text-micro text-ink-muted mt-0.5">
-            The delivery fee split, and cash against GCash or Maya ({timeframe})
-          </p>
+          <h3 className="text-panel text-ink">{copy.title}</h3>
+          <p className="text-micro text-ink-muted mt-0.5">{copy.description(timeframe)}</p>
         </div>
       </div>
 
@@ -96,10 +60,8 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
         <SummaryChartSkeleton type="mix" />
       ) : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-1.5 px-6 text-center">
-          <p className="text-label text-ink font-semibold">No fees or payments in these dates</p>
-          <p className="text-micro text-ink-muted">
-            No order was paid for in these dates.
-          </p>
+          <p className="text-label text-ink font-semibold">{copy.emptyTitle}</p>
+          <p className="text-micro text-ink-muted">{copy.emptyDetail}</p>
         </div>
       ) : (
         <div className={cn("w-full", isPhone ? "h-[270px]" : "h-[240px]")}>
@@ -114,7 +76,8 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
                 stroke="#E2E8F0"
               />
               <XAxis
-                dataKey="domain"
+                dataKey="name"
+                interval={0}
                 tick={{ fontSize: isPhone ? 10 : 12, fill: "#1E293B", fontWeight: 600 }}
                 tickLine={false}
                 axisLine={{ stroke: "#E2E8F0" }}
@@ -123,46 +86,36 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
                 tick={{ fontSize: 11, fill: "#64748B" }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `₱${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
+                tickFormatter={(v) => `₱${v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : v}`}
               />
               <Tooltip
-                content={({ active, payload, label }) => {
+                cursor={{ fill: "#F1F5F9" }}
+                content={({ active, payload }) => {
                   if (!active || !payload || !payload.length) return null;
+                  const bar = payload[0].payload as MixBar;
+                  const share = total > 0 ? Math.round((bar.amount / total) * 100) : 0;
                   return (
                     <div className="rounded-trim border border-edge bg-board-plate p-2.5 shadow-plate text-xs space-y-1.5 min-w-[170px]">
-                      <p className="font-bold text-ink border-b border-hairline pb-1">
-                        {label}
+                      <p className="flex items-center gap-1.5 font-bold text-ink border-b border-hairline pb-1">
+                        <span
+                          className="size-2 rounded-full inline-block shrink-0"
+                          style={{ backgroundColor: bar.fill }}
+                        />
+                        {bar.name}
                       </p>
-                      {payload.map((entry, idx) => (
-                        <div
-                          key={`tooltip-entry-${idx}`}
-                          className="flex items-center justify-between gap-3 text-label"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className="size-2 rounded-full inline-block shrink-0"
-                              style={{ backgroundColor: entry.color }}
-                            />
-                            <span className="text-ink-muted text-micro">{entry.name}:</span>
-                          </span>
-                          <span className="font-mono font-semibold text-ink">
-                            {formatPeso(Number(entry.value) || 0)}
-                          </span>
-                        </div>
-                      ))}
+                      <div className="flex items-center justify-between gap-3 text-label">
+                        <span className="font-mono font-semibold text-ink">{formatPeso(bar.amount)}</span>
+                        <span className="text-ink-muted text-micro">{share}% of {formatPeso(total)}</span>
+                      </div>
                     </div>
                   );
                 }}
               />
-              <Legend
-                wrapperStyle={{ paddingTop: "8px", fontSize: "11px" }}
-                iconType="circle"
-                iconSize={8}
-              />
-              <Bar dataKey="Sugo's share" isAnimationActive={false} fill="#1E3A5F" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Rider's share" isAnimationActive={false} fill="#10B981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Cash on delivery" isAnimationActive={false} fill="#D97706" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="GCash or Maya" isAnimationActive={false} fill="#2563EB" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="amount" isAnimationActive={false} radius={[4, 4, 0, 0]} maxBarSize={72}>
+                {chartData.map((bar) => (
+                  <Cell key={bar.name} fill={bar.fill} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

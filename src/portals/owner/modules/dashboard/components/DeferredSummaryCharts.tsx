@@ -3,6 +3,7 @@ import { lazyWithRetry } from "../../../../../utils/lazyWithRetry";
 import { useDeviceTier } from "../../../../../hooks/useDeviceTier";
 import type { DashboardReportMetrics } from "../../../hooks/useDashboardReportsSummary";
 import { SummaryChartSkeleton } from "../../../components/OwnerSkeletons";
+import { FINANCIAL_CHART_COPY, feeBars, paymentBars, type FinancialChartView } from "./financialMixModel";
 
 const CategorySalesChart = lazyWithRetry(() =>
   import("./CategorySalesChart").then((m) => ({ default: m.CategorySalesChart }))
@@ -77,31 +78,39 @@ export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: Deferre
     message={isLoading ? "Loading sales by store type..." : hasSalesData ? "Loading chart..." : "No sales in these dates"}
     detail={!isLoading && !hasSalesData ? "No store orders were placed in these dates." : undefined}
   />;
-  const hasFinancialData = Boolean(
-    metrics.commission && (metrics.commission.businessShare > 0 || metrics.commission.riderShare > 0)
-  ) || Boolean(metrics.transactions?.paymentMethods.some((method) => method.amount > 0));
-  const financialPlaceholder = <ChartPlaceholder
-    title="Who gets the fees, and how customers paid"
-    description={`The delivery fee split, and cash against GCash or Maya (${timeframe})`}
-    height={!isLoading && hasFinancialData && isPhone ? 270 : 240}
-    loading={isLoading || hasFinancialData}
-    type="mix"
-    message={isLoading ? "Loading fees and payments..." : hasFinancialData ? "Loading chart..." : "No fees or payments in these dates"}
-    detail={!isLoading && !hasFinancialData ? "No order was paid for in these dates." : undefined}
-  />;
+  const financialChart = (view: FinancialChartView) => {
+    const copy = FINANCIAL_CHART_COPY[view];
+    const bars = view === "fees" ? feeBars(metrics.commission) : paymentBars(metrics.transactions);
+    const hasData = bars.some((bar) => bar.amount > 0);
+    const placeholder = <ChartPlaceholder
+      title={copy.title}
+      description={copy.description(timeframe)}
+      height={!isLoading && hasData && isPhone ? 270 : 240}
+      loading={isLoading || hasData}
+      type="mix"
+      message={isLoading ? copy.loading : hasData ? "Loading chart..." : copy.emptyTitle}
+      detail={!isLoading && !hasData ? copy.emptyDetail : undefined}
+    />;
+    return isNearViewport && !isLoading && hasData ? (
+      <Suspense fallback={placeholder}>
+        <FinancialChannelMixChart view={view} commission={metrics.commission} transactions={metrics.transactions} timeframe={timeframe} isLoading={isLoading} />
+      </Suspense>
+    ) : placeholder;
+  };
 
+  // Sales keeps half the row on wide screens; the fee split and the payment
+  // split each take a quarter beside it, and drop below it on narrower ones.
   return (
-    <div ref={containerRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 pt-2">
-      {isNearViewport && !isLoading && hasSalesData ? (
-        <Suspense fallback={salesPlaceholder}>
-          <CategorySalesChart data={metrics.sales?.categoryBreakdown ?? []} timeframe={timeframe} isLoading={isLoading} />
-        </Suspense>
-      ) : salesPlaceholder}
-      {isNearViewport && !isLoading && hasFinancialData ? (
-        <Suspense fallback={financialPlaceholder}>
-          <FinancialChannelMixChart commission={metrics.commission} transactions={metrics.transactions} timeframe={timeframe} isLoading={isLoading} />
-        </Suspense>
-      ) : financialPlaceholder}
+    <div ref={containerRef} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 pt-2">
+      <div className="sm:col-span-2 [&>*]:h-full">
+        {isNearViewport && !isLoading && hasSalesData ? (
+          <Suspense fallback={salesPlaceholder}>
+            <CategorySalesChart data={metrics.sales?.categoryBreakdown ?? []} timeframe={timeframe} isLoading={isLoading} />
+          </Suspense>
+        ) : salesPlaceholder}
+      </div>
+      {financialChart("fees")}
+      {financialChart("payments")}
     </div>
   );
 }
