@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { ReportState } from "./ReportState";
 import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { ReportNotes } from "./ReportNotes";
 import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
 import { useReportPrint } from "../../../hooks/useReportPrint";
@@ -40,10 +39,10 @@ export const SalesReportView: React.FC = () => {
     downloadCSV(
       `Sugo_Sales_Report_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
-        "Store Type",
-        "Orders",
-        "Cost of Items Bought (PHP)",
-        "Delivery Fees (PHP)",
+        "Merchant Category",
+        "Errands",
+        "Items Cost (PHP)",
+        "Service Fees (PHP)",
         "Tips (PHP)",
         "Total Sales (PHP)",
       ],
@@ -98,9 +97,9 @@ export const SalesReportView: React.FC = () => {
             unit={data.breakdownUnit}
             points={data.timelineBreakdown}
             figures={[
-              { header: "Orders", format: "count", value: (t) => t.orderCount },
-              { header: "Cost of items bought", format: "money", value: (t) => t.itemCost },
-              { header: "Delivery fees", format: "money", value: (t) => t.deliveryFee },
+              { header: "Errands", format: "count", value: (t) => t.orderCount },
+              { header: "Items Cost", format: "money", value: (t) => t.itemCost },
+              { header: "Service fees", format: "money", value: (t) => t.deliveryFee },
               { header: "Tips", format: "money", value: (t) => t.tip },
               { header: "Total sales", format: "money", value: (t) => t.revenue, primary: true },
             ]}
@@ -108,7 +107,7 @@ export const SalesReportView: React.FC = () => {
 
           {/* 2. CATEGORY BREAKDOWN SECTION */}
           <div className="space-y-3 pt-2">
-            <h3 className="text-panel text-ink">Sales by store type</h3>
+            <h3 className="text-panel text-ink">Sales by Merchant Category</h3>
 
             {data.byCategory.length === 0 ? (
               <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
@@ -151,16 +150,16 @@ export const SalesReportView: React.FC = () => {
                         <thead className="bg-board-ground text-ink-muted">
                           <tr>
                             <th scope="col" className="text-left px-5 py-2 font-semibold">
-                              Store type
+                              Merchant Category
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Orders
+                              Errands
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Cost of items bought
+                              Items Cost
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Delivery fees
+                              Service fees
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
                               Tips
@@ -178,9 +177,9 @@ export const SalesReportView: React.FC = () => {
                                 {c.touchedOrderCount > c.orderCount && (
                                   <span
                                     className="ml-1.5 text-body text-ink-muted"
-                                    title={`${c.touchedOrderCount} orders bought something from this store type. ${c.orderCount} are counted here, because each order is counted once, under the store type where most of its money went.`}
+                                    title={`${c.touchedOrderCount} errands bought something from this merchant category. ${c.orderCount} are counted here, because each errand is counted once, under the merchant category where most of its money went.`}
                                   >
-                                    {c.touchedOrderCount} orders bought here
+                                    {c.touchedOrderCount} errands bought here
                                   </span>
                                 )}
                               </td>
@@ -222,8 +221,8 @@ export const SalesReportView: React.FC = () => {
                     data={data.byCategory}
                     keyExtractor={(c) => c.category}
                     desktopView={desktopTable}
-                    primaryHeader="Store type"
-                    secondaryHeader="Total sales and orders"
+                    primaryHeader="Merchant Category"
+                    secondaryHeader="Total sales and errands"
                     renderPrimary={(c) => (
                       <div className="min-w-0">
                         <div className="font-semibold text-ink text-xs truncate">
@@ -231,7 +230,7 @@ export const SalesReportView: React.FC = () => {
                         </div>
                         {c.touchedOrderCount > c.orderCount && (
                           <div className="text-[10px] text-ink-muted">
-                            {c.touchedOrderCount} orders bought here
+                            {c.touchedOrderCount} errands bought here
                           </div>
                         )}
                       </div>
@@ -242,18 +241,18 @@ export const SalesReportView: React.FC = () => {
                           {formatPeso(c.revenue)}
                         </div>
                         <div className="text-[10px] text-ink-muted tabular-nums">
-                          {c.orderCount} order{c.orderCount === 1 ? "" : "s"}
+                          {c.orderCount} errand{c.orderCount === 1 ? "" : "s"}
                         </div>
                       </div>
                     )}
                     renderPreview={(c) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Cost of items bought</span>
+                          <span className="text-ink-muted">Items Cost</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.itemCost)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Delivery fees</span>
+                          <span className="text-ink-muted">Service fees</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.deliveryFee)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -263,7 +262,7 @@ export const SalesReportView: React.FC = () => {
                       </div>
                     )}
                     inspectorTitle={(c) => c.category}
-                    inspectorSubtitle={(c) => `${c.orderCount} order${c.orderCount === 1 ? "" : "s"}`}
+                    inspectorSubtitle={(c) => `${c.orderCount} errand${c.orderCount === 1 ? "" : "s"}`}
                     inspectorStatusBadge={(c) => (
                       <span className="font-mono font-bold text-xs text-ink">
                         {formatPeso(c.revenue)}
@@ -273,17 +272,17 @@ export const SalesReportView: React.FC = () => {
                       {
                         title: "Sales",
                         items: [
-                          { label: "Store type", value: c.category },
-                          { label: "Orders", value: `${c.orderCount}` },
-                          { label: "Orders that bought here", value: `${c.touchedOrderCount}` },
+                          { label: "Merchant Category", value: c.category },
+                          { label: "Errands", value: `${c.orderCount}` },
+                          { label: "Errands that bought here", value: `${c.touchedOrderCount}` },
                           { label: "Total sales", value: formatPeso(c.revenue) },
                         ],
                       },
                       {
                         title: "Costs and fees",
                         items: [
-                          { label: "Cost of items bought", value: formatPeso(c.itemCost) },
-                          { label: "Delivery fees", value: formatPeso(c.deliveryFee) },
+                          { label: "Items Cost", value: formatPeso(c.itemCost) },
+                          { label: "Service fees", value: formatPeso(c.deliveryFee) },
                           { label: "Tips", value: formatPeso(c.tip) },
                         ],
                       },
@@ -293,22 +292,17 @@ export const SalesReportView: React.FC = () => {
               })()}
 
               {/* Surfaced rather than asserted internally: if the allocation ever
-                  stops reconciling, it shows up here instead of in an audit. */}
-              {data.reconciliation.difference === 0 ? (
-                <p className="text-body text-status-done-ink">
-                  The store type amounts add up exactly to the total sales.
-                </p>
-              ) : (
+                  stops reconciling, it shows up here instead of in an audit.
+                  Only the mismatch speaks; a clean match says nothing. */}
+              {data.reconciliation.difference !== 0 && (
                 <p className="text-label text-status-act-ink" role="alert">
-                  The store type amounts are off by {formatPeso(data.reconciliation.difference)} from
+                  The merchant category amounts are off by {formatPeso(data.reconciliation.difference)} from
                   the total sales. Treat this report as unconfirmed.
                 </p>
               )}
             </>
           )}
           </div>
-
-          <ReportNotes notes={data.notes} />
         </>
       )}
 
