@@ -26,7 +26,6 @@ interface FinancialChannelMixChartProps {
   view: FinancialChartView;
   commission: Commission;
   transactions: Transactions;
-  timeframe: string;
   isLoading?: boolean;
 }
 
@@ -38,7 +37,6 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
   view,
   commission,
   transactions,
-  timeframe,
   isLoading = false,
 }) => {
   const { isPhone } = useDeviceTier();
@@ -52,7 +50,6 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-panel text-ink">{copy.title}</h3>
-          <p className="text-micro text-ink-muted mt-0.5">{copy.description(timeframe)}</p>
         </div>
       </div>
 

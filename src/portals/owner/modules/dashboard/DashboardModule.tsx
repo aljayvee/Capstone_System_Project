@@ -53,7 +53,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
 }) => {
   // The dashboard's frequency enum and RangeSelector's preset enum are the same
   // four values, so the pills drive this directly.
-  const [frequency, setFrequency] = useState<DashboardFrequency>("MONTH");
+  const [frequency, setFrequency] = useState<DashboardFrequency>("TODAY");
 
   // The presets and the calendar are two ways to ask, and only one can be in
   // force. RangeSelector owns that coordination for both this page and the
@@ -133,9 +133,8 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
               // roster while the map showed every one of them signal-lost.
               // Falls back to what the number MEANS rather than to nothing.
               // The breakdown is data-derived and genuinely cannot be shown
-              // when the fetch failed, but its two neighbours carry static
-              // descriptions, so an undefined sub left one cell of the band
-              // short and the row read as ragged rather than as incomplete.
+              // when the fetch failed; the fallback keeps the cell from going
+              // blank so it reads as a definition rather than as missing data.
               sub: data
                 ? [
                     `${data.riders.signalLost + data.riders.offline} no signal`,
@@ -145,19 +144,17 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
               onClick: onNavigateToModule ? () => onNavigateToModule("tracking") : undefined,
             },
             {
-              label: "Errands pending",
+              label: "Orders waiting",
               value: data ? String(data.errands.pending) : placeholder,
               valueTitle: data ? undefined : placeholderWhy,
-              sub: "Awaiting dispatch",
               // The only figure on this page that means somebody must act, so
               // the only one allowed to spend the signal red.
               urgent: Boolean(data && data.errands.pending > 0),
             },
             {
-              label: "Errands active",
+              label: "Orders on the way",
               value: data ? String(data.errands.active) : placeholder,
               valueTitle: data ? undefined : placeholderWhy,
-              sub: "In transit",
             },
           ]}
         />
@@ -180,21 +177,8 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         {/* REPORTS & ANALYTICS SUMMARY. Executive summary of all 6 reporting domains with dual professional charts */}
         <DashboardReportsSummary
           range={apiRange}
-          timeframe={activeLabel}
           onNavigateToReport={onNavigateToReport}
         />
-
-        {/* ALL TIME. A footnote, because it ignores the selector above. */}
-        <p className="border-t border-hairline pt-3 text-label text-ink-muted">
-          <span
-            data-figure
-            title={data ? undefined : placeholderWhy}
-            className="text-data text-ink"
-          >
-            {data ? String(data.errands.completedAllTime) : placeholder}
-          </span>{" "}
-          errands completed all time. This figure does not follow the period selector.
-        </p>
       </div>
     </OwnerPanelShell>
   );

@@ -59,21 +59,18 @@ export function paymentBars(transactions: Transactions): MixBar[] {
 
 export const FINANCIAL_CHART_COPY: Record<FinancialChartView, {
   title: string;
-  description: (timeframe: string) => string;
   loading: string;
   emptyTitle: string;
   emptyDetail: string;
 }> = {
   fees: {
-    title: "Who gets the delivery fees",
-    description: (timeframe) => `Sugo's share against the riders' share (${timeframe})`,
+    title: "Sugo and Rider Shares",
     loading: "Loading delivery fees...",
     emptyTitle: "No delivery fees in these dates",
     emptyDetail: "No delivery was completed in these dates.",
   },
   payments: {
-    title: "How customers paid",
-    description: (timeframe) => `Cash against GCash or Maya (${timeframe})`,
+    title: "Payment Method",
     loading: "Loading payments...",
     emptyTitle: "No payments in these dates",
     emptyDetail: "No order was paid for in these dates.",

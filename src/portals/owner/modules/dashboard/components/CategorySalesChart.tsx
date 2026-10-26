@@ -15,7 +15,6 @@ import { SummaryChartSkeleton } from "../../../components/OwnerSkeletons";
 
 interface CategorySalesChartProps {
   data: Array<{ name: string; revenue: number; orders: number }>;
-  timeframe: string;
   isLoading?: boolean;
 }
 
@@ -37,7 +36,6 @@ const getCategoryColor = (name: string, index: number) => {
 
 export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
   data,
-  timeframe,
   isLoading = false,
 }) => {
   const { isPhone } = useDeviceTier();
@@ -47,10 +45,7 @@ export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
     <div className="space-y-3 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-panel text-ink">Sales by store type</h3>
-          <p className="text-micro text-ink-muted mt-0.5">
-            How much was sold from each kind of store ({timeframe})
-          </p>
+          <h3 className="text-panel text-ink">Sales by Merchant Categories</h3>
         </div>
       </div>
 

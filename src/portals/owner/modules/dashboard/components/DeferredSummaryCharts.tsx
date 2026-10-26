@@ -14,13 +14,11 @@ const FinancialChannelMixChart = lazyWithRetry(() =>
 
 interface DeferredSummaryChartsProps {
   metrics: Pick<DashboardReportMetrics, "sales" | "commission" | "transactions">;
-  timeframe: string;
   isLoading: boolean;
 }
 
-function ChartPlaceholder({ title, description, height, message, detail, loading, type = "bars" }: {
+function ChartPlaceholder({ title, height, message, detail, loading, type = "bars" }: {
   title: string;
-  description: string;
   height: number;
   message: string;
   detail?: string;
@@ -31,7 +29,6 @@ function ChartPlaceholder({ title, description, height, message, detail, loading
     <div className="space-y-3 rounded-plate border border-edge bg-board-plate p-3.5 sm:p-4">
       <div>
         <h3 className="text-panel text-ink">{title}</h3>
-        <p className="text-micro text-ink-muted mt-0.5">{description}</p>
       </div>
       {loading ? (
         <SummaryChartSkeleton type={type} />
@@ -45,7 +42,7 @@ function ChartPlaceholder({ title, description, height, message, detail, loading
   );
 }
 
-export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: DeferredSummaryChartsProps) {
+export function DeferredSummaryCharts({ metrics, isLoading }: DeferredSummaryChartsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isNearViewport, setIsNearViewport] = useState(false);
   const { isPhone } = useDeviceTier();
@@ -70,12 +67,11 @@ export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: Deferre
 
   const hasSalesData = Boolean(metrics.sales?.categoryBreakdown.length);
   const salesPlaceholder = <ChartPlaceholder
-    title="Sales by store type"
-    description={`How much was sold from each kind of store (${timeframe})`}
+    title="Sales by Merchant Categories"
     height={!isLoading && hasSalesData && isPhone ? 280 : 240}
     loading={isLoading || hasSalesData}
     type="bars"
-    message={isLoading ? "Loading sales by store type..." : hasSalesData ? "Loading chart..." : "No sales in these dates"}
+    message={isLoading ? "Loading sales by merchant category..." : hasSalesData ? "Loading chart..." : "No sales in these dates"}
     detail={!isLoading && !hasSalesData ? "No store orders were placed in these dates." : undefined}
   />;
   const financialChart = (view: FinancialChartView) => {
@@ -84,7 +80,6 @@ export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: Deferre
     const hasData = bars.some((bar) => bar.amount > 0);
     const placeholder = <ChartPlaceholder
       title={copy.title}
-      description={copy.description(timeframe)}
       height={!isLoading && hasData && isPhone ? 270 : 240}
       loading={isLoading || hasData}
       type="mix"
@@ -93,7 +88,7 @@ export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: Deferre
     />;
     return isNearViewport && !isLoading && hasData ? (
       <Suspense fallback={placeholder}>
-        <FinancialChannelMixChart view={view} commission={metrics.commission} transactions={metrics.transactions} timeframe={timeframe} isLoading={isLoading} />
+        <FinancialChannelMixChart view={view} commission={metrics.commission} transactions={metrics.transactions} isLoading={isLoading} />
       </Suspense>
     ) : placeholder;
   };
@@ -105,7 +100,7 @@ export function DeferredSummaryCharts({ metrics, timeframe, isLoading }: Deferre
       <div className="sm:col-span-2 [&>*]:h-full">
         {isNearViewport && !isLoading && hasSalesData ? (
           <Suspense fallback={salesPlaceholder}>
-            <CategorySalesChart data={metrics.sales?.categoryBreakdown ?? []} timeframe={timeframe} isLoading={isLoading} />
+            <CategorySalesChart data={metrics.sales?.categoryBreakdown ?? []} isLoading={isLoading} />
           </Suspense>
         ) : salesPlaceholder}
       </div>

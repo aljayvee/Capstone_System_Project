@@ -41,9 +41,6 @@ export const RevenueChart: React.FC<RevenueChartProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-hairline pb-3.5">
         <div>
           <h3 className="text-panel text-ink">Sales ({timeframe})</h3>
-          <p className="text-micro text-ink-muted mt-0.5">
-            How much customers paid, and how much of it goes to riders, in these dates
-          </p>
         </div>
 
         <div className="flex items-center gap-4 sm:gap-6 self-start sm:self-auto divide-x divide-hairline">

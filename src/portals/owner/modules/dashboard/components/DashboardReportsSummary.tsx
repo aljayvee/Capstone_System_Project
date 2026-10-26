@@ -23,7 +23,6 @@ export type ReportTab =
 
 interface DashboardReportsSummaryProps {
   range: ApiDateRange;
-  timeframe: string;
   onNavigateToReport?: (tab: ReportTab) => void;
 }
 
@@ -33,7 +32,6 @@ function formatPeso(amount: number): string {
 
 export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = ({
   range,
-  timeframe,
   onNavigateToReport,
 }) => {
   const { metrics, isLoading } = useDashboardReportsSummary(range);
@@ -52,10 +50,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
       <div className="rounded-plate border border-edge bg-board-plate overflow-hidden">
         <header className="px-5 py-3 border-b border-edge flex items-center justify-between">
           <div>
-            <h3 className="text-panel text-ink">Reports at a glance</h3>
-            <p className="text-micro text-ink-muted mt-0.5">
-              The main number from each report ({timeframe}). Open one to see the details.
-            </p>
+            <h3 className="text-panel text-ink">Summary Reports</h3>
           </div>
         </header>
 
@@ -312,7 +307,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
       </div>
 
       {/* The two charts under the summary */}
-      <DeferredSummaryCharts metrics={metrics} timeframe={timeframe} isLoading={isLoading} />
+      <DeferredSummaryCharts metrics={metrics} isLoading={isLoading} />
     </section>
   );
 };
