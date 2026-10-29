@@ -168,8 +168,6 @@ export const UserManagementModule: React.FC = () => {
       role: UserRole;
       status: "Active" | "Inactive";
       password: string;
-      adminUsername: string;
-      adminPassword: string;
     }> & { id: number; version: number },
   ) => {
     try {

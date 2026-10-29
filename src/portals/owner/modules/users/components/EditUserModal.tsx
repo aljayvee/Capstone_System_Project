@@ -8,7 +8,6 @@ import {
   Loader2,
   CircleCheck,
   Circle,
-  ShieldAlert,
   KeyRound,
   ShieldCheck,
   Headphones,
@@ -29,7 +28,6 @@ import { ConfirmDialog } from "@/components/panel";
 import {
   ASSIGNABLE_ROLES,
   AssignableRole,
-  requiresRoleChangeApproval,
   roleLabel,
 } from "../../../../../constants/userRoles";
 import {
@@ -55,8 +53,6 @@ type EditUserPayload = Partial<{
   role: UserRole;
   status: "Active" | "Inactive";
   password: string;
-  adminUsername: string;
-  adminPassword: string;
 }> & { id: number; version: number };
 
 interface EditUserModalProps {
@@ -138,14 +134,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
-
-  // Re-authentication step
-  const [showReauth, setShowReauth] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [reauthError, setReauthError] = useState("");
-
-  const roleChangeNeedsApproval = requiresRoleChangeApproval(user.role, role);
 
   const clearFieldError = (field: FieldKey) =>
     setFieldErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
@@ -236,28 +224,18 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     return payload;
   };
 
-  const submit = async (extra?: { adminUsername: string; adminPassword: string }) => {
+  const submit = async () => {
     setError("");
     setIsSubmitting(true);
 
     try {
       const payload = buildPayload();
-      if (extra) {
-        payload.adminUsername = extra.adminUsername;
-        payload.adminPassword = extra.adminPassword;
-      }
-
       const success = await onSave(payload);
       if (success) {
         onClose();
       }
     } catch (err: any) {
-      const message = err.message || "Failed to update user. Please try again.";
-      if (showReauth) {
-        setReauthError(message);
-      } else {
-        setError(message);
-      }
+      setError(err.message || "Failed to update user. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -285,26 +263,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
   const handleConfirmSave = async () => {
     setShowConfirmModal(false);
-    if (roleChangeNeedsApproval) {
-      setError("");
-      setAdminPassword("");
-      setReauthError("");
-      setShowReauth(true);
-      return;
-    }
-
     await submit();
-  };
-
-  const handleReauthConfirm = async () => {
-    if (!adminPassword.trim()) {
-      setReauthError("Enter your admin password to confirm this role change.");
-      return;
-    }
-    await submit({
-      adminUsername: currentUser?.username || "",
-      adminPassword,
-    });
   };
 
   const inputBaseClass = (hasError: boolean) =>
@@ -313,110 +272,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
         ? "border-status-act-ink/50 focus:ring-2 focus:ring-status-act-ink/25 focus:border-status-act-ink bg-status-act-fill"
         : "border-edge focus:ring-2 focus:ring-board-field/20 focus:border-board-field"
     }`;
-
-  // ── Re-authentication confirmation step ──────────────────────────────────
-  if (showReauth) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 overflow-y-auto animate-fade-in">
-        <div className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-md w-full overflow-hidden space-y-5 p-6 sm:p-7 my-auto">
-          <div className="flex items-center gap-3 border-b border-hairline pb-4">
-            <div className="w-10 h-10 rounded-plate bg-signal text-white flex items-center justify-center font-bold shrink-0">
-              <ShieldAlert size={20} />
-            </div>
-            <div>
-              <h3 className="text-panel text-ink">Security Verification</h3>
-              <p className="text-body text-ink-muted">Confirm privileged role change</p>
-            </div>
-          </div>
-
-          <div className="bg-status-waiting-fill border border-status-waiting-ink/20 rounded-plate p-4 space-y-2">
-            <p className="text-label text-status-waiting-ink flex items-center gap-1.5">
-              <AlertTriangle size={15} className="shrink-0 text-status-waiting-ink" />
-              <span>Operational Role Re-assignment</span>
-            </p>
-            <p className="text-label text-status-waiting-ink leading-relaxed">
-              <span className="font-bold text-ink">{user.name}</span> will be switched from{" "}
-              <span className="font-bold text-ink-muted bg-board-ground px-1.5 py-0.5 rounded">
-                {roleLabel(user.role)}
-              </span>{" "}
-              to{" "}
-              <span className="font-bold text-ink bg-board-ground px-1.5 py-0.5 rounded">
-                {roleLabel(role)}
-              </span>
-              . This immediately updates permissions and active dispatch duties.
-            </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="block text-micro uppercase text-ink">
-              Admin Password {currentUser?.username ? `(@${currentUser.username})` : ""}{" "}
-              <span className="text-signal">*</span>
-            </label>
-            <div className="relative">
-              <KeyRound
-                size={15}
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
-              />
-              <input
-                type={showAdminPassword ? "text" : "password"}
-                autoFocus
-                autoComplete="current-password"
-                value={adminPassword}
-                onChange={(e) => {
-                  setAdminPassword(e.target.value);
-                  setReauthError("");
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleReauthConfirm();
-                  }
-                }}
-                placeholder="Enter your administrator password"
-                className={`${inputBaseClass(!!reauthError)} pl-9 pr-9 font-mono`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowAdminPassword(!showAdminPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink"
-              >
-                {showAdminPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-            {reauthError && <p className="text-label text-status-act-ink mt-1">{reauthError}</p>}
-          </div>
-
-          <div className="flex gap-2.5 pt-3 border-t border-hairline">
-            <button
-              type="button"
-              onClick={() => {
-                setShowReauth(false);
-                setAdminPassword("");
-                setReauthError("");
-              }}
-              disabled={isSubmitting}
-              className="flex-1 bg-board-plate hover:bg-board-ground text-ink py-2.5 rounded-plate border border-edge text-label transition disabled:opacity-50"
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={handleReauthConfirm}
-              disabled={isSubmitting}
-              className="flex-1 bg-signal hover:bg-signal text-white py-2.5 rounded-plate text-label flex items-center justify-center gap-1.5 transition disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <ShieldAlert size={14} />
-              )}
-              <span>Verify & Apply</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // ── Main Edit Form ───────────────────────────────────────────────────────
   return (
@@ -547,17 +402,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                       </button>
                     );
                   })}
-                </div>
-              )}
-
-              {roleChangeNeedsApproval && !isSelf && (
-                <div className="flex items-start gap-2 p-3 rounded-plate bg-status-waiting-fill border border-status-waiting-ink/20 text-status-waiting-ink text-label leading-relaxed">
-                  <ShieldAlert size={15} className="shrink-0 mt-0.5 text-status-waiting-ink" />
-                  <span>
-                    Changing role from <strong className="text-ink">{roleLabel(user.role)}</strong>{" "}
-                    to <strong className="text-ink">{roleLabel(role)}</strong> requires admin
-                    password authorization upon saving.
-                  </span>
                 </div>
               )}
             </div>
@@ -887,7 +731,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
             ) : (
               <>
                 <Check size={15} />
-                <span>{roleChangeNeedsApproval ? "Authorize Role Change" : "Save Changes"}</span>
+                <span>Save Changes</span>
               </>
             )}
           </button>
@@ -903,11 +747,6 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
         confirmLabel="Confirm & Save"
         cancelLabel="Back to Form"
         onConfirm={handleConfirmSave}
-        consequence={
-          roleChangeNeedsApproval
-            ? "Changing an operational role requires secondary administrator password authorization."
-            : undefined
-        }
         body={
           <div className="space-y-3">
             <p className="text-body text-ink">

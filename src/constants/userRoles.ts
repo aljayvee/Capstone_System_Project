@@ -40,15 +40,3 @@ export const ROLE_SORT_RANK: Record<string, number> = {
   dispatcher: 1,
   rider: 2,
 };
-
-// Re-assigning an operational account (Dispatcher / Rider) changes what that
-// person can see and do in the live dispatch board, so it is gated behind the
-// acting admin re-entering their own password. Enforced again server-side in
-// Backend/src/server.js — this helper only decides when to ASK.
-export const ROLE_CHANGE_REAUTH_ROLES = ["dispatcher", "rider"];
-
-export function requiresRoleChangeApproval(currentRole: string, nextRole: string): boolean {
-  const from = String(currentRole).toLowerCase();
-  const to = String(nextRole).toLowerCase();
-  return from !== to && ROLE_CHANGE_REAUTH_ROLES.includes(from);
-}
