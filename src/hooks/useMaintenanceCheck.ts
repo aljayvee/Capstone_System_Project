@@ -9,22 +9,24 @@
 
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { io, Socket } from "socket.io-client";
 import type { PortalKey, PortalMaintenanceStatus } from "../types/sysAdmin";
+import {
+  subscribePublicMaintenance,
+  onPublicSocketReconnected,
+} from "../services/publicSocketService";
 
 const API_BASE_URL =
   (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
-const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
-  ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/?$/, "")
-  : "http://localhost:5000";
-
-const POLL_INTERVAL_MS = 30_000; // 30 seconds fallback
+const POLL_INTERVAL_MS = 60_000; // 60 seconds fallback (WebSocket push handles instant updates)
 
 export interface MaintenanceCheckState extends PortalMaintenanceStatus {
   countdownSeconds: number;
   showWarningBanner: boolean;
   showFullScreenOverlay: boolean;
+  isAdvisory: boolean;
+  showAdvisoryModal: boolean;
+  dismissAdvisory: (permanent?: boolean) => void;
 }
 
 export function useMaintenanceCheck(portal: PortalKey): MaintenanceCheckState {
@@ -37,12 +39,64 @@ export function useMaintenanceCheck(portal: PortalKey): MaintenanceCheckState {
     notice: "Scheduled system maintenance in progress. Services will resume shortly.",
     supportContact: "support@sugo-express.org",
     customColor: "",
+    footnote: "",
     activatedAt: null,
-    updatedAt: new Date().toISOString(),
+    updatedAt: "",
   });
 
   const [countdownSeconds, setCountdownSeconds] = useState<number>(0);
+  const [sessionDismissed, setSessionDismissed] = useState<boolean>(false);
   const mountedRef = useRef(true);
+  const lastFetchRef = useRef<number>(0);
+
+  const isAdvisory =
+    status.isActive &&
+    (status.maintenanceType === "ADVISORY" || status.maintenanceType === "LIVE_NOTICE");
+
+  const storageKey = `sugo_advisory_dismissed_${portal}_${status.updatedAt || status.activatedAt || "default"}`;
+  const sessionKey = `sugo_advisory_session_${portal}_${status.updatedAt || status.activatedAt || "default"}`;
+
+  // Reset session dismissal if notice update timestamp changes
+  useEffect(() => {
+    setSessionDismissed(false);
+  }, [status.updatedAt, status.isActive]);
+
+  const isSessionDismissed = (): boolean => {
+    if (sessionDismissed) return true;
+    try {
+      return typeof window !== "undefined" && window.sessionStorage?.getItem(sessionKey) === "1";
+    } catch {
+      return false;
+    }
+  };
+
+  const isPermanentlyDismissed = (): boolean => {
+    try {
+      return typeof window !== "undefined" && window.localStorage?.getItem(storageKey) === "1";
+    } catch {
+      return false;
+    }
+  };
+
+  const dismissAdvisory = (permanent = false) => {
+    setSessionDismissed(true);
+    try {
+      if (typeof window !== "undefined" && window.sessionStorage) {
+        window.sessionStorage.setItem(sessionKey, "1");
+      }
+    } catch {
+      // Fail open silently
+    }
+    if (permanent) {
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.setItem(storageKey, "1");
+        }
+      } catch {
+        // Fail open silently
+      }
+    }
+  };
 
   // 1. Dual-Sync: HTTP polling fallback + Socket.io push listener
   useEffect(() => {
@@ -50,18 +104,34 @@ export function useMaintenanceCheck(portal: PortalKey): MaintenanceCheckState {
 
     // HTTP polling
     const fetchStatus = async () => {
+      lastFetchRef.current = Date.now();
       try {
         const res = await axios.get<PortalMaintenanceStatus>(
           `${API_BASE_URL}/maintenance/status`,
           { params: { portal }, timeout: 5000 }
         );
         if (mountedRef.current && res.data) {
-          setStatus((prev) => ({
-            ...prev,
-            ...res.data,
-            // Fallback for legacy notice field
-            message: res.data.message || res.data.notice || prev.message,
-          }));
+          setStatus((prev) => {
+            const nextMsg = res.data.message || res.data.notice || prev.message;
+            if (
+              prev.isActive === res.data.isActive &&
+              prev.maintenanceType === res.data.maintenanceType &&
+              prev.updatedAt === res.data.updatedAt &&
+              prev.header === res.data.header &&
+              prev.message === nextMsg &&
+              prev.footnote === res.data.footnote &&
+              prev.customColor === res.data.customColor &&
+              prev.supportContact === res.data.supportContact
+            ) {
+              return prev;
+            }
+            return {
+              ...prev,
+              ...res.data,
+              // Fallback for legacy notice field
+              message: nextMsg,
+            };
+          });
         }
       } catch {
         // Fail open silently
@@ -69,43 +139,63 @@ export function useMaintenanceCheck(portal: PortalKey): MaintenanceCheckState {
     };
 
     fetchStatus();
-    const intervalId = setInterval(fetchStatus, POLL_INTERVAL_MS);
 
-    // Socket.io real-time push subscription
-    let socket: Socket | null = null;
-    try {
-      socket = io(BACKEND_URL, {
-        transports: ["websocket", "polling"],
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-      });
+    // Skip polling if tab is hidden in the background
+    const intervalId = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      fetchStatus();
+    }, POLL_INTERVAL_MS);
 
-      socket.on("maintenance:update", (payload: PortalMaintenanceStatus) => {
-        if (!mountedRef.current) return;
-        if (payload && payload.portal === portal) {
-          setStatus((prev) => ({
-            ...prev,
-            ...payload,
-            message: payload.message || payload.notice || prev.message,
-          }));
+    // Immediate check on tab focus or visibility if at least 15s elapsed
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        if (Date.now() - lastFetchRef.current > 15_000) {
+          fetchStatus();
         }
-      });
-    } catch {
-      // If socket initialization fails, polling will continue as fallback
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
     }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", handleVisibilityOrFocus);
+    }
+
+    // Shared Socket.io real-time push subscription multiplexed through publicSocketService
+    const unsubscribeSocket = subscribePublicMaintenance(portal, (payload) => {
+      if (!mountedRef.current) return;
+      setStatus((prev) => ({
+        ...prev,
+        ...payload,
+        message: payload.message || payload.notice || prev.message,
+      }));
+    });
+
+    const unsubscribeReconnect = onPublicSocketReconnected(() => {
+      if (mountedRef.current) {
+        fetchStatus();
+      }
+    });
 
     return () => {
       mountedRef.current = false;
       clearInterval(intervalId);
-      if (socket) {
-        socket.disconnect();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
       }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", handleVisibilityOrFocus);
+      }
+      unsubscribeSocket();
+      unsubscribeReconnect();
     };
   }, [portal]);
 
-  // 2. Dynamic 60-Second Grace Period Countdown Engine
+  // 2. Dynamic 60-Second Grace Period Countdown Engine (Locks only for actual downtime)
   useEffect(() => {
-    if (!status.isActive) {
+    if (!status.isActive || isAdvisory) {
       setCountdownSeconds(0);
       return;
     }
@@ -132,16 +222,20 @@ export function useMaintenanceCheck(portal: PortalKey): MaintenanceCheckState {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [status.isActive, status.activatedAt]);
+  }, [status.isActive, status.activatedAt, isAdvisory]);
 
-  const showWarningBanner = status.isActive && countdownSeconds > 0;
-  const showFullScreenOverlay = status.isActive && countdownSeconds === 0;
+  const showWarningBanner = !isAdvisory && status.isActive && countdownSeconds > 0;
+  const showFullScreenOverlay = !isAdvisory && status.isActive && countdownSeconds === 0;
+  const showAdvisoryModal = isAdvisory && !isSessionDismissed() && !isPermanentlyDismissed();
 
   return {
     ...status,
     countdownSeconds,
     showWarningBanner,
     showFullScreenOverlay,
+    isAdvisory,
+    showAdvisoryModal,
+    dismissAdvisory,
   };
 }
 

@@ -10,7 +10,10 @@ import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
 import type { LoginSuccessResponse, LoginChallengeResponse, LoginErrorResponse } from "../services/apiService";
 import { apiClient } from "../services/apiClient";
-import { io, Socket } from "socket.io-client";
+import {
+  subscribePublicServerError,
+  onPublicSocketReconnected,
+} from "../services/publicSocketService";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +30,10 @@ import { ProfileSetupStep } from "./login/ProfileSetupStep";
 import { OtpStep } from "./login/OtpStep";
 import { ForgotPasswordFlow } from "./login/ForgotPasswordFlow";
 import { LoginAlertBanner, AlertVariant } from "./login/LoginAlertBanner";
+import { useMaintenanceCheck } from "../hooks/useMaintenanceCheck";
+import { MaintenanceOverlay } from "./MaintenanceOverlay";
+import { MaintenanceWarningBanner } from "./MaintenanceWarningBanner";
+import { LiveEditNoticeModal } from "./LiveEditNoticeModal";
 
 // Sign-in is a small state machine, not a single request. An account that has
 // not yet proven it owns its email is answered with a challenge instead of a
@@ -164,6 +171,18 @@ function toPortalUser(rawUser: any, fallbackIdentifier: string, token: string): 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const ownerMaintenance = useMaintenanceCheck("owner");
+  const dispatcherMaintenance = useMaintenanceCheck("dispatcher");
+
+  const maintenance =
+    (ownerMaintenance.showFullScreenOverlay && ownerMaintenance) ||
+    (dispatcherMaintenance.showFullScreenOverlay && dispatcherMaintenance) ||
+    (ownerMaintenance.showAdvisoryModal && ownerMaintenance) ||
+    (dispatcherMaintenance.showAdvisoryModal && dispatcherMaintenance) ||
+    (ownerMaintenance.showWarningBanner && ownerMaintenance) ||
+    (dispatcherMaintenance.showWarningBanner && dispatcherMaintenance) ||
+    (ownerMaintenance.isActive && ownerMaintenance) ||
+    dispatcherMaintenance;
   // Read once on mount: prefills the field and ticks the box when a previous
   // sign-in asked to be remembered.
   const [rememberedIdentifier] = useState(readRememberedIdentifier);
@@ -216,15 +235,21 @@ export default function LoginPage() {
 
   useEffect(() => {
     let isMounted = true;
+    let lastServerErrorFetch = 0;
 
     const checkServerError = async () => {
+      lastServerErrorFetch = Date.now();
       try {
         const res = await apiClient.get<{ active: boolean }>("/system/server-error-status", {
           timeout: 4000,
         });
         if (isMounted && typeof res.data?.active === "boolean") {
           setIsServerErrorOverlayActive(res.data.active);
-          localStorage.setItem("sugo_simulate_500_error", res.data.active ? "true" : "false");
+          try {
+            localStorage.setItem("sugo_simulate_500_error", res.data.active ? "true" : "false");
+          } catch {
+            // Storage quota or sandboxed iframe
+          }
         }
       } catch {
         // Fail silently; fallback to cached state
@@ -232,7 +257,27 @@ export default function LoginPage() {
     };
 
     checkServerError();
-    const pollInterval = setInterval(checkServerError, 5000);
+
+    // 60-second fallback poll; skipped entirely when tab is hidden
+    const pollInterval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+      checkServerError();
+    }, 60_000);
+
+    // Immediate check on tab focus or visibility if at least 15s elapsed
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        if (Date.now() - lastServerErrorFetch > 15_000) {
+          checkServerError();
+        }
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    }
+    window.addEventListener("focus", handleVisibilityOrFocus);
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "sugo_simulate_500_error") {
@@ -249,37 +294,34 @@ export default function LoginPage() {
     };
     window.addEventListener("sugo:server-error-update", handleCustomEvent as EventListener);
 
-    let socket: Socket | null = null;
-    try {
-      const backendUrl = (import.meta as any).env?.VITE_API_URL
-        ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/?$/, "")
-        : "http://localhost:5000";
+    // Shared Socket.io subscription multiplexed through publicSocketService
+    const unsubscribeSocket = subscribePublicServerError((active) => {
+      if (!isMounted) return;
+      setIsServerErrorOverlayActive(active);
+      try {
+        localStorage.setItem("sugo_simulate_500_error", active ? "true" : "false");
+      } catch {
+        // Fail open silently
+      }
+    });
 
-      socket = io(backendUrl, {
-        transports: ["websocket", "polling"],
-        reconnectionAttempts: 5,
-        reconnectionDelay: 2000,
-      });
-
-      socket.on("system:server_error_update", (payload: { active: boolean }) => {
-        if (!isMounted) return;
-        if (payload && typeof payload.active === "boolean") {
-          setIsServerErrorOverlayActive(payload.active);
-          localStorage.setItem("sugo_simulate_500_error", payload.active ? "true" : "false");
-        }
-      });
-    } catch {
-      // Polling fallback active
-    }
+    const unsubscribeReconnect = onPublicSocketReconnected(() => {
+      if (isMounted) {
+        checkServerError();
+      }
+    });
 
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      }
+      window.removeEventListener("focus", handleVisibilityOrFocus);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("sugo:server-error-update", handleCustomEvent as EventListener);
-      if (socket) {
-        socket.disconnect();
-      }
+      unsubscribeSocket();
+      unsubscribeReconnect();
     };
   }, []);
 
@@ -1104,6 +1146,39 @@ export default function LoginPage() {
             onClose={() => setMobileAppRoleAlert(null)}
           />
         </React.Suspense>
+      )}
+
+      {/* System Maintenance & Live Advisory Notices */}
+      {maintenance.showWarningBanner && (
+        <MaintenanceWarningBanner
+          portal={maintenance.portal || "owner"}
+          maintenanceType={maintenance.maintenanceType}
+          countdownSeconds={maintenance.countdownSeconds}
+          header={maintenance.header}
+          customColor={maintenance.customColor}
+        />
+      )}
+      {maintenance.showFullScreenOverlay && (
+        <MaintenanceOverlay
+          portal={maintenance.portal || "owner"}
+          header={maintenance.header}
+          message={maintenance.message}
+          notice={maintenance.notice}
+          maintenanceType={maintenance.maintenanceType}
+          supportContact={maintenance.supportContact}
+          customColor={maintenance.customColor}
+        />
+      )}
+      {maintenance.showAdvisoryModal && (
+        <LiveEditNoticeModal
+          portal={maintenance.portal || "owner"}
+          header={maintenance.header}
+          message={maintenance.message}
+          footnote={maintenance.footnote}
+          customColor={maintenance.customColor}
+          onDismiss={() => maintenance.dismissAdvisory(false)}
+          onPermanentDismiss={() => maintenance.dismissAdvisory(true)}
+        />
       )}
     </main>
   );
