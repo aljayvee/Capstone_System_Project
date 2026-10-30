@@ -26,6 +26,11 @@
 set -euo pipefail
 
 HOST="${DEPLOY_HOST:-root@109.123.239.182}"
+# Every ssh call fails fast instead of hanging. On 2026-10-30 the live-check
+# connection stalled after the site was already live, and with no timeout the
+# deploy sat there for 25 minutes. Keepalives drop a dead link in ~30 s;
+# ConnectTimeout covers the port-22 rate limiter's silent drops.
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3)
 : "${DEPLOY_ROOT:?DEPLOY_ROOT is required}"
 : "${DEPLOY_SOURCE:?DEPLOY_SOURCE is required}"
 : "${DEPLOY_URL:?DEPLOY_URL is required}"
@@ -60,7 +65,7 @@ for path in $HEAVY; do
   [ -e "dist/$path" ] || continue
   local_sum=$(find "dist/$path" -type f -exec md5sum {} + 2>/dev/null \
               | awk '{print $1}' | sort | md5sum | cut -d' ' -f1)
-  remote_sum=$(ssh -o BatchMode=yes "$HOST" \
+  remote_sum=$(ssh "${SSH_OPTS[@]}" "$HOST" \
     "find '$REMOTE_DIST/$path' -type f -exec md5sum {} + 2>/dev/null \
      | awk '{print \$1}' | sort | md5sum | cut -d' ' -f1" || echo "none")
 
@@ -83,14 +88,14 @@ echo "==> local build: $LOCAL_COUNT files, uploading $UPLOAD_COUNT"
 
 # ── upload into a staging directory ────────────────────────────────────────
 echo "==> uploading to $STAGING"
-ssh -o BatchMode=yes "$HOST" "rm -rf '$STAGING' && mkdir -p '$STAGING' '$BACKUP_DIR'"
+ssh "${SSH_OPTS[@]}" "$HOST" "rm -rf '$STAGING' && mkdir -p '$STAGING' '$BACKUP_DIR'"
 tar -czf - -C dist "${TAR_EXCLUDE[@]+"${TAR_EXCLUDE[@]}"}" . \
-  | ssh -o BatchMode=yes "$HOST" "tar -xzf - -C '$STAGING'"
+  | ssh "${SSH_OPTS[@]}" "$HOST" "tar -xzf - -C '$STAGING'"
 
-REMOTE_STAGED=$(ssh -o BatchMode=yes "$HOST" "find '$STAGING' -type f | wc -l")
+REMOTE_STAGED=$(ssh "${SSH_OPTS[@]}" "$HOST" "find '$STAGING' -type f | wc -l")
 if [ "$REMOTE_STAGED" -ne "$UPLOAD_COUNT" ]; then
   echo "!! staged $REMOTE_STAGED files but expected $UPLOAD_COUNT - aborting before touching the live tree"
-  ssh -o BatchMode=yes "$HOST" "rm -rf '$STAGING'"
+  ssh "${SSH_OPTS[@]}" "$HOST" "rm -rf '$STAGING'"
   exit 1
 fi
 echo "==> staged $REMOTE_STAGED files, matches expectation"
@@ -107,7 +112,7 @@ echo "==> staged $REMOTE_STAGED files, matches expectation"
 #                     unchanged file keeps whatever mode scp gave it. -rlpt,
 #                     not -a, so owner and group are left alone.
 echo "==> syncing into $REMOTE_DIST (--delete-after, deleted files parked)"
-ssh -o BatchMode=yes "$HOST" bash -s <<EOF
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s <<EOF
 set -euo pipefail
 rsync -rlpt --delete-after \
       --filter='P /assets/**' \
@@ -133,7 +138,7 @@ EOF
 if [ ${#SKIPPED_PATHS[@]} -gt 0 ]; then
   echo "==> normalising permissions on skipped paths: ${SKIPPED_PATHS[*]}"
   for path in "${SKIPPED_PATHS[@]}"; do
-    ssh -o BatchMode=yes "$HOST" \
+    ssh "${SSH_OPTS[@]}" "$HOST" \
       "find '$REMOTE_DIST/$path' -type d -exec chmod 755 {} + ; \
        find '$REMOTE_DIST/$path' -type f -exec chmod 644 {} +"
   done
@@ -147,7 +152,7 @@ fi
 # from INSIDE the JS matter as much as those named in index.html: the portal's
 # DispatcherPortal bundle is lazy-imported and appears in no HTML at all.
 echo "==> verifying"
-ssh -o BatchMode=yes "$HOST" bash -s <<EOF
+ssh "${SSH_OPTS[@]}" "$HOST" bash -s <<EOF
 set -uo pipefail
 missing=0
 for f in \$(grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' '$REMOTE_DIST/index.html' | sort -u); do
@@ -177,7 +182,7 @@ EOF
 echo "==> live check (direct to nginx, bypassing any CDN)"
 DEPLOY_DOMAIN="${DEPLOY_URL#https://}"
 DEPLOY_DOMAIN="${DEPLOY_DOMAIN%%/*}"
-ssh -o BatchMode=yes "$HOST" \
+ssh "${SSH_OPTS[@]}" "$HOST" \
   "curl -sk -o /dev/null -w '  $DEPLOY_URL -> HTTP %{http_code}\n' -m 20 \
    --resolve '$DEPLOY_DOMAIN:443:127.0.0.1' '$DEPLOY_URL'"
 

@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "specVersion": "1.0",
   "host": {
     "displayName": "Sugo Express Operations Portal",
@@ -7,7 +6,6 @@
   },
   "entries": [
     {
-      "@context": "https://agenticresourcediscovery.org/context/v1",
       "identifier": "urn:air:portal.sugo-express.org:docs:operations",
       "displayName": "Sugo Express Operations Documentation",
       "description": "Logistics, fleet dispatch, and errand delivery management platform for Tacurong City, Philippines.",
