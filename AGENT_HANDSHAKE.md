@@ -1,5 +1,25 @@
 # 🌐 DUAL-MODEL COLLABORATION TUNNEL (CLAUDE ◄► GEMINI)
 
+## 2026-10-31 - Lighthouse Audit Optimization: ARD Manifest, COOP Headers, and Critical Preload Tuning (Antigravity 2.0, Gemini 3.8 Flash High)
+* **Goal**: Resolved Lighthouse audit recommendations on `portal.sugo-express.org`:
+  1. Fixed Agentic Browsing failure (3/4 ➔ 4/4) by creating the standardized `ai-catalog.json` Agent Resource Discovery (ARD) manifest.
+  2. Fixed Best Practices COOP warning by injecting `Cross-Origin-Opener-Policy: same-origin-allow-popups` into Nginx on the Contabo VPS.
+  3. Streamlined critical font preloads in `index.html` to eliminate network pipe saturation during initial paint.
+* **Implementation Details**:
+  - **`public/ai-catalog.json` & `public/.well-known/ai-catalog.json`**: Created valid ARD v1.0 machine-readable catalogs referencing `llms.txt` and operational documentation with URN identifiers.
+  - **`/etc/nginx/snippets/portal-security-headers.conf`**: Configured `add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;`, tested with `nginx -t`, and reloaded on VPS `109.123.239.182`.
+  - **`index.html`**: Retained critical `geist-latin-wght-normal.woff2` preload and eliminated secondary font preloads that competed with initial CSS/JS delivery.
+* **Verification**:
+  - `curl -i https://portal.sugo-express.org/ai-catalog.json` returning HTTP 200 OK with `Content-Type: application/json`.
+  - `curl -i https://portal.sugo-express.org/.well-known/ai-catalog.json` returning HTTP 200 OK.
+  - `curl -I https://portal.sugo-express.org/` returning `cross-origin-opener-policy: same-origin-allow-popups`.
+  - Built and deployed cleanly via `scripts/deploy-web.sh` with live Nginx check returning HTTP 200.
+* **Modified Files**:
+  - `public/ai-catalog.json` (created)
+  - `public/.well-known/ai-catalog.json` (created)
+  - `index.html`
+  - `/etc/nginx/snippets/portal-security-headers.conf` (remote VPS)
+
 ## 2026-10-31 - Public Polling & Socket.io Deduplication Optimization (Antigravity 2.0, Gemini 3.8 Flash High)
 * **Goal**: Resolved aggressive HTTP network polling flooding and redundant parallel Socket.io connections on `LoginPage` and client portal maintenance checks.
 * **Problem**: 
