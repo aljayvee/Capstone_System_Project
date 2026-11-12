@@ -1,0 +1,46 @@
+/* One operational palette for Owner, Dispatcher and System Admin. */
+[data-surface="owner"],
+[data-surface="dispatch"],
+[data-surface="sysadmin"] {
+  --color-board-ground: #F6F8FB;
+  --color-board-plate: #FFFFFF;
+  --color-board-field: #1E3A5F;
+  --color-board-field-deep: #162D4A;
+  --color-board-trim: #526779;
+  --color-ink: #1D2E3D;
+  --color-ink-muted: #526779;
+  --color-hairline: rgb(104 129 150 / 0.20);
+  --color-edge: rgb(104 129 150 / 0.34);
+  --color-field-line: rgb(255 255 255 / 0.19);
+  --color-signal: #DC2626;
+  --color-signal-deep: #C62828;
+  --color-signal-on-field: #FF8A85;
+  --color-signal-ink: #DC2626;
+  --color-field-ink: #1E3A5F;
+  --color-go: #15803D;
+  --color-go-deep: #166534;
+  --color-status-waiting-fill: #FBEBC8;
+  --color-status-waiting-ink: #7A4A05;
+  --color-status-moving-fill: #E2E9F2;
+  --color-status-moving-ink: #1E3A5F;
+  --color-status-done-fill: #D9F2E5;
+  --color-status-done-ink: #0B5B42;
+  --color-status-closed-fill: #E6E8EB;
+  --color-status-closed-ink: #414B57;
+  --color-status-act-fill: #FBE0DE;
+  --color-status-act-ink: #A81E1A;
+  --shadow-plate: 0 0 #0000;
+  --shadow-field: 0 0 #0000;
+}
+
+[data-surface] [data-on-field] { --color-board-trim: #B8CAD7; }
+
+[data-surface] [data-portal-nav] {
+  --color-board-field: #0F2035;
+  --color-board-trim: #8494A8;
+}
+
+[data-surface="sysadmin"] .shadow-sm,
+[data-surface="sysadmin"] .shadow-lg,
+[data-surface="sysadmin"] .shadow-xl,
+[data-surface="sysadmin"] .shadow-2xl { --tw-shadow: 0 0 #0000; }

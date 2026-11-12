@@ -8,13 +8,13 @@
         "type": "tabs",
         "children": [
           {
-            "id": "67d1fbf6510083ff",
+            "id": "b5c7ff5feaee689f",
             "type": "leaf",
             "state": {
-              "type": "empty",
+              "type": "graph",
               "state": {},
-              "icon": "lucide-file",
-              "title": "New tab"
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
             }
           }
         ]
@@ -181,8 +181,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "67d1fbf6510083ff",
+  "active": "b5c7ff5feaee689f",
   "lastOpenFiles": [
+    "Untitled 1.base",
+    "Untitled 1.canvas",
+    "Untitled.canvas",
+    "Untitled",
     "Untitled.base",
     "2026-09-27.md",
     "node_modules/@base-ui/react/docs/react/overview/releases.md",

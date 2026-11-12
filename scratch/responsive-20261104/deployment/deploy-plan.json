@@ -1,0 +1,11 @@
+{
+  "stamp": "web-responsive-20261105-015317",
+  "host": "root@109.123.239.182",
+  "live": "/var/www/web/dist",
+  "staging": "/root/deploy-staging/web-responsive-20261105-015317",
+  "backup": "/root/deploy-backups/web-responsive-20261105-015317",
+  "expected_live_index_sha256": "b7bee4d5f5ccedc7699665d4ef8e7997ef23f584744a93448dcc76efa3c83355",
+  "release_index_sha256": "5a1a4a4d5026ad0af1fcfa20df005222caad0172f5e4e1b6a25934b65413bc7e",
+  "entry": "assets/index-e4ljJuOU.js",
+  "file_count": 191
+}

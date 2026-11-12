@@ -1,0 +1,1 @@
+import{j as e}from"./vendor-react-CDXYDeYH.js";import{L as s,T as i}from"./LegalDocumentView-DvxUJQdm.js";import"./vendor-icons-DTCW-YOL.js";const o=()=>e.jsx(s,{document:i,meta:[{label:"Jurisdiction",value:"Tacurong City, Philippines"},{label:"Applies to",value:"Customers, riders and dispatchers"}]});export{o as TermsOfServicePage,o as default};

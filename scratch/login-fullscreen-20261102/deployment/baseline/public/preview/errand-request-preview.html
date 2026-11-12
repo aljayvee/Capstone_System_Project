@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dispatcher Order Chat - Errand Request Card Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            'dispatcher-navy': '#1E3A5F',
+            'dispatcher-navy-dark': '#0B132B',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; }
+  </style>
+</head>
+<body class="p-6 md:p-12 text-slate-800 flex flex-col items-center min-h-screen">
+
+  <div class="max-w-2xl w-full space-y-8">
+    <div class="text-center space-y-2">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
+        <span>UI Modernization</span>
+        <span>•</span>
+        <span>Dispatcher Order Chat</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-black text-white tracking-tight">Structured Errand Request Card</h1>
+      <p class="text-sm text-slate-400 max-w-lg mx-auto">
+        Transforming squished errand request announcements into a high-density, perfectly aligned multi-category receipt card.
+      </p>
+    </div>
+
+    <!-- Before / After Comparison -->
+    <div class="grid grid-cols-1 gap-6">
+
+      <!-- Simulated Chat Window Container -->
+      <div class="bg-[#F8FAFC] rounded-2xl border border-slate-300/80 shadow-2xl overflow-hidden">
+        <!-- Chat Header -->
+        <div class="bg-white border-b border-slate-200 px-5 py-3.5 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-sm shadow-xs">
+              JD
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-extrabold text-sm text-slate-900">John Doe (Customer)</h3>
+                <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                  Online
+                </span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-medium">Order #SGO-8C84F2 • Pabili Request</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+            <span>Tacurong City</span>
+          </div>
+        </div>
+
+        <!-- Chat Feed Area -->
+        <div class="p-4 md:p-6 space-y-4">
+
+          <!-- Customer Initial Text Message -->
+          <div class="flex items-end gap-2.5 max-w-[88%] mr-auto">
+            <div class="w-7 h-7 rounded-xl bg-slate-200 text-slate-700 border border-slate-300 flex items-center justify-center text-xs font-bold shrink-0">
+              C
+            </div>
+            <div class="flex flex-col items-start min-w-0">
+              <span class="text-[10px] font-bold text-slate-400 mb-1 px-1">John Doe</span>
+              <div class="bg-white text-slate-800 border border-slate-200 rounded-2xl rounded-bl-xs p-3 shadow-xs text-xs">
+                <p>Hello po! Submitting my errand list for lunch and office supplies. Please review po.</p>
+                <span class="text-[9px] text-slate-400 font-mono block text-right mt-1">01:22 AM</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- THE NEW STRUCTURED ERRAND REQUEST CARD -->
+          <div class="my-3 mx-auto w-full max-w-[96%] animate-in fade-in duration-300">
+            <div class="bg-white rounded-2xl border border-slate-300 shadow-md overflow-hidden text-slate-800 text-xs">
+              
+              <!-- Card Header -->
+              <div class="bg-gradient-to-r from-dispatcher-navy-dark to-dispatcher-navy text-white p-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <span class="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-200 flex items-center justify-center shadow-inner">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                  </span>
+                  <div>
+                    <h4 class="font-extrabold text-xs tracking-wide">New Errand Request</h4>
+                    <p class="text-[10px] text-blue-200/80">Submitted by customer • 7 items across 2 stores</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <span class="bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-extrabold px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+                    <svg class="w-3 h-3 text-amber-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" stroke-width="2"></circle>
+                      <polyline points="12 6 12 12 16 14" stroke-width="2"></polyline>
+                    </svg>
+                    Awaiting Review
+                  </span>
+                  <span class="text-[10px] text-blue-200/70 font-mono hidden sm:inline">01:23 AM</span>
+                </div>
+              </div>
+
+              <!-- Card Body -->
+              <div class="p-3.5 sm:p-4 space-y-3 bg-slate-50/50">
+
+                <!-- Route & Stores Strip -->
+                <div class="bg-white border border-slate-200/90 rounded-xl p-3 space-y-2 shadow-xs">
+                  <!-- Stores row -->
+                  <div class="flex items-start gap-2">
+                    <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider shrink-0 mt-0.5 flex items-center gap-1">
+                      <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                      </svg>
+                      Stores:
+                    </span>
+                    <div class="flex flex-wrap gap-1.5">
+                      <span class="bg-blue-50 text-blue-800 border border-blue-200/80 px-2 py-0.5 rounded-md font-bold text-[11px]">
+                        Fast Food & Restaurant
+                      </span>
+                      <span class="bg-indigo-50 text-indigo-800 border border-indigo-200/80 px-2 py-0.5 rounded-md font-bold text-[11px]">
+                        Retail & General Merchandise
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Delivery Address row -->
+                  <div class="flex items-start gap-2 pt-2 border-t border-slate-100">
+                    <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider shrink-0 mt-0.5 flex items-center gap-1">
+                      <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                      </svg>
+                      Deliver To:
+                    </span>
+                    <span class="font-semibold text-slate-800 text-[11px] leading-snug">
+                      MMJ7+HC9 New Isabela, City of Tacurong, Sultan Kudarat, Philippines
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Grouped Items Category 1: Fast Food & Restaurant -->
+                <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-xs">
+                  <div class="bg-slate-100/90 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2 font-black text-xs text-dispatcher-navy">
+                      <svg class="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                      </svg>
+                      <span class="tracking-wide">Fast Food & Restaurant</span>
+                    </div>
+                    <span class="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60 font-mono">
+                      3 items
+                    </span>
+                  </div>
+                  <div class="divide-y divide-slate-100">
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Fried Chicken (2pc)</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Pancit / Noodles</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-blue-50 text-blue-800 border border-blue-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Rice Meal</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Grouped Items Category 2: Retail & General Merchandise -->
+                <div class="bg-white border border-slate-200/90 rounded-xl overflow-hidden shadow-xs">
+                  <div class="bg-slate-100/90 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                    <div class="flex items-center gap-2 font-black text-xs text-dispatcher-navy">
+                      <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                      </svg>
+                      <span class="tracking-wide">Retail & General Merchandise</span>
+                    </div>
+                    <span class="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60 font-mono">
+                      4 items
+                    </span>
+                  </div>
+                  <div class="divide-y divide-slate-100">
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Bond Paper (Ream)</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">AA Batteries (4pk)</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Disinfectant Wipes</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                    <div class="px-3 py-2 flex items-center justify-between text-xs hover:bg-slate-50/70 transition-colors">
+                      <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span class="w-7 h-6 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 font-black font-mono text-[11px] flex items-center justify-center shrink-0">
+                          1×
+                        </span>
+                        <span class="font-bold text-slate-800 truncate">Notebooks</span>
+                      </div>
+                      <span class="text-[10px] text-slate-400 font-medium italic shrink-0 ml-2">Official receipt upon purchase</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Delivery Fee Estimate Row -->
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50/60 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                  <div class="flex items-center gap-2 text-blue-950 font-bold text-xs">
+                    <svg class="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"></path>
+                    </svg>
+                    <span>Initial Estimated Delivery Fee:</span>
+                  </div>
+                  <span class="font-black text-base text-dispatcher-navy font-mono">
+                    ₱100.00
+                  </span>
+                </div>
+
+                <!-- Dispatcher Note / Action Guidance -->
+                <div class="flex items-center gap-2 text-[11px] text-amber-900 bg-amber-50/80 border border-amber-200/70 px-3 py-2 rounded-xl">
+                  <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <span>Waiting for a dispatcher to review and claim this request.</span>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- Dispatcher Response Sample -->
+          <div class="flex items-end gap-2.5 max-w-[88%] ml-auto flex-row-reverse">
+            <div class="w-7 h-7 rounded-xl bg-dispatcher-navy text-white border border-blue-400/30 flex items-center justify-center text-xs font-bold shrink-0 shadow-inner">
+              <svg class="w-3.5 h-3.5 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+              </svg>
+            </div>
+            <div class="flex flex-col items-end min-w-0">
+              <span class="text-[10px] font-bold text-slate-400 mb-1 px-1">Dispatcher (You)</span>
+              <div class="bg-gradient-to-r from-dispatcher-navy-dark to-dispatcher-navy text-white rounded-2xl rounded-br-xs p-3 shadow-xs text-xs border border-blue-500/20">
+                <p>Order received! I will verify with the stores and confirm availability shortly.</p>
+                <span class="text-[9px] text-blue-200/80 font-mono block text-right mt-1">01:24 AM</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

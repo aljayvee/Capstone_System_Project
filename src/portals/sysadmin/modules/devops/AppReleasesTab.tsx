@@ -427,9 +427,9 @@ export const AppReleasesTab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 rounded-xl bg-[#0F1A30] border border-slate-800 text-center space-y-3">
-        <RefreshCw className="w-6 h-6 animate-spin text-red-500 mx-auto" />
-        <p className="text-xs text-slate-400">Loading app release inventory and build statuses...</p>
+      <div className="p-8 rounded-xl bg-board-plate border border-edge text-center space-y-3">
+        <RefreshCw className="w-6 h-6 animate-spin text-status-act-ink mx-auto" />
+        <p className="text-xs text-ink-muted">Loading app release inventory and build statuses...</p>
       </div>
     );
   }
@@ -443,8 +443,8 @@ export const AppReleasesTab: React.FC = () => {
             onClick={() => handleSelectTarget("customer")}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2.5 ${
               activeTarget === "customer"
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                ? "bg-signal text-white shadow-sm"
+                : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
@@ -460,8 +460,8 @@ export const AppReleasesTab: React.FC = () => {
             onClick={() => handleSelectTarget("rider")}
             className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2.5 ${
               activeTarget === "rider"
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                ? "bg-signal text-white shadow-sm"
+                : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
             }`}
           >
             <Bike className="w-4 h-4" />
@@ -478,16 +478,16 @@ export const AppReleasesTab: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={fetchReleases}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F1A30] hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-board-plate hover:bg-board-ground border border-edge text-xs font-medium text-ink transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-ink-muted" />
             <span>Refresh</span>
           </button>
           <a
             href="https://sugoonthego.online#download-apps"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F1A30] hover:bg-slate-800 border border-slate-800 text-xs font-medium text-red-400 hover:text-red-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-board-plate hover:bg-board-ground border border-edge text-xs font-medium text-status-act-ink hover:text-status-act-ink transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span>View Landing Page</span>
@@ -497,61 +497,61 @@ export const AppReleasesTab: React.FC = () => {
 
       {/* Global Notifications */}
       {error && (
-        <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-800/60 text-xs text-red-300 flex items-center gap-2.5">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink flex items-center gap-2.5">
+          <AlertCircle className="w-4 h-4 text-status-act-ink shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {successMessage && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300 flex items-center gap-2.5">
-          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-status-done-fill border border-status-done-ink/30 text-xs text-status-done-ink flex items-center gap-2.5">
+          <Check className="w-4 h-4 text-status-done-ink shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {/* App Inventory Header Card */}
       {activeRelease && (
-        <div className="p-5 rounded-xl bg-[#0F1A30] border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div className="p-5 rounded-xl bg-board-plate border border-edge flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700/60 flex items-center justify-center text-red-500 shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-board-ground border border-edge flex items-center justify-center text-status-act-ink shrink-0">
               {activeTarget === "customer" ? <ShoppingBag className="w-6 h-6" /> : <Bike className="w-6 h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-white">{activeRelease.appName}</h3>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 font-semibold">
+                <h3 className="text-base font-bold text-ink">{activeRelease.appName}</h3>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-status-act-fill border border-status-act-ink/30 text-status-act-ink font-semibold">
                   v{activeRelease.version}
                 </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
+                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-status-done-fill border border-status-done-ink/30 text-status-done-ink font-semibold">
                   Live on Landing Page
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Target package: <span className="font-mono text-slate-300">{activeRelease.packageName}</span> | File:{" "}
-                <span className="font-mono text-slate-300">{activeRelease.fileName}</span>
+              <p className="text-xs text-ink-muted mt-0.5">
+                Target package: <span className="font-mono text-ink">{activeRelease.packageName}</span> | File:{" "}
+                <span className="font-mono text-ink">{activeRelease.fileName}</span>
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <HardDrive className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-1.5 text-ink-muted">
+              <HardDrive className="w-4 h-4 text-ink-muted" />
               <span>
-                Size: <strong className="font-mono text-white">{activeRelease.fileSize}</strong>
+                Size: <strong className="font-mono text-ink">{activeRelease.fileSize}</strong>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Cpu className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-1.5 text-ink-muted">
+              <Cpu className="w-4 h-4 text-ink-muted" />
               <span>
-                Min OS: <strong className="text-white">{activeRelease.minAndroid}</strong>
+                Min OS: <strong className="text-ink">{activeRelease.minAndroid}</strong>
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <ShieldCheck className="w-4 h-4 text-slate-500" />
+            <div className="flex items-center gap-1.5 text-ink-muted">
+              <ShieldCheck className="w-4 h-4 text-ink-muted" />
               <span>
                 Updated:{" "}
-                <strong className="text-white">
+                <strong className="text-ink">
                   {new Date(activeRelease.updatedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
@@ -563,7 +563,7 @@ export const AppReleasesTab: React.FC = () => {
             <a
               href={`https://sugoonthego.online${activeRelease.downloadUrl}`}
               download
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-xs font-medium text-ink transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Test Download</span>
@@ -575,19 +575,19 @@ export const AppReleasesTab: React.FC = () => {
       {/* Main Grid: Upload APK Area (Left) & Edit Details / What's New (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: APK File Upload Box */}
-        <div className="lg:col-span-5 p-5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-            <UploadCloud className="w-4 h-4 text-red-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+        <div className="lg:col-span-5 p-5 rounded-xl bg-board-plate border border-edge space-y-4">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
+            <UploadCloud className="w-4 h-4 text-status-act-ink" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
               Upload New APK Package
             </h4>
           </div>
 
-          <p className="text-xs text-slate-400 leading-relaxed">
+          <p className="text-xs text-ink-muted leading-relaxed">
             Upload the latest compiled release build for{" "}
-            <strong className="text-slate-200">{activeRelease?.appName}</strong>. Once uploaded, the file is deployed
+            <strong className="text-ink">{activeRelease?.appName}</strong>. Once uploaded, the file is deployed
             directly to the server and made immediately available for download on{" "}
-            <span className="font-mono text-slate-300">sugoonthego.online</span>.
+            <span className="font-mono text-ink">sugoonthego.online</span>.
           </p>
 
           {/* Drag & Drop Box */}
@@ -597,8 +597,8 @@ export const AppReleasesTab: React.FC = () => {
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
               selectedFile
-                ? "border-emerald-500/50 bg-emerald-950/10"
-                : "border-slate-700/80 hover:border-red-500/50 hover:bg-slate-800/40 bg-slate-900/40"
+                ? "border-status-done-ink/30 bg-status-done-fill"
+                : "border-edge hover:border-status-act-ink/30 hover:bg-board-ground bg-board-ground"
             }`}
           >
             <input
@@ -608,27 +608,27 @@ export const AppReleasesTab: React.FC = () => {
               onChange={handleFileChange}
               className="hidden"
             />
-            <div className="w-12 h-12 rounded-xl bg-slate-800/80 flex items-center justify-center text-slate-400 mx-auto mb-3">
-              <UploadCloud className={`w-6 h-6 ${selectedFile ? "text-emerald-400" : "text-slate-400"}`} />
+            <div className="w-12 h-12 rounded-xl bg-board-ground flex items-center justify-center text-ink-muted mx-auto mb-3">
+              <UploadCloud className={`w-6 h-6 ${selectedFile ? "text-status-done-ink" : "text-ink-muted"}`} />
             </div>
             {selectedFile ? (
               <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-emerald-300 break-all">{selectedFile.name}</p>
-                <div className="flex items-center justify-center gap-2 text-[11px] text-slate-300 font-mono">
+                <p className="text-xs font-semibold text-status-done-ink break-all">{selectedFile.name}</p>
+                <div className="flex items-center justify-center gap-2 text-[11px] text-ink font-mono">
                   <span>{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-red-400 font-sans font-medium">
+                  <span className="text-ink-muted">•</span>
+                  <span className="text-status-act-ink font-sans font-medium">
                     {Math.ceil(selectedFile.size / (5 * 1024 * 1024))} chunk parts (5 MB slices)
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-2">Click to select a different APK</p>
+                <p className="text-[10px] text-ink-muted mt-2">Click to select a different APK</p>
               </div>
             ) : (
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-slate-200">
+                <p className="text-xs font-semibold text-ink">
                   Drop .apk package here or click to browse
                 </p>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-ink-muted">
                   Accepts signed Android packages (.apk) up to 300 MB • Uploaded chunk-by-chunk (5 MB slices)
                 </p>
               </div>
@@ -636,8 +636,8 @@ export const AppReleasesTab: React.FC = () => {
           </div>
 
           {uploadError && (
-            <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-800/50 text-[11px] text-red-300 flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <div className="p-2.5 rounded-lg bg-status-act-fill border border-status-act-ink/30 text-[11px] text-status-act-ink flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5 text-status-act-ink shrink-0" />
               <span>{uploadError}</span>
             </div>
           )}
@@ -646,23 +646,23 @@ export const AppReleasesTab: React.FC = () => {
           {isUploading && (
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-slate-300 font-medium">
+                <span className="text-ink font-medium">
                   {uploadStage === "assembling"
                     ? "Assembling chunks & validating APK signature..."
                     : chunkInfo
                     ? `Uploading chunk ${chunkInfo.current} of ${chunkInfo.total}...`
                     : "Uploading package..."}
                 </span>
-                <span className="font-mono text-red-400 font-semibold">{uploadProgress}%</span>
+                <span className="font-mono text-status-act-ink font-semibold">{uploadProgress}%</span>
               </div>
-              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div className="w-full h-2 rounded-full bg-board-ground overflow-hidden">
                 <div
-                  className="h-full bg-red-600 transition-all duration-150"
+                  className="h-full bg-signal transition-all duration-150"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
               {totalUploadBytes > 0 && (
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                <div className="flex justify-between text-[10px] text-ink-muted font-mono">
                   <span>
                     {(uploadedBytes / (1024 * 1024)).toFixed(1)} MB transferred
                     {chunkInfo && ` (Part ${chunkInfo.current}/${chunkInfo.total})`}
@@ -680,8 +680,8 @@ export const AppReleasesTab: React.FC = () => {
             disabled={!selectedFile || isUploading}
             className={`w-full py-2.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
               selectedFile && !isUploading
-                ? "bg-red-600 hover:bg-red-500 text-white shadow-sm cursor-pointer active:scale-[0.99]"
-                : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                ? "bg-signal hover:bg-signal-deep text-white shadow-sm cursor-pointer active:scale-[0.99]"
+                : "bg-board-ground text-ink-muted cursor-not-allowed"
             }`}
           >
             {isUploading ? (
@@ -705,16 +705,16 @@ export const AppReleasesTab: React.FC = () => {
         </div>
 
         {/* Right Column: Editable Release Details & What's New */}
-        <div className="lg:col-span-7 p-5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="lg:col-span-7 p-5 rounded-xl bg-board-plate border border-edge space-y-5">
+          <div className="flex items-center justify-between border-b border-edge pb-3">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-red-400" />
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+              <FileText className="w-4 h-4 text-status-act-ink" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
                 Edit Release Details & What's New
               </h4>
             </div>
-            <span className="text-[11px] text-slate-400">
-              Reflects live on <strong className="text-slate-300">sugoonthego.online</strong>
+            <span className="text-[11px] text-ink-muted">
+              Reflects live on <strong className="text-ink">sugoonthego.online</strong>
             </span>
           </div>
 
@@ -722,7 +722,7 @@ export const AppReleasesTab: React.FC = () => {
             {/* Version & System Specs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-ink block mb-1">
                   Version Number
                 </label>
                 <input
@@ -730,13 +730,13 @@ export const AppReleasesTab: React.FC = () => {
                   value={activeForm.version}
                   onChange={(e) => handleFieldChange("version", e.target.value)}
                   placeholder="e.g. 1.0.1"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-lg bg-board-ground border border-edge text-xs font-mono text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-ink block mb-1">
                   Requires (Min OS)
                 </label>
                 <input
@@ -744,13 +744,13 @@ export const AppReleasesTab: React.FC = () => {
                   value={activeForm.minAndroid}
                   onChange={(e) => handleFieldChange("minAndroid", e.target.value)}
                   placeholder="e.g. Android 8.0+"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
+                <label className="text-[11px] font-semibold text-ink block mb-1">
                   Display Size
                 </label>
                 <input
@@ -758,28 +758,28 @@ export const AppReleasesTab: React.FC = () => {
                   value={activeForm.fileSize}
                   onChange={(e) => handleFieldChange("fileSize", e.target.value)}
                   placeholder="e.g. 125 MB"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-lg bg-board-ground border border-edge text-xs font-mono text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   required
                 />
               </div>
             </div>
 
             {/* 1. Features Added List Editor */}
-            <div className="space-y-2.5 pt-1 border-t border-slate-800">
+            <div className="space-y-2.5 pt-1 border-t border-edge">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <label className="text-[11px] font-semibold text-ink flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-status-waiting-ink" />
                   <span>Features Added</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-status-waiting-fill text-status-waiting-ink border border-status-waiting-ink/30 font-mono">
                     {activeForm.features.length}
                   </span>
                 </label>
                 <button
                   type="button"
                   onClick={handleAddFeature}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-board-ground hover:bg-board-ground text-[11px] font-medium text-ink transition-colors cursor-pointer"
                 >
-                  <Plus className="w-3 h-3 text-red-400" />
+                  <Plus className="w-3 h-3 text-status-act-ink" />
                   <span>Add Feature</span>
                 </button>
               </div>
@@ -787,7 +787,7 @@ export const AppReleasesTab: React.FC = () => {
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {activeForm.features.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
+                    <span className="text-[11px] font-mono text-ink-muted w-5 text-right shrink-0">
                       #{idx + 1}
                     </span>
                     <input
@@ -795,12 +795,12 @@ export const AppReleasesTab: React.FC = () => {
                       value={item}
                       onChange={(e) => handleUpdateFeature(idx, e.target.value)}
                       placeholder="e.g. Real-time multi-stop errand route tracking on map..."
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                     />
                     <button
                       type="button"
                       onClick={() => handleRemoveFeature(idx)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-board-ground hover:bg-status-act-fill text-ink-muted hover:text-status-act-ink border border-edge transition-colors shrink-0 cursor-pointer"
                       title="Remove feature"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -809,7 +809,7 @@ export const AppReleasesTab: React.FC = () => {
                 ))}
 
                 {activeForm.features.length === 0 && (
-                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                  <div className="p-3 rounded-lg bg-board-ground border border-dashed border-edge text-center text-xs text-ink-muted">
                     No new features listed. Click "+ Add Feature" above.
                   </div>
                 )}
@@ -817,21 +817,21 @@ export const AppReleasesTab: React.FC = () => {
             </div>
 
             {/* 2. Bug Fixes List Editor */}
-            <div className="space-y-2.5 pt-1 border-t border-slate-800">
+            <div className="space-y-2.5 pt-1 border-t border-edge">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Wrench className="w-3.5 h-3.5 text-blue-400" />
+                <label className="text-[11px] font-semibold text-ink flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-status-moving-ink" />
                   <span>Bug Fixes & Stability</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-status-moving-fill text-status-moving-ink border border-status-moving-ink/30 font-mono">
                     {activeForm.fixes.length}
                   </span>
                 </label>
                 <button
                   type="button"
                   onClick={handleAddFix}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-board-ground hover:bg-board-ground text-[11px] font-medium text-ink transition-colors cursor-pointer"
                 >
-                  <Plus className="w-3 h-3 text-red-400" />
+                  <Plus className="w-3 h-3 text-status-act-ink" />
                   <span>Add Fix</span>
                 </button>
               </div>
@@ -839,7 +839,7 @@ export const AppReleasesTab: React.FC = () => {
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {activeForm.fixes.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
+                    <span className="text-[11px] font-mono text-ink-muted w-5 text-right shrink-0">
                       #{idx + 1}
                     </span>
                     <input
@@ -847,12 +847,12 @@ export const AppReleasesTab: React.FC = () => {
                       value={item}
                       onChange={(e) => handleUpdateFix(idx, e.target.value)}
                       placeholder="e.g. Fixed receipt image orientation glitch on Android 14..."
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                     />
                     <button
                       type="button"
                       onClick={() => handleRemoveFix(idx)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-board-ground hover:bg-status-act-fill text-ink-muted hover:text-status-act-ink border border-edge transition-colors shrink-0 cursor-pointer"
                       title="Remove fix"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -861,7 +861,7 @@ export const AppReleasesTab: React.FC = () => {
                 ))}
 
                 {activeForm.fixes.length === 0 && (
-                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                  <div className="p-3 rounded-lg bg-board-ground border border-dashed border-edge text-center text-xs text-ink-muted">
                     No bug fixes listed. Click "+ Add Fix" above.
                   </div>
                 )}
@@ -869,21 +869,21 @@ export const AppReleasesTab: React.FC = () => {
             </div>
 
             {/* 3. Detailed Logs & Improvements List Editor */}
-            <div className="space-y-2.5 pt-1 border-t border-slate-800">
+            <div className="space-y-2.5 pt-1 border-t border-edge">
               <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <label className="text-[11px] font-semibold text-ink flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-status-done-ink" />
                   <span>Release Logs & Improvements</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-status-done-fill text-status-done-ink border border-status-done-ink/30 font-mono">
                     {activeForm.logs.length}
                   </span>
                 </label>
                 <button
                   type="button"
                   onClick={handleAddLog}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-200 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-board-ground hover:bg-board-ground text-[11px] font-medium text-ink transition-colors cursor-pointer"
                 >
-                  <Plus className="w-3 h-3 text-red-400" />
+                  <Plus className="w-3 h-3 text-status-act-ink" />
                   <span>Add Log</span>
                 </button>
               </div>
@@ -891,7 +891,7 @@ export const AppReleasesTab: React.FC = () => {
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {activeForm.logs.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-slate-500 w-5 text-right shrink-0">
+                    <span className="text-[11px] font-mono text-ink-muted w-5 text-right shrink-0">
                       #{idx + 1}
                     </span>
                     <input
@@ -899,12 +899,12 @@ export const AppReleasesTab: React.FC = () => {
                       value={item}
                       onChange={(e) => handleUpdateLog(idx, e.target.value)}
                       placeholder="e.g. Upgraded Expo SDK 57 runtime and reduced cold start latency..."
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                     />
                     <button
                       type="button"
                       onClick={() => handleRemoveLog(idx)}
-                      className="p-1.5 rounded-lg bg-slate-900 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-800 transition-colors shrink-0 cursor-pointer"
+                      className="p-1.5 rounded-lg bg-board-ground hover:bg-status-act-fill text-ink-muted hover:text-status-act-ink border border-edge transition-colors shrink-0 cursor-pointer"
                       title="Remove log"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -913,7 +913,7 @@ export const AppReleasesTab: React.FC = () => {
                 ))}
 
                 {activeForm.logs.length === 0 && (
-                  <div className="p-3 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                  <div className="p-3 rounded-lg bg-board-ground border border-dashed border-edge text-center text-xs text-ink-muted">
                     No system logs listed. Click "+ Add Log" above.
                   </div>
                 )}
@@ -925,7 +925,7 @@ export const AppReleasesTab: React.FC = () => {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-signal hover:bg-signal-deep text-white text-xs font-semibold shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
               >
                 {isSaving ? (
                   <>
@@ -945,64 +945,64 @@ export const AppReleasesTab: React.FC = () => {
       </div>
 
       {/* Live Landing Page Preview Simulation */}
-      <div className="p-5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="p-5 rounded-xl bg-board-plate border border-edge space-y-4">
+        <div className="flex items-center justify-between border-b border-edge pb-3">
           <div className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+            <Smartphone className="w-4 h-4 text-status-done-ink" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
               Live Preview: How it Appears on sugoonthego.online
             </h4>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">
+          <span className="text-[11px] text-ink-muted font-mono">
             Previewing: {activeRelease?.appName}
           </span>
         </div>
 
         {/* Mock Landing Card Surface */}
-        <div className="max-w-xl mx-auto p-6 rounded-2xl bg-[#FAFAF9] text-slate-900 border border-slate-200/80 shadow-xs space-y-5">
+        <div className="max-w-xl mx-auto p-6 rounded-2xl bg-board-ground text-ink border border-edge shadow-xs space-y-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200/80 flex items-center justify-center text-red-600 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-status-act-fill border border-status-act-ink/30 flex items-center justify-center text-status-act-ink shrink-0">
               {activeTarget === "customer" ? <ShoppingBag className="w-5 h-5" /> : <Bike className="w-5 h-5" />}
             </div>
             <div>
-              <span className="text-[10px] font-bold tracking-wider text-red-600 uppercase">
+              <span className="text-[10px] font-bold tracking-wider text-status-act-ink uppercase">
                 {activeTarget === "customer" ? "Customer Application" : "Delivery Partner Application"}
               </span>
-              <h3 className="text-xl font-extrabold text-slate-950 tracking-tight leading-tight">
+              <h3 className="text-xl font-extrabold text-ink tracking-tight leading-tight">
                 {activeRelease?.appName}
               </h3>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-slate-500 pt-2 border-t border-slate-200">
+          <div className="flex flex-wrap items-center gap-y-2 gap-x-5 text-xs text-ink-muted pt-2 border-t border-edge">
             <div className="flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-slate-400" />
+              <Cpu className="w-3.5 h-3.5 text-ink-muted" />
               <span>
-                Version <strong className="font-mono text-slate-800 tabular-nums">{activeForm.version || "1.0.0"}</strong>
+                Version <strong className="font-mono text-ink tabular-nums">{activeForm.version || "1.0.0"}</strong>
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+              <HardDrive className="w-3.5 h-3.5 text-ink-muted" />
               <span>
-                Size <strong className="font-mono text-slate-800 tabular-nums">{activeForm.fileSize || "125 MB"}</strong>
+                Size <strong className="font-mono text-ink tabular-nums">{activeForm.fileSize || "125 MB"}</strong>
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+              <Smartphone className="w-3.5 h-3.5 text-ink-muted" />
               <span>
-                Requires <strong className="text-slate-800">{activeForm.minAndroid || "Android 8.0+"}</strong>
+                Requires <strong className="text-ink">{activeForm.minAndroid || "Android 8.0+"}</strong>
               </span>
             </div>
           </div>
 
           <div className="space-y-2 pt-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-900 block">
+            <span className="text-xs font-bold uppercase tracking-wider text-ink block">
               What's New in this Version
             </span>
-            <ul className="space-y-1.5 text-xs text-slate-600">
+            <ul className="space-y-1.5 text-xs text-ink-muted">
               {activeForm.whatsNew.filter(Boolean).map((bullet, idx) => (
                 <li key={idx} className="flex items-start gap-2">
-                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <Check className="w-3.5 h-3.5 text-status-done-ink shrink-0 mt-0.5" />
                   <span>{bullet}</span>
                 </li>
               ))}
@@ -1010,7 +1010,7 @@ export const AppReleasesTab: React.FC = () => {
           </div>
 
           <div className="pt-2">
-            <div className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#DC2626] text-white font-bold rounded-xl text-xs sm:text-sm">
+            <div className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-signal text-white font-bold rounded-xl text-xs sm:text-sm">
               <Download className="w-4 h-4" />
               <span>Download {activeRelease?.appName} APK</span>
             </div>

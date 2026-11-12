@@ -16,38 +16,33 @@ interface DispatcherPipelineTrackerProps {
 const PHASES = [
   {
     key: "claimed",
-    label: "Claimed & Review",
+    label: "Under Review",
     stepNumber: "01",
     icon: <ClipboardCheck size={14} />,
-    description: "Orders claimed by dispatch",
   },
   {
     key: "toStore",
-    label: "To the Store",
+    label: "To Store",
     stepNumber: "02",
     icon: <Store size={14} />,
-    description: "Riders travelling to pinpoints",
   },
   {
     key: "bought",
-    label: "Purchased",
+    label: "Items Bought",
     stepNumber: "03",
     icon: <ShoppingBag size={14} />,
-    description: "Items bought & verified",
   },
   {
     key: "onTheWay",
     label: "On the Way",
     stepNumber: "04",
     icon: <Bike size={14} />,
-    description: "Riders delivering to customer",
   },
   {
     key: "delivered",
     label: "Delivered Today",
     stepNumber: "05",
     icon: <CheckCircle2 size={14} />,
-    description: "Completed & settled",
   },
 ] as const;
 
@@ -60,11 +55,8 @@ export const DispatcherPipelineTracker: React.FC<DispatcherPipelineTrackerProps>
       <div className="flex items-center justify-between pb-3 border-b border-hairline mb-3">
         <div>
           <h2 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-            Active Pipeline Milestones
+            Errand Progress
           </h2>
-          <p className="text-micro text-ink-muted mt-0.5">
-            Real-time delivery progress across the 5 canonical phases of order fulfillment
-          </p>
         </div>
       </div>
 
@@ -120,9 +112,6 @@ export const DispatcherPipelineTracker: React.FC<DispatcherPipelineTrackerProps>
                 </p>
                 <p className="text-label font-bold text-ink truncate mt-0.5">
                   {phase.label}
-                </p>
-                <p className="text-micro text-ink-muted truncate mt-0.5">
-                  {phase.description}
                 </p>
               </div>
             </button>

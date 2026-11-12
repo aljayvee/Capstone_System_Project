@@ -113,17 +113,17 @@ export const BackupsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Retention Policy Banner */}
-      <div className="p-4 rounded-xl bg-[#0F1A30] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 rounded-xl bg-board-plate border border-edge flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-sky-950/60 border border-sky-800/60 flex items-center justify-center text-sky-400 shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-lg bg-status-moving-fill border border-status-moving-ink/30 flex items-center justify-center text-status-moving-ink shrink-0 mt-0.5">
             <FileArchive className="w-5 h-5" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
               Automated Gzip Database Backup Engine
             </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Nightly compressed snapshots (<code className="text-sky-300 font-mono">.sql.gz</code>) execute automatically at 02:00 AM Manila Time (18:00 UTC). Backups older than 7 days are automatically pruned to preserve server storage.
+            <p className="text-xs text-ink leading-relaxed">
+              Nightly compressed snapshots (<code className="text-status-moving-ink font-mono">.sql.gz</code>) execute automatically at 02:00 AM Manila Time (18:00 UTC). Backups older than 7 days are automatically pruned to preserve server storage.
             </p>
           </div>
         </div>
@@ -132,14 +132,14 @@ export const BackupsTab: React.FC = () => {
           <button
             onClick={fetchBackups}
             disabled={isLoading}
-            className="p-2 rounded-lg bg-[#0B132B] hover:bg-slate-800 border border-slate-800 text-slate-300 transition-colors"
+            className="p-2 rounded-lg bg-board-ground hover:bg-board-ground border border-edge text-ink transition-colors"
             title="Refresh Backups List"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-red-400" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-status-act-ink" : ""}`} />
           </button>
           <button
             onClick={() => setIsTriggerModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 font-semibold text-xs text-white transition-colors flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl bg-signal hover:bg-signal-deep font-semibold text-xs text-white transition-colors flex items-center gap-2"
           >
             <Database className="w-3.5 h-3.5" />
             <span>Create Snapshot</span>
@@ -149,14 +149,14 @@ export const BackupsTab: React.FC = () => {
 
       {/* Action Messages */}
       {actionSuccess && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-xs text-emerald-300 font-mono flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-status-done-fill border border-status-done-ink/30 text-xs text-status-done-ink font-mono flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-status-done-ink shrink-0" />
             <span>{actionSuccess}</span>
           </div>
           <button
             onClick={() => setActionSuccess(null)}
-            className="text-slate-400 hover:text-white underline text-xs"
+            className="text-ink-muted hover:text-ink underline text-xs"
           >
             Dismiss
           </button>
@@ -164,14 +164,14 @@ export const BackupsTab: React.FC = () => {
       )}
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/60 text-xs text-rose-300 font-mono flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink font-mono flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-status-act-ink shrink-0" />
             <span>{error}</span>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-slate-400 hover:text-white underline text-xs"
+            className="text-ink-muted hover:text-ink underline text-xs"
           >
             Dismiss
           </button>
@@ -187,14 +187,14 @@ export const BackupsTab: React.FC = () => {
         );
 
         const desktopTable = (
-          <div className="p-5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-4">
+          <div className="p-5 rounded-xl bg-board-plate border border-edge space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold font-mono uppercase text-slate-300 flex items-center gap-2">
-                  <HardDrive className="w-4 h-4 text-sky-400" />
+                <h3 className="text-xs font-bold font-mono uppercase text-ink flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-status-moving-ink" />
                   <span>Snapshot Inventory &amp; Export Stream ({backups.length})</span>
                 </h3>
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-ink-muted">
                   Storage destination: /var/www/server/backups/
                 </span>
               </div>
@@ -203,7 +203,7 @@ export const BackupsTab: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase text-[10px]">
+                  <tr className="border-b border-edge text-ink-muted font-mono uppercase text-[10px]">
                     <th className="py-2.5 px-3">File Name</th>
                     <th className="py-2.5 px-3">Size</th>
                     <th className="py-2.5 px-3">Type</th>
@@ -213,28 +213,28 @@ export const BackupsTab: React.FC = () => {
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-hairline">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400 font-mono">
-                        <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-red-400" />
+                      <td colSpan={7} className="py-8 text-center text-ink-muted font-mono">
+                        <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-status-act-ink" />
                         Loading database backup inventory...
                       </td>
                     </tr>
                   ) : filteredBackups.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400 font-mono">
+                      <td colSpan={7} className="py-8 text-center text-ink-muted font-mono">
                         No database snapshots found. Click &quot;Create Snapshot&quot; to generate an on-demand backup.
                       </td>
                     </tr>
                   ) : (
                     filteredBackups.map((b) => (
-                      <tr key={b.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-3 font-mono font-medium text-white flex items-center gap-2">
-                          <FileArchive className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                      <tr key={b.id} className="hover:bg-board-ground transition-colors">
+                        <td className="py-3 px-3 font-mono font-medium text-ink flex items-center gap-2">
+                          <FileArchive className="w-3.5 h-3.5 text-status-moving-ink shrink-0" />
                           <span>{b.fileName}</span>
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-300 tabular-nums">
+                        <td className="py-3 px-3 font-mono text-ink tabular-nums">
                           {b.fileSizeFormatted}
                         </td>
                         <td className="py-3 px-3">
@@ -242,7 +242,7 @@ export const BackupsTab: React.FC = () => {
                             className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
                               b.backupType === "AUTOMATED"
                                 ? "bg-purple-950/60 text-purple-300 border-purple-800/60"
-                                : "bg-sky-950/60 text-sky-300 border-sky-800/60"
+                                : "bg-status-moving-fill text-status-moving-ink border-status-moving-ink/30"
                             }`}
                           >
                             {b.backupType}
@@ -252,17 +252,17 @@ export const BackupsTab: React.FC = () => {
                           <span
                             className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
                               b.status === "SUCCESS"
-                                ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
-                                : "bg-rose-950/60 text-rose-400 border-rose-800/60"
+                                ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
+                                : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
                             }`}
                           >
                             {b.status}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-300">
+                        <td className="py-3 px-3 font-mono text-ink">
                           {b.createdBy}
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-400 text-[11px]">
+                        <td className="py-3 px-3 font-mono text-ink-muted text-[11px]">
                           {new Date(b.createdAt).toLocaleString()}
                         </td>
                         <td className="py-3 px-3 text-right">
@@ -270,7 +270,7 @@ export const BackupsTab: React.FC = () => {
                             <button
                               onClick={() => handleDownload(b)}
                               disabled={downloadingId === b.id}
-                              className="px-2.5 py-1 rounded-lg bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/60 text-sky-300 text-[11px] font-medium transition-colors flex items-center gap-1.5"
+                              className="px-2.5 py-1 rounded-lg bg-status-moving-fill hover:bg-status-moving-fill border border-status-moving-ink/30 text-status-moving-ink text-[11px] font-medium transition-colors flex items-center gap-1.5"
                               title="Download compressed snapshot"
                             >
                               <Download className={`w-3 h-3 ${downloadingId === b.id ? "animate-spin" : ""}`} />
@@ -278,7 +278,7 @@ export const BackupsTab: React.FC = () => {
                             </button>
                             <button
                               onClick={() => setBackupToDelete(b)}
-                              className="p-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 text-[11px] transition-colors"
+                              className="p-1 rounded-lg bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-status-act-ink text-[11px] transition-colors"
                               title="Delete snapshot"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -304,12 +304,12 @@ export const BackupsTab: React.FC = () => {
             secondaryHeader="Size & Status"
             renderPrimary={(b) => (
               <div className="flex items-center gap-2">
-                <FileArchive className="w-4 h-4 text-sky-400 shrink-0" />
+                <FileArchive className="w-4 h-4 text-status-moving-ink shrink-0" />
                 <div className="min-w-0">
-                  <div className="font-mono font-medium text-white text-xs truncate">
+                  <div className="font-mono font-medium text-ink text-xs truncate">
                     {b.fileName}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono">
+                  <div className="text-[10px] text-ink-muted font-mono">
                     {b.backupType} · {b.createdBy}
                   </div>
                 </div>
@@ -317,14 +317,14 @@ export const BackupsTab: React.FC = () => {
             )}
             renderSecondary={(b) => (
               <div className="text-right">
-                <div className="font-mono text-xs text-slate-200 tabular-nums">
+                <div className="font-mono text-xs text-ink tabular-nums">
                   {b.fileSizeFormatted}
                 </div>
                 <span
                   className={`inline-block text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${
                     b.status === "SUCCESS"
-                      ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
-                      : "bg-rose-950/60 text-rose-400 border-rose-800/60"
+                      ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
+                      : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
                   }`}
                 >
                   {b.status}
@@ -332,20 +332,20 @@ export const BackupsTab: React.FC = () => {
               </div>
             )}
             renderPreview={(b) => (
-              <div className="space-y-1.5 pt-1 text-slate-300">
+              <div className="space-y-1.5 pt-1 text-ink">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">Created By:</span>
-                  <span className="font-mono text-slate-200">{b.createdBy}</span>
+                  <span className="text-ink-muted">Created By:</span>
+                  <span className="font-mono text-ink">{b.createdBy}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">Timestamp:</span>
-                  <span className="font-mono text-slate-400 text-[10px]">
+                  <span className="text-ink-muted">Timestamp:</span>
+                  <span className="font-mono text-ink-muted text-[10px]">
                     {new Date(b.createdAt).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">Type / Engine:</span>
-                  <span className="font-mono text-sky-400">{b.backupType} (Gzip .sql.gz)</span>
+                  <span className="text-ink-muted">Type / Engine:</span>
+                  <span className="font-mono text-status-moving-ink">{b.backupType} (Gzip .sql.gz)</span>
                 </div>
               </div>
             )}
@@ -355,7 +355,7 @@ export const BackupsTab: React.FC = () => {
                   type="button"
                   onClick={() => handleDownload(b)}
                   disabled={downloadingId === b.id}
-                  className="flex-1 py-2 px-3 rounded-xl bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/60 text-sky-300 text-xs font-semibold flex items-center justify-center gap-1.5 min-h-[44px] active:scale-95 transition-all"
+                  className="flex-1 py-2 px-3 rounded-xl bg-status-moving-fill hover:bg-status-moving-fill border border-status-moving-ink/30 text-status-moving-ink text-xs font-semibold flex items-center justify-center gap-1.5 min-h-[44px] active:scale-95 transition-all"
                 >
                   <Download className={`w-3.5 h-3.5 ${downloadingId === b.id ? "animate-spin" : ""}`} />
                   <span>Download</span>
@@ -363,7 +363,7 @@ export const BackupsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setBackupToDelete(b)}
-                  className="p-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 text-xs flex items-center justify-center min-h-[44px] min-w-[44px] active:scale-95 transition-all"
+                  className="p-2.5 rounded-xl bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-status-act-ink text-xs flex items-center justify-center min-h-[44px] min-w-[44px] active:scale-95 transition-all"
                   title="Delete snapshot"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -376,8 +376,8 @@ export const BackupsTab: React.FC = () => {
               <span
                 className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
                   b.status === "SUCCESS"
-                    ? "bg-emerald-950/60 text-emerald-400 border-emerald-800/60"
-                    : "bg-rose-950/60 text-rose-400 border-rose-800/60"
+                    ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
+                    : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
                 }`}
               >
                 {b.status}
@@ -403,7 +403,7 @@ export const BackupsTab: React.FC = () => {
                   type="button"
                   onClick={() => handleDownload(b)}
                   disabled={downloadingId === b.id}
-                  className="w-full py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-status-moving-ink hover:bg-status-moving-ink text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   <Download className={`w-4 h-4 ${downloadingId === b.id ? "animate-spin" : ""}`} />
                   <span>Download Gzip Archive ({b.fileSizeFormatted})</span>
@@ -414,7 +414,7 @@ export const BackupsTab: React.FC = () => {
                     onClose();
                     setBackupToDelete(b);
                   }}
-                  className="w-full py-3 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-status-act-ink font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete Snapshot</span>
@@ -431,50 +431,50 @@ export const BackupsTab: React.FC = () => {
       {/* Trigger Modal */}
       {isTriggerModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0F1A30] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <Database className="w-4 h-4 text-sky-400" />
+          <div className="w-full max-w-md bg-board-plate border border-edge rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
+              <div className="flex items-center gap-2 text-ink font-bold text-sm">
+                <Database className="w-4 h-4 text-status-moving-ink" />
                 <span>Generate Database Backup Snapshot</span>
               </div>
               <button
                 onClick={() => setIsTriggerModalOpen(false)}
                 disabled={isCreatingBackup}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-ink-muted hover:text-ink transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300">
+            <div className="space-y-3 text-xs text-ink">
               <p>
-                An on-demand compressed SQL dump (<code className="font-mono text-sky-300">.sql.gz</code>) of the entire <span className="font-bold text-white">errand_system_db</span> database will be generated on the VPS disk.
+                An on-demand compressed SQL dump (<code className="font-mono text-status-moving-ink">.sql.gz</code>) of the entire <span className="font-bold text-ink">errand_system_db</span> database will be generated on the VPS disk.
               </p>
 
               <div className="space-y-1.5 pt-1">
-                <label className="block text-[11px] font-medium text-slate-400">
+                <label className="block text-[11px] font-medium text-ink-muted">
                   Step-Up Administrator Password
                 </label>
                 <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-3" />
                   <input
                     type="password"
                     value={triggerPassword}
                     onChange={(e) => setTriggerPassword(e.target.value)}
                     placeholder="Enter password..."
                     disabled={isCreatingBackup}
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#070D1B] border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-red-500/60"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-edge">
               <button
                 type="button"
                 onClick={() => setIsTriggerModalOpen(false)}
                 disabled={isCreatingBackup}
-                className="px-3.5 py-1.5 rounded-lg bg-[#070D1B] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-medium transition-colors"
+                className="px-3.5 py-1.5 rounded-lg bg-board-ground hover:bg-board-ground border border-edge text-xs text-ink font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -482,7 +482,7 @@ export const BackupsTab: React.FC = () => {
                 type="button"
                 onClick={handleTriggerBackup}
                 disabled={isCreatingBackup || !triggerPassword}
-                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center gap-2"
+                className="px-4 py-1.5 rounded-lg bg-signal hover:bg-signal-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center gap-2"
               >
                 {isCreatingBackup ? (
                   <>
@@ -501,54 +501,54 @@ export const BackupsTab: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {backupToDelete && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#0F1A30] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+          <div className="w-full max-w-md bg-board-plate border border-edge rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-edge pb-3">
+              <div className="flex items-center gap-2 text-status-act-ink font-bold text-sm">
                 <Trash2 className="w-4 h-4" />
                 <span>Delete Database Snapshot</span>
               </div>
               <button
                 onClick={() => setBackupToDelete(null)}
                 disabled={isDeleting}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-ink-muted hover:text-ink transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-300">
+            <div className="space-y-3 text-xs text-ink">
               <p>
                 Are you sure you want to permanently delete snapshot{" "}
-                <span className="font-mono font-bold text-white">{backupToDelete.fileName}</span>?
+                <span className="font-mono font-bold text-ink">{backupToDelete.fileName}</span>?
               </p>
-              <p className="text-rose-400 text-[11px]">
+              <p className="text-status-act-ink text-[11px]">
                 This will unlink the file from disk and remove its database metadata record.
               </p>
 
               <div className="space-y-1.5 pt-1">
-                <label className="block text-[11px] font-medium text-slate-400">
+                <label className="block text-[11px] font-medium text-ink-muted">
                   Confirm with Administrator Password
                 </label>
                 <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-3" />
                   <input
                     type="password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
                     placeholder="Enter password..."
                     disabled={isDeleting}
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#070D1B] border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-red-500/60"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-edge">
               <button
                 type="button"
                 onClick={() => setBackupToDelete(null)}
                 disabled={isDeleting}
-                className="px-3.5 py-1.5 rounded-lg bg-[#070D1B] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 font-medium transition-colors"
+                className="px-3.5 py-1.5 rounded-lg bg-board-ground hover:bg-board-ground border border-edge text-xs text-ink font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -556,7 +556,7 @@ export const BackupsTab: React.FC = () => {
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting || !deletePassword}
-                className="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center gap-2"
+                className="px-4 py-1.5 rounded-lg bg-signal hover:bg-signal-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center gap-2"
               >
                 {isDeleting ? (
                   <>

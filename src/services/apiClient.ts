@@ -1,4 +1,5 @@
 import axios from "axios";
+import { rememberErrandReferences } from "../utils/formatErrandId";
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:5000/api";
 
@@ -86,10 +87,16 @@ function getDeviceId(): string | null {
   }
 }
 
-/** Headers every call must carry, including the raw axios refresh below. */
+/**
+ * Headers every call must carry, including the raw axios refresh below.
+ *
+ * `x-sugo-mfa: 1` tells the server this client runs the two-step sign-in
+ * itself: it asks for the email code with an explicit "Send code" instead of
+ * the server mailing one at the password step, and it can do the SMS factor.
+ */
 export const deviceHeaders = (): Record<string, string> => {
   const id = getDeviceId();
-  return id ? { "x-device-id": id } : {};
+  return id ? { "x-device-id": id, "x-sugo-mfa": "1" } : { "x-sugo-mfa": "1" };
 };
 
 export const apiClient = axios.create({
@@ -138,7 +145,12 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Most screens show an errand from its id alone; this is where they learn
+    // its number (see formatErrandId).
+    rememberErrandReferences(response.data);
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -166,33 +178,26 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const fallbackRefreshToken = typeof sessionStorage !== "undefined"
-          ? sessionStorage.getItem("sugo_refresh_fallback")
-          : null;
-
-        // Attempt silent token refresh via HttpOnly cookie (with sessionStorage fallback)
+        // Silent token refresh via the HttpOnly cookie alone. Sending the token
+        // in the body would make the server echo the rotated one back in the
+        // body, where page scripts can read it (AuthContext's
+        // LEGACY_REFRESH_COPY_KEY note).
         // Raw axios, not apiClient, so the request interceptor never sees it -
         // the device header has to be attached by hand or this one refresh
         // would reach the server looking like a different device.
         const res = await axios.post(
           `${API_BASE_URL}/auth/refresh`,
-          { refreshToken: fallbackRefreshToken || undefined },
+          {},
           { withCredentials: true, headers: deviceHeaders() }
         );
 
         const newAccessToken = res.data.token;
-        if (res.data?.refreshToken && typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("sugo_refresh_fallback", res.data.refreshToken);
-        }
         setMemoryAccessToken(newAccessToken);
         processQueue(null, newAccessToken);
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr: any) {
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.removeItem("sugo_refresh_fallback");
-        }
         processQueue(refreshErr, null);
         setMemoryAccessToken(null);
         const errorMsg = String(

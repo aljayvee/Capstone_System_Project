@@ -30,6 +30,7 @@ import {
   AssignableRole,
   roleLabel,
 } from "../../../../../constants/userRoles";
+import { useOptionalPermissions } from "../../../../../context/PermissionsContext";
 import {
   PASSWORD_RULES,
   PH_MOBILE_LENGTH,
@@ -111,6 +112,10 @@ const ROLE_METADATA: Record<
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onSave }) => {
   const { user: currentUser } = useAuth();
+  // Moving an account into the Admin role is the Main Owner's; the server
+  // refuses anyone else, so the option is not offered.
+  const access = useOptionalPermissions();
+  const allowAdminRole = !access || access.legacy || access.isMainOwner || user.role === "owner";
   const isSelf = Boolean(
     currentUser && (currentUser.id === user.id || currentUser.username === user.username),
   );
@@ -270,19 +275,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
     `w-full bg-board-ground border border-edge rounded-plate py-2.5 px-3.5 text-body text-ink placeholder-ink-muted outline-none transition duration-150 focus:bg-board-plate ${
       hasError
         ? "border-status-act-ink/50 focus:ring-2 focus:ring-status-act-ink/25 focus:border-status-act-ink bg-status-act-fill"
-        : "border-edge focus:ring-2 focus:ring-board-field/20 focus:border-board-field"
+        : "border-edge focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink"
     }`;
 
   // ── Main Edit Form ───────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 overflow-y-auto animate-fade-in">
-      <div className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-xl w-full max-h-[94vh] flex flex-col overflow-hidden my-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="edit-personnel-title" className="bg-board-plate border border-edge rounded-plate sm:rounded-plate max-w-xl min-w-0 w-full max-h-[calc(100dvh_-_1.5rem)] flex flex-col overflow-hidden my-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-hairline bg-board-ground shrink-0">
           {/* Same removal as the add modal: a gradient chip with a coloured
               shadow, replaced by the title doing its own work. */}
           <div className="min-w-0">
-            <h3 className="truncate text-panel text-ink">Edit Personnel Account</h3>
+            <h3 id="edit-personnel-title" className="truncate text-panel text-ink">Edit Personnel Account</h3>
             <p className="mt-0.5 text-label text-ink-muted">
               Update account credentials, profile details & operational role
             </p>
@@ -378,7 +383,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-1.5 p-1 bg-board-ground border border-edge rounded-plate">
-                  {ASSIGNABLE_ROLES.map((option) => {
+                  {ASSIGNABLE_ROLES.filter((option) => option.value !== "owner" || allowAdminRole).map((option) => {
                     const meta = ROLE_METADATA[option.value];
                     const Icon = meta.icon;
                     const isSelected = role === option.value;
@@ -397,7 +402,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                             : "text-ink-muted hover:text-ink"
                         }`}
                       >
-                        <Icon size={14} className={isSelected ? "text-board-field" : "text-ink-muted"} />
+                        <Icon size={14} className={isSelected ? "text-field-ink" : "text-ink-muted"} />
                         <span>{meta.label}</span>
                       </button>
                     );
@@ -413,7 +418,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-label text-ink-muted mb-1">
-                    First Name <span className="text-signal">*</span>
+                    First Name <span className="text-signal-ink">*</span>
                   </label>
                   <div className="relative">
                     <User
@@ -438,7 +443,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
                 <div>
                   <label className="block text-label text-ink-muted mb-1">
-                    Last Name <span className="text-signal">*</span>
+                    Last Name <span className="text-signal-ink">*</span>
                   </label>
                   <div className="relative">
                     <User
@@ -491,7 +496,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-label text-ink-muted mb-1">
-                    Username <span className="text-signal">*</span>
+                    Username <span className="text-signal-ink">*</span>
                   </label>
                   <div className="relative">
                     <AtSign
@@ -517,7 +522,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
                 <div>
                   <label className="block text-label text-ink-muted mb-1">
-                    Phone Number <span className="text-signal">*</span>
+                    Phone Number <span className="text-signal-ink">*</span>
                   </label>
                   <div className="relative">
                     <Phone
@@ -550,7 +555,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
 
               <div>
                 <label className="block text-label text-ink-muted mb-1">
-                  Email Address <span className="text-signal">*</span>
+                  Email Address <span className="text-signal-ink">*</span>
                 </label>
                 <div className="relative">
                   <Mail
@@ -758,7 +763,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onS
                   <span className="text-ink-muted shrink-0">{change.label}:</span>
                   <span className="text-ink text-right font-medium">
                     <span className="line-through text-ink-muted mr-1.5">{change.from}</span>
-                    <span className="text-board-field font-semibold">→ {change.to}</span>
+                    <span className="text-field-ink font-semibold">→ {change.to}</span>
                   </span>
                 </div>
               ))}

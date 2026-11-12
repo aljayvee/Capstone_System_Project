@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
   ArrowLeft,
+  CalendarDays,
   Check,
   Copy,
   Phone,
@@ -115,6 +116,15 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   }
 
   const isAvailable = String(errand.status).toUpperCase() === "AVAILABLE";
+  const orderDate = errand.createdAt ? new Date(errand.createdAt) : null;
+  const formattedOrderDate = orderDate && !Number.isNaN(orderDate.getTime())
+    ? new Intl.DateTimeFormat("en-PH", {
+        timeZone: "Asia/Manila",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(orderDate)
+    : null;
   const items = errand.pabiliDetails || errand.pabiliItemRequests || [];
   const primaryStore =
     errand.pinpoints?.[0]?.storeName || items[0]?.storeCategory || errand.category || "Store";
@@ -195,13 +205,13 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   return (
     // `relative` anchors the decline dialog's absolute overlay to this plate.
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
-      {/* Header: the run's identity, painted on the field */}
-      <div data-on-field className="shrink-0 bg-board-field px-4 py-3 shadow-field">
+      {/* Header: the run's identity on the same light surface as the board. */}
+      <div className="shrink-0 border-b border-hairline bg-board-ground px-4 py-3">
         {onBackToBoard ? (
           <button
             type="button"
             onClick={onBackToBoard}
-            className="mb-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-board-trim transition-colors hover:text-board-plate lg:hidden"
+            className="mb-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted transition-colors hover:text-ink lg:hidden"
           >
             <ArrowLeft size={14} />
             Back to the board
@@ -210,14 +220,14 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 data-figure className="truncate font-mono text-title font-bold tabular-nums tracking-wide text-board-plate">
+            <h2 data-figure className="truncate font-mono text-title font-bold tabular-nums tracking-wide text-ink">
               {formatErrandId(errand.id)}
             </h2>
             <button
               type="button"
               onClick={handleCopyId}
               aria-label="Copy this run's number"
-              className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-board-trim transition-colors hover:bg-board-plate/10 hover:text-board-plate"
+              className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-trim text-ink-muted transition-colors hover:bg-board-plate hover:text-ink"
             >
               {copiedId ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
             </button>
@@ -226,8 +236,20 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
           <StatusChip status={errand.status} className="shrink-0" />
         </div>
 
+        <div className="mt-1.5 flex items-center gap-1.5 text-label text-ink-muted">
+          <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
+          <span>Order date:</span>
+          {formattedOrderDate ? (
+            <time dateTime={errand.createdAt} className="font-medium text-ink">
+              {formattedOrderDate}
+            </time>
+          ) : (
+            <span className="font-medium text-ink">Not recorded</span>
+          )}
+        </div>
+
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="truncate text-label font-semibold text-board-plate/95">
+          <span className="truncate text-label font-semibold text-ink">
             {errand.customerName || "Customer"}
           </span>
           {errand.customerPhone ? (
@@ -236,7 +258,7 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
                 type="button"
                 onClick={handleCopyPhone}
                 aria-label={`Copy ${errand.customerName || "the customer"}'s phone number`}
-                className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label tabular-nums text-board-trim transition-colors hover:text-board-plate"
+                className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 font-mono text-label tabular-nums text-ink-muted transition-colors hover:text-ink"
               >
                 <Phone size={12} />
                 <span data-figure className="font-mono tabular-nums">{errand.customerPhone}</span>
@@ -245,24 +267,24 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
               {errand.customerPhoneVerified ? (
                 <span
                   title={errand.customerPhoneVerifiedAt ? `Verified on ${new Date(errand.customerPhoneVerifiedAt).toLocaleDateString()}` : "Phone number verified via SMS OTP"}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-semibold tracking-wide uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 select-none"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-semibold tracking-wide uppercase bg-status-done-fill text-status-done-ink select-none"
                 >
-                  <ShieldCheck size={10} className="text-emerald-400" />
+                  <ShieldCheck size={10} className="text-status-done-ink" />
                   <span>Verified</span>
                 </span>
               ) : (
                 <span
                   title="Phone number unverified"
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-medium tracking-wide uppercase bg-amber-500/15 text-amber-300 border border-amber-500/30 select-none"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-trim text-[10px] font-medium tracking-wide uppercase bg-status-waiting-fill text-status-waiting-ink select-none"
                 >
                   <span>Unverified</span>
                 </span>
               )}
             </div>
           ) : (
-            <span className="text-label text-board-trim">No number on file</span>
+            <span className="text-label text-ink-muted">No number on file</span>
           )}
-          <span className="truncate text-label font-medium text-board-trim/90">{primaryStore}</span>
+          <span className="truncate text-label font-medium text-ink-muted">{primaryStore}</span>
         </div>
       </div>
 

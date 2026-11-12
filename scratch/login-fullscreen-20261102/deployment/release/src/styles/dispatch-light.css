@@ -1,0 +1,16 @@
+/* Dispatcher layout refinements. Colors are shared in portal-palette.css. */
+[data-surface="dispatch"] .shadow-plate,
+[data-surface="dispatch"] .shadow-field {
+  --tw-shadow: 0 0 #0000;
+}
+
+/* Dashboard owns the shift tools. Let the title and tools use separate rows
+   when the available panel width cannot comfortably hold both. */
+[data-surface="dispatch"] .dispatcher-dashboard > div > header {
+  flex-wrap: wrap;
+}
+
+[data-surface="dispatch"] .dispatcher-dashboard > div > header > div:last-child {
+  max-width: 100%;
+}
+

@@ -2674,13 +2674,23 @@ export function distanceOutsideTacurongKm(lat: number, lng: number): number {
   const x = Number(lng);
   if (!Number.isFinite(y) || !Number.isFinite(x)) return Infinity;
 
-  if (isPointInPolygon(y, x, TACURONG_POLYGON_COORDINATES)) return 0;
+  return distanceOutsidePolygonKm(y, x, TACURONG_POLYGON_COORDINATES);
+}
+
+/**
+ * Distance in kilometers from (lat, lng) to the nearest edge of `poly`. 0 inside it.
+ */
+function distanceOutsidePolygonKm(lat: number, lng: number, poly: Array<{ lat: number; lng: number }>): number {
+  const y = Number(lat);
+  const x = Number(lng);
+  if (!Number.isFinite(y) || !Number.isFinite(x)) return Infinity;
+
+  if (isPointInPolygon(y, x, poly)) return 0;
 
   const kmPerDegLat = 111.195;
   const kmPerDegLng = kmPerDegLat * Math.cos((y * Math.PI) / 180);
   let nearest = Infinity;
 
-  const poly = TACURONG_POLYGON_COORDINATES;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const ax = (poly[j].lng - x) * kmPerDegLng;
     const ay = (poly[j].lat - y) * kmPerDegLat;
@@ -2717,8 +2727,191 @@ export function isWithinTacurong(lat: number, lng: number, bufferKm: number = 0.
 }
 
 /**
- * Single source service area gate for web components.
+ * Single source service area gate for web components: inside any service zone
+ * (Tacurong City or Banga) or its 100 m edge buffer.
  */
 export function isWithinServiceArea(lat: number, lng: number): boolean {
-  return isWithinTacurong(lat, lng, 0.1);
+  return detectServiceZone(lat, lng, 0.1) !== null;
 }
+
+// ── Banga, South Cotabato (2026-11-09) ───────────────────────────────────
+// The second service zone, where the rider app is field tested. Mirrors the
+// server's gis/banga-service-area.geojson (OpenStreetMap relation 20011844,
+// 88 points; data (c) OpenStreetMap contributors, ODbL 1.0). Every
+// errand stays inside one zone, and the server refuses a cross-zone one.
+
+/** Banga's bounding box, from the OSM relation. */
+export const BANGA_BOUNDS = {
+  south: 6.282736,
+  west: 124.7074706,
+  north: 6.5140662,
+  east: 124.918899,
+} as const;
+
+/** Map centre for Banga (the poblacion). */
+export const BANGA_CENTER = { lat: 6.4232, lng: 124.7762 } as const;
+
+/** Administrative boundary polygon of Banga. Wound like Tacurong's, so both punch holes in the mask. */
+export const BANGA_POLYGON_COORDINATES: Array<{ lat: number; lng: number }> = [
+  { lat: 6.45088, lng: 124.7074706 },
+  { lat: 6.4479669, lng: 124.7098556 },
+  { lat: 6.441653, lng: 124.7124715 },
+  { lat: 6.4408406, lng: 124.7128099 },
+  { lat: 6.440372, lng: 124.7129462 },
+  { lat: 6.4249525, lng: 124.7161679 },
+  { lat: 6.4174285, lng: 124.7175127 },
+  { lat: 6.417182, lng: 124.7175666 },
+  { lat: 6.4170284, lng: 124.7176347 },
+  { lat: 6.4140382, lng: 124.7196952 },
+  { lat: 6.4123991, lng: 124.7205774 },
+  { lat: 6.4076347, lng: 124.7230504 },
+  { lat: 6.406982, lng: 124.7244031 },
+  { lat: 6.4055085, lng: 124.7268708 },
+  { lat: 6.4023689, lng: 124.7321772 },
+  { lat: 6.3979591, lng: 124.7396308 },
+  { lat: 6.3955206, lng: 124.7436592 },
+  { lat: 6.3912022, lng: 124.7512866 },
+  { lat: 6.3892767, lng: 124.7543233 },
+  { lat: 6.3882219, lng: 124.7546902 },
+  { lat: 6.3877035, lng: 124.7557461 },
+  { lat: 6.3868334, lng: 124.7553072 },
+  { lat: 6.3587651, lng: 124.803468 },
+  { lat: 6.3537961, lng: 124.8117793 },
+  { lat: 6.3509238, lng: 124.810094 },
+  { lat: 6.3496891, lng: 124.8123377 },
+  { lat: 6.348705, lng: 124.8141136 },
+  { lat: 6.3485442, lng: 124.8142785 },
+  { lat: 6.3483559, lng: 124.8143915 },
+  { lat: 6.3477832, lng: 124.8146519 },
+  { lat: 6.3416887, lng: 124.8169345 },
+  { lat: 6.3363789, lng: 124.8237484 },
+  { lat: 6.3343837, lng: 124.8245037 },
+  { lat: 6.332241, lng: 124.825417 },
+  { lat: 6.326146, lng: 124.8277017 },
+  { lat: 6.327437, lng: 124.8310656 },
+  { lat: 6.3281582, lng: 124.8329499 },
+  { lat: 6.3301093, lng: 124.838298 },
+  { lat: 6.3312105, lng: 124.8413723 },
+  { lat: 6.3300677, lng: 124.8420985 },
+  { lat: 6.329693, lng: 124.8423051 },
+  { lat: 6.3289761, lng: 124.8426639 },
+  { lat: 6.3262814, lng: 124.8437984 },
+  { lat: 6.3211657, lng: 124.8461581 },
+  { lat: 6.3161564, lng: 124.8478134 },
+  { lat: 6.3111228, lng: 124.8498185 },
+  { lat: 6.3108186, lng: 124.8497163 },
+  { lat: 6.3106095, lng: 124.8495173 },
+  { lat: 6.3105905, lng: 124.8494254 },
+  { lat: 6.3104539, lng: 124.8492099 },
+  { lat: 6.3103209, lng: 124.8491107 },
+  { lat: 6.3101433, lng: 124.8489401 },
+  { lat: 6.3099058, lng: 124.8484775 },
+  { lat: 6.3094545, lng: 124.8483322 },
+  { lat: 6.3093013, lng: 124.8483011 },
+  { lat: 6.3091815, lng: 124.8483637 },
+  { lat: 6.3090666, lng: 124.848601 },
+  { lat: 6.3089312, lng: 124.84896 },
+  { lat: 6.3087482, lng: 124.8492172 },
+  { lat: 6.3084186, lng: 124.8493604 },
+  { lat: 6.2902548, lng: 124.8541987 },
+  { lat: 6.2943548, lng: 124.8640955 },
+  { lat: 6.2912086, lng: 124.8669988 },
+  { lat: 6.2877366, lng: 124.8705138 },
+  { lat: 6.282736, lng: 124.8801362 },
+  { lat: 6.2974807, lng: 124.918899 },
+  { lat: 6.3376094, lng: 124.8837087 },
+  { lat: 6.3517672, lng: 124.8680091 },
+  { lat: 6.4584925, lng: 124.812026 },
+  { lat: 6.4680231, lng: 124.8071122 },
+  { lat: 6.4683856, lng: 124.8036146 },
+  { lat: 6.4699633, lng: 124.8024773 },
+  { lat: 6.4691958, lng: 124.8009538 },
+  { lat: 6.4706882, lng: 124.798572 },
+  { lat: 6.4695582, lng: 124.7961902 },
+  { lat: 6.4712213, lng: 124.7947311 },
+  { lat: 6.469942, lng: 124.7919845 },
+  { lat: 6.4718822, lng: 124.7888517 },
+  { lat: 6.4901099, lng: 124.7983754 },
+  { lat: 6.5140662, lng: 124.7521968 },
+  { lat: 6.5048285, lng: 124.7437324 },
+  { lat: 6.4971381, lng: 124.7348581 },
+  { lat: 6.4950523, lng: 124.7335629 },
+  { lat: 6.4787156, lng: 124.7239827 },
+  { lat: 6.4760412, lng: 124.7224286 },
+  { lat: 6.4708773, lng: 124.7193937 },
+  { lat: 6.4569043, lng: 124.7110625 },
+  { lat: 6.45088, lng: 124.7074706 },
+];
+
+// ── Service zones ────────────────────────────────────────────────────────
+// The same two zones as the server's lib/serviceArea.ts. The server is the
+// authority (it refuses a cross-zone errand with HTTP 400); these let Stage 2
+// answer at once and search the right town.
+
+export type ServiceZone = "TACURONG" | "BANGA";
+
+export interface ServiceZoneShape {
+  /** How dispatchers name the place. */
+  name: string;
+  center: { lat: number; lng: number };
+  bounds: { south: number; west: number; north: number; east: number };
+  polygon: Array<{ lat: number; lng: number }>;
+  /** Added to a Google text search so it answers with this town's branches. */
+  searchSuffix: string;
+}
+
+export const SERVICE_ZONES: Record<ServiceZone, ServiceZoneShape> = {
+  TACURONG: {
+    name: "Tacurong City",
+    center: TACURONG_CENTER,
+    bounds: SERVICE_AREA_BOUNDS,
+    polygon: TACURONG_POLYGON_COORDINATES,
+    searchSuffix: "Tacurong City",
+  },
+  BANGA: {
+    name: "Banga",
+    center: BANGA_CENTER,
+    bounds: BANGA_BOUNDS,
+    polygon: BANGA_POLYGON_COORDINATES,
+    searchSuffix: "Banga, South Cotabato",
+  },
+};
+
+/**
+ * The zone (lat, lng) belongs to: the zone it is inside, else the nearest one
+ * whose border is within `bufferKm` (the 100 m highway buffer by default).
+ * Null outside every zone or for coordinates that are not numbers.
+ */
+export function detectServiceZone(lat: number, lng: number, bufferKm: number = 0.1): ServiceZone | null {
+  const y = Number(lat);
+  const x = Number(lng);
+  if (!Number.isFinite(y) || !Number.isFinite(x)) return null;
+
+  let nearest: ServiceZone | null = null;
+  let nearestKm = Infinity;
+  for (const zone of Object.keys(SERVICE_ZONES) as ServiceZone[]) {
+    const { bounds, polygon } = SERVICE_ZONES[zone];
+    // Fast envelope pre-check (0.05 degrees ~ 5.5 km buffer)
+    if (y < bounds.south - 0.05 || y > bounds.north + 0.05 || x < bounds.west - 0.05 || x > bounds.east + 0.05) {
+      continue;
+    }
+    if (isPointInPolygon(y, x, polygon)) return zone;
+    const km = distanceOutsidePolygonKm(y, x, polygon);
+    if (km <= bufferKm && km < nearestKm) {
+      nearest = zone;
+      nearestKm = km;
+    }
+  }
+  return nearest;
+}
+
+/**
+ * The inverted mask with a clear hole for every zone: the world ring from
+ * TACURONG_MASK_PATHS, then each zone's polygon (all wound the same way, the
+ * opposite of the world ring).
+ */
+export const SERVICE_AREA_MASK_PATHS: Array<Array<{ lat: number; lng: number }>> = [
+  TACURONG_MASK_PATHS[0],
+  TACURONG_POLYGON_COORDINATES,
+  BANGA_POLYGON_COORDINATES,
+];

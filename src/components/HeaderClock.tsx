@@ -67,7 +67,7 @@ export const HeaderClock: React.FC = () => {
   return (
     <div
       data-clock
-      className="flex select-none items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 sm:gap-2 sm:px-3"
+      className="flex select-none items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 sm:gap-2 sm:px-3 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
     >
       <Clock size={14} className="shrink-0 opacity-70" />
       <time data-figure dateTime={machineValue(now)} className="tabular-nums tracking-tight">

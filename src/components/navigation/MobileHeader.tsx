@@ -1,4 +1,5 @@
 import React from "react";
+import { BrandMark } from "../brand/BrandMark";
 
 interface MobileHeaderProps {
   title: string;
@@ -14,23 +15,23 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   rightElement,
 }) => {
   return (
-    <header className="sticky top-0 z-30 w-full bg-[#0B132B]/95 border-b border-slate-800/80 pt-safe px-3.5 backdrop-blur-md select-none">
+    <header data-mobile-header className="sticky top-0 z-30 shrink-0 w-full bg-board-plate border-b border-edge pt-safe px-3.5 select-none">
       <div className="h-12 flex items-center justify-between gap-3">
         {/* Left Chrome (Logo or Back action) */}
-        <div className="flex items-center gap-2.5 shrink-0 min-w-0">
+        <div className="flex flex-1 items-center gap-2.5 min-w-0">
           {leftElement || (
-            <div className="w-7 h-7 rounded-lg bg-red-600 flex items-center justify-center text-white font-bold text-xs tracking-wider shrink-0 shadow-xs">
-              SG
+            <div className="w-7 h-7 rounded-lg bg-signal flex items-center justify-center text-white shrink-0 shadow-xs">
+              <BrandMark className="w-5" label="Sugo Express" />
             </div>
           )}
 
           {/* Title & Subtitle */}
           <div className="min-w-0">
-            <h1 className="text-sm font-bold text-white tracking-tight truncate leading-tight">
+            <p className="text-sm font-bold text-ink tracking-tight truncate leading-tight">
               {title}
-            </h1>
+            </p>
             {subtitle && (
-              <p className="text-[10px] text-slate-400 font-mono truncate leading-none mt-0.5">
+              <p className="text-[10px] text-ink-muted font-mono truncate leading-none mt-0.5">
                 {subtitle}
               </p>
             )}

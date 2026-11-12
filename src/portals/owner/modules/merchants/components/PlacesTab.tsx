@@ -13,7 +13,6 @@ import {
   MapPin,
   Plus,
   Search,
-  Trash2,
   Edit2,
   Check,
   X,
@@ -28,6 +27,7 @@ import {
   Camera,
 } from "lucide-react";
 import { MobileResponsiveTable } from "../../../../../components/table";
+import { PlacesTableSkeleton } from "../../../components/OwnerSkeletons";
 import { GooglePlaceFinder, type GooglePlaceDetails } from "./GooglePlaceFinder";
 import { WeeklyHoursEditor } from "./WeeklyHoursEditor";
 import { StorePhotoField, type PhotoChange } from "./StorePhotoField";
@@ -150,6 +150,13 @@ export interface VerifiedPlace {
 interface PlacesTabProps {
   categories?: PlaceCategory[];
   preSelectedCategory?: number | "ALL";
+  /**
+   * Every directory this tab loads, retired stores included. The Merchants
+   * module keeps the Archive tab and both badges from it; they were fetched
+   * once on mount, so a store archived here stayed out of the Archive until
+   * the page was reloaded.
+   */
+  onPlacesChanged?: (places: VerifiedPlace[]) => void;
 }
 
 type PlaceSortField = "name" | "category" | "address" | "newest";
@@ -158,6 +165,7 @@ type SortDirection = "asc" | "desc";
 export default function PlacesTab({
   categories: initialCategories,
   preSelectedCategory,
+  onPlacesChanged,
 }: PlacesTabProps) {
   const [searchParams] = useSearchParams();
   const urlCategoryId = searchParams.get("categoryId");
@@ -276,12 +284,14 @@ export default function PlacesTab({
     }
   }, [preSelectedCategory, urlCategoryId]);
 
-  const fetchPlaces = async () => {
+  /** `quiet` keeps the list on screen while it refreshes after a save or delete. */
+  const fetchPlaces = async (options: { quiet?: boolean } = {}) => {
     try {
-      setIsLoading(true);
+      if (!options.quiet) setIsLoading(true);
       const res = await apiClient.get("/places?includeInactive=true");
       setPlaces(res.data || []);
       setPlacesError(null);
+      onPlacesChanged?.(res.data || []);
       // The server's duplicate check over the whole directory. A failure only
       // costs the banner, never the list.
       apiClient
@@ -865,6 +875,11 @@ export default function PlacesTab({
       let placeId = editingId;
       if (isEditing && editingId) {
         await apiClient.put(`/places/${editingId}`, payload);
+        // The server took it: an archived store leaves the list now, not when
+        // the refetch below answers.
+        const next = places.map((p) => (p.id === editingId ? { ...p, isActive: formIsActive } : p));
+        setPlaces(next);
+        onPlacesChanged?.(next);
       } else {
         const created = await apiClient.post("/places", payload);
         placeId = created.data?.id ?? null;
@@ -886,7 +901,7 @@ export default function PlacesTab({
         }
       }
 
-      await fetchPlaces();
+      await fetchPlaces({ quiet: true });
       if (photoFailed && placeId) {
         // The store saved; only the photo did not. Keep the form open on the
         // saved store so the owner can try the photo again.
@@ -911,44 +926,6 @@ export default function PlacesTab({
       setFormError(apiError(err, "Failed to save establishment details."));
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  /**
-   * The store the owner has asked to delete, or null.
-   *
-   * This was a `window.confirm` whose rejection path reported failure through
-   * a bare `alert()`, so the only feedback a failed delete ever produced was
-   * a browser-chrome box with no product voice, and the screen behind it was
-   * left looking as though nothing had been attempted.
-   */
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const handleDeletePlace = (id: string, name: string) => {
-    setDeleteError(null);
-    setPendingDelete({ id, name });
-  };
-
-  const confirmDeletePlace = async () => {
-    if (!pendingDelete) return;
-    const { id } = pendingDelete;
-    setIsDeleting(true);
-    try {
-      await apiClient.delete(`/places/${id}`);
-      await fetchPlaces();
-      if (editingId === id) resetForm();
-      setPendingDelete(null);
-    } catch (err: any) {
-      // Stays on screen, in the product's own voice, rather than an alert()
-      // the owner dismisses and then cannot re-read.
-      setDeleteError(
-        err.response?.data?.message ||
-          "That store could not be deleted. It is still in the directory.",
-      );
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -1047,9 +1024,9 @@ export default function PlacesTab({
   return (
     <div className="flex-1 min-h-0 flex flex-col w-full overflow-hidden">
       {/* DIRECTORY TABLE & SEARCH CONTAINER (Fills Height) */}
-      <div className="flex-1 min-h-0 bg-board-plate rounded-plate border border-edge flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Search, Filter & Sort Rail (STATIC NON-SCROLLING) */}
-        <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground space-y-2">
+        <div className="shrink-0 py-3 border-b border-hairline space-y-2">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             {/* Search Input */}
             <div className="relative flex-1">
@@ -1062,7 +1039,7 @@ export default function PlacesTab({
                 placeholder="Search store name, address, keywords, or barangay..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field transition"
+                className="w-full pl-9 pr-4 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-field-ink transition"
               />
             </div>
 
@@ -1201,10 +1178,7 @@ export default function PlacesTab({
         {/* Directory List Table - ONLY THIS SECTION SCROLLS! */}
         <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto relative">
           {isLoading ? (
-            <div className="h-full min-h-[300px] flex items-center justify-center p-12 text-ink-muted space-y-3 flex-col">
-              <Loader2 className="animate-spin text-board-field" size={32} />
-              <p className="text-body">Loading verified directory...</p>
-            </div>
+            <PlacesTableSkeleton />
           ) : places.length === 0 && placesError ? (
             <div
               role="alert"
@@ -1222,7 +1196,7 @@ export default function PlacesTab({
                   void fetchPlaces();
                   void fetchCategories();
                 }}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-white transition-colors hover:bg-signal-deep"
               >
                 <RotateCcw size={14} />
                 <span>Try again</span>
@@ -1241,6 +1215,7 @@ export default function PlacesTab({
           ) : (
             <MobileResponsiveTable<VerifiedPlace>
               data={sortedPlaces}
+              appearance="flat"
               keyExtractor={(place) => place.id}
               primaryHeader="Establishment & Address"
               secondaryHeader="Category"
@@ -1294,18 +1269,11 @@ export default function PlacesTab({
                   <button
                     type="button"
                     onClick={() => handleEditPlace(place)}
-                    className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-plate border border-field-ink bg-board-plate p-2 text-field-ink transition-colors hover:bg-board-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink"
                     title="Edit Store Details"
+                    aria-label={`Edit ${place.name}`}
                   >
                     <Edit2 size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePlace(place.id, place.name)}
-                    className="p-2 text-status-act-ink hover:bg-status-act-fill rounded-plate transition-colors"
-                    title="Delete Store Pin"
-                  >
-                    <Trash2 size={15} />
                   </button>
                 </div>
               )}
@@ -1339,16 +1307,13 @@ export default function PlacesTab({
               ]}
               desktopView={
                 <table className="w-full text-left text-label">
-                  <thead className="sticky top-0 z-10 select-none border-b border-edge bg-board-ground text-micro uppercase text-ink-muted">
+                  <thead className="sticky top-0 z-10 select-none border-b border-hairline bg-board-ground text-micro uppercase text-ink-muted">
                     <tr>
                       <SortTh field="name" label="Establishment / Store" />
                       <SortTh field="category" label="Category" />
                       <SortTh field="address" label="Barangay & Address" />
                       <th scope="col" className="p-4">
                         Opening Hours
-                      </th>
-                      <th scope="col" className="p-4">
-                        Google Maps
                       </th>
                       <th scope="col" className="p-4 text-right">
                         Actions
@@ -1390,23 +1355,14 @@ export default function PlacesTab({
                           <td className="p-4 text-label text-ink-muted whitespace-nowrap">
                             {summarizeWeek(readWeek(place.openingHours))}
                           </td>
-                          <td className="p-4 whitespace-nowrap">
-                            <GoogleLinkStatus place={place} />
-                          </td>
                           <td className="p-4 text-right space-x-1.5 whitespace-nowrap">
                             <button
                               onClick={() => handleEditPlace(place)}
-                              className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-plate border border-field-ink bg-board-plate px-3 py-1.5 text-label font-medium text-field-ink transition-colors hover:bg-board-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink"
                               title="Edit Store Details"
                             >
                               <Edit2 size={15} />
-                            </button>
-                            <button
-                              onClick={() => handleDeletePlace(place.id, place.name)}
-                              className="p-2 text-status-act-ink hover:bg-status-act-fill rounded-plate transition-colors"
-                              title="Delete Store Pin"
-                            >
-                              <Trash2 size={15} />
+                              <span>Edit</span>
                             </button>
                           </td>
                         </tr>
@@ -1570,7 +1526,7 @@ export default function PlacesTab({
                   {pinningMode === "manual" ? (
                     <div className="rounded-plate border border-edge bg-board-ground p-3 text-label text-ink space-y-1">
                       <p className="m-0 flex items-center gap-1.5 font-medium text-ink">
-                        <MapPin size={14} className="text-board-field shrink-0" />
+                        <MapPin size={14} className="text-field-ink shrink-0" />
                         <span>Manual Map Pinning Active</span>
                       </p>
                       <p className="m-0 text-micro text-ink-muted">
@@ -1629,7 +1585,7 @@ export default function PlacesTab({
                       placeholder="e.g. Jollibee Tacurong Highway"
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                     />
                   </div>
 
@@ -1642,7 +1598,7 @@ export default function PlacesTab({
                       <select
                         value={formCategoryId}
                         onChange={(e) => setFormCategoryId(Number(e.target.value))}
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                       >
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -1659,7 +1615,7 @@ export default function PlacesTab({
                         placeholder="e.g. Poblacion, New Isabela"
                         value={formBarangay}
                         onChange={(e) => setFormBarangay(e.target.value)}
-                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                        className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                       />
                     </div>
                   </div>
@@ -1671,7 +1627,7 @@ export default function PlacesTab({
                         Street Address / Landmark *
                       </label>
                       {isGeocoding ? (
-                        <span className="flex items-center gap-1 text-micro text-board-field font-medium">
+                        <span className="flex items-center gap-1 text-micro text-field-ink font-medium">
                           <Loader2 size={12} className="animate-spin" />
                           <span>Detecting address...</span>
                         </span>
@@ -1690,7 +1646,7 @@ export default function PlacesTab({
                         setFormAddress(e.target.value);
                         setAddressAutoDetected(false);
                       }}
-                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                     />
                   </div>
 
@@ -1728,7 +1684,7 @@ export default function PlacesTab({
                       placeholder="e.g. jollibee, burger, chickenjoy, fastfood"
                       value={formKeywords}
                       onChange={(e) => setFormKeywords(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                      className="w-full px-3.5 py-2 bg-board-ground border border-edge rounded-plate text-body text-ink focus:outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                     />
                   </div>
 
@@ -1755,7 +1711,7 @@ export default function PlacesTab({
                           onClick={() => setFormIsActive(false)}
                           className={`flex-1 px-3.5 py-2 rounded-plate border text-label transition ${
                             !formIsActive
-                              ? "bg-board-field text-white border-board-field"
+                              ? "bg-board-field text-white border-field-ink"
                               : "bg-board-ground text-ink-muted border-edge hover:text-ink"
                           }`}
                         >
@@ -1848,7 +1804,7 @@ export default function PlacesTab({
                     <span className="text-ink-muted shrink-0">{change.label}:</span>
                     <span className="text-ink text-right font-medium">
                       <span className="line-through text-ink-muted mr-1.5">{change.from}</span>
-                      <span className="text-board-field font-semibold">→ {change.to}</span>
+                      <span className="text-field-ink font-semibold">→ {change.to}</span>
                     </span>
                   </div>
                 ))}
@@ -1904,42 +1860,6 @@ export default function PlacesTab({
           )
         }
       />
-
-      {/* Replaces window.confirm. The consequence line is the point: the old
-          box asked "Are you sure you want to delete" and never said that the
-          pin is what the dispatcher's store picker reads. */}
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        onOpenChange={(next) => {
-          if (!next) setPendingDelete(null);
-        }}
-        title="Delete this store pin?"
-        body={`"${pendingDelete?.name ?? ""}" will be removed from the verified places directory.`}
-        consequence="Dispatchers will no longer be able to pin an errand to this store. To take it out of circulation without deleting it, set it to Retired instead."
-        confirmLabel="Delete the store"
-        onConfirm={() => void confirmDeletePlace()}
-        busy={isDeleting}
-      />
-
-      {/* The failed-delete path had no in-page state at all; it reported
-          through alert(). This persists until dismissed or retried. */}
-      {deleteError && (
-        <p
-          role="alert"
-          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-plate bg-status-act-fill px-4 py-2.5 text-label text-status-act-ink"
-        >
-          <AlertCircle size={14} className="shrink-0" />
-          <span>{deleteError}</span>
-          <button
-            type="button"
-            onClick={() => setDeleteError(null)}
-            aria-label="Dismiss"
-            className="shrink-0 transition-opacity hover:opacity-70"
-          >
-            <X size={14} />
-          </button>
-        </p>
-      )}
     </div>
   );
 }

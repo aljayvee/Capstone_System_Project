@@ -10,6 +10,7 @@ import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "./DispatcherFilterToolbar";
 import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { RUN_PROGRESSION, progressIndexOf } from "@/lib/statusPresentation";
 
@@ -101,22 +102,16 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
   return (
     <PanelShell
       title="Active errands"
-      figure={{
-        label: "On the road",
-        value: isLoading || loadError ? "--" : String(activeErrands.length),
-      }}
       detail={`${activeErrands.length} run${activeErrands.length === 1 ? "" : "s"} on the road`}
-      aside={
-        <div className="w-full sm:w-80">
+      controls={
+        <DispatcherFilterToolbar search={
           <DispatcherSearchField
             aria-label="Search active runs by customer, rider, route number or stop"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search customer, rider or stop"
           />
-        </div>
-      }
-      controls={
+        } filters={
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {FILTERS.map((f) => {
             const isActive = statusFilter === f.id;
@@ -144,7 +139,8 @@ export const ActiveErrandsPanel: React.FC<ActiveErrandsPanelProps> = ({
               </button>
             );
           })}
-        </div>
+        </div>}
+        />
       }
     >
       <PanelState

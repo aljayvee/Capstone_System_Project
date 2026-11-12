@@ -207,6 +207,32 @@ export interface SystemActivityResponse {
   totalPages: number;
 }
 
+/** One Owner report sent to the print screen, recorded by the server before it sent the PDF. */
+export interface ReportPrintLog {
+  id: number;
+  userId: number | null;
+  /** The name as it was when printed, the one on the printout's signature line. */
+  printedByName: string;
+  role: string;
+  reportType: string;
+  reportName: string;
+  period: string;
+  coverageLabel: string;
+  rangeStart: string;
+  rangeEnd: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface ReportPrintLogResponse {
+  logs: ReportPrintLog[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface TrafficSummary {
   isLiveVps: boolean;
   generatedAt: string;
@@ -268,10 +294,11 @@ export interface SystemTelemetry {
   maintenance: Record<PortalKey, PortalMaintenanceStatus>;
   serverErrorSimulated?: boolean;
   dispatcherAiSuggestionsEnabled?: boolean;
+  kuyaSugoEnabled?: boolean;
 }
 
 export type PortalKey = "owner" | "dispatcher" | "rider" | "customer";
-export type MaintenanceType = "SCHEDULED" | "EMERGENCY" | "UPGRADE" | "SECURITY";
+export type MaintenanceType = "SCHEDULED" | "EMERGENCY" | "UPGRADE" | "SECURITY" | "ADVISORY" | "LIVE_NOTICE";
 
 export interface PortalMaintenanceStatus {
   portal?: PortalKey;
@@ -282,6 +309,7 @@ export interface PortalMaintenanceStatus {
   notice?: string;
   supportContact?: string;
   customColor?: string;
+  footnote?: string;
   activatedAt?: string | null;
   updatedAt?: string;
 }

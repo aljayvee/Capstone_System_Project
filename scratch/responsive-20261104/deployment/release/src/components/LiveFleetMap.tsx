@@ -1,0 +1,642 @@
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import {
+  Bike,
+  Navigation,
+  WifiOff,
+  Package,
+  Moon,
+  Target,
+  Eye,
+  EyeOff,
+  MapPinOff,
+} from "lucide-react";
+import { createRoot, Root } from "react-dom/client";
+import { createMarkerTween, type MarkerTween } from "./markerTween";
+import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
+import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
+import { RIDER_STATUS_THEMES } from "../constants/riderPresence";
+import { decodePolyline } from "../utils/polyline";
+import { cn } from "@/lib/utils";
+
+/** For a stop pinned outside the catalogue. Mirrors the server's default. */
+const DEFAULT_ARRIVAL_RADIUS_METERS = 75;
+
+interface LiveFleetMapProps {
+  riders: RiderFleetMember[];
+  center?: google.maps.LatLngLiteral;
+  selectedRiderId?: number | null;
+  onSelectRider?: (riderId: number) => void;
+  hideOffline?: boolean;
+  onToggleHideOffline?: () => void;
+  filterStatus?: RiderPresenceState | "ALL";
+  /**
+   * ADDITIVE: true when the caller could not read presence at all.
+   *
+   * The live pill derives its own counts from `riders`, so an unreachable
+   * /riders made it print "0 Ready, 0 Busy" behind a pulsing green dot. The
+   * Owner Portal's tracking screen now reports that failure in its header,
+   * and without this the map contradicted it two inches below.
+   *
+   * Defaults to false, so the dispatcher's existing call is unchanged.
+   */
+  presenceUnknown?: boolean;
+  /**
+   * ADDITIVE: set when the live position feed itself is down or refusing.
+   *
+   * Distinct from `presenceUnknown`, which means the ROSTER could not be read.
+   * These two fail independently and look identical on an unlabelled map: an
+   * empty board either way. When the roster is healthy and the feed is not,
+   * the map is showing a real fleet with every pin missing, and saying so is
+   * the difference between "nobody is on shift" and "we cannot see anybody".
+   *
+   * Defaults to null, so existing calls are unchanged.
+   */
+  telemetryError?: string | null;
+  /**
+   * Encoded polyline of the selected errand's road-network route
+   * (Errand.routeGeometry). Drawing the real route rather than straight lines
+   * between pins means the dispatcher sees the same path the fare was billed on
+   * and the ETA was computed from.
+   */
+  routeGeometry?: string | null;
+  /** Ordered store stops for the selected errand. */
+  routeStops?: Array<{
+    latitude: number;
+    longitude: number;
+    storeName: string;
+    /** The arrival circle for this stop, resolved server-side per category. */
+    geofenceRadiusMeters?: number | null;
+    departedAt?: string | null;
+  }>;
+  /** Delivery destination for the selected errand. */
+  routeDestination?: { latitude: number; longitude: number } | null;
+  /**
+   * ADDITIVE, 2026-09-23: state of the Socket.IO position feed, from
+   * useRiderFleetPresence. When it is down the pill says the map is
+   * reconnecting, since pins may then be moving on RTDB alone or not at all.
+   * Omitted, the pill is unchanged.
+   */
+  liveLink?: FleetLiveLink;
+}
+
+interface CustomMarkerContentProps {
+  rider: RiderFleetMember;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
+  rider,
+  isSelected,
+  onClick,
+}) => {
+  const theme = RIDER_STATUS_THEMES[rider.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
+  const isStale = rider.presence === "AVAILABLE_SIGNAL_LOST";
+  const isOffDuty = rider.presence === "OFFLINE";
+  const isBusy = rider.presence === "ON_DELIVERY";
+  const isAvailable = rider.presence === "AVAILABLE_ONLINE";
+
+  const firstName = rider.name.split(" ")[0] || "Rider";
+  const heading = rider.plottableLocation?.heading;
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`relative group cursor-pointer select-none transition-all duration-200 ${
+        isSelected ? "scale-125 z-50" : "hover:scale-110 z-20"
+      }`}
+      style={{
+        opacity: isStale ? 0.75 : isOffDuty ? 0.6 : 1,
+      }}
+      title={`${rider.name}: ${rider.statusText || theme.label}`}
+    >
+      {/* 1. Outer Live Pulsing Halo Ring (for AVAILABLE status) */}
+      {isAvailable && (
+        <span className="absolute -inset-1.5 rounded-full animate-ping opacity-60 bg-emerald-400 pointer-events-none" />
+      )}
+
+      {/* 2. Spotlight Ring (when selected by dispatcher) */}
+      {isSelected && (
+        <span className="absolute -inset-2 rounded-full border-2 border-blue-500 animate-pulse bg-blue-500/10 pointer-events-none" />
+      )}
+
+      {/* 3. Main Circular Vehicle Container (42x42px) */}
+      <div
+        className="relative w-10 h-10 rounded-full bg-white flex items-center justify-center transition-all"
+        style={{
+          border: `3px solid ${theme.primaryColor}`,
+          boxShadow: isSelected
+            ? `0 0 0 2px white, 0 8px 16px ${theme.glowColor}`
+            : `0 2px 8px rgba(0,0,0,0.18)`,
+        }}
+      >
+        {/* Directional Motorcycle / Vehicle Icon with Heading Bearing Rotation */}
+        <div
+          className="flex items-center justify-center transition-transform duration-300"
+          style={{
+            transform: heading !== null && heading !== undefined ? `rotate(${heading}deg)` : "none",
+          }}
+        >
+          {heading !== null && heading !== undefined ? (
+            <Navigation
+              size={18}
+              style={{ color: theme.primaryColor, fill: theme.primaryColor }}
+            />
+          ) : (
+            <Bike size={20} style={{ color: theme.primaryColor }} />
+          )}
+        </div>
+
+        {/* 4. Mini Corner State Badge */}
+        <div
+          className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white shadow-xs border border-white"
+          style={{ backgroundColor: theme.primaryColor }}
+        >
+          {isBusy && <Package size={10} className="stroke-[2.5]" />}
+          {isAvailable && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+          {isStale && <WifiOff size={9} className="stroke-[2.5]" />}
+          {isOffDuty && <Moon size={9} className="stroke-[2.5]" />}
+        </div>
+      </div>
+
+      {/* 5. Floating Rider Name Tag Pill */}
+      <div
+        data-elevate
+        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap px-1.5 py-0.5 rounded-trim text-[10px] font-extrabold shadow-plate border flex items-center gap-1 transition-all"
+        style={{
+          backgroundColor: isSelected ? "#0F172A" : "rgba(15, 23, 42, 0.85)",
+          color: "#FFFFFF",
+          borderColor: isSelected ? theme.primaryColor : "rgba(255, 255, 255, 0.2)",
+        }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ backgroundColor: theme.primaryColor }}
+        />
+        <span className="truncate max-w-[70px]">{firstName}</span>
+        {isBusy && <span className="text-amber-300 text-[9px]">● #{rider.activeOrdersCount}</span>}
+      </div>
+    </div>
+  );
+};
+
+export default function LiveFleetMap({
+  riders,
+  center = { lat: 6.671, lng: 124.6644 },
+  selectedRiderId,
+  onSelectRider,
+  hideOffline = false,
+  onToggleHideOffline,
+  filterStatus = "ALL",
+  presenceUnknown = false,
+  telemetryError = null,
+  routeGeometry = null,
+  routeStops = [],
+  routeDestination = null,
+  liveLink,
+}: LiveFleetMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<google.maps.Map | null>(null);
+  const markersRef = useRef<{
+    [key: string]: {
+      marker: google.maps.marker.AdvancedMarkerElement;
+      root: Root;
+      tween: MarkerTween;
+    };
+  }>({});
+  const routePolylineRef = useRef<google.maps.Polyline | null>(null);
+  const routeCasingRef = useRef<google.maps.Polyline | null>(null);
+  const routeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const routeCirclesRef = useRef<google.maps.Circle[]>([]);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  // Without this the catch below only reached the console, isMapLoaded stayed
+  // false, and the "Loading Live Fleet Map..." veil span forever: a failed map
+  // was indistinguishable from a slow one, on the surface whose whole job is
+  // saying where the riders are. AGENT_HANDSHAKE [LOCKED] Anti-Happy-Path.
+  const [mapError, setMapError] = useState<string | null>(null);
+  const markerLibraryRef = useRef<any>(null);
+
+  // Draws the selected errand's road-network route: the decoded polyline plus
+  // numbered store stops and the delivery destination. Rebuilt whenever the
+  // selection changes, and fully torn down when nothing is selected so a stale
+  // route can never linger over a different errand.
+  useEffect(() => {
+    if (!isMapLoaded || !mapInstance.current) return;
+    const g = (window as any).google;
+    if (!g?.maps) return;
+
+    routePolylineRef.current?.setMap(null);
+    routePolylineRef.current = null;
+    routeCasingRef.current?.setMap(null);
+    routeCasingRef.current = null;
+    routeMarkersRef.current.forEach((marker) => {
+      marker.map = null;
+    });
+    routeMarkersRef.current = [];
+    routeCirclesRef.current.forEach((circle) => circle.setMap(null));
+    routeCirclesRef.current = [];
+
+    if (!routeGeometry) return;
+
+    const path = decodePolyline(routeGeometry);
+    if (path.length < 2) return;
+
+    // Drawn like a road: a light casing under a solid line, both flat (not
+    // geodesic) so the path follows the stored road geometry point for point.
+    // The geometry itself arrives with its corners already filleted by the
+    // server (smoothPath.ts), inside half a lane of the centreline. The casing
+    // is what makes that line read as sitting ON the carriageway rather than
+    // floating over the base map's own road drawing, and keeps it legible
+    // where it crosses a road of a similar colour.
+    routeCasingRef.current = new g.maps.Polyline({
+      path,
+      map: mapInstance.current,
+      geodesic: false,
+      clickable: false,
+      strokeColor: "#FFFFFF",
+      strokeOpacity: 0.95,
+      strokeWeight: 8,
+      zIndex: 1,
+    });
+    routePolylineRef.current = new g.maps.Polyline({
+      path,
+      map: mapInstance.current,
+      geodesic: false,
+      clickable: false,
+      strokeColor: "#1E3A5F",
+      strokeOpacity: 1,
+      strokeWeight: 4,
+      zIndex: 2,
+    });
+
+    // The circle each stop is reached inside. Dispatch reads these pins to
+    // judge whether a rider has actually got there, and until now the boundary
+    // that decides it was invisible — an arrival appeared to happen at an
+    // arbitrary moment.
+    routeStops.forEach((stop) => {
+      const done = Boolean(stop.departedAt);
+      routeCirclesRef.current.push(
+        new g.maps.Circle({
+          map: mapInstance.current,
+          center: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
+          radius: Number(stop.geofenceRadiusMeters) || DEFAULT_ARRIVAL_RADIUS_METERS,
+          strokeColor: done ? "#6B7280" : "#2563EB",
+          strokeOpacity: done ? 0.35 : 0.5,
+          strokeWeight: 1.5,
+          fillColor: done ? "#6B7280" : "#2563EB",
+          fillOpacity: done ? 0.05 : 0.09,
+          clickable: false,
+        })
+      );
+    });
+
+    // Advanced markers, like the rider pins. google.maps.Marker is deprecated
+    // and logged a console warning on every route drawn; this map always has
+    // a Map ID, which is all advanced markers need.
+    const markerLibrary = markerLibraryRef.current;
+    if (!markerLibrary) return;
+    const { AdvancedMarkerElement, PinElement } = markerLibrary;
+
+    routeStops.forEach((stop, index) => {
+      const pin = new PinElement({
+        glyph: String(index + 1),
+        glyphColor: "#FFFFFF",
+        background: "#1E3A5F",
+        borderColor: "#0B132B",
+      });
+      routeMarkersRef.current.push(
+        new AdvancedMarkerElement({
+          position: { lat: Number(stop.latitude), lng: Number(stop.longitude) },
+          map: mapInstance.current,
+          title: `Stop ${index + 1}: ${stop.storeName}`,
+          content: pin.element,
+          zIndex: 5,
+        })
+      );
+    });
+
+    if (routeDestination) {
+      const pin = new PinElement({
+        background: "#E53935",
+        borderColor: "#B71C1C",
+        glyphColor: "#FFFFFF",
+      });
+      routeMarkersRef.current.push(
+        new AdvancedMarkerElement({
+          position: {
+            lat: Number(routeDestination.latitude),
+            lng: Number(routeDestination.longitude),
+          },
+          map: mapInstance.current,
+          title: "Delivery destination",
+          content: pin.element,
+          zIndex: 5,
+        })
+      );
+    }
+  }, [isMapLoaded, routeGeometry, routeStops, routeDestination]);
+
+  // Filter riders based on visibility criteria
+  const visibleRiders = riders.filter((r) => {
+    if (!r.plottableLocation) return false;
+    if (hideOffline && r.presence === "OFFLINE") return false;
+    if (filterStatus !== "ALL" && r.presence !== filterStatus) return false;
+    return true;
+  });
+
+  // Initialize Map
+  useEffect(() => {
+    let isMounted = true;
+
+    const initMap = async () => {
+      try {
+        const [{ Map }, markerLibrary] = await Promise.all([
+          importGoogleMapsLibrary("maps"),
+          importGoogleMapsLibrary("marker"),
+        ]);
+
+        markerLibraryRef.current = markerLibrary;
+        if (!mapRef.current || !isMounted) return;
+
+        const googleMapId = (import.meta as any).env?.VITE_GOOGLE_MAP_ID || "DEMO_MAP_ID";
+        const mapOptions: any = {
+          center,
+          zoom: 14,
+          disableDefaultUI: true,
+          zoomControl: true,
+          fullscreenControl: false,
+          streetViewControl: false,
+          mapId: googleMapId,
+        };
+
+        mapInstance.current = new Map(mapRef.current, mapOptions);
+
+        setIsMapLoaded(true);
+        setMapError(null);
+      } catch (err) {
+        console.error("Failed to load Google Maps:", err);
+        setMapError("The map did not load.");
+      }
+    };
+
+    initMap();
+
+    return () => {
+      isMounted = false;
+      Object.values(markersRef.current).forEach(({ marker, root, tween }) => {
+        // Cancel first: an in-flight frame would otherwise write a position to
+        // a marker that has already been torn down.
+        tween.cancel();
+        marker.map = null;
+        root.unmount();
+      });
+      markersRef.current = {};
+    };
+  }, []);
+
+  // Update Markers when riders list, selectedRiderId, or filters change
+  useEffect(() => {
+    if (!isMapLoaded || !mapInstance.current || !markerLibraryRef.current) return;
+
+    const { AdvancedMarkerElement } = markerLibraryRef.current;
+    const plottableIds = new Set<string>();
+
+    visibleRiders.forEach((rider) => {
+      const idStr = String(rider.id);
+      plottableIds.add(idStr);
+
+      const position = {
+        lat: rider.plottableLocation!.lat,
+        lng: rider.plottableLocation!.lng,
+      };
+
+      const isSelected = selectedRiderId === rider.id;
+
+      if (markersRef.current[idStr]) {
+        // Slide to the new fix rather than assigning `position` outright, which
+        // teleported the pin between Firebase updates.
+        markersRef.current[idStr].tween.moveTo(position);
+        markersRef.current[idStr].marker.zIndex = isSelected ? 999 : 10;
+        // Re-render React root content
+        markersRef.current[idStr].root.render(
+          <CustomRiderMarkerPin
+            rider={rider}
+            isSelected={isSelected}
+            onClick={() => onSelectRider?.(rider.id)}
+          />
+        );
+      } else {
+        // Create new AdvancedMarkerElement with React Root container
+        const markerContainer = document.createElement("div");
+        markerContainer.className = "rider-marker-wrapper";
+
+        const root = createRoot(markerContainer);
+        root.render(
+          <CustomRiderMarkerPin
+            rider={rider}
+            isSelected={isSelected}
+            onClick={() => onSelectRider?.(rider.id)}
+          />
+        );
+
+        const marker = new AdvancedMarkerElement({
+          map: mapInstance.current,
+          position,
+          content: markerContainer,
+          title: rider.name,
+          zIndex: isSelected ? 999 : 10,
+        });
+
+        markersRef.current[idStr] = {
+          marker,
+          root,
+          tween: createMarkerTween(marker as unknown as { position: google.maps.LatLngLiteral | null }, position),
+        };
+      }
+    });
+
+    // Cleanup markers that are no longer visible or plottable
+    Object.keys(markersRef.current).forEach((idStr) => {
+      if (!plottableIds.has(idStr)) {
+        markersRef.current[idStr].tween.cancel();
+        markersRef.current[idStr].marker.map = null;
+        markersRef.current[idStr].root.unmount();
+        delete markersRef.current[idStr];
+      }
+    });
+  }, [visibleRiders, isMapLoaded, selectedRiderId, onSelectRider]);
+
+  // Smooth Camera Panning when a rider is selected in sidebar
+  useEffect(() => {
+    if (!isMapLoaded || !mapInstance.current || selectedRiderId === null || selectedRiderId === undefined) return;
+    const selected = riders.find((r) => r.id === selectedRiderId);
+    if (selected && selected.plottableLocation) {
+      mapInstance.current.panTo({
+        lat: selected.plottableLocation.lat,
+        lng: selected.plottableLocation.lng,
+      });
+      if (mapInstance.current.getZoom()! < 15) {
+        mapInstance.current.setZoom(16);
+      }
+    }
+  }, [selectedRiderId, isMapLoaded, riders]);
+
+  // Fit all active pins to screen boundary
+  const handleFitBounds = useCallback(() => {
+    if (!mapInstance.current || visibleRiders.length === 0) return;
+    const bounds = new google.maps.LatLngBounds();
+    visibleRiders.forEach((r) => {
+      if (r.plottableLocation) {
+        bounds.extend({ lat: r.plottableLocation.lat, lng: r.plottableLocation.lng });
+      }
+    });
+    mapInstance.current.fitBounds(bounds, { top: 60, right: 60, bottom: 60, left: 60 });
+  }, [visibleRiders]);
+
+  const activeReadyCount = riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length;
+  const activeBusyCount = riders.filter((r) => r.presence === "ON_DELIVERY").length;
+  const signalLostCount = riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length;
+  // "connecting" is the first second of every page load; only a link that was
+  // up and dropped is worth telling anyone about.
+  const liveLinkDown = liveLink === "offline";
+
+  return (
+    <div className="w-full h-full relative rounded-plate overflow-hidden border border-edge bg-slate-50">
+      <div ref={mapRef} className="w-full h-full bg-slate-100" />
+
+      {/* The feed is down but the map itself is fine, so this is a banner and
+          not a scrim: the base map, the controls and any route still drawn on
+          it remain usable and worth looking at. Only the rider pins are gone,
+          and that is exactly what this says. */}
+      {telemetryError && !mapError ? (
+        <div
+          role="alert"
+          className="absolute inset-x-0 top-0 z-30 flex items-start gap-2 border-b border-edge bg-status-act-fill px-3 py-2"
+        >
+          <MapPinOff size={14} className="mt-0.5 shrink-0 text-status-act-ink" />
+          <div className="min-w-0">
+            <p className="text-label text-status-act-ink">{telemetryError}</p>
+            <p className="text-micro text-status-act-ink/80">
+              No rider pins can be drawn until it is restored. The roster still shows who is on
+              duty, and their last known stop is on the errand record.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Error first, then loading. A spinner that never resolves is a worse
+          answer than a sentence saying the map failed and what still works. */}
+      {mapError ? (
+        <div
+          role="alert"
+          className="absolute inset-0 flex items-center justify-center bg-board-ground/95 z-30 p-6"
+        >
+          <div className="flex max-w-xs flex-col items-center gap-2 rounded-plate border border-edge bg-board-plate p-6 text-center">
+            <MapPinOff size={20} className="text-status-act-ink" />
+            <p className="text-label text-ink">{mapError}</p>
+            <p className="text-label text-ink-muted">
+              Rider positions are unavailable on the map. The roster beside it still lists who is
+              on duty.
+            </p>
+          </div>
+        </div>
+      ) : !isMapLoaded ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-board-ground/95 z-30">
+          <div
+            className="flex flex-col items-center gap-2.5 rounded-plate border border-edge bg-board-plate p-6"
+            aria-busy="true"
+          >
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-field-ink border-t-transparent"></div>
+            <p className="text-label text-ink">Loading Live Fleet Map...</p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Floating Status & Controls Bar.
+          Unmounted while the map is unusable rather than left to print
+          through the failure scrim. The scrim is 95% opaque and sits at z-30
+          over this bar at z-20, so on a failed map these three controls came
+          through at about 1:1 against the wash: illegible, unclickable, and
+          reading as a rendering fault rather than as a disabled state. They
+          also control a map that is not there. Nothing here is a filter on
+          the roster - "Hide Off-Duty" is passed in by the parent and the
+          roster keeps its own presence strip - so removing them for the
+          duration costs the reader no capability. */}
+      {isMapLoaded && !mapError ? (
+      <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex flex-wrap items-center justify-end gap-2 z-20">
+        {/* Toggle Hide Offline */}
+        {onToggleHideOffline && (
+          <button
+            type="button"
+            onClick={onToggleHideOffline}
+            title={hideOffline ? "Show offline riders" : "Hide offline riders"}
+            data-elevate
+            className={cn(
+              "h-9 px-3.5 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border transition-all flex items-center gap-1.5 cursor-pointer shadow-sm",
+              hideOffline
+                ? "bg-board-field text-white border-field-ink"
+                : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900 hover:border-slate-300"
+            )}
+          >
+            {hideOffline ? <EyeOff size={14} /> : <Eye size={14} />}
+            <span className="hidden sm:inline">{hideOffline ? "Offline Hidden" : "Hide Offline"}</span>
+          </button>
+        )}
+
+        {/* Re-center / Fit Bounds Button */}
+        <button
+          type="button"
+          onClick={handleFitBounds}
+          title="Fit all visible riders on map"
+          data-elevate
+          className="h-9 px-3.5 bg-white/95 hover:bg-white text-slate-700 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border border-slate-200/80 hover:border-slate-300 flex items-center gap-1.5 transition-all hover:text-[#1E3A5F] cursor-pointer shadow-sm"
+        >
+          <Target size={15} className="text-[#1E3A5F]" />
+          <span className="hidden sm:inline">Fit All</span>
+        </button>
+
+        {/* Live Active Pill.
+
+            The pulsing ring is gone. It was painted unconditionally, so it
+            announced a live feed whatever the counts beside it were, including
+            when they were zero because the roster request had failed. A
+            solid mark still reads as a status; a pulse that never checks
+            anything is an assertion the component cannot support. */}
+        <div className="bg-white/95 px-3.5 py-2 rounded-trim border border-slate-200/80 text-micro font-semibold text-slate-800 flex items-center gap-2 shadow-sm">
+          <span
+            className={cn(
+              "inline-flex h-2.5 w-2.5 shrink-0 rounded-full",
+              presenceUnknown
+                ? "bg-slate-400"
+                : liveLinkDown
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
+            )}
+          />
+          <span>
+            {presenceUnknown ? (
+              "Presence unknown"
+            ) : (
+              <>
+                <span className="font-mono tabular-nums font-bold text-slate-900">{activeReadyCount}</span> Online •{" "}
+                <span className="font-mono tabular-nums font-bold text-slate-900">{activeBusyCount}</span> On delivery
+                {signalLostCount > 0 ? (
+                  <> • <span className="text-red-700 font-semibold"><span className="font-mono tabular-nums font-bold">{signalLostCount}</span> Signal lost</span></>
+                ) : null}
+              </>
+            )}
+          </span>
+          {/* Said in words, not only by the dot's colour. Pins may still move
+              over RTDB while this shows; they are just not guaranteed to. */}
+          {!presenceUnknown && liveLinkDown ? (
+            <span className="font-semibold text-amber-700 uppercase tracking-wider text-[10px]">Reconnecting</span>
+          ) : null}
+        </div>
+      </div>
+      ) : null}
+    </div>
+  );
+}

@@ -1,0 +1,1260 @@
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { toast } from "sonner";
+import { apiClient } from "../../../../../services/apiClient";
+import {
+  apiService,
+  type ApiPinQuote,
+  type ApiPredictedStore,
+  type ApiStoreLocationVerdict,
+} from "../../../../../services/apiService";
+import {
+  loadGoogleMapsScript,
+  importGoogleMapsLibrary,
+  onGoogleMapsStatus,
+  type GoogleMapsStatus,
+} from "../../../../../utils/loadGoogleMaps";
+import {
+  SERVICE_AREA_BOUNDS,
+  TACURONG_CENTER,
+  TACURONG_MASK_PATHS,
+  isWithinTacurong,
+} from "../../../../../constants/serviceArea";
+import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
+import { metresBetween } from "../../../../../utils/geo";
+import { GOOGLE_MAP_ID, canUseAdvancedMarkers } from "../../../../../utils/googleMapId";
+import { copy } from "../copy";
+import {
+  inferCategoryFromGoogleTypes,
+  inferCategoryFromCatalogueName,
+  findDuplicatePin,
+  SAME_PLACE_METERS,
+  type DuplicateVerdict,
+} from "./storeCategoryInference";
+import { normalizeStoreName } from "../../../../../utils/storeName";
+import type { PostCardOptions } from "./useOrderChat";
+import type {
+  StorePinpoint,
+  MerchantCategory,
+  CategorySource,
+  OrderChatMessage,
+} from "../types";
+
+/**
+ * How many stores one errand may visit: the first store plus the owner's
+ * "Max Additional Stores Allowed" (Service Rates). This was a literal 3, so
+ * raising the setting changed nothing here (2026-10-25). The server enforces
+ * the same figure (server lib/storeLimit.ts); 2 is its column default, used
+ * until the rate card has loaded.
+ */
+export function maxPinpointsFor(rateConfig: { maxAdditionalStores?: number | null } | null | undefined): number {
+  const extra = Number(rateConfig?.maxAdditionalStores);
+  return 1 + (Number.isFinite(extra) ? Math.min(Math.max(Math.round(extra), 0), 5) : 2);
+}
+
+/** Illegal Firebase RTDB key characters: . # $ / [ ] */
+const cleanName = (s: string) => (s || "").replace(/[.#$/[\]]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * A Plus Code (Open Location Code) — Google's own fallback "address" for a
+ * point with no real street address, e.g. "MMF7+6G8". Grid coordinates spelled
+ * with letters, not a name: a dispatcher glancing at a store list has no way to
+ * know what it refers to.
+ */
+const PLUS_CODE_PATTERN = /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}$/i;
+
+/**
+ * How close a click must land to a business for that business to count as
+ * "this is what was pinned", rather than a nearby but different building.
+ */
+const ESTABLISHMENT_MATCH_RADIUS_METERS = 30;
+
+/**
+ * Turns a reverse-geocode response into a name a dispatcher can actually read.
+ *
+ * Google orders results most-to-least specific, and for a point with no
+ * addressed building nearby — an alley, a market stall, a spot in a parking
+ * lot, all common in Tacurong — the MOST specific result is routinely a Plus
+ * Code. Taking results[0] unconditionally meant clicking exactly the kind of
+ * place that lacks a tidy address was the one case guaranteed to produce a
+ * code. Returns null rather than guess, so the caller's honest "Store N"
+ * fallback is what a dispatcher sees.
+ */
+function resolveReadablePlaceName(results: any[] | null | undefined): string | null {
+  for (const result of results || []) {
+    if (result?.types?.includes("plus_code")) continue;
+    // Only the leading segment — a formatted_address can still OPEN with a Plus
+    // Code ("MMF7+6G8, Tacurong City") without being one, and that front half is
+    // exactly what a dispatcher can't read.
+    const candidates = [
+      result?.address_components?.[0]?.long_name,
+      result?.formatted_address?.split(",")[0],
+    ];
+    for (const candidate of candidates) {
+      const trimmed = candidate?.trim();
+      if (trimmed && !PLUS_CODE_PATTERN.test(trimmed)) return trimmed;
+    }
+  }
+  return null;
+}
+
+/**
+ * The name of the business at a clicked point, if the click landed on one.
+ *
+ * A plain reverse-geocode answers "what is this address" — for a spot sitting
+ * on top of a real store that is routinely a street number, because the
+ * geocoder has no idea a business is there. Places is what knows about
+ * businesses. Ranked by actual distance from the click, not Places' own
+ * relevance ordering, so a well-known chain a little farther off can't win over
+ * the exact shop the pin landed on.
+ */
+function findNearbyEstablishmentName(
+  map: any,
+  lat: number,
+  lng: number,
+  callback: (name: string | null) => void
+) {
+  const places = (window as any).google?.maps?.places;
+  if (!places?.PlacesService) {
+    callback(null);
+    return;
+  }
+  const service = new places.PlacesService(map);
+  service.nearbySearch(
+    { location: { lat, lng }, radius: ESTABLISHMENT_MATCH_RADIUS_METERS, type: "establishment" },
+    (results: any, status: any) => {
+      if (status !== places.PlacesServiceStatus.OK || !results?.length) {
+        callback(null);
+        return;
+      }
+      let closest: { name: string; distance: number } | null = null;
+      for (const place of results) {
+        const loc = place.geometry?.location;
+        if (!place.name || !loc) continue;
+        const distance = metresBetween({ lat, lng }, { lat: loc.lat(), lng: loc.lng() });
+        if (
+          distance <= ESTABLISHMENT_MATCH_RADIUS_METERS &&
+          (!closest || distance < closest.distance)
+        ) {
+          closest = { name: place.name, distance };
+        }
+      }
+      callback(closest?.name ?? null);
+    }
+  );
+}
+
+interface UseStorePinsArgs {
+  orderId: string;
+  orderDetails: any;
+  merchantCategories: MerchantCategory[];
+  customerDisplayName: string;
+  initialPinpoints: StorePinpoint[] | null;
+  /**
+   * The conversation, read only to find out whether the stores have already
+   * been sent. Stage 2 completes on that, and a dispatcher who reloads the
+   * page mid-order must not be sent back to re-send stores the customer
+   * already has.
+   */
+  messages: OrderChatMessage[];
+  onOrderUpdated: (errand: any) => void;
+  /** The owner's rate card; only maxAdditionalStores is read here. */
+  rateConfig?: { maxAdditionalStores?: number | null } | null;
+  /** One store-locations card in the chat, updated or moved (useOrderChat.postCard). */
+  postCard: (card: Record<string, any> & { type: string }, opts: PostCardOptions) => Promise<{ moved: boolean }>;
+  /** Only mount the map when stage 2 is actually open. */
+  mapVisible: boolean;
+  /**
+   * Price the pins on screen as they change (POST /pinpoints/quote). Off for
+   * a closed, read-only order, where nothing can be re-pinned.
+   */
+  liveQuote?: boolean;
+}
+
+export type PinQuoteStatus = "idle" | "pricing" | "ready" | "error";
+
+/** Held back so placing three pins in a row costs one quote, not three. */
+const QUOTE_DEBOUNCE_MS = 600;
+
+/** What the server stores for a stop, reduced to what decides its price and route. */
+function stopSignature(
+  pins: Array<{ storeName?: string | null; latitude: number | string; longitude: number | string; placeId?: string | null; categoryId?: number | null }>
+): string {
+  return JSON.stringify(
+    pins.map((p) => [
+      String(p.storeName || "").trim(),
+      Number(p.latitude).toFixed(6),
+      Number(p.longitude).toFixed(6),
+      p.placeId ?? null,
+      p.categoryId ?? null,
+    ])
+  );
+}
+
+export function useStorePins({
+  orderId,
+  orderDetails,
+  merchantCategories,
+  customerDisplayName,
+  initialPinpoints,
+  messages,
+  onOrderUpdated,
+  rateConfig,
+  postCard,
+  mapVisible,
+  liveQuote = true,
+}: UseStorePinsArgs) {
+  const maxPinpoints = maxPinpointsFor(rateConfig);
+  // Read by the map and search callbacks, which are not rebuilt on its change.
+  const maxPinpointsRef = useRef(maxPinpoints);
+  maxPinpointsRef.current = maxPinpoints;
+  const [pinpoints, setPinpoints] = useState<StorePinpoint[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [mapsStatus, setMapsStatus] = useState<GoogleMapsStatus>("ok");
+  /**
+   * The map instance lives in a ref, and assigning a ref does not re-render.
+   * Without this flag the marker effect below ran once while the map was still
+   * null, returned early, and never ran again - so pins loaded from the server
+   * were never drawn at all. Only pins added AFTER the map existed appeared,
+   * which is why the bug looked intermittent.
+   */
+  const [mapReady, setMapReady] = useState(false);
+  const feedback = useInlineMessage();
+
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapInstance = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const customerMarkerRef = useRef<any>(null);
+  // The map click handler is rebuilt on every pin change; a ref keeps the
+  // listener reading current state without re-creating the map.
+  const pinsRef = useRef<StorePinpoint[]>([]);
+  pinsRef.current = pinpoints;
+  const searchInputRef = useRef("");
+  searchInputRef.current = searchInput;
+  const categoriesRef = useRef<MerchantCategory[]>([]);
+  categoriesRef.current = merchantCategories;
+
+  /** True when the map cannot be shown, for whatever reason. */
+  const mapUnavailable = mapsStatus !== "ok";
+
+  useEffect(() => {
+    if (initialPinpoints && initialPinpoints.length > 0) setPinpoints(initialPinpoints);
+  }, [initialPinpoints]);
+
+  // Google tells us the key was refused through a global callback, not a
+  // rejected promise — see loadGoogleMaps.ts.
+  useEffect(() => onGoogleMapsStatus(setMapsStatus), []);
+
+  useEffect(() => {
+    loadGoogleMapsScript()
+      .then(() => setScriptLoaded(true))
+      .catch((err) => console.warn("Google Maps script load failed:", err));
+  }, []);
+
+  const notifyAtLimit = useCallback(() => {
+    toast.warning(copy.stage2.atLimit(maxPinpointsRef.current));
+  }, []);
+
+  /**
+   * A pin the dispatcher has been warned about and must confirm or discard.
+   * Held rather than added, so an accidental double-pin never silently reaches
+   * the customer's bill.
+   */
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    pin: StorePinpoint;
+    verdict: Extract<DuplicateVerdict, { kind: "likely" }>;
+  } | null>(null);
+
+  /**
+   * Fills in a category the local rules could not work out, by asking the
+   * category service to read the shop name (see server/ml).
+   *
+   * Runs AFTER the pin is on screen, never before it. The dispatcher gets their
+   * pin at the speed of a click and the category arrives a moment later if it
+   * arrives at all — putting this in front of the pin would mean a sidecar
+   * having a slow morning is felt as the map being broken.
+   *
+   * Only ever fills a category that is MISSING. It cannot overwrite a catalogue
+   * match, a Google type or anything the dispatcher chose: those are all better
+   * evidence than reading a name, and a guess that quietly replaces a known
+   * answer is the one failure mode that would make this worse than nothing.
+   */
+  const enrichCategory = useCallback(async (pin: StorePinpoint) => {
+    if (pin.categoryId != null) return;
+
+    const guess = await apiService.inferStoreCategory(pin.storeName, pin.googleTypes);
+    if (!guess.available || guess.categoryId == null) return;
+
+    setPinpoints((prev) =>
+      prev.map((p) =>
+        // Matched on identity rather than index: a dispatcher can remove a pin
+        // while this request is in flight, and patching by position would then
+        // categorise a different shop.
+        p.categoryId == null &&
+        p.storeName === pin.storeName &&
+        p.latitude === pin.latitude &&
+        p.longitude === pin.longitude
+          ? {
+              ...p,
+              categoryId: guess.categoryId!,
+              categorySource: "model" as CategorySource,
+              categoryConfidence: guess.confidence,
+              categoryRunnerUp: guess.alternatives?.[0]?.categoryName,
+            }
+          : p
+      )
+    );
+  }, []);
+
+  /** Adds without asking. Only for a pin the dispatcher has already confirmed. */
+  const forceAddPin = useCallback(
+    (pin: StorePinpoint): boolean => {
+      let added = false;
+      setPinpoints((prev) => {
+        if (prev.length >= maxPinpointsRef.current) {
+          notifyAtLimit();
+          return prev;
+        }
+        added = true;
+        return [...prev, pin];
+      });
+      // The single funnel every pin passes through, so the search result, the
+      // map click and the "pin it anyway" override all get the same treatment.
+      if (added) void enrichCategory(pin);
+      return added;
+    },
+    [notifyAtLimit, enrichCategory]
+  );
+
+  /**
+   * The single gate every pin passes through.
+   *
+   * Duplicates are not merely untidy. The server prices a "store" as
+   * `pinpoints.length`, so a second pin on a shop already pinned adds a
+   * multi-store fee to a quote the customer has already agreed to. An identical
+   * catalogue id is refused outright; anything merely close or same-named is put
+   * to the dispatcher with the cost stated, because two real shops can share a
+   * building.
+   */
+  /** The last pin refused outright, with the reason, until dismissed. */
+  const [blockedPin, setBlockedPin] = useState<{ storeName: string; message: string } | null>(null);
+  const [isCheckingLocation, setIsCheckingLocation] = useState(false);
+
+  /**
+   * The location half of the gate: is this spot inside Tacurong?
+   * Evaluated client-side against the official 649-point Tacurong polygon and verified by the server.
+   * Any store pin > 100m outside Tacurong City is strictly blocked outright with an instant notification.
+   */
+  const guardLocation = useCallback(
+    async (pin: StorePinpoint) => {
+      // Instant client-side check against official 649-point Tacurong boundary
+      if (!isWithinTacurong(pin.latitude, pin.longitude, 0.1)) {
+        const message = `${pin.storeName} is outside Tacurong City. SUGO Express currently operates exclusively within Tacurong City.`;
+        setBlockedPin({ storeName: pin.storeName, message });
+        toast.error(`Outside Service Area: ${pin.storeName} is outside Tacurong City.`);
+        return;
+      }
+
+      setIsCheckingLocation(true);
+      const verdict = await apiService.checkStoreLocation(pin.latitude, pin.longitude);
+      setIsCheckingLocation(false);
+
+      if (!verdict || verdict.status === "inside") {
+        setBlockedPin(null);
+        forceAddPin(pin);
+        return;
+      }
+
+      // Hard block: outside border or off road map
+      setBlockedPin({ storeName: pin.storeName, message: verdict.message });
+      toast.error(`Cannot pin store: ${verdict.message}`);
+    },
+    [forceAddPin]
+  );
+
+  const addPin = useCallback(
+    (pin: StorePinpoint): boolean => {
+      const verdict = findDuplicatePin(pin, pinsRef.current);
+
+      if (verdict.kind === "exact") {
+        toast.warning(copy.stage2.dupExact(verdict.existing.storeName, verdict.index + 1));
+        return false;
+      }
+      if (verdict.kind === "likely") {
+        setPendingDuplicate({ pin, verdict });
+        return false;
+      }
+      void guardLocation(pin);
+      return true;
+    },
+    [guardLocation]
+  );
+
+  const confirmPendingDuplicate = useCallback(() => {
+    setPendingDuplicate((pending) => {
+      // Still has to pass the location check: "same shop twice" and "outside
+      // Tacurong" are separate questions.
+      if (pending) void guardLocation(pending.pin);
+      return null;
+    });
+  }, [guardLocation]);
+
+  const dismissBlockedPin = useCallback(() => setBlockedPin(null), []);
+
+  /**
+   * Pins the stores the predictor proposed, after the dispatcher answered
+   * "yes, accurate". Each was already location-checked server-side and any
+   * border warning was on the card they said yes to, so that answer is the
+   * confirmation; only a blocked store (never proposed) or an exact duplicate
+   * is skipped. Returns how many were pinned.
+   */
+  const addPredictedStores = useCallback(
+    (stores: ApiPredictedStore[]): number => {
+      // Decided up front against the pins as they stand. forceAddPin's own
+      // return value is computed inside a state updater and cannot be counted
+      // on synchronously; its updater still enforces the limit either way.
+      const batch: StorePinpoint[] = [];
+      for (const store of stores) {
+        if (
+          store.alreadyPinned ||
+          store.location.status === "blocked" ||
+          !isWithinTacurong(store.latitude, store.longitude, 0.1)
+        ) {
+          continue;
+        }
+        const pin: StorePinpoint = {
+          storeName: store.storeName.slice(0, 60),
+          latitude: store.latitude,
+          longitude: store.longitude,
+          placeId: store.placeId,
+          categoryId: store.categoryId,
+          // From the catalogue when it came with a place id; otherwise it is
+          // what past pins of this shop were filed as, which is still a guess
+          // and is shown as one until the dispatcher confirms it.
+          categorySource: (store.categoryId == null
+            ? null
+            : store.placeId
+              ? "catalogue"
+              : "name") as CategorySource,
+        };
+        // The same shop already pinned, by catalogue id or, for a suggestion
+        // learned from past orders (no place id), by name at the same spot.
+        // Only "exact" was skipped before, which needs a place id on both
+        // sides, so "Pin" on one suggestion and then "Yes, pin these" pinned
+        // that shop twice. Same-building neighbours with other names still go
+        // through. Checked against every pin rather than through
+        // findDuplicatePin, which reports only the first nearby pin and in a
+        // mall that can be a different shop.
+        const name = normalizeStoreName(pin.storeName);
+        const sameShopPinned = [...pinsRef.current, ...batch].some(
+          (existing) =>
+            (pin.placeId != null &&
+              existing.placeId != null &&
+              String(existing.placeId) === String(pin.placeId)) ||
+            (name !== "" &&
+              normalizeStoreName(existing.storeName || "") === name &&
+              metresBetween(
+                { lat: Number(existing.latitude), lng: Number(existing.longitude) },
+                { lat: pin.latitude, lng: pin.longitude }
+              ) < SAME_PLACE_METERS)
+        );
+        if (sameShopPinned) continue;
+        if (pinsRef.current.length + batch.length >= maxPinpointsRef.current) {
+          notifyAtLimit();
+          break;
+        }
+        batch.push(pin);
+      }
+      batch.forEach((pin) => forceAddPin(pin));
+      // Show where it landed: the map follows the pin just placed.
+      const last = batch[batch.length - 1];
+      if (last) panTo(last.latitude, last.longitude);
+      return batch.length;
+    },
+    // panTo is declared further down; it is stable (useCallback with no deps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [forceAddPin, notifyAtLimit]
+  );
+
+  const dismissPendingDuplicate = useCallback(() => setPendingDuplicate(null), []);
+
+  /**
+   * Asks our own catalogue what is at these coordinates.
+   *
+   * `GET /places/reverse` returns the nearest verified place within 50 m. It
+   * already backs the server's wrong-branch detector; nothing on the web side
+   * called it until now. It is the difference between a map click producing
+   * "Store 2" with no category and producing the real shop with its `placeId`
+   * and `categoryId` - which ten server behaviours depend on, from the ETA's
+   * dwell allowance to the geofence radius.
+   */
+  const resolveFromCatalogue = useCallback(
+    async (lat: number, lng: number): Promise<Partial<StorePinpoint> | null> => {
+      try {
+        const res = await apiClient.get(`/places/reverse?lat=${lat}&lng=${lng}`);
+        const place = res.data?.place ?? res.data;
+        if (!place?.id) return null;
+
+        // `/places/reverse` deliberately returns a slim record - id, name,
+        // address, coordinates - and no category. Since the category is the
+        // whole reason for asking, fetch the full row by id. One extra request,
+        // and only on a click that actually landed on a shop we know.
+        let categoryId: number | null = place.categoryId ?? null;
+        if (categoryId == null) {
+          try {
+            const full = await apiClient.get(`/places/${place.id}`);
+            const record = full.data?.place ?? full.data;
+            categoryId = record?.categoryId ?? record?.category?.id ?? null;
+          } catch {
+            // Name and placeId are still worth having on their own.
+          }
+        }
+
+        return {
+          storeName: place.name,
+          placeId: place.id,
+          categoryId,
+          categorySource: (categoryId != null ? "reverse" : null) as CategorySource,
+        };
+      } catch {
+        // A catalogue that is down must not stop a dispatcher pinning.
+        return null;
+      }
+    },
+    []
+  );
+
+  const panTo = useCallback((lat: number, lng: number, zoom = 16) => {
+    if (mapInstance.current && !isNaN(lat) && !isNaN(lng)) {
+      mapInstance.current.panTo({ lat, lng });
+      mapInstance.current.setZoom(zoom);
+    }
+  }, []);
+
+  // ── map instance ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!scriptLoaded || mapUnavailable || !mapVisible) return;
+    let timer: any;
+
+    async function initGoogleMap() {
+      if (!mapRef.current) return;
+      try {
+        const mapsLib = await importGoogleMapsLibrary("maps");
+        await importGoogleMapsLibrary("marker");
+        await importGoogleMapsLibrary("places");
+
+        const MapClass = mapsLib?.Map || (window as any).google?.maps?.Map;
+        if (!MapClass || !mapRef.current) return;
+        if (mapRef.current.children.length > 0 && mapInstance.current) return;
+
+        const googleMapId = GOOGLE_MAP_ID;
+        const mapOptions: any = {
+          center: TACURONG_CENTER,
+          zoom: 14,
+          mapTypeControl: false,
+          streetViewControl: false,
+        };
+        if (googleMapId) mapOptions.mapId = googleMapId;
+
+        const map = new MapClass(mapRef.current, mapOptions);
+
+        // Inverted polygon mask: dims out everything outside Tacurong City at 35% navy opacity.
+        // Tacurong City is completely transparent and bright; outside areas are dimmed.
+        const PolygonClass = (window as any).google?.maps?.Polygon;
+        if (PolygonClass) {
+          new PolygonClass({
+            map,
+            paths: TACURONG_MASK_PATHS,
+            strokeColor: "#1E3A5F",
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: "#0B132B",
+            fillOpacity: 0.35,
+            clickable: false,
+          });
+        }
+
+        map.addListener("click", async (e: any) => {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          const typed = searchInputRef.current.trim();
+
+          const commitPin = (resolvedName: string, extra?: Partial<StorePinpoint>) => {
+            const clean = cleanName(resolvedName);
+            const fallback = `Store ${pinsRef.current.length + 1}`;
+            addPin({
+              storeName: clean || fallback,
+              latitude: lat,
+              longitude: lng,
+              ...extra,
+            });
+            setSearchInput("");
+          };
+
+          const resolveByAddress = () => {
+            const Geocoder = (window as any).google?.maps?.Geocoder;
+            if (!Geocoder) {
+              commitPin(`Store ${pinsRef.current.length + 1}`);
+              return;
+            }
+            new Geocoder().geocode({ location: { lat, lng } }, (results: any, status: any) => {
+              const placeName = status === "OK" ? resolveReadablePlaceName(results) : null;
+              // A clear, honest "Store N" beats a Plus Code the dispatcher
+              // would have to decipher.
+              commitPin(placeName || `Store ${pinsRef.current.length + 1}`);
+            });
+          };
+
+          // Our own catalogue first. A click that lands on a shop we already
+          // know about should produce that shop - name, placeId AND category -
+          // rather than a coordinate Google has to re-describe.
+          const known = await resolveFromCatalogue(lat, lng);
+          if (known?.storeName) {
+            commitPin(known.storeName, {
+              placeId: known.placeId,
+              categoryId: known.categoryId,
+              categorySource: known.categorySource,
+            });
+            return;
+          }
+
+          if (typed) {
+            commitPin(typed);
+          } else {
+            // A business name beats an address every time.
+            findNearbyEstablishmentName(map, lat, lng, (name) =>
+              name ? commitPin(name) : resolveByAddress()
+            );
+          }
+        });
+
+        mapInstance.current = map;
+        setMapReady(true);
+
+        setTimeout(() => {
+          const ev = (window as any).google?.maps?.event;
+          if (mapInstance.current && ev) {
+            ev.trigger(mapInstance.current, "resize");
+            mapInstance.current.setCenter(TACURONG_CENTER);
+          }
+        }, 300);
+      } catch (err) {
+        console.warn("Google Maps initialization exception caught:", err);
+      }
+    }
+
+    timer = setTimeout(initGoogleMap, 200);
+    return () => clearTimeout(timer);
+  }, [scriptLoaded, mapUnavailable, mapVisible, addPin, resolveFromCatalogue]);
+
+  // Stage 2 opening changes the container size; Google needs telling.
+  useEffect(() => {
+    if (!mapVisible || !mapInstance.current) return;
+    const timer = setTimeout(() => {
+      const ev = (window as any).google?.maps?.event;
+      if (!mapInstance.current || !ev) return;
+      ev.trigger(mapInstance.current, "resize");
+      const last = pinpoints[pinpoints.length - 1];
+      mapInstance.current.setCenter(
+        last ? { lat: Number(last.latitude), lng: Number(last.longitude) } : TACURONG_CENTER
+      );
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [mapVisible, pinpoints]);
+
+  // ── markers ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!mapInstance.current || !(window as any).google) return;
+    const g = (window as any).google;
+
+    markersRef.current.forEach((m) => {
+      if (m.setMap) m.setMap(null);
+      else m.map = null;
+    });
+    markersRef.current = [];
+
+    pinpoints.forEach((pin, idx) => {
+      const latNum = parseFloat(String(pin.latitude));
+      const lngNum = parseFloat(String(pin.longitude));
+      if (isNaN(latNum) || isNaN(lngNum)) return;
+      const pos = { lat: latNum, lng: lngNum };
+      const titleStr = `Store #${idx + 1}: ${pin.storeName}`;
+      let marker: any;
+
+      if (canUseAdvancedMarkers(g)) {
+        marker = new g.maps.marker.AdvancedMarkerElement({
+          map: mapInstance.current,
+          position: pos,
+          title: titleStr,
+          content: new g.maps.marker.PinElement({
+            glyphText: String(idx + 1),
+            glyphColor: "#FFFFFF",
+            background: "#DC2626",
+            borderColor: "#991B1B",
+          }),
+        });
+      } else {
+        marker = new g.maps.Marker({
+          position: pos,
+          map: mapInstance.current,
+          title: titleStr,
+          label: { text: String(idx + 1), color: "#FFFFFF", fontWeight: "bold" },
+        });
+      }
+
+      const infoWindow = new g.maps.InfoWindow({
+        content: `<div style="font-size:12px;font-weight:bold;color:#1F2937;">Store #${idx + 1}: ${pin.storeName}</div>`,
+      });
+      const clickEvent =
+        canUseAdvancedMarkers(g) && marker instanceof g.maps.marker.AdvancedMarkerElement
+          ? "gmp-click"
+          : "click";
+      marker.addListener(clickEvent, () => infoWindow.open(mapInstance.current, marker));
+      markersRef.current.push(marker);
+    });
+
+    // The customer's drop-off, so the dispatcher can see it relative to shops.
+    const custLat = orderDetails?.deliveryLatitude
+      ? parseFloat(String(orderDetails.deliveryLatitude))
+      : NaN;
+    const custLng = orderDetails?.deliveryLongitude
+      ? parseFloat(String(orderDetails.deliveryLongitude))
+      : NaN;
+
+    if (!isNaN(custLat) && !isNaN(custLng) && custLat !== 0 && custLng !== 0) {
+      const custPos = { lat: custLat, lng: custLng };
+      const custAddress = orderDetails?.deliveryAddress || "Customer destination";
+      let custMarker: any;
+
+      if (canUseAdvancedMarkers(g)) {
+        custMarker = new g.maps.marker.AdvancedMarkerElement({
+          map: mapInstance.current,
+          position: custPos,
+          title: `Drop-off: ${custAddress}`,
+          content: new g.maps.marker.PinElement({
+            glyphText: "H",
+            glyphColor: "#FFFFFF",
+            background: "#059669",
+            borderColor: "#065F46",
+          }),
+        });
+      } else {
+        custMarker = new g.maps.Marker({
+          position: custPos,
+          map: mapInstance.current,
+          title: `Drop-off: ${custAddress}`,
+          icon: { url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png" },
+        });
+      }
+
+      const custInfoWindow = new g.maps.InfoWindow({
+        content: `<div style="font-size:12px;color:#1e293b;padding:2px 4px;">
+          <div style="color:#059669;font-weight:800;font-size:11px;margin-bottom:2px;">DROP-OFF</div>
+          <div>${custAddress}</div>
+          ${customerDisplayName ? `<div style="color:#64748b;font-size:11px;margin-top:2px;">${customerDisplayName}</div>` : ""}
+        </div>`,
+      });
+      const custClickEvent =
+        canUseAdvancedMarkers(g) &&
+        custMarker instanceof g.maps.marker.AdvancedMarkerElement
+          ? "gmp-click"
+          : "click";
+      custMarker.addListener(custClickEvent, () => custInfoWindow.open(mapInstance.current, custMarker));
+      customerMarkerRef.current = custMarker;
+      markersRef.current.push(custMarker);
+    }
+
+    const last = pinpoints[pinpoints.length - 1];
+    if (last) {
+      const lat = parseFloat(String(last.latitude));
+      const lng = parseFloat(String(last.longitude));
+      if (!isNaN(lat) && !isNaN(lng)) mapInstance.current.panTo({ lat, lng });
+    }
+    // The drop-off fields, not the whole errand: it now arrives live
+    // (useOrderDetails), and a rider marking an item bought must not redraw
+    // the markers and pan the map out from under the dispatcher.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pinpoints,
+    orderDetails?.deliveryLatitude,
+    orderDetails?.deliveryLongitude,
+    orderDetails?.deliveryAddress,
+    customerDisplayName,
+    mapReady,
+  ]);
+
+  // ── actions ─────────────────────────────────────────────────────────────
+  const removePin = useCallback((index: number) => {
+    setPinpoints((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  /**
+   * A pin from catalogue search already carries a categoryId. One dropped by
+   * clicking the map never gets one automatically, which left the server's
+   * category fallback with no data for the majority of how pins get placed.
+   */
+  const setPinCategory = useCallback((index: number, categoryId: number | null) => {
+    // Choosing by hand settles it - the guess marker clears.
+    setPinpoints((prev) =>
+      prev.map((p, i) =>
+        i === index
+          ? { ...p, categoryId, categorySource: categoryId ? ("manual" as CategorySource) : null }
+          : p
+      )
+    );
+  }, []);
+
+  const focusPin = useCallback(
+    (pin: StorePinpoint) => {
+      panTo(parseFloat(String(pin.latitude)), parseFloat(String(pin.longitude)));
+    },
+    [panTo]
+  );
+
+  const hoverResult = useCallback(
+    (result: any) => {
+      const loc = result?.geometry?.location;
+      if (!loc) return;
+      panTo(
+        typeof loc.lat === "function" ? loc.lat() : Number(loc.lat),
+        typeof loc.lng === "function" ? loc.lng() : Number(loc.lng)
+      );
+    },
+    [panTo]
+  );
+
+  const selectResult = useCallback(
+    (result: any) => {
+      if (pinpoints.length >= maxPinpointsRef.current) {
+        notifyAtLimit();
+        return;
+      }
+      const loc = result.geometry.location;
+      const lat = typeof loc.lat === "function" ? loc.lat() : Number(loc.lat);
+      const lng = typeof loc.lng === "function" ? loc.lng() : Number(loc.lng);
+      const streetName = (result.formatted_address || "").split(",")[0] || searchInput;
+      // placeId/categoryId are present on catalogue results and absent on Google
+      // ones — the honest distinction: a Google result has no catalogue entry to
+      // point at, and the server treats a stop without a placeId as uncomparable
+      // rather than guessing.
+      addPin({
+        storeName: result.name || `${searchInput} (${streetName})`,
+        latitude: lat,
+        longitude: lng,
+        placeId: result.placeId ?? null,
+        categoryId: result.categoryId ?? null,
+        categorySource: result.categorySource ?? (result.categoryId ? "google" : null),
+      });
+      setSearchInput("");
+      setSearchResults([]);
+      panTo(lat, lng);
+    },
+    [pinpoints.length, searchInput, addPin, notifyAtLimit, panTo]
+  );
+
+  /**
+   * Two-tier search. Tier 1 is our own verified-places catalogue and needs no
+   * Google at all — which is what keeps this stage completable when the Maps
+   * key is refused.
+   */
+  const search = useCallback(
+    async (e?: React.FormEvent, customQuery?: string) => {
+      // Catalogue hits are kept even when we end up pinning a Google result, so
+      // the name-match rung of the category ladder still has something to
+      // consult. The catalogue's `keywords` column carries aliases and
+      // misspellings, which is the only misspelling tolerance the app has.
+      let catalogueHits: any[] = [];
+      if (e) e.preventDefault();
+      const trimmed = (typeof customQuery === "string" ? customQuery : searchInput).trim();
+      if (!trimmed) {
+        toast.error("Type a store name to search for.");
+        return;
+      }
+      if (pinpoints.length >= maxPinpointsRef.current) {
+        notifyAtLimit();
+        return;
+      }
+      setSearchInput(trimmed);
+      setIsSearching(true);
+      setSearchResults([]);
+
+      // ── TIER 1: our catalogue ─────────────────────────────────────────
+      try {
+        const dbRes = await apiClient.get(`/places?search=${encodeURIComponent(trimmed)}`);
+        const dbPlaces: any[] = (dbRes.data || []).filter((p: any) => {
+          const lat = Number(p.latitude);
+          const lng = Number(p.longitude);
+          return isWithinTacurong(lat, lng, 0.1);
+        });
+        catalogueHits = dbPlaces;
+
+        if (dbPlaces.length > 1) {
+          // A chain with more than one branch — "Jollibee" returns both. Carry
+          // each result's catalogue identity so picking the Drive-Thru records
+          // the Drive-Thru, not just a coordinate that looks like it.
+          setSearchResults(
+            dbPlaces.map((p) => ({
+              name: p.name,
+              formatted_address: p.address + (p.barangay ? `, Brgy. ${p.barangay}` : ""),
+              categoryName: p.category?.name,
+              geometry: { location: { lat: () => p.latitude, lng: () => p.longitude } },
+              isVerifiedDb: true,
+              placeId: p.id,
+              categoryId: p.categoryId ?? null,
+              categorySource: "catalogue" as CategorySource,
+            }))
+          );
+          setIsSearching(false);
+          return;
+        }
+
+        if (dbPlaces.length === 1) {
+          const item = dbPlaces[0];
+          const lat = Number(item.latitude);
+          const lng = Number(item.longitude);
+          addPin({
+            storeName: item.name,
+            latitude: lat,
+            longitude: lng,
+            placeId: item.id,
+            categoryId: item.categoryId ?? null,
+            categorySource: "catalogue",
+          });
+          setSearchInput("");
+          setIsSearching(false);
+          panTo(lat, lng);
+          return;
+        }
+      } catch (err) {
+        // A catalogue that is unreachable is NOT the same as a catalogue that
+        // found nothing - the old code logged both identically and fell through
+        // to Google, so an outage looked like "no such shop".
+        console.warn("Database place search query warning:", err);
+        toast.info(copy.stage2.catalogueUnreachable);
+      }
+
+      // ── TIER 2: Google ────────────────────────────────────────────────
+      if (mapUnavailable) {
+        setIsSearching(false);
+        toast.error(
+          `"${trimmed}" isn't in our store list, and the map is unavailable to search further.`
+        );
+        return;
+      }
+
+      try {
+        const g = (window as any).google;
+        if (!g?.maps?.places || !mapInstance.current) {
+          setIsSearching(false);
+          toast.info("Maps is still loading. Try again in a moment.");
+          return;
+        }
+
+        const bounds = new g.maps.LatLngBounds(
+          new g.maps.LatLng(SERVICE_AREA_BOUNDS.south, SERVICE_AREA_BOUNDS.west),
+          new g.maps.LatLng(SERVICE_AREA_BOUNDS.north, SERVICE_AREA_BOUNDS.east)
+        );
+        const placesService = new g.maps.places.PlacesService(mapInstance.current);
+
+        placesService.textSearch(
+          {
+            query: `${trimmed} Tacurong City`,
+            location: new g.maps.LatLng(TACURONG_CENTER.lat, TACURONG_CENTER.lng),
+            radius: 7000,
+            bounds,
+          },
+          (results: any, status: any) => {
+            setIsSearching(false);
+
+            if (status === g.maps.places.PlacesServiceStatus.OK && results?.length) {
+              const local = results.filter((p: any) => {
+                const addr = (p.formatted_address || p.vicinity || "").toLowerCase();
+                if (
+                  addr.includes("isulan") ||
+                  addr.includes("koronadal") ||
+                  addr.includes("esperanza") ||
+                  addr.includes("marbel")
+                ) {
+                  return false;
+                }
+                const loc = p.geometry?.location;
+                if (!loc) return false;
+                const pLat = typeof loc.lat === "function" ? loc.lat() : loc.lat;
+                const pLng = typeof loc.lng === "function" ? loc.lng() : loc.lng;
+                return isWithinTacurong(pLat, pLng, 0.1);
+              });
+
+              if (local.length > 1) {
+                setSearchResults(
+                  local.slice(0, 5).map((place: any) => ({
+                    name: place.name,
+                    formatted_address:
+                      place.formatted_address || place.vicinity || "Tacurong City",
+                    geometry: place.geometry,
+                    isPlaceResult: true,
+                    // Google tells us what kind of business this is on every
+                    // result. It was being discarded, which is why a
+                    // Google-sourced pin had no category at all.
+                    googleTypes: place.types || [],
+                    categoryId: inferCategoryFromGoogleTypes(
+                      place.types,
+                      categoriesRef.current
+                    ),
+                    categorySource: "google" as CategorySource,
+                  }))
+                );
+                return;
+              }
+              if (local.length === 1) {
+                const place = local[0];
+                const lat =
+                  typeof place.geometry.location.lat === "function"
+                    ? place.geometry.location.lat()
+                    : place.geometry.location.lat;
+                const lng =
+                  typeof place.geometry.location.lng === "function"
+                    ? place.geometry.location.lng()
+                    : place.geometry.location.lng;
+                const byTypes = inferCategoryFromGoogleTypes(
+                  place.types,
+                  categoriesRef.current
+                );
+                const byName = byTypes
+                  ? null
+                  : inferCategoryFromCatalogueName(place.name, catalogueHits);
+                addPin({
+                  storeName: place.name,
+                  latitude: lat,
+                  longitude: lng,
+                  categoryId: byTypes ?? byName,
+                  categorySource: byTypes ? "google" : byName ? "name" : null,
+                  // Carried even when the local rules already matched: the
+                  // category service uses them as a prior when neither did.
+                  googleTypes: place.types || [],
+                });
+                setSearchInput("");
+                panTo(lat, lng);
+                return;
+              }
+            }
+
+            toast.error(
+              `Couldn't find "${trimmed}" in Tacurong City. Check the spelling, or click the map to drop a pin.`
+            );
+          }
+        );
+      } catch (err) {
+        console.warn("Place search failed:", err);
+        setIsSearching(false);
+        toast.error(`Couldn't find "${trimmed}". Click the map to drop a pin.`);
+      }
+    },
+    [searchInput, pinpoints.length, mapUnavailable, addPin, notifyAtLimit, panTo]
+  );
+
+  /**
+   * When the stores were last sent to the customer, or null.
+   *
+   * Seeded from the conversation rather than held only in memory: the
+   * `pinpoints` card this hook posts is a durable record that the handover
+   * happened, so a reload, a second dispatcher opening the order, or a browser
+   * crash all recover the same answer instead of asking for the stores again.
+   */
+  const [storesSentAt, setStoresSentAt] = useState<number | null>(null);
+
+  /**
+   * Whether the stores were sent by pressing the button on THIS screen, as
+   * opposed to being recovered from the conversation on load.
+   *
+   * The screen holds the dispatcher on stage 2 after a send so they can press
+   * "Continue to step 3" themselves. That must not apply to an order whose
+   * stores went out in an earlier session: on load the chat arrives a moment
+   * after the panel opens, so stage 2 opens first, the recovered send then
+   * completes it - and the hold kept a returning dispatcher parked on a
+   * finished stage. Found by reloading a real test order on 2026-09-23.
+   */
+  const [sentThisSession, setSentThisSession] = useState(false);
+
+  useEffect(() => {
+    const card = [...messages].reverse().find((m: any) => m?.type === "pinpoints");
+    if (!card) return;
+    setStoresSentAt((prev) =>
+      prev ?? (typeof card.timestamp === "number" ? card.timestamp : Date.now())
+    );
+  }, [messages]);
+
+  // ── the live fee ──────────────────────────────────────────────────────────
+  /**
+   * The fee for the pins on screen, priced by the server as they change.
+   *
+   * The fee used to appear only after "send these stores to the customer",
+   * because pricing was part of saving, so the dispatcher committed the stops
+   * before seeing what they cost. This asks for a quote instead: the same
+   * calculation, nothing saved, nobody notified (errandService.quotePinpoints).
+   */
+  const pinsSignature = useMemo(() => stopSignature(pinpoints), [pinpoints]);
+  const [quote, setQuote] = useState<ApiPinQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<PinQuoteStatus>("idle");
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteAttempt, setQuoteAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!liveQuote || pinpoints.length === 0) {
+      setQuote(null);
+      setQuoteStatus("idle");
+      setQuoteError(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteStatus("pricing");
+    const timer = setTimeout(async () => {
+      try {
+        const next = await apiService.quotePinpoints(
+          orderId,
+          pinpoints
+            .map((p) => ({
+              storeName: p.storeName || "Store",
+              latitude: Number(p.latitude),
+              longitude: Number(p.longitude),
+              placeId: p.placeId ?? null,
+              categoryId: p.categoryId ?? null,
+            }))
+            .filter((p) => !isNaN(p.latitude) && !isNaN(p.longitude))
+        );
+        if (cancelled) return;
+        setQuote(next);
+        setQuoteError(null);
+        setQuoteStatus("ready");
+      } catch (err) {
+        if (cancelled) return;
+        // A 422 names the stop that cannot be routed to; anything else is ours.
+        const serverMessage = (err as any)?.response?.data?.error;
+        setQuoteError(typeof serverMessage === "string" ? serverMessage : null);
+        setQuoteStatus("error");
+      }
+    }, QUOTE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // pinpoints is represented by pinsSignature.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, pinsSignature, liveQuote, quoteAttempt]);
+
+  const retryQuote = useCallback(() => setQuoteAttempt((n) => n + 1), []);
+
+  /**
+   * The customer already has exactly these stores: sent, and nothing changed
+   * since. Compared with what the server saved, so a reload knows it too.
+   */
+  const savedSignature = useMemo(
+    () => stopSignature(Array.isArray(orderDetails?.pinpoints) ? orderDetails.pinpoints : []),
+    [orderDetails?.pinpoints]
+  );
+  const storesUpToDate =
+    Boolean(storesSentAt) && pinpoints.length > 0 && savedSignature === pinsSignature;
+
+  const sendToCustomer = useCallback(async (): Promise<boolean> => {
+    setIsSaving(true);
+    feedback.dismiss();
+    try {
+      const storesList = pinpoints.map((p) => p.storeName).join(", ");
+      const sanitized = pinpoints
+        .map((p) => ({
+          storeName: p.storeName || "Store",
+          latitude: Number(p.latitude),
+          longitude: Number(p.longitude),
+          // Sending these is what gives the ETA a per-category dwell allowance
+          // instead of the generic default, and what lets the server notice a
+          // rider at the wrong branch. Null for a pin outside the catalogue.
+          placeId: p.placeId ?? null,
+          categoryId: p.categoryId ?? null,
+        }))
+        .filter((p) => !isNaN(p.latitude) && !isNaN(p.longitude));
+
+      // The server re-prices as part of saving pinpoints (distance is now
+      // known) and returns the priced errand in the same response — apply it so
+      // the fee breakdown updates immediately rather than staying on its stale
+      // fetch-on-mount copy.
+      const res = await apiClient.post(`/errands/${orderId}/pinpoints`, {
+        pinpoints: sanitized,
+      });
+      onOrderUpdated(res.data?.errand || res.data);
+
+      // One store-locations card in the chat (2026-10-10): re-sending updates
+      // it where it stands and the customer gets a push; buried under newer
+      // messages it moves to the bottom and the old one is deleted.
+      await postCard(
+        {
+          type: "pinpoints",
+          text: `I've set the store locations for your errand: ${storesList || "stores updated"}. You can see them on the map in your app.`,
+          pinpoints: sanitized,
+        },
+        { updatedNotice: copy.chatCards.storesUpdated }
+      );
+
+      // What actually completes stage 2. Pinning used to, which meant placing
+      // the first of three pins finished the stage and threw the dispatcher
+      // out of the map and into stage 3 mid-task.
+      setStoresSentAt(Date.now());
+      setSentThisSession(true);
+      feedback.showSuccess(copy.stage2.sent(customerDisplayName));
+      return true;
+    } catch (err) {
+      console.error("Failed to save store pinpoints:", err);
+      // A 422 is the server refusing a stop it cannot route to (see
+      // storeLocationGuard); a 409 is it refusing to drop a stop the rider has
+      // already filed a receipt against (errandService.savePinpoints). Either
+      // sentence names the store and says why, which is the only useful thing to
+      // show; anything else is a generic fault.
+      const status = (err as any)?.response?.status;
+      const serverMessage = (err as any)?.response?.data?.error;
+      feedback.showError((status === 422 || status === 409) && serverMessage ? serverMessage : copy.stage2.failed);
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [pinpoints, orderId, onOrderUpdated, postCard, feedback, customerDisplayName]);
+
+  return {
+    pinpoints,
+    maxPinpoints,
+    mapRef,
+    mapInstance,
+    customerMarkerRef,
+    mapUnavailable,
+    mapsStatus,
+    scriptLoaded,
+    isSaving,
+    feedback,
+    searchInput,
+    setSearchInput,
+    isSearching,
+    searchResults,
+    clearResults: () => setSearchResults([]),
+    search,
+    selectResult,
+    hoverResult,
+    removePin,
+    setPinCategory,
+    focusPin,
+    sendToCustomer,
+    storesSentAt,
+    sentThisSession,
+    storesUpToDate,
+    quote,
+    quoteStatus,
+    quoteError,
+    retryQuote,
+    pendingDuplicate,
+    confirmPendingDuplicate,
+    dismissPendingDuplicate,
+    blockedPin,
+    dismissBlockedPin,
+    isCheckingLocation,
+    addPredictedStores,
+  };
+}

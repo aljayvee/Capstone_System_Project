@@ -4,11 +4,14 @@ This file contains the unified rules and instructions for Claude App / Claude De
 
 ---
 
-## 🌐 Dual-Agent Tunnel Invariant (Always Active in All Sessions)
-1. **Boot-Time Handshake Check (Step 0)**: In every session, ALWAYS inspect `AGENT_HANDSHAKE.md` in this repository root before proposing or writing code.
-2. **Locked Contract Invariant**: NEVER refactor, rename, or remove any function, database model, or interface marked `[LOCKED]` in `AGENT_HANDSHAKE.md`.
-3. **Surgical Diffs**: Always generate precise, minimal deltas without removing existing comments, defensive checks, or adjacent logic.
-4. **Handoff Directives**: When designing new features or plans, format your output so the user can easily paste it into `AGENT_HANDSHAKE.md` for Antigravity execution.
+## 🌐 Tri-Agent Distributed Peer Tunnel (Claude Code ◄► OpenAI Codex ◄► Antigravity)
+1. **Boot-Time Handshake Check (Step 0)**: In every session, ALWAYS inspect `AGENT_HANDSHAKE.md` in this repository root before proposing or writing code. Identify the active mission, locked contracts, and previous driver logs.
+2. **Distributed Peer Ownership**: You are an autonomous full-stack peer. You have full authority to architect, write surgical deltas, refactor, and verify code across Web, Server, and Mobile workspaces.
+3. **Locked Contract Invariant**: NEVER refactor, rename, or remove any function, database model, or interface marked `[LOCKED]` in `AGENT_HANDSHAKE.md`.
+4. **Universal "CARE" Code-Hygiene Invariant**:
+   - **Phase 1 (Make It Work)**: Apply surgical, minimal deltas without removing existing comments or error handling. Never overwrite full files.
+   - **Phase 2 (Make It Right / Clean-Up)**: Prune dead imports, unreferenced variables, and console logs. Validate non-happy-path bounds and verify with `npx tsc --noEmit`.
+5. **Session Handoff & Peer Review**: Update `AGENT_HANDSHAKE.md` with modified file paths, `tsc` verification results, and concise notes for whichever peer agent (Codex or Antigravity) drives next.
 
 ---
 

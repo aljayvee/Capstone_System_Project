@@ -1,0 +1,128 @@
+/* Shared layout only: the portal palettes and Owner appearance still own color. */
+[data-portal="owner"],
+[data-portal="dispatch"] {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.portal-main {
+  --portal-gutter: 0.75rem;
+  padding-bottom: max(var(--portal-gutter), env(safe-area-inset-bottom, 0px));
+}
+
+.portal-mobile-drawer [data-sidebar="trigger"],
+.portal-mobile-drawer [data-sidebar="rail"] {
+  display: none;
+}
+
+.portal-mobile-drawer {
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+@media (width >= 640px) {
+  .portal-main { --portal-gutter: 1rem; }
+}
+
+@media (width >= 1024px) {
+  .portal-main { --portal-gutter: 1.25rem; }
+}
+
+@media (width < 768px) {
+  :is([data-surface="owner"], [data-surface="dispatch"]) :is(button, [role="tab"], select) {
+    min-height: 44px;
+  }
+
+  /* The bell has its own stable 40px geometry shared by all page headers. */
+  :is([data-surface="owner"], [data-surface="dispatch"]) [data-bell] {
+    min-height: 40px;
+  }
+
+  :is([data-surface="owner"], [data-surface="dispatch"]) :is(input, textarea, select) {
+    font-size: 16px;
+    max-width: 100%;
+  }
+
+  :is([data-surface="owner"], [data-surface="dispatch"]) [data-slot="dialog-popup"] {
+    max-height: calc(100dvh - 2rem);
+    padding: 1rem;
+  }
+
+  [data-owner-header] h1 {
+    font-size: var(--text-panel);
+  }
+
+  [data-dispatcher-filter-toolbar] > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .kuya-header {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-mobile-drawer {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Short landscape screens need a content viewport even with pinned controls. */
+@media (width < 1024px) and (height < 500px) and (orientation: landscape) {
+  [data-mobile-header] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .portal-main {
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .owner-tracking-summary-enter {
+    display: none;
+  }
+
+  .owner-users-header-enter [data-owner-header] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    row-gap: 0;
+  }
+
+  .owner-users-header-enter [data-owner-header] > :nth-child(2):not(:last-child) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .owner-users-header-enter [data-owner-header] > :last-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .owner-users-header-enter [data-owner-header] > :last-child > .hidden {
+    display: none;
+  }
+
+  .owner-users-controls-enter > div {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .owner-users-controls-enter > div > :first-child {
+    flex: 0 1 40%;
+    width: auto;
+    min-width: 12rem;
+  }
+
+  .owner-users-controls-enter > div > :last-child {
+    flex: 1 1 0%;
+    min-width: 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .owner-users-controls-enter > div > :last-child > * {
+    flex-shrink: 0;
+  }
+}

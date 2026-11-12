@@ -71,6 +71,14 @@ interface LiveFleetMapProps {
   /** Delivery destination for the selected errand. */
   routeDestination?: { latitude: number; longitude: number } | null;
   /**
+   * ADDITIVE, 2026-11-10: the line the selected rider's own app is following
+   * (useRiderActiveRoute `liveLine`), to their next store or the door. Given,
+   * it is THE route drawn, and `routeGeometry` (the route the fare was priced
+   * on) stays underneath, faint, so a rider who has left it is plain to see.
+   * Omitted, the map is unchanged.
+   */
+  liveRoute?: { coordinates: Array<{ latitude: number; longitude: number }> } | null;
+  /**
    * ADDITIVE, 2026-09-23: state of the Socket.IO position feed, from
    * useRiderFleetPresence. When it is down the pill says the map is
    * reconnecting, since pins may then be moving on RTDB alone or not at all.
@@ -196,6 +204,7 @@ export default function LiveFleetMap({
   routeGeometry = null,
   routeStops = [],
   routeDestination = null,
+  liveRoute = null,
   liveLink,
 }: LiveFleetMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -209,6 +218,7 @@ export default function LiveFleetMap({
   }>({});
   const routePolylineRef = useRef<google.maps.Polyline | null>(null);
   const routeCasingRef = useRef<google.maps.Polyline | null>(null);
+  const plannedRouteRef = useRef<google.maps.Polyline | null>(null);
   const routeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const routeCirclesRef = useRef<google.maps.Circle[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -232,6 +242,8 @@ export default function LiveFleetMap({
     routePolylineRef.current = null;
     routeCasingRef.current?.setMap(null);
     routeCasingRef.current = null;
+    plannedRouteRef.current?.setMap(null);
+    plannedRouteRef.current = null;
     routeMarkersRef.current.forEach((marker) => {
       marker.map = null;
     });
@@ -239,10 +251,30 @@ export default function LiveFleetMap({
     routeCirclesRef.current.forEach((circle) => circle.setMap(null));
     routeCirclesRef.current = [];
 
-    if (!routeGeometry) return;
+    const livePath =
+      liveRoute && liveRoute.coordinates.length > 1
+        ? liveRoute.coordinates.map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude) }))
+        : null;
+    const plannedPath = routeGeometry ? decodePolyline(routeGeometry) : [];
+    if (!livePath && !routeGeometry) return;
 
-    const path = decodePolyline(routeGeometry);
+    const path = livePath ?? plannedPath;
     if (path.length < 2) return;
+
+    // The planned route, faint, under the rider's live line. Where the two
+    // part, the rider has taken another road.
+    if (livePath && plannedPath.length > 1) {
+      plannedRouteRef.current = new g.maps.Polyline({
+        path: plannedPath,
+        map: mapInstance.current,
+        geodesic: false,
+        clickable: false,
+        strokeColor: "#64748B",
+        strokeOpacity: 0.45,
+        strokeWeight: 3,
+        zIndex: 0,
+      });
+    }
 
     // Drawn like a road: a light casing under a solid line, both flat (not
     // geodesic) so the path follows the stored road geometry point for point.
@@ -337,7 +369,7 @@ export default function LiveFleetMap({
         })
       );
     }
-  }, [isMapLoaded, routeGeometry, routeStops, routeDestination]);
+  }, [isMapLoaded, routeGeometry, routeStops, routeDestination, liveRoute]);
 
   // Filter riders based on visibility criteria
   const visibleRiders = riders.filter((r) => {
@@ -549,7 +581,7 @@ export default function LiveFleetMap({
             className="flex flex-col items-center gap-2.5 rounded-plate border border-edge bg-board-plate p-6"
             aria-busy="true"
           >
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-board-field border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-field-ink border-t-transparent"></div>
             <p className="text-label text-ink">Loading Live Fleet Map...</p>
           </div>
         </div>
@@ -577,7 +609,7 @@ export default function LiveFleetMap({
             className={cn(
               "h-9 px-3.5 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border transition-all flex items-center gap-1.5 cursor-pointer shadow-sm",
               hideOffline
-                ? "bg-board-field text-board-plate border-board-field"
+                ? "bg-board-field text-white border-field-ink"
                 : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-slate-900 hover:border-slate-300"
             )}
           >

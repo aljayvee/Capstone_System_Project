@@ -42,6 +42,7 @@ export const FinancialReportsModule: React.FC<FinancialReportsModuleProps> = ({
   return (
     <OwnerPanelShell
       title="Reports & Analytics"
+      className="owner-reports-enter"
       controls={
         <OwnerTabs
           label="Report type"
@@ -64,6 +65,8 @@ export const FinancialReportsModule: React.FC<FinancialReportsModuleProps> = ({
           strip above was a plain div of six buttons with no tab semantics at
           all, so this is the first time the relationship is expressed. */}
       <div
+        key={activeTab}
+        className="owner-report-enter"
         role="tabpanel"
         id={`reports-panel-${activeTab}`}
         aria-labelledby={`reports-tab-${activeTab}`}

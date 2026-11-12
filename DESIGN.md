@@ -1,7 +1,11 @@
 # The Route Board
 
-The design system of this application's operator surfaces. It ships in **two
-skins on one system**:
+The design system of this application's operator surfaces. The user's
+2026-10-18 instruction unifies **Owner, Dispatcher and System Admin on one
+soft-white, navy and red palette** in `src/styles/portal-palette.css`.
+Historical skin descriptions below are superseded for color values.
+
+The original system shipped in two skins:
 
 | Skin | Surface | Root attribute | Where its colour lives |
 |---|---|---|---|
@@ -833,3 +837,26 @@ Screenshots of the reviewed state are in `.impeccable/review/`, with their own
 caveats recorded in `HANDOFF.md` — including that Chrome's headless window
 clamps to a 500px minimum on this machine, so the 390px case is measured
 numerically rather than photographed.
+
+## Order Chat workspace amendment (2026-10-18)
+
+The user rolled back the recent Order Chat redesign. Restore the prior
+three-stage layout: a vertical stage rail on desktop, compact mobile stepper,
+stage cards, stacked map/store/fee controls, and the original stage scrolling.
+The later delivery-cost relocation is rolled back with that redesign.
+
+Dashboard, sidebar, and Dispatcher Management refinements remain in place,
+including the soft-white Dispatcher palette. The earlier flat-workspace
+screenshots in scratch are historical previews and no longer describe the
+current Order Chat interface.
+
+## Shared portal palette (2026-10-18)
+
+Owner, Dispatcher and System Admin use the same scoped values from
+`src/styles/portal-palette.css`: soft-white canvas #F6F8FB, white plates,
+navy #1E3A5F, navy rails #0F2035, red #DC2626, and the same status pairs.
+Owner and Dispatcher keep their existing layouts. System Admin's former
+dark surface utilities now use these semantic tokens, including login,
+profile setup, verification, session warning, settings, and operational tabs.
+Shared mobile web navigation follows the same palette. User-configurable
+telemetry series colors remain data settings rather than interface colors.

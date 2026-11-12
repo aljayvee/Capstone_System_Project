@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { apiClient } from "../../../../../services/apiClient";
 import { formatErrandId } from "../../../../../utils/formatErrandId";
 import { copy } from "../copy";
+import { useOptionalPermissions } from "../../../../../context/PermissionsContext";
 
 interface UseRiderDispatchArgs {
   orderId: string;
@@ -18,8 +19,15 @@ export function useRiderDispatch({
   onDispatched,
 }: UseRiderDispatchArgs) {
   const [isAssigning, setIsAssigning] = useState(false);
+  // The server refuses it too; this says why before the round trip.
+  const permissions = useOptionalPermissions();
+  const canAssign = !permissions || permissions.can("errands.assign");
 
   const sendRider = useCallback(async () => {
+    if (!canAssign) {
+      toast.error("Your access group does not include assigning riders. The Main Owner can change it.");
+      return;
+    }
     setIsAssigning(true);
     try {
       const res = await apiClient.post(`/errands/${orderId}/assign-rider`, {});
@@ -60,7 +68,7 @@ export function useRiderDispatch({
     } finally {
       setIsAssigning(false);
     }
-  }, [orderId, pushMessage, onRefreshOrders, onDispatched]);
+  }, [orderId, pushMessage, onRefreshOrders, onDispatched, canAssign]);
 
   return { isAssigning, sendRider };
 }

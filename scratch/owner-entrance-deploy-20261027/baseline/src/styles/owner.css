@@ -1,0 +1,77 @@
+/* Owner flat-surface rules. Shared colors live in portal-palette.css. */
+/* ── The zero-elevation rule, enforced rather than asserted ─────────────────
+
+   This portal is a declared flat surface, and the comment above says it
+   spends no elevation at all. That was an assertion about call sites rather
+   than a property of the stylesheet, and the difference matters: the shared
+   card primitive `DispatcherCard` bakes `shadow-plate` into its class list
+   and `PanelShell` puts `shadow-field` on its header figure. Both are
+   legitimate in the dispatcher, where that single step is reviewed, so
+   neither can be edited.
+
+   Measured before writing this: no Owner file imports DispatcherCard today,
+   and no Owner screen passes a `figure`, so neither shadow currently renders
+   here. This rule is therefore a GUARD, not a repair. It exists because
+   DispatcherCard is the shared card primitive and adopting it is the obvious
+   next refactor for this portal - at which point every white plate on the
+   surface would quietly acquire a drop shadow and contradict the invariant
+   with nothing failing. A finish reviewer read the primitive and concluded
+   exactly that had already happened, which is a fair reading of the code and
+   a good reason to make the stylesheet say what the portal means.
+
+   `shadow-plate` does not compile to `var(--shadow-plate)` - Tailwind emits
+   `--tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, #0f20350f)` - so the skin
+   cannot retire it by redefining a token the way it redefines the other
+   eight. It CAN set the same variable Tailwind composes from, which is what
+   `shadow-none` itself does. Rings and inset rings compose separately and are
+   untouched, so a focus ring still lands. Verified in the browser: the
+   dispatcher keeps its inset highlight, this surface reports none. */
+[data-surface="owner"] .shadow-plate,
+[data-surface="owner"] .shadow-field {
+  --tw-shadow: 0 0 #0000;
+}
+
+/* Elevation survives here in exactly three places, none of them structure:
+   the notification popover, and the two controls plus the name tag that float
+   over map imagery, where a white control on pale tiles needs one step to
+   stay findable. They opt in with data-elevate so the intent is legible in
+   the markup instead of inferred from a class. */
+[data-surface="owner"] [data-elevate].shadow-plate {
+  --tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, #0f20350f);
+}
+
+/* Run on screen or report-tab mount; data refreshes keep sections mounted.
+   Backwards fill releases transforms after entry so popovers stay anchored. */
+@keyframes owner-screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-surface="owner"] .owner-dashboard-enter > :first-child,
+  [data-surface="owner"] .owner-dashboard-sections > *,
+  [data-surface="owner"] .owner-reports-enter > :first-child > *,
+  [data-surface="owner"] .owner-report-enter {
+    animation: owner-screen-enter 320ms var(--ease-board, ease-out) backwards;
+  }
+
+  [data-surface="owner"] .owner-dashboard-sections > :nth-child(1),
+  [data-surface="owner"] .owner-reports-enter > :first-child > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  [data-surface="owner"] .owner-dashboard-sections > :nth-child(2),
+  [data-surface="owner"] .owner-report-enter {
+    animation-delay: 90ms;
+  }
+
+  [data-surface="owner"] .owner-dashboard-sections > :nth-child(3) {
+    animation-delay: 140ms;
+  }
+}

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../../../../../services/apiClient";
 import { apiService, type ApiMerchantCategory } from "../../../../../services/apiService";
+import { ArchivedPlacesSkeleton } from "../../../components/OwnerSkeletons";
 
 export interface ArchivedPlace {
   id: string;
@@ -272,10 +273,7 @@ export const ArchiveTab: React.FC<ArchiveTabProps> = ({
             </div>
 
             {isLoadingPlaces ? (
-              <p className="flex items-center gap-2 text-label text-ink-muted px-4 py-4 m-0">
-                <Loader2 size={14} className="animate-spin" />
-                Loading retired stores...
-              </p>
+              <ArchivedPlacesSkeleton />
             ) : placesError ? (
               <p
                 role="alert"

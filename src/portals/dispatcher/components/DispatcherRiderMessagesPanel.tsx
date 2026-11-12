@@ -5,6 +5,7 @@ import { apiClient } from "../../../services/apiClient";
 import { formatErrandId } from "../../../utils/formatErrandId";
 import { cn } from "@/lib/utils";
 import {
+  ArrowLeft,
   Send,
   MessageCircle,
   Bike,
@@ -38,6 +39,9 @@ export interface DispatcherRiderMessagesPanelProps {
   riders: any[];
   dispatcher: any;
   selectedRiderId?: string | null;
+  /** Reopens a conversation when a notification targets the already selected rider. */
+  openRequest?: number;
+  onConversationVisibleChange?: (visible: boolean) => void;
   onSelectRiderId?: (riderId: string) => void;
   unreadCounts?: Record<string, number>;
 }
@@ -63,10 +67,19 @@ export function DispatcherRiderMessagesPanel({
   riders,
   dispatcher,
   selectedRiderId: controlledSelectedRiderId,
+  openRequest = 0,
+  onConversationVisibleChange,
   onSelectRiderId,
   unreadCounts = {},
 }: DispatcherRiderMessagesPanelProps) {
   const [search, setSearch] = useState("");
+  const [showConversation, setShowConversation] = useState(Boolean(controlledSelectedRiderId));
+  useEffect(() => {
+    onConversationVisibleChange?.(showConversation);
+  }, [showConversation, onConversationVisibleChange]);
+  useEffect(() => {
+    if (controlledSelectedRiderId) setShowConversation(true);
+  }, [controlledSelectedRiderId, openRequest]);
   const [internalSelectedRiderId, setInternalSelectedRiderId] = useState<string | null>(null);
   const [messages, setMessages] = useState<RiderChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
@@ -77,7 +90,8 @@ export function DispatcherRiderMessagesPanel({
   const [chatMetaMap, setChatMetaMap] = useState<Record<string, any>>({});
   const [copiedErrandId, setCopiedErrandId] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conversationBodyRef = useRef<HTMLDivElement>(null);
+  const messagesListRef = useRef<HTMLDivElement>(null);
   // Shared thread or this dispatcher's own threads: see riderChat.ts.
   const chatMode = useRiderChatMode();
   const dispatcherId = dispatcher?.id;
@@ -86,7 +100,8 @@ export function DispatcherRiderMessagesPanel({
     ? controlledSelectedRiderId
     : internalSelectedRiderId;
 
-  const handleSelectRider = (id: string) => {
+  const handleSelectRider = (id: string, openConversation = true) => {
+    if (openConversation) setShowConversation(true);
     if (onSelectRiderId) {
       onSelectRiderId(id);
     } else {
@@ -186,11 +201,12 @@ export function DispatcherRiderMessagesPanel({
       });
   }, [consolidatedRiders, filterTab, search, chatMetaMap, unreadCounts, riderActiveErrandsMap]);
 
-  // Auto-select first rider if current selection invalid
+  // Desktop can preview the first rider; narrow screens start with the list.
   useEffect(() => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) return;
     if (filteredRiders.length > 0) {
       if (!selectedRiderId || !filteredRiders.some((r) => r.id === selectedRiderId)) {
-        handleSelectRider(filteredRiders[0].id);
+        handleSelectRider(filteredRiders[0].id, false);
       }
     }
   }, [filteredRiders, selectedRiderId]);
@@ -233,7 +249,11 @@ export function DispatcherRiderMessagesPanel({
 
   // Auto-scroll on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messages.length) return;
+    const scroller = window.matchMedia("(min-width: 1024px)").matches
+      ? messagesListRef.current
+      : conversationBodyRef.current;
+    scroller?.scrollTo({ top: scroller.scrollHeight, behavior: "auto" });
   }, [messages]);
 
   const handleSendMessage = async () => {
@@ -284,16 +304,15 @@ export function DispatcherRiderMessagesPanel({
   const currentStepIdx = currentErrand ? stepIndexForStatus(currentErrand.status) : 0;
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden rounded-plate border border-edge bg-board-plate">
+    <div data-rider-messages className="flex h-full min-h-0 min-w-0 overflow-hidden rounded-plate border border-edge bg-board-plate">
       {/* ───────────────────────────────────────────────────────────── */}
       {/* LEFT COLUMN: RIDER CONVERSATION LIST (35% Width)              */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex w-full shrink-0 flex-col border-hairline bg-board-ground sm:w-[320px] sm:border-r lg:w-[360px]">
+      <div data-rider-list className={cn("min-h-0 min-w-0 w-full shrink-0 flex-col border-hairline bg-board-ground lg:flex lg:w-[320px] lg:border-r xl:w-[360px]", showConversation ? "hidden" : "flex")}>
         {/* Panel Header */}
         <div className="border-b border-hairline bg-board-plate p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="text-panel font-bold text-ink">Rider Messages</h2>
-            <span data-figure className="font-mono text-label font-bold tabular-nums text-ink-muted">
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <span data-figure aria-label={`${filteredRiders.length} riders`} className="font-mono text-label font-bold tabular-nums text-ink-muted">
               {filteredRiders.length}
             </span>
           </div>
@@ -478,11 +497,13 @@ export function DispatcherRiderMessagesPanel({
       {/* ───────────────────────────────────────────────────────────── */}
       {/* RIGHT COLUMN: MESSENGER CHAT & ERRAND BREADCRUMBS (65% Width) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col bg-board-plate">
+      <div data-rider-conversation className={cn("min-h-0 min-w-0 flex-1 flex-col bg-board-plate lg:flex", showConversation ? "flex" : "hidden")}>
+        <button type="button" onClick={() => setShowConversation(false)} className="flex min-h-11 shrink-0 items-center gap-2 border-b border-hairline px-3 text-label text-ink lg:hidden"><ArrowLeft size={18} />Back to conversations</button>
         {activeRider ? (
           <>
+            <div ref={conversationBodyRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:flex lg:flex-col lg:overflow-hidden">
             {/* 1. Rider Header with Task Summary & Breadcrumbs */}
-            <div className="flex flex-col border-b border-hairline bg-board-plate px-4 py-3 gap-2.5">
+            <div className="flex min-w-0 shrink-0 flex-col border-b border-hairline bg-board-plate px-4 py-3 gap-2.5">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="relative">
@@ -503,7 +524,7 @@ export function DispatcherRiderMessagesPanel({
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h3 className="truncate text-panel font-bold text-ink">{activeRider.name}</h3>
                       <span className="inline-flex items-center px-2 py-0.5 rounded-trim text-micro font-bold uppercase tracking-[0.06em] bg-board-ground text-ink border border-edge">
                         {activeRider.online ? "On Duty" : "Offline"}
@@ -530,7 +551,7 @@ export function DispatcherRiderMessagesPanel({
                         type="button"
                         onClick={() => setSelectedErrandIndex(idx)}
                         className={cn(
-                          "px-2.5 py-1 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] cursor-pointer transition-colors border",
+                          "max-w-40 shrink-0 truncate whitespace-nowrap px-2.5 py-1 rounded-trim text-micro font-semibold uppercase tracking-[0.06em] cursor-pointer transition-colors border",
                           selectedErrandIndex === idx
                             ? "border-signal bg-signal text-white shadow-sm"
                             : "border-edge bg-board-ground text-ink hover:border-board-trim hover:bg-board-plate"
@@ -620,7 +641,7 @@ export function DispatcherRiderMessagesPanel({
             </div>
 
             {/* 3. Messages Scroll Area */}
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-board-ground p-4">
+            <div ref={messagesListRef} className="space-y-4 bg-board-ground p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
               {messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
                   <div className="grid size-12 place-items-center rounded-plate bg-board-plate text-ink-muted border border-edge shadow-sm">
@@ -704,11 +725,11 @@ export function DispatcherRiderMessagesPanel({
                   );
                 })
               )}
-              <div ref={messagesEndRef} />
+            </div>
             </div>
 
             {/* 4. Input Composer Bar */}
-            <div className="border-t border-hairline bg-board-plate p-3">
+            <div className="shrink-0 border-t border-hairline bg-board-plate p-3">
               {sendError && (
                 <p
                   role="alert"
@@ -725,7 +746,7 @@ export function DispatcherRiderMessagesPanel({
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   aria-label={`Message ${activeRider.name}`}
-                  className="min-h-10 flex-1 rounded-trim border border-edge bg-board-ground px-3 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
+                  className="min-h-11 min-w-0 flex-1 rounded-trim border border-edge bg-board-ground px-3 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate"
                 />
                 <button
                   type="button"

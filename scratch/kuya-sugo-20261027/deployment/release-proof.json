@@ -1,0 +1,8 @@
+{
+  "baselineAssets": 123,
+  "releaseFiles": 124,
+  "expectedLiveIndexHash": "8d1e7d4311bc75c4d33a224482b947d8983f5c4ffac2c3cb0dbb4259b96474e9",
+  "previousEntry": "/assets/index-5uhMwtBU.js",
+  "releaseEntry": "/assets/index-ruN_qe89.js",
+  "scope": "Only Kuya Sugo redesign; baseline rebuild restores original three Kuya files and omits four new character/UI/CSS files. All other source and public files match the previous release source with its already-deployed rates animation."
+}

@@ -111,6 +111,7 @@ export interface SysAdminTranslations {
   auditTabModifications: string;
   auditTabThreats: string;
   auditTabLifecycle: string;
+  auditTabReportPrints: string;
 
   trafficHeaderTitle: string;
   trafficHeaderSubtitle: string;
@@ -236,6 +237,7 @@ export const SYSADMIN_TRANSLATIONS: Record<SysAdminLanguage, SysAdminTranslation
     auditTabModifications: "账户配置与状态变更",
     auditTabThreats: "安全威胁与入侵事件",
     auditTabLifecycle: "系统生命周期",
+    auditTabReportPrints: "报表打印记录",
 
     trafficHeaderTitle: "Web 访问流量与网络态势监控",
     trafficHeaderSubtitle: "实时监测 Nginx 反向代理层访问吞吐、地理分布、IP 频次与协议状态",
@@ -359,6 +361,7 @@ export const SYSADMIN_TRANSLATIONS: Record<SysAdminLanguage, SysAdminTranslation
     auditTabModifications: "Account Modifications",
     auditTabThreats: "Security Threats",
     auditTabLifecycle: "System Lifecycle",
+    auditTabReportPrints: "Report Prints",
 
     trafficHeaderTitle: "Web Traffic Analytics & Threat Monitoring",
     trafficHeaderSubtitle: "Real-time visibility into Nginx requests, geolocations, IP frequencies, and response codes",

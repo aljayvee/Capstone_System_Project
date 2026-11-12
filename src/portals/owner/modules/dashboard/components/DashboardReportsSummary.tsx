@@ -148,7 +148,7 @@ export const DashboardReportsSummary: React.FC<DashboardReportsSummaryProps> = (
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pl-11 sm:pl-0">
               <div className="text-right">
-                <div className="font-mono text-base font-bold text-board-field tabular-nums">
+                <div className="font-mono text-base font-bold text-field-ink tabular-nums">
                   {metrics.commission ? formatPeso(metrics.commission.businessShare) : placeholder}
                 </div>
                 <div className="text-[11px] text-ink-muted">Sugo's share</div>

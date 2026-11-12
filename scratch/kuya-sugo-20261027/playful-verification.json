@@ -1,0 +1,47 @@
+[
+  {
+    "pose": "walk",
+    "box": "matrix(1, 0, 0, 1, -11.1246, -0.5623)",
+    "heldDisplay": "none",
+    "line": [
+      "Coming through!"
+    ],
+    "looseDisplay": "block"
+  },
+  {
+    "pose": "trip",
+    "box": "matrix(0.934771, -0.35525, 0.35525, 0.934771, 7.45717, -0.659358)",
+    "heldDisplay": "none",
+    "line": [
+      "Ay! My feet!"
+    ],
+    "looseDisplay": "block"
+  },
+  {
+    "pose": "drop",
+    "box": "matrix(0.983762, -0.179479, 0.179479, 0.983762, -22, 17.5091)",
+    "heldDisplay": "none",
+    "line": [
+      "Oops! My box!"
+    ],
+    "looseDisplay": "block"
+  },
+  {
+    "pose": "pickup",
+    "box": "matrix(0.993366, -0.114997, 0.114997, 0.993366, -12.8578, 10.9052)",
+    "heldDisplay": "none",
+    "line": [
+      "Got it, Boss!"
+    ],
+    "looseDisplay": "block"
+  },
+  {
+    "pose": "okay",
+    "box": "matrix(1, 0, 0, 1, -0.486275, -2)",
+    "heldDisplay": "none",
+    "line": [
+      "I'm okay, Boss!"
+    ],
+    "looseDisplay": "block"
+  }
+]

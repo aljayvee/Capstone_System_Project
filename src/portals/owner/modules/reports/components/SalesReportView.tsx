@@ -32,6 +32,10 @@ export const SalesReportView: React.FC = () => {
   const { data, isLoading, error, reload } = useReport(apiService.getSalesReport, apiRange);
   const printer = useReportPrint("sales", apiRange);
 
+  // No Tips column, on purpose: the business takes no tips. The server leaves
+  // `tip` out of Total sales too (reportService salesValue), so each row is
+  // items plus delivery fee and still adds up without the column.
+
   // Retained and still wired, though the button that calls it is hidden — see
   // SHOW_CSV_EXPORT in ReportPeriodToolbar.
   const handleExportCSV = () => {
@@ -43,7 +47,6 @@ export const SalesReportView: React.FC = () => {
         "Errands",
         "Items Cost (PHP)",
         "Service Fees (PHP)",
-        "Tips (PHP)",
         "Total Sales (PHP)",
       ],
       data.byCategory.map((c) => [
@@ -51,7 +54,6 @@ export const SalesReportView: React.FC = () => {
         c.orderCount,
         c.itemCost,
         c.deliveryFee,
-        c.tip,
         c.revenue,
       ]),
     );
@@ -100,7 +102,6 @@ export const SalesReportView: React.FC = () => {
               { header: "Errands", format: "count", value: (t) => t.orderCount },
               { header: "Items Cost", format: "money", value: (t) => t.itemCost },
               { header: "Service fees", format: "money", value: (t) => t.deliveryFee },
-              { header: "Tips", format: "money", value: (t) => t.tip },
               { header: "Total sales", format: "money", value: (t) => t.revenue, primary: true },
             ]}
           />
@@ -162,9 +163,6 @@ export const SalesReportView: React.FC = () => {
                               Service fees
                             </th>
                             <th scope="col" className="text-right px-5 py-2 font-semibold">
-                              Tips
-                            </th>
-                            <th scope="col" className="text-right px-5 py-2 font-semibold">
                               Total sales
                             </th>
                           </tr>
@@ -192,9 +190,6 @@ export const SalesReportView: React.FC = () => {
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                                 {formatPeso(c.deliveryFee)}
                               </td>
-                              <td className="px-5 py-2.5 text-right font-mono tabular-nums">
-                                {formatPeso(c.tip)}
-                              </td>
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold">
                                 {formatPeso(c.revenue)}
                               </td>
@@ -205,7 +200,7 @@ export const SalesReportView: React.FC = () => {
                             <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                               {data.totalOrders}
                             </td>
-                            <td colSpan={3} />
+                            <td colSpan={2} />
                             <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                               {formatPeso(data.totalRevenue)}
                             </td>
@@ -255,10 +250,6 @@ export const SalesReportView: React.FC = () => {
                           <span className="text-ink-muted">Service fees</span>
                           <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.deliveryFee)}</span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Tips</span>
-                          <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.tip)}</span>
-                        </div>
                       </div>
                     )}
                     inspectorTitle={(c) => c.category}
@@ -283,7 +274,6 @@ export const SalesReportView: React.FC = () => {
                         items: [
                           { label: "Items Cost", value: formatPeso(c.itemCost) },
                           { label: "Service fees", value: formatPeso(c.deliveryFee) },
-                          { label: "Tips", value: formatPeso(c.tip) },
                         ],
                       },
                     ]}

@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ReportState } from "./ReportState";
-import { Wallet, Banknote, HandCoins, TrendingDown, TrendingUp } from "lucide-react";
+import { Wallet, Banknote, HandCoins, TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { ReportNotes } from "./ReportNotes";
 import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
 import { useReportPrint } from "../../../hooks/useReportPrint";
@@ -21,7 +20,9 @@ type CashPoint = NonNullable<ApiSettlementReport["timelineBreakdown"]>[number];
 
 /** MATCHED -> Matched: the handover result, in words. */
 const plainStatus = (status: string) =>
-  status.charAt(0).toUpperCase() + status.slice(1).toLowerCase().replace(/_/g, " ");
+  /^[A-Z_]+$/.test(status)
+    ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase().replace(/_/g, " ")
+    : status;
 
 const shortDay = (iso: string) =>
   new Date(iso).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" });
@@ -29,11 +30,11 @@ const shortDay = (iso: string) =>
 /**
  * What became of a short since the handover, in the printout's words:
  * "Rider paid back ₱25.00 (Oct 22, Rose Santos)". Empty for a handover that
- * was not short; the handover's own figures never change.
+ * was not short and has no repayment; the handover's own figures never change.
  */
 function whatHappenedSince(l: ApiSettlementLine): string {
-  if (!l.short || l.short <= 0) return "";
   const followUps = l.followUps ?? [];
+  if ((!l.short || l.short <= 0) && followUps.length === 0) return "";
   if (followUps.length === 0) return "Not paid yet";
   return followUps
     .map((u) => {
@@ -70,22 +71,22 @@ export const SettlementReportView: React.FC = () => {
       `Sugo_Settlement_Report_${who}${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
         "Rider",
-        "Cash Handovers",
-        "Should Collect (PHP)",
+        "Cash Turn-over",
+        "Expected to Collect (PHP)",
         "Collected (PHP)",
-        "Short or Over (PHP)",
-        "Times Short",
+        "Short (PHP)",
+        "Over (PHP)",
         "Paid Back Later (PHP)",
         "Written Off (PHP)",
-        "Still Owed Today (PHP)",
+        "Unremitted (PHP)",
       ],
       data.cash.byRider.map((r) => [
         r.riderName ?? `Rider ${r.riderId}`,
         r.settlementCount,
         r.expected,
         r.collected,
-        r.variance,
-        r.shortageCount,
+        r.short ?? 0,
+        r.over ?? 0,
         r.paidBackLater ?? 0,
         r.writtenOff ?? 0,
         r.stillOwed ?? 0,
@@ -102,7 +103,9 @@ export const SettlementReportView: React.FC = () => {
   const shortTotal =
     data?.cash.shortTotal ?? lines.reduce((s, l) => s + Math.max(0, -l.variance), 0);
   const overTotal = data?.cash.overTotal ?? lines.reduce((s, l) => s + Math.max(0, l.variance), 0);
-  const overCount = data?.cash.overCount ?? lines.filter((l) => l.variance > 0).length;
+  // One turn-over's short and over, apart (owner, 2026-10-27).
+  const lineShort = (l: ApiSettlementLine) => l.short ?? Math.max(0, -l.variance);
+  const lineOver = (l: ApiSettlementLine) => l.over ?? Math.max(0, l.variance);
   const businessPct = 100 - riderPct;
 
   return (
@@ -133,7 +136,7 @@ export const SettlementReportView: React.FC = () => {
           {data.rider && (
             <p className="text-label text-ink-muted" data-testid="settlement-rider">
               <span className="font-semibold text-ink">{data.rider.name}</span>
-              {" · only this rider's orders and cash handovers · "}
+              {" · only this rider's orders and cash turn-overs · "}
               <button
                 type="button"
                 onClick={() => setRiderId(null)}
@@ -177,15 +180,15 @@ export const SettlementReportView: React.FC = () => {
                       to blend cash somebody counted with cash nobody has seen,
                       and nothing on screen said which was which. */}
                   <tr className="border-b border-hairline">
-                    <td className="py-2 pl-8 text-ink-muted">cash handed over and counted</td>
+                    <td className="py-2 pl-8 text-ink-muted">cash collected</td>
                     <td className="py-2 text-right font-mono tabular-nums text-ink-muted">
                       {formatPeso(data.revenue.collectedRevenue ?? 0)}
                     </td>
                   </tr>
                   <tr className="border-b border-hairline">
                     <td className="py-2 pl-4 text-ink-muted">
-                      not handed over yet
-                      {data.revenue.awaitingCount ? ` (${data.revenue.awaitingCount} orders)` : ""}
+                      not collected cash
+                      {data.revenue.awaitingCount ? ` (ongoing errand ${data.revenue.awaitingCount})` : ""}
                     </td>
                     <td
                       className={`py-2 text-right font-mono tabular-nums ${
@@ -198,14 +201,14 @@ export const SettlementReportView: React.FC = () => {
                     </td>
                   </tr>
                   <tr className="border-b border-hairline">
-                    <td className="py-2 text-ink-muted">Delivery fees</td>
+                    <td className="py-2 text-ink-muted">Service fees</td>
                     <td className="py-2 text-right font-semibold font-mono tabular-nums">
                       {formatPeso(data.revenue.totalDeliveryFees)}
                     </td>
                   </tr>
                   <tr className="border-b border-hairline">
                     <td className="py-2 text-ink-muted">
-                      Sugo's share ({businessPct}% of delivery fees)
+                      Sugo's share ({businessPct}% of service fees)
                     </td>
                     {/* Neutral ink. Navy for the business and the DONE green for
                         the rider was colour standing for a party, and green
@@ -216,7 +219,7 @@ export const SettlementReportView: React.FC = () => {
                   </tr>
                   <tr>
                     <td className="py-2 text-ink-muted">
-                      Rider's share ({riderPct}% of delivery fees, plus all tips)
+                      Rider's share ({riderPct}% of service fees, plus all tips)
                     </td>
                     <td className="py-2 text-right font-semibold font-mono tabular-nums text-ink">
                       {formatPeso(data.revenue.riderShare)}
@@ -228,16 +231,10 @@ export const SettlementReportView: React.FC = () => {
           </section>
 
           {/* ── cash, on a different clock, and labelled as such ───────── */}
+          {/* No heading or caption here, and no second line under the tiles
+              (owner, 2026-10-27). */}
           <section className="space-y-3">
-            <header>
-              <h3 className="text-label text-ink">Cash handed over</h3>
-              <p className="text-label text-ink-muted">
-                Counted on the day the rider handed the cash over, so it does not have to match the
-                sales above
-              </p>
-            </header>
-
-            <div className="bg-hairline border border-edge rounded-plate overflow-hidden grid grid-cols-1 gap-px sm:grid-cols-2 xl:grid-cols-5">
+            <div className="bg-hairline border border-edge rounded-plate overflow-hidden grid grid-cols-1 gap-px sm:grid-cols-2 xl:grid-cols-4">
               <div className="bg-board-plate p-5 flex items-start gap-4">
                 <div className="p-2.5 rounded-lg bg-board-ground text-ink-muted shrink-0">
                   <Banknote className="w-5 h-5" />
@@ -247,9 +244,6 @@ export const SettlementReportView: React.FC = () => {
                   <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                     {formatPeso(data.cash.collectedTotal)}
                   </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {data.cash.settlementCount} cash handovers
-                  </div>
                 </div>
               </div>
               <div className="bg-board-plate p-5 flex items-start gap-4">
@@ -257,28 +251,9 @@ export const SettlementReportView: React.FC = () => {
                   <Wallet className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-body text-ink-muted">Should collect</div>
+                  <div className="text-body text-ink-muted">Expected to collect</div>
                   <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
                     {formatPeso(data.cash.expectedTotal)}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    What should have come back
-                  </div>
-                </div>
-              </div>
-              {/* Short and over apart: netted, a ₱60 short and a ₱60 over read
-                  as nothing wrong. */}
-              <div className="bg-board-plate p-5 flex items-start gap-4" data-testid="short-tile">
-                <div className={`p-2.5 rounded-lg shrink-0 ${shortTotal > 0 ? "bg-status-act-fill text-status-act-ink" : "bg-board-ground text-ink-muted"}`}>
-                  <TrendingDown className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-body text-ink-muted">Short</div>
-                  <div className={`text-xl font-bold font-mono mt-1 tabular-nums ${shortTotal > 0 ? "text-status-act-ink" : "text-ink"}`}>
-                    {formatPeso(shortTotal)}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {data.cash.shortageCount} {data.cash.shortageCount === 1 ? "time" : "times"} less cash than expected
                   </div>
                 </div>
               </div>
@@ -291,53 +266,46 @@ export const SettlementReportView: React.FC = () => {
                   <div className="text-xl font-bold font-mono mt-1 tabular-nums text-ink">
                     {formatPeso(overTotal)}
                   </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {overCount} {overCount === 1 ? "time" : "times"} more cash than expected
-                  </div>
                 </div>
               </div>
-              {/* The short as counted stays above. This is what is left of it
-                  today, after money that came in later or was written off. */}
-              <div className="bg-board-plate p-5 flex items-start gap-4 sm:col-span-2 xl:col-span-1" data-testid="still-owed-tile">
+              {/* What is left of shorts today, after money that came in later
+                  or was written off. */}
+              <div className="bg-board-plate p-5 flex items-start gap-4" data-testid="still-owed-tile">
                 <div className={`p-2.5 rounded-lg shrink-0 ${(data.cash.stillOwedTotal ?? 0) > 0 ? "bg-status-act-fill text-status-act-ink" : "bg-board-ground text-ink-muted"}`}>
                   <HandCoins className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-body text-ink-muted">Still owed (today)</div>
+                  <div className="text-body text-ink-muted">Unremitted</div>
                   <div className={`text-xl font-bold font-mono mt-1 tabular-nums ${(data.cash.stillOwedTotal ?? 0) > 0 ? "text-status-act-ink" : "text-ink"}`}>
                     {formatPeso(data.cash.stillOwedTotal ?? 0)}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5">
-                    {formatPeso(data.cash.paidBackLaterTotal ?? 0)} paid back later,{" "}
-                    {formatPeso(data.cash.writtenOffTotal ?? 0)} written off
                   </div>
                 </div>
               </div>
             </div>
 
             <PeriodBreakdownTable<CashPoint>
-              subject="Cash handed over"
+              subject="Cash collected"
               unit={data.breakdownUnit}
               points={data.timelineBreakdown}
               figures={[
-                { header: "Handovers", format: "count", value: (p) => p.settlementCount },
-                { header: "Should collect", format: "money", value: (p) => p.expected },
+                { header: "Cash turn-over", format: "count", value: (p) => p.settlementCount },
+                { header: "Expected to collect", format: "money", value: (p) => p.expected },
                 { header: "Collected", format: "money", value: (p) => p.collected, primary: true },
-                { header: "Short or over", format: "money", value: (p) => p.variance, signed: true },
-                { header: "Times short", format: "count", value: (p) => p.shortageCount },
-                { header: "Still owed", format: "money", value: (p) => p.stillOwed ?? 0 },
+                { header: "Short", format: "money", value: (p) => p.short ?? 0 },
+                { header: "Over", format: "money", value: (p) => p.over ?? 0 },
+                { header: "Unremitted", format: "money", value: (p) => p.stillOwed ?? 0 },
               ]}
             />
 
-            {data.cash.byRider.length === 0 ? (
+            {data.cash.byRider.length === 0 && data.cash.lines.length === 0 ? (
               <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
-                No cash was handed over in these dates.
+                No cash was collected in these dates.
               </div>
             ) : (
               <>
                 <div className="bg-board-plate border border-edge rounded-plate p-6">
                   <div className="text-body font-semibold text-ink mb-4">
-                    Cash by rider: should collect and collected
+                    Cash by rider: expected to collect and collected
                   </div>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={data.cash.byRider}>
@@ -355,7 +323,7 @@ export const SettlementReportView: React.FC = () => {
                       <Legend wrapperStyle={{ paddingTop: "8px", fontSize: "12px" }} />
                       <Bar
                         dataKey="expected"
-                        name="Should collect"
+                        name="Expected to collect"
                         fill="#2563EB"
                         radius={[4, 4, 0, 0]}
                       />
@@ -376,36 +344,30 @@ export const SettlementReportView: React.FC = () => {
                   <MobileResponsiveTable<typeof data.cash.byRider[number]>
                     data={byRiderPagination.paginatedItems}
                     keyExtractor={(r) => String(r.riderId)}
-                    primaryHeader="Rider and handovers"
-                    secondaryHeader="Short or over"
+                    primaryHeader="Rider and cash turn-over"
+                    secondaryHeader="Short and over"
                     renderPrimary={(r) => (
                       <div className="min-w-0">
                         <div className="font-semibold text-ink text-xs truncate">
                           {r.riderName ?? `Rider ${r.riderId}`}
                         </div>
                         <div className="text-[10px] text-ink-muted">
-                          {r.settlementCount} handover{r.settlementCount === 1 ? "" : "s"}
+                          {r.settlementCount} cash turn-over
                         </div>
                       </div>
                     )}
                     renderSecondary={(r) => (
-                      <div className="text-right shrink-0">
-                        <div className={`font-mono text-xs font-semibold tabular-nums ${r.variance < 0 ? "text-status-act-ink" : "text-ink"}`}>
-                          {formatPeso(r.variance)}
+                      <div className="text-right shrink-0 font-mono text-xs tabular-nums">
+                        <div className={(r.short ?? 0) > 0 ? "text-status-act-ink font-semibold" : "text-ink"}>
+                          Short {formatPeso(r.short ?? 0)}
                         </div>
-                        {r.variance < 0 ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded-full text-[10px] uppercase font-bold bg-status-act-fill text-status-act-ink">
-                            Short
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-ink-muted">Balanced</span>
-                        )}
+                        <div className="text-ink-muted">Over {formatPeso(r.over ?? 0)}</div>
                       </div>
                     )}
                     renderPreview={(r) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Should collect</span>
+                          <span className="text-ink-muted">Expected to collect</span>
                           <span className="font-mono text-ink font-medium">{formatPeso(r.expected)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -413,13 +375,7 @@ export const SettlementReportView: React.FC = () => {
                           <span className="font-mono text-ink font-medium">{formatPeso(r.collected)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Times short</span>
-                          <span className={`font-mono font-medium ${r.shortageCount > 0 ? "text-status-act-ink" : "text-ink"}`}>
-                            {r.shortageCount}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Still owed</span>
+                          <span className="text-ink-muted">Unremitted</span>
                           <span className={`font-mono font-medium ${(r.stillOwed ?? 0) > 0 ? "text-status-act-ink" : "text-ink"}`}>
                             {formatPeso(r.stillOwed ?? 0)}
                           </span>
@@ -427,31 +383,31 @@ export const SettlementReportView: React.FC = () => {
                       </div>
                     )}
                     inspectorTitle={(r) => r.riderName ?? `Rider ${r.riderId}`}
-                    inspectorSubtitle={(r) => `${r.settlementCount} cash handovers`}
+                    inspectorSubtitle={(r) => `${r.settlementCount} cash turn-over`}
                     inspectorSections={(r) => [
                       {
                         title: "Rider",
                         items: [
                           { label: "Rider ID", value: `#${r.riderId}` },
                           { label: "Name", value: r.riderName ?? `Rider ${r.riderId}` },
-                          { label: "Cash handovers", value: String(r.settlementCount) },
+                          { label: "Cash turn-over", value: String(r.settlementCount) },
                         ],
                       },
                       {
                         title: "Cash check",
                         items: [
-                          { label: "Should collect", value: formatPeso(r.expected) },
+                          { label: "Expected to collect", value: formatPeso(r.expected) },
                           { label: "Collected", value: formatPeso(r.collected) },
-                          { label: "Short or over", value: formatPeso(r.variance) },
-                          { label: "Times short", value: String(r.shortageCount) },
+                          { label: "Short", value: formatPeso(r.short ?? 0) },
+                          { label: "Over", value: formatPeso(r.over ?? 0) },
                         ],
                       },
                       {
-                        title: "Since the handover",
+                        title: "Since the cash turn-over",
                         items: [
                           { label: "Paid back later", value: formatPeso(r.paidBackLater ?? 0) },
                           { label: "Written off", value: formatPeso(r.writtenOff ?? 0) },
-                          { label: "Still owed (today)", value: formatPeso(r.stillOwed ?? 0) },
+                          { label: "Unremitted", value: formatPeso(r.stillOwed ?? 0) },
                         ],
                       },
                     ]}
@@ -464,19 +420,19 @@ export const SettlementReportView: React.FC = () => {
                                 Rider
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Handovers
+                                Cash turn-over
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Should collect
+                                Expected to collect
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
                                 Collected
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Short or over
+                                Short
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Times short
+                                Over
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
                                 Paid back later
@@ -485,7 +441,7 @@ export const SettlementReportView: React.FC = () => {
                                 Written off
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Still owed
+                                Unremitted
                               </th>
                             </tr>
                           </thead>
@@ -506,13 +462,13 @@ export const SettlementReportView: React.FC = () => {
                                 </td>
                                 <td
                                   className={`px-5 py-2.5 text-right font-mono tabular-nums ${
-                                    r.variance < 0 ? "text-status-act-ink font-semibold" : ""
+                                    (r.short ?? 0) > 0 ? "text-status-act-ink font-semibold" : ""
                                   }`}
                                 >
-                                  {formatPeso(r.variance)}
+                                  {formatPeso(r.short ?? 0)}
                                 </td>
                                 <td className="px-5 py-2.5 text-right font-mono tabular-nums">
-                                  {r.shortageCount}
+                                  {formatPeso(r.over ?? 0)}
                                 </td>
                                 <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                                   {formatPeso(r.paidBackLater ?? 0)}
@@ -541,10 +497,10 @@ export const SettlementReportView: React.FC = () => {
                                 {formatPeso(data.cash.collectedTotal)}
                               </td>
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums">
-                                {formatPeso(data.cash.varianceTotal)}
+                                {formatPeso(shortTotal)}
                               </td>
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums">
-                                {data.cash.shortageCount}
+                                {formatPeso(overTotal)}
                               </td>
                               <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                                 {formatPeso(data.cash.paidBackLaterTotal ?? 0)}
@@ -574,13 +530,13 @@ export const SettlementReportView: React.FC = () => {
 
                 <div className="bg-board-plate border border-edge rounded-plate overflow-hidden">
                   <header className="px-5 py-3 border-b border-edge">
-                    <h4 className="text-label text-ink">Every cash handover</h4>
+                    <h4 className="text-label text-ink">Every cash turn-over</h4>
                   </header>
                   <MobileResponsiveTable<typeof data.cash.lines[number]>
                     data={linesPagination.paginatedItems}
-                    keyExtractor={(l) => l.errandId}
+                    keyExtractor={(l) => l.lineKey ?? `${l.errandId}-${l.settledAt}`}
                     primaryHeader="Order and rider"
-                    secondaryHeader="Result and short or over"
+                    secondaryHeader="Result, short and over"
                     renderPrimary={(l) => (
                       <div className="min-w-0">
                         <div className="font-mono font-semibold text-ink text-xs">
@@ -596,15 +552,18 @@ export const SettlementReportView: React.FC = () => {
                         <span className="inline-block px-1.5 py-0.5 rounded-full bg-board-ground text-ink-muted text-[10px] font-semibold">
                           {plainStatus(l.status)}
                         </span>
-                        <div className={`font-mono text-xs mt-0.5 tabular-nums ${l.variance < 0 ? "text-status-act-ink font-semibold" : "text-ink"}`}>
-                          {formatPeso(l.variance)}
+                        <div className={`font-mono text-xs mt-0.5 tabular-nums ${lineShort(l) > 0 ? "text-status-act-ink font-semibold" : "text-ink"}`}>
+                          Short {formatPeso(lineShort(l))}
+                        </div>
+                        <div className="font-mono text-xs tabular-nums text-ink-muted">
+                          Over {formatPeso(lineOver(l))}
                         </div>
                       </div>
                     )}
                     renderPreview={(l) => (
                       <div className="space-y-1.5 pt-1 text-ink-muted">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Should collect</span>
+                          <span className="text-ink-muted">Expected to collect</span>
                           <span className="font-mono text-ink font-medium">{formatPeso(l.expected)}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
@@ -617,7 +576,7 @@ export const SettlementReportView: React.FC = () => {
                         </div>
                         {(l.short ?? 0) > 0 ? (
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-ink-muted">Still owed</span>
+                            <span className="text-ink-muted">Unremitted</span>
                             <span className={`font-mono font-medium ${(l.stillOwed ?? 0) > 0 ? "text-status-act-ink" : "text-ink"}`}>
                               {formatPeso(l.stillOwed ?? 0)}
                             </span>
@@ -629,7 +588,7 @@ export const SettlementReportView: React.FC = () => {
                     inspectorSubtitle={(l) => `${l.riderName ?? "Not assigned"} · ${plainStatus(l.status)}`}
                     inspectorSections={(l) => [
                       {
-                        title: "Cash handover",
+                        title: "Cash turn-over",
                         items: [
                           { label: "Order number", value: formatErrandId(l.errandId), copyable: true, copyValue: l.errandId },
                           { label: "Rider", value: l.riderName ?? "--" },
@@ -639,18 +598,21 @@ export const SettlementReportView: React.FC = () => {
                       {
                         title: "Amounts",
                         items: [
-                          { label: "Should collect", value: formatPeso(l.expected) },
+                          { label: "Expected to collect", value: formatPeso(l.expected) },
                           { label: "Collected", value: formatPeso(l.collected) },
-                          { label: "Short or over", value: formatPeso(l.variance) },
+                          { label: "Short", value: formatPeso(lineShort(l)) },
+                          { label: "Over", value: formatPeso(lineOver(l)) },
                           { label: "Reason given", value: l.shortReason || "None", fullWidth: true },
                         ],
                       },
-                      ...((l.short ?? 0) > 0
+                      ...((l.short ?? 0) > 0 || (l.followUps?.length ?? 0) > 0
                         ? [
                             {
-                              title: "Since the handover",
+                              title: "Since the cash turn-over",
                               items: [
-                                { label: "Still owed (today)", value: formatPeso(l.stillOwed ?? 0) },
+                                ...((l.short ?? 0) > 0
+                                  ? [{ label: "Unremitted", value: formatPeso(l.stillOwed ?? 0) }]
+                                  : []),
                                 { label: "What happened", value: whatHappenedSince(l), fullWidth: true },
                               ],
                             },
@@ -669,13 +631,16 @@ export const SettlementReportView: React.FC = () => {
                                 Rider
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Should collect
+                                Expected to collect
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
                                 Collected
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Short or over
+                                Short
+                              </th>
+                              <th scope="col" className="text-right px-5 py-2 font-semibold">
+                                Over
                               </th>
                               <th scope="col" className="text-left px-5 py-2 font-semibold">
                                 Result
@@ -687,13 +652,13 @@ export const SettlementReportView: React.FC = () => {
                                 What happened since
                               </th>
                               <th scope="col" className="text-right px-5 py-2 font-semibold">
-                                Still owed
+                                Unremitted
                               </th>
                             </tr>
                           </thead>
                           <tbody>
                             {linesPagination.paginatedItems.map((l) => (
-                              <tr key={l.errandId} className="border-t border-hairline">
+                              <tr key={l.lineKey ?? `${l.errandId}-${l.settledAt}`} className="border-t border-hairline">
                                 <td className="px-5 py-2.5 font-mono text-ink-muted">
                                   {formatErrandId(l.errandId)}
                                 </td>
@@ -706,10 +671,13 @@ export const SettlementReportView: React.FC = () => {
                                 </td>
                                 <td
                                   className={`px-5 py-2.5 text-right font-mono tabular-nums ${
-                                    l.variance < 0 ? "text-status-act-ink font-semibold" : ""
+                                    lineShort(l) > 0 ? "text-status-act-ink font-semibold" : ""
                                   }`}
                                 >
-                                  {formatPeso(l.variance)}
+                                  {formatPeso(lineShort(l))}
+                                </td>
+                                <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                                  {formatPeso(lineOver(l))}
                                 </td>
                                 <td className="px-5 py-2.5">
                                   <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
@@ -743,14 +711,14 @@ export const SettlementReportView: React.FC = () => {
                     startIndex={linesPagination.startIndex}
                     endIndex={linesPagination.endIndex}
                     onPageChange={linesPagination.setCurrentPage}
-                    itemName="cash handovers"
+                    itemName="cash turn-overs"
                   />
                 </div>
               </>
             )}
           </section>
 
-          <ReportNotes notes={data.notes} />
+          {/* No "About these numbers" block on this report (owner, 2026-10-27). */}
         </>
       )}
 

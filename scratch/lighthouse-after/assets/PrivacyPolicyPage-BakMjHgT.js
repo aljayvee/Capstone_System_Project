@@ -1,0 +1,1 @@
+import{j as a}from"./vendor-react-YjMes8jK.js";import{L as i,P as t}from"./LegalDocumentView-DrYHjaht.js";import"./vendor-icons-tvIRN7ah.js";const l=()=>a.jsx(i,{document:t,meta:[{label:"Jurisdiction",value:"Tacurong City, Philippines"},{label:"Law",value:"RA 10173 (Data Privacy Act of 2012)"}]});export{l as PrivacyPolicyPage,l as default};

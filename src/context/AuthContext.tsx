@@ -5,7 +5,11 @@ import { endRealtimeSession, ensureRealtimeSession } from "../firebase/realtimeS
 import { io } from "socket.io-client";
 
 const USER_SESSION_KEY = "errand_system_session_user";
-const REFRESH_TOKEN_FALLBACK_KEY = "sugo_refresh_fallback";
+// Until 2026-11-02 the portal also kept the 30-day refresh token here, readable
+// by any script on the page, which undid the HttpOnly cookie that carries it.
+// The cookie alone holds the session now; this key is only ever removed, so a
+// tab signed in before the change drops its copy on the next load.
+const LEGACY_REFRESH_COPY_KEY = "sugo_refresh_fallback";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,10 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try {
-      const fallbackToken = typeof sessionStorage !== "undefined"
-        ? sessionStorage.getItem(REFRESH_TOKEN_FALLBACK_KEY)
-        : null;
-      await apiClient.post("/auth/logout", { refreshToken: fallbackToken || undefined }).catch(() => {});
+      // The HttpOnly cookie rides along, and the server revokes the session from it.
+      await apiClient.post("/auth/logout", {}).catch(() => {});
     } finally {
       // Before the local session is cleared, so the Firebase credential does
       // not outlive the account that owns it. A browser left holding one would
@@ -44,7 +46,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       updateToken(null);
       sessionStorage.removeItem(USER_SESSION_KEY);
-      sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
       if (typeof document !== "undefined") {
         document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
       }
@@ -52,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [updateToken]);
 
   const login = useCallback(
-    (newUser: User, newToken?: string, newRefreshToken?: string) => {
+    (newUser: User, newToken?: string) => {
       // Purge any lingering SysAdmin credentials to ensure strict mutual exclusion
       try {
         // Only when a SysAdmin session is actually open in this tab. This used
@@ -76,9 +77,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(newUser);
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(newUser));
-      if (newRefreshToken) {
-        sessionStorage.setItem(REFRESH_TOKEN_FALLBACK_KEY, newRefreshToken);
-      }
       if (typeof document !== "undefined") {
         document.cookie = "sugo_session_active=1; path=/; max-age=2592000; SameSite=Lax; Secure";
       }
@@ -108,21 +106,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   // Initial silent token refresh on page load/mount. Only executed if there is
-  // evidence of an existing session (either session cookie, sessionStorage, or fallback token).
+  // evidence of an existing session (the session marker cookie or a saved user).
   // Fresh guest visits and search crawlers skip this to avoid unnecessary network latency
   // and prevent false 401 unauthorized errors in the browser console.
   useEffect(() => {
     let isMounted = true;
     const initializeAuth = async () => {
-      const fallbackToken = typeof sessionStorage !== "undefined"
-        ? sessionStorage.getItem(REFRESH_TOKEN_FALLBACK_KEY)
-        : null;
+      try {
+        sessionStorage.removeItem(LEGACY_REFRESH_COPY_KEY);
+      } catch {
+        // Storage blocked: there is no copy to remove either.
+      }
 
       const hasPossibleSession =
         typeof document !== "undefined" &&
         (document.cookie.includes("sugo_session_active=1") ||
-         !!sessionStorage.getItem(USER_SESSION_KEY) ||
-         !!fallbackToken);
+         !!sessionStorage.getItem(USER_SESSION_KEY));
 
       if (!hasPossibleSession) {
         if (isMounted) {
@@ -132,17 +131,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        const res = await apiClient.post("/auth/refresh", {
-          refreshToken: fallbackToken || undefined,
-        });
+        // Cookie only. A body token would make the server answer with the
+        // rotated one in the body too, where page scripts can read it.
+        const res = await apiClient.post("/auth/refresh", {});
 
         if (isMounted && res.data?.token) {
           updateToken(res.data.token);
           if (res.data.user) {
             setUser(res.data.user);
-          }
-          if (res.data.refreshToken && typeof sessionStorage !== "undefined") {
-            sessionStorage.setItem(REFRESH_TOKEN_FALLBACK_KEY, res.data.refreshToken);
           }
           // A reload restores the JWT session silently, and the Firebase one
           // has to come back with it. Without this, the map worked only on the
@@ -156,7 +152,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null);
           updateToken(null);
           sessionStorage.removeItem(USER_SESSION_KEY);
-          sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
           if (typeof document !== "undefined") {
             document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
           }
@@ -200,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         updateToken(null);
         sessionStorage.removeItem(USER_SESSION_KEY);
-        sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
         if (typeof document !== "undefined") {
           document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
         }
@@ -246,7 +240,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         updateToken(null);
         sessionStorage.removeItem(USER_SESSION_KEY);
-        sessionStorage.removeItem(REFRESH_TOKEN_FALLBACK_KEY);
         if (typeof document !== "undefined") {
           document.cookie = "sugo_session_active=; path=/; max-age=0; SameSite=Lax; Secure";
         }
@@ -259,6 +252,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ) {
         void logout();
       }
+    });
+
+    // The Main Owner changed this account's access group or overrides.
+    // Nothing is revoked; PermissionsContext refetches what the portal shows.
+    // A window event rather than a second socket, like sugo:session-superseded.
+    socket.on("permissions:changed", () => {
+      window.dispatchEvent(new CustomEvent("sugo:permissions-changed"));
     });
 
     return () => {

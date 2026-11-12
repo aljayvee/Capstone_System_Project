@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUGO Express — Minimalist White SMS OTP Verification Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --border: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --primary: #DC2626;
+      --primary-hover: #B91C1C;
+      --emerald: #059669;
+      --emerald-bg: #ECFDF5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 40px 20px 80px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    p.sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .links-bar {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .nav-btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #FFFFFF;
+    }
+    .nav-btn.primary:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Grid of screens */
+    .screens-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 28px;
+      margin-top: 36px;
+    }
+    .screen-wrapper {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+    .screen-meta {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: #FAFAFA;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .screen-step {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--primary);
+    }
+    .screen-desc {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* Pure white flat canvas phone mockup */
+    .phone-canvas {
+      background: #FFFFFF;
+      padding: 32px 28px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .brand-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+    }
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-badge {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      color: #FFFFFF;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .brand-name {
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    .brand-tag {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .secure-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .title-group {
+      margin-bottom: 28px;
+    }
+    .title-group h2 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+    .title-group p {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .edit-link {
+      color: var(--primary);
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Form controls */
+    .field-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #334155;
+      margin-bottom: 6px;
+      display: block;
+    }
+    .text-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      color: var(--text-main);
+      background: #FFFFFF;
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .text-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+
+    /* 6-Digit Segmented OTP */
+    .otp-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 24px 0 16px;
+    }
+    .otp-slot {
+      width: 44px;
+      height: 54px;
+      border: 1px solid #CBD5E1;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      background: #F8FAFC;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+      transition: all 0.15s;
+    }
+    .otp-slot.filled {
+      background: #FFFFFF;
+      border-color: #94A3B8;
+    }
+    .otp-slot.active {
+      border-color: var(--primary);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    }
+    .otp-divider {
+      color: #CBD5E1;
+      font-weight: 700;
+    }
+
+    /* Countdown & Resend */
+    .resend-box {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .timer-digits {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .resend-action {
+      color: var(--primary);
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Primary CTA */
+    .btn-submit {
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--primary);
+      border: none;
+      border-radius: 12px;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+    }
+    .btn-submit:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Success state */
+    .success-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: var(--emerald-bg);
+      border: 1px solid #A7F3D0;
+      color: var(--emerald);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 20px auto 16px;
+      font-size: 24px;
+    }
+    .success-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: var(--emerald);
+      border: none;
+      border-radius: 12px;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      margin-top: 24px;
+    }
+
+    /* Expired Security State */
+    .amber-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: #FEF3C7;
+      border: 1px solid #FDE68A;
+      color: #D97706;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 20px auto 16px;
+      font-size: 24px;
+    }
+    .expired-info-box {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 16px 0;
+      text-align: left;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .expired-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: #FEF3C7;
+      color: #B45309;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 10.5px;
+    }
+    .dark-btn {
+      width: 100%;
+      padding: 14px 20px;
+      background: #0F172A;
+      border: none;
+      border-radius: 12px;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .dark-btn:hover {
+      background: #1E293B;
+    }
+
+    /* Visual comparison banner */
+    .render-section {
+      margin-top: 50px;
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      text-align: center;
+    }
+    .render-img {
+      max-width: 420px;
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">Dribbble Modern Redesign</div>
+      <h1>SMS OTP Verification — White Canvas</h1>
+      <p class="sub">Flat white background, card-free layout, human-readable copy, 3+3 segmented input boxes, and an active 60s resend countdown.</p>
+      <div class="links-bar">
+        <a href="/test-phone-verification" class="nav-btn primary">Live Lab (/test-phone-verification)</a>
+        <a href="/phone?phone=+639171234567" class="nav-btn">Live Flow (/phone)</a>
+      </div>
+    </div>
+
+    <div class="screens-grid">
+      <!-- STEP 1: Phone Entry -->
+      <div class="screen-wrapper">
+        <div class="screen-meta">
+          <span class="screen-step">Step 1</span>
+          <span class="screen-desc">Mobile Number Input</span>
+        </div>
+        <div class="phone-canvas">
+          <div>
+            <div class="brand-row">
+              <div class="brand-logo">
+                <div class="brand-badge">SE</div>
+                <div>
+                  <div class="brand-name">SUGO EXPRESS</div>
+                  <div class="brand-tag">Phone Verification</div>
+                </div>
+              </div>
+              <div class="secure-pill">🔒 Secure</div>
+            </div>
+
+            <div class="title-group">
+              <h2>Verify your phone number</h2>
+              <p>Enter your mobile number to receive a 6-digit verification code via SMS.</p>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+              <label class="field-label">Mobile number</label>
+              <input type="tel" value="+63 917 123 4567" class="text-input" readonly />
+              <p style="font-size: 11.5px; color: #94A3B8; margin-top: 6px;">Standard telecom SMS rates may apply.</p>
+            </div>
+          </div>
+
+          <button class="btn-submit">
+            <span>Send verification code</span>
+            <span>&rarr;</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Code Entry with Countdown -->
+      <div class="screen-wrapper">
+        <div class="screen-meta">
+          <span class="screen-step">Step 2</span>
+          <span class="screen-desc">Code Entry (Counting Down)</span>
+        </div>
+        <div class="phone-canvas">
+          <div>
+            <div class="brand-row">
+              <div class="brand-logo">
+                <div class="brand-badge">SE</div>
+                <div>
+                  <div class="brand-name">SUGO EXPRESS</div>
+                  <div class="brand-tag">Phone Verification</div>
+                </div>
+              </div>
+              <div class="secure-pill">🔒 Secure</div>
+            </div>
+
+            <div class="title-group">
+              <h2>Enter verification code</h2>
+              <p>We sent a 6-digit code to <strong>+63 917 123 4567</strong> · <span class="edit-link">Edit number</span></p>
+            </div>
+
+            <div class="otp-row">
+              <div class="otp-slot filled">4</div>
+              <div class="otp-slot filled">8</div>
+              <div class="otp-slot filled">2</div>
+              <div class="otp-divider">&ndash;</div>
+              <div class="otp-slot active">|</div>
+              <div class="otp-slot">&bull;</div>
+              <div class="otp-slot">&bull;</div>
+            </div>
+
+            <div class="resend-box">
+              Didn't receive the code? Resend in <span class="timer-digits">0:45</span>
+            </div>
+          </div>
+
+          <button class="btn-submit" style="opacity: 0.6; cursor: not-allowed;">
+            <span>Confirm & Continue</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2B: Code Entry with Resend Expired -->
+      <div class="screen-wrapper">
+        <div class="screen-meta">
+          <span class="screen-step">Step 2 (Expired)</span>
+          <span class="screen-desc">Countdown 0:00 & Resend Active</span>
+        </div>
+        <div class="phone-canvas">
+          <div>
+            <div class="brand-row">
+              <div class="brand-logo">
+                <div class="brand-badge">SE</div>
+                <div>
+                  <div class="brand-name">SUGO EXPRESS</div>
+                  <div class="brand-tag">Phone Verification</div>
+                </div>
+              </div>
+              <div class="secure-pill">🔒 Secure</div>
+            </div>
+
+            <div class="title-group">
+              <h2>Enter verification code</h2>
+              <p>We sent a 6-digit code to <strong>+63 917 123 4567</strong> · <span class="edit-link">Edit number</span></p>
+            </div>
+
+            <div class="otp-row">
+              <div class="otp-slot filled">4</div>
+              <div class="otp-slot filled">8</div>
+              <div class="otp-slot filled">2</div>
+              <div class="otp-divider">&ndash;</div>
+              <div class="otp-slot filled">9</div>
+              <div class="otp-slot filled">1</div>
+              <div class="otp-slot filled">0</div>
+            </div>
+
+            <div class="resend-box">
+              Didn't receive the code? <span class="resend-action">Resend SMS</span>
+            </div>
+          </div>
+
+          <button class="btn-submit">
+            <span>Confirm & Continue</span>
+            <span>&check;</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Success -->
+      <div class="screen-wrapper">
+        <div class="screen-meta">
+          <span class="screen-step">Step 3</span>
+          <span class="screen-desc">Phone Verified</span>
+        </div>
+        <div class="phone-canvas" style="text-align: center;">
+          <div style="margin: auto 0;">
+            <div class="success-icon-box">&check;</div>
+            <div class="title-group" style="margin-bottom: 8px;">
+              <h2>Phone verified!</h2>
+              <p>Verified: <strong style="color: var(--text-main); font-family: monospace;">+63 917 123 4567</strong></p>
+              <p style="font-size: 13px; margin-top: 4px;">Your mobile number has been authenticated.</p>
+            </div>
+          </div>
+
+          <div>
+            <a href="#" class="success-btn">
+              <span>Return to Sugo Express App</span>
+              <span>&nearr;</span>
+            </a>
+            <p style="font-size: 11px; color: #94A3B8; margin-top: 8px;">If the app does not open automatically, tap the button above.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Link Expired (Security Invalidation) -->
+      <div class="screen-wrapper">
+        <div class="screen-meta">
+          <span class="screen-step">Step 4 (Security)</span>
+          <span class="screen-desc">Link Expired After Success</span>
+        </div>
+        <div class="phone-canvas" style="text-align: center;">
+          <div style="margin: auto 0;">
+            <div class="amber-icon-box">🛡️</div>
+            <div class="title-group" style="margin-bottom: 8px;">
+              <h2>Verification link expired</h2>
+              <p style="font-size: 13px; margin-top: 4px;">This single-use link was completed and expired immediately for security.</p>
+            </div>
+
+            <div class="expired-info-box">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 600; color: #334155;">One-Time Link</span>
+                <span class="expired-pill">Expired</span>
+              </div>
+              <p>SMS verification links expire immediately once authentication succeeds. Replay attempts are blocked to protect account integrity.</p>
+            </div>
+          </div>
+
+          <div>
+            <a href="#" class="dark-btn">
+              <span>Return to Sugo Express App</span>
+              <span>&rarr;</span>
+            </a>
+            <p style="font-size: 11px; color: #94A3B8; margin-top: 8px;">Single-use verification token permanently revoked.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- High-Fidelity Mockup Section -->
+    <div class="render-section">
+      <h2>Dribbble Minimalist Mobile Architecture</h2>
+      <p class="sub">Generated high-fidelity reference render illustrating the uncarded white canvas layout and typography balance.</p>
+      <div>
+        <img src="sms_otp_white_preview.jpg" alt="SMS OTP White Canvas Preview" class="render-img" />
+      </div>
+    </div>
+  </div>
+</body>
+</html>

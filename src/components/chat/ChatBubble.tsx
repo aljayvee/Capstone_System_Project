@@ -217,7 +217,7 @@ function ThreadCard({
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="shrink-0 text-board-trim">{mark}</span>
             <div className="min-w-0">
-              <h4 className="m-0 truncate text-label text-board-plate">{title}</h4>
+              <h4 className="m-0 truncate text-label text-white">{title}</h4>
               {detail ? (
                 <p className="m-0 truncate text-label text-board-trim">{detail}</p>
               ) : null}
@@ -606,7 +606,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
     >
       <div
         className={`grid size-7 shrink-0 place-items-center rounded-full ${
-          isCurrentUser ? "bg-board-field text-board-plate" : "bg-board-ground text-ink-muted"
+          isCurrentUser ? "bg-board-field text-white" : "bg-board-ground text-ink-muted"
         }`}
         title={message.senderName}
         role="img"
@@ -629,7 +629,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
         <div
           className={`relative min-w-0 max-w-full px-3 py-2 ${
             isCurrentUser
-              ? "rounded-plate rounded-br-xs bg-board-field text-board-plate"
+              ? "rounded-plate rounded-br-xs bg-board-field text-white"
               : "rounded-plate rounded-bl-xs border border-edge bg-board-plate text-ink"
           }`}
           {...(isCurrentUser ? { "data-on-field": "" } : {})}

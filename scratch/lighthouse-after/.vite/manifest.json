@@ -1,0 +1,558 @@
+{
+  "_ConfirmDialog-5zPs47L6.js": {
+    "file": "assets/ConfirmDialog-5zPs47L6.js",
+    "name": "ConfirmDialog",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_HeaderClock-DR9Lem6m.js": {
+    "file": "assets/HeaderClock-DR9Lem6m.js",
+    "name": "HeaderClock",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_LegalDocumentView-DrYHjaht.js": {
+    "file": "assets/LegalDocumentView-DrYHjaht.js",
+    "name": "LegalDocumentView",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_MobileResponsiveTable-BwMbBPYM.js": {
+    "file": "assets/MobileResponsiveTable-BwMbBPYM.js",
+    "name": "MobileResponsiveTable",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_OwnerPanelShell-hPkpJ6ht.js": {
+    "file": "assets/OwnerPanelShell-hPkpJ6ht.js",
+    "name": "OwnerPanelShell",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "index.html"
+    ]
+  },
+  "_OwnerPortal-8gPzODVy.css": {
+    "file": "assets/OwnerPortal-8gPzODVy.css",
+    "src": "_OwnerPortal-8gPzODVy.css"
+  },
+  "_OwnerPortal-C6Io468B.js": {
+    "file": "assets/OwnerPortal-C6Io468B.js",
+    "name": "OwnerPortal",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_vendor-react-YjMes8jK.js",
+      "_sidebar-JVFhKK_5.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-charts-C-gLU5Rz.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_OwnerPanelShell-hPkpJ6ht.js",
+      "_HeaderClock-DR9Lem6m.js"
+    ],
+    "dynamicImports": [
+      "src/portals/owner/modules/users/UserManagementModule.tsx",
+      "src/portals/owner/modules/riders/RiderManagementModule.tsx",
+      "src/portals/owner/modules/merchants/MerchantCategoryModule.tsx",
+      "src/portals/owner/modules/rates/ServiceRatesModule.tsx",
+      "src/portals/owner/modules/reports/FinancialReportsModule.tsx",
+      "src/portals/owner/modules/tracking/RiderTrackingModule.tsx",
+      "src/components/account/AccountSecurityLogsView.tsx"
+    ],
+    "css": [
+      "assets/OwnerPortal-8gPzODVy.css"
+    ]
+  },
+  "_OwnerTabs-C9kQIYML.js": {
+    "file": "assets/OwnerTabs-C9kQIYML.js",
+    "name": "OwnerTabs",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html"
+    ]
+  },
+  "_PlacesTab-BXj0S2dT.js": {
+    "file": "assets/PlacesTab-BXj0S2dT.js",
+    "name": "PlacesTab",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_ConfirmDialog-5zPs47L6.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_storeName-Bfn02hgs.js",
+      "_MobileResponsiveTable-BwMbBPYM.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_ScrollToTopButton-BsYHEp_B.js": {
+    "file": "assets/ScrollToTopButton-BsYHEp_B.js",
+    "name": "ScrollToTopButton",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_format-ea9YAKE0.js": {
+    "file": "assets/format-ea9YAKE0.js",
+    "name": "format"
+  },
+  "_loadGoogleMaps-CSz0eHeM.js": {
+    "file": "assets/loadGoogleMaps-CSz0eHeM.js",
+    "name": "loadGoogleMaps",
+    "imports": [
+      "_vendor-maps-BmXNOHR3.js"
+    ]
+  },
+  "_sidebar-JVFhKK_5.js": {
+    "file": "assets/sidebar-JVFhKK_5.js",
+    "name": "sidebar",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "_staffPhotoService-Dz6h3rgm.js": {
+    "file": "assets/staffPhotoService-Dz6h3rgm.js",
+    "name": "staffPhotoService",
+    "imports": [
+      "index.html"
+    ]
+  },
+  "_storeName-Bfn02hgs.js": {
+    "file": "assets/storeName-Bfn02hgs.js",
+    "name": "storeName"
+  },
+  "_useRiderActiveRoute-ChxzjCBD.js": {
+    "file": "assets/useRiderActiveRoute-ChxzjCBD.js",
+    "name": "useRiderActiveRoute",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_useRiderFleetPresence-DaMaJOwl.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "_useRiderFleetPresence-DaMaJOwl.js": {
+    "file": "assets/useRiderFleetPresence-DaMaJOwl.js",
+    "name": "useRiderFleetPresence",
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js"
+    ]
+  },
+  "_vendor-charts-C-gLU5Rz.js": {
+    "file": "assets/vendor-charts-C-gLU5Rz.js",
+    "name": "vendor-charts",
+    "imports": [
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-react-YjMes8jK.js"
+    ]
+  },
+  "_vendor-firebase-DyT7cgPc.js": {
+    "file": "assets/vendor-firebase-DyT7cgPc.js",
+    "name": "vendor-firebase"
+  },
+  "_vendor-icons-tvIRN7ah.js": {
+    "file": "assets/vendor-icons-tvIRN7ah.js",
+    "name": "vendor-icons",
+    "imports": [
+      "_vendor-react-YjMes8jK.js"
+    ]
+  },
+  "_vendor-maps-BmXNOHR3.js": {
+    "file": "assets/vendor-maps-BmXNOHR3.js",
+    "name": "vendor-maps"
+  },
+  "_vendor-react-YjMes8jK.js": {
+    "file": "assets/vendor-react-YjMes8jK.js",
+    "name": "vendor-react"
+  },
+  "_vendor-utils-bWqjuwkH.js": {
+    "file": "assets/vendor-utils-bWqjuwkH.js",
+    "name": "vendor-utils"
+  },
+  "index.html": {
+    "file": "assets/index-C_FF70a5.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ],
+    "dynamicImports": [
+      "src/components/MobileAppNoticeModal.tsx",
+      "src/components/MobileAppNoticeModal.tsx",
+      "_OwnerPortal-C6Io468B.js",
+      "src/portals/dispatcher/DispatcherPortal.tsx",
+      "src/portals/owner/screens/PlacesDirectoryScreen.tsx",
+      "src/components/MobileAppNoticeModal.tsx",
+      "src/components/NotFoundPage.tsx",
+      "src/portals/sysadmin/SysAdminPortal.tsx",
+      "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx",
+      "src/pages/PrivacyPolicyPage.tsx",
+      "src/pages/TermsOfServicePage.tsx",
+      "src/pages/TestPhoneVerificationPage.tsx",
+      "src/pages/PhoneVerificationPage.tsx"
+    ],
+    "css": [
+      "assets/index-DhDxdkMf.css"
+    ],
+    "assets": [
+      "assets/geist-cyrillic-ext-wght-normal-DjL33-gN.woff2",
+      "assets/geist-cyrillic-wght-normal-BEAKL7Jp.woff2",
+      "assets/geist-vietnamese-wght-normal-6IgcOCM7.woff2",
+      "assets/geist-latin-ext-wght-normal-DC-KSUi6.woff2",
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+      "assets/geist-mono-cyrillic-ext-wght-normal-X_5orZeX.woff2",
+      "assets/geist-mono-cyrillic-wght-normal-DiZS0aHC.woff2",
+      "assets/geist-mono-symbols2-wght-normal-CO5SzqOn.woff2",
+      "assets/geist-mono-vietnamese-wght-normal-DadHysG0.woff2",
+      "assets/geist-mono-latin-ext-wght-normal-Bwz-egvJ.woff2",
+      "assets/geist-mono-latin-wght-normal-XN7g48iV.woff2"
+    ]
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/geist-mono-cyrillic-ext-wght-normal-X_5orZeX.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-wght-normal.woff2": {
+    "file": "assets/geist-mono-cyrillic-wght-normal-DiZS0aHC.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-ext-wght-normal.woff2": {
+    "file": "assets/geist-mono-latin-ext-wght-normal-Bwz-egvJ.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2": {
+    "file": "assets/geist-mono-latin-wght-normal-XN7g48iV.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-symbols2-wght-normal.woff2": {
+    "file": "assets/geist-mono-symbols2-wght-normal-CO5SzqOn.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-symbols2-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-vietnamese-wght-normal.woff2": {
+    "file": "assets/geist-mono-vietnamese-wght-normal-DadHysG0.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-vietnamese-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/geist-cyrillic-ext-wght-normal-DjL33-gN.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-cyrillic-wght-normal.woff2": {
+    "file": "assets/geist-cyrillic-wght-normal-BEAKL7Jp.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-cyrillic-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2": {
+    "file": "assets/geist-latin-ext-wght-normal-DC-KSUi6.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2": {
+    "file": "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-vietnamese-wght-normal.woff2": {
+    "file": "assets/geist-vietnamese-wght-normal-6IgcOCM7.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-vietnamese-wght-normal.woff2"
+  },
+  "src/components/MobileAppNoticeModal.tsx": {
+    "file": "assets/MobileAppNoticeModal-DMixk92J.js",
+    "name": "MobileAppNoticeModal",
+    "src": "src/components/MobileAppNoticeModal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/components/NotFoundPage.tsx": {
+    "file": "assets/NotFoundPage-I3lNdPBX.js",
+    "name": "NotFoundPage",
+    "src": "src/components/NotFoundPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/components/account/AccountSecurityLogsView.tsx": {
+    "file": "assets/AccountSecurityLogsView-Z2ZN73L2.js",
+    "name": "AccountSecurityLogsView",
+    "src": "src/components/account/AccountSecurityLogsView.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/pages/PhoneVerificationPage.tsx": {
+    "file": "assets/PhoneVerificationPage-DQZ77kI6.js",
+    "name": "PhoneVerificationPage",
+    "src": "src/pages/PhoneVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/pages/PrivacyPolicyPage.tsx": {
+    "file": "assets/PrivacyPolicyPage-BakMjHgT.js",
+    "name": "PrivacyPolicyPage",
+    "src": "src/pages/PrivacyPolicyPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_LegalDocumentView-DrYHjaht.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "src/pages/TermsOfServicePage.tsx": {
+    "file": "assets/TermsOfServicePage-DM6yihUi.js",
+    "name": "TermsOfServicePage",
+    "src": "src/pages/TermsOfServicePage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_LegalDocumentView-DrYHjaht.js",
+      "_vendor-icons-tvIRN7ah.js"
+    ]
+  },
+  "src/pages/TestPhoneVerificationPage.tsx": {
+    "file": "assets/TestPhoneVerificationPage-B9MUkv80.js",
+    "name": "TestPhoneVerificationPage",
+    "src": "src/pages/TestPhoneVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/dispatcher/DispatcherPortal.tsx": {
+    "file": "assets/DispatcherPortal-DelXRZKb.js",
+    "name": "DispatcherPortal",
+    "src": "src/portals/dispatcher/DispatcherPortal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_sidebar-JVFhKK_5.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_format-ea9YAKE0.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_useRiderActiveRoute-ChxzjCBD.js",
+      "_useRiderFleetPresence-DaMaJOwl.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_storeName-Bfn02hgs.js",
+      "_MobileResponsiveTable-BwMbBPYM.js",
+      "_staffPhotoService-Dz6h3rgm.js",
+      "src/components/account/AccountSecurityLogsView.tsx",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-maps-BmXNOHR3.js"
+    ]
+  },
+  "src/portals/owner/modules/merchants/MerchantCategoryModule.tsx": {
+    "file": "assets/MerchantCategoryModule-Diw5EYMV.js",
+    "name": "MerchantCategoryModule",
+    "src": "src/portals/owner/modules/merchants/MerchantCategoryModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_OwnerTabs-C9kQIYML.js",
+      "_ConfirmDialog-5zPs47L6.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_PlacesTab-BXj0S2dT.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_vendor-maps-BmXNOHR3.js",
+      "_storeName-Bfn02hgs.js",
+      "_MobileResponsiveTable-BwMbBPYM.js"
+    ]
+  },
+  "src/portals/owner/modules/rates/ServiceRatesModule.tsx": {
+    "file": "assets/ServiceRatesModule-BumSBYyt.js",
+    "name": "ServiceRatesModule",
+    "src": "src/portals/owner/modules/rates/ServiceRatesModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_OwnerPanelShell-hPkpJ6ht.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_ConfirmDialog-5zPs47L6.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/owner/modules/reports/FinancialReportsModule.tsx": {
+    "file": "assets/FinancialReportsModule-Bavm15p2.js",
+    "name": "FinancialReportsModule",
+    "src": "src/portals/owner/modules/reports/FinancialReportsModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_OwnerPortal-C6Io468B.js",
+      "_format-ea9YAKE0.js",
+      "_MobileResponsiveTable-BwMbBPYM.js",
+      "index.html",
+      "_vendor-charts-C-gLU5Rz.js",
+      "_OwnerPanelShell-hPkpJ6ht.js",
+      "_OwnerTabs-C9kQIYML.js",
+      "_sidebar-JVFhKK_5.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-firebase-DyT7cgPc.js"
+    ]
+  },
+  "src/portals/owner/modules/riders/RiderManagementModule.tsx": {
+    "file": "assets/RiderManagementModule-ChHr1h_J.js",
+    "name": "RiderManagementModule",
+    "src": "src/portals/owner/modules/riders/RiderManagementModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_useRiderFleetPresence-DaMaJOwl.js",
+      "_OwnerPortal-C6Io468B.js",
+      "_OwnerPanelShell-hPkpJ6ht.js",
+      "index.html",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_sidebar-JVFhKK_5.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-charts-C-gLU5Rz.js"
+    ]
+  },
+  "src/portals/owner/modules/tracking/RiderTrackingModule.tsx": {
+    "file": "assets/RiderTrackingModule-CHTMlgJ5.js",
+    "name": "RiderTrackingModule",
+    "src": "src/portals/owner/modules/tracking/RiderTrackingModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_useRiderActiveRoute-ChxzjCBD.js",
+      "_OwnerPortal-C6Io468B.js",
+      "_useRiderFleetPresence-DaMaJOwl.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_vendor-maps-BmXNOHR3.js",
+      "_sidebar-JVFhKK_5.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-charts-C-gLU5Rz.js",
+      "_OwnerPanelShell-hPkpJ6ht.js"
+    ]
+  },
+  "src/portals/owner/modules/users/UserManagementModule.tsx": {
+    "file": "assets/UserManagementModule-Ch5dR5BJ.js",
+    "name": "UserManagementModule",
+    "src": "src/portals/owner/modules/users/UserManagementModule.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_MobileResponsiveTable-BwMbBPYM.js",
+      "_ConfirmDialog-5zPs47L6.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "_staffPhotoService-Dz6h3rgm.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/owner/screens/PlacesDirectoryScreen.tsx": {
+    "file": "assets/PlacesDirectoryScreen-Bv0RsU5M.js",
+    "name": "PlacesDirectoryScreen",
+    "src": "src/portals/owner/screens/PlacesDirectoryScreen.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "_PlacesTab-BXj0S2dT.js",
+      "_OwnerPanelShell-hPkpJ6ht.js",
+      "_vendor-icons-tvIRN7ah.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_ConfirmDialog-5zPs47L6.js",
+      "_HeaderClock-DR9Lem6m.js",
+      "_loadGoogleMaps-CSz0eHeM.js",
+      "_vendor-maps-BmXNOHR3.js",
+      "_storeName-Bfn02hgs.js",
+      "_MobileResponsiveTable-BwMbBPYM.js"
+    ]
+  },
+  "src/portals/sysadmin/SysAdminPortal.tsx": {
+    "file": "assets/SysAdminPortal-BritxXY1.js",
+    "name": "SysAdminPortal",
+    "src": "src/portals/sysadmin/SysAdminPortal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_MobileResponsiveTable-BwMbBPYM.js",
+      "_ScrollToTopButton-BsYHEp_B.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx": {
+    "file": "assets/SysAdminMagicLinkVerificationPage-Cta2qjuN.js",
+    "name": "SysAdminMagicLinkVerificationPage",
+    "src": "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-YjMes8jK.js",
+      "index.html",
+      "_vendor-icons-tvIRN7ah.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  }
+}

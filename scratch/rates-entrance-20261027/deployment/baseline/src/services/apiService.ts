@@ -1,0 +1,1779 @@
+import { apiClient, setMemoryAccessToken } from "./apiClient";
+import { filenameFromDisposition } from "../utils/downloadBlob";
+import { User, ActiveSession, AccountLoginLog } from "../types/auth";
+
+export interface ApiUser {
+  id: number;
+  username: string;
+  role: string;
+  name: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  status: "Active" | "Inactive";
+  version: number;
+  isOnline?: boolean;
+}
+
+export interface ConflictError extends Error {
+  isConflict: true;
+  latest: ApiUser | null;
+}
+
+// Sign-in does not always end in a session. When the account still has to prove
+// it owns its email address (or, for the seeded bootstrap admin, still has to
+// supply an identity at all), the server answers 200 with one of these instead
+// of a token — see the server's loginChallengeService.
+export interface LoginChallengeResponse {
+  message?: string;
+  otpRequired?: boolean;
+  profileSetupRequired?: boolean;
+  challengeToken: string;
+  maskedEmail?: string | null;
+  maskedPhone?: string | null;
+  phone?: string | null;
+  role: string;
+  expiresInSeconds: number;
+}
+
+export interface LoginSuccessResponse {
+  user: User;
+  token: string;
+  message?: string;
+}
+
+export interface LoginAnotherDeviceResponse {
+  anotherDeviceActive: true;
+  existingSession: {
+    ipAddress: string;
+    deviceInfo: string;
+    lastUsedAt: string;
+    createdAt: string;
+  };
+}
+
+export interface LoginErrorResponse {
+  error: string;
+  statusCode?: number;
+  retryAfterSeconds?: number;
+  isRateLimit?: boolean;
+  // Failures this browser has left before sign-in is paused, and which limit
+  // that is (the API's X-Login-Attempts-* headers). An API without them leaves
+  // these undefined, and the screen simply gives no early warning.
+  attemptsRemaining?: number;
+  limitScope?: "device" | "network";
+}
+
+// Header values arrive as strings, or not at all when CORS does not expose them.
+function headerNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "string" ? parseInt(value, 10) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+export type LoginResponse =
+  | LoginSuccessResponse
+  | LoginChallengeResponse
+  | LoginAnotherDeviceResponse
+  | LoginErrorResponse;
+
+export function isLoginChallenge(res: LoginResponse): res is LoginChallengeResponse {
+  return "challengeToken" in res;
+}
+
+export function isAnotherDeviceActive(res: LoginResponse): res is LoginAnotherDeviceResponse {
+  return "anotherDeviceActive" in res && (res as any).anotherDeviceActive === true;
+}
+
+export interface CompleteLoginProfileInput {
+  challengeToken: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  email: string;
+}
+
+// Errors on the challenge endpoints carry a message worth showing verbatim
+// (expired session, wrong code, cooldown), plus an optional retry hint the OTP
+// screen uses to re-sync its countdown instead of trusting the client clock.
+export interface ChallengeError {
+  error: string;
+  retryAfterSeconds?: number;
+}
+
+function toChallengeError(err: any, fallback: string): ChallengeError {
+  return {
+    error: err?.response?.data?.error || err?.message || fallback,
+    retryAfterSeconds: err?.response?.data?.details?.retryAfterSeconds,
+  };
+}
+
+function isConflictResponse(err: any): boolean {
+  return err?.response?.status === 409;
+}
+
+/**
+ * The server's beacon-derived liveness state — the one authority on whether a
+ * rider is reachable (see server/src/lib/riderAvailability.ts).
+ *
+ * Thresholds are counted in BEACONS, not seconds: 2.5 missed beacons at the
+ * cadence the device reports, so 25s on an errand and 75s idle. A flat number
+ * marked healthy idle riders as lost two thirds of the time.
+ */
+export type RiderAvailabilityState =
+  | "AVAILABLE"
+  | "SIGNAL_LOST"
+  | "OFFLINE"
+  | "NEEDS_PERMISSIONS"
+  | "OFF_DUTY"
+  | "LOGGED_OUT";
+
+export type RiderImpediment = "background_location" | "notifications" | "exact_alarms";
+
+export interface ApiRider {
+  id: number;
+  name: string;
+  phone: string;
+  avatar: string | null;
+  /** ACCOUNT status — enabled or disabled by an owner. Not presence. */
+  status: "Active" | "Inactive";
+  activeOrdersCount: number;
+  /** True only for AVAILABLE. The single question dispatch asks. */
+  online: boolean;
+  availability: RiderAvailabilityState;
+  /** True when OFFLINE was inferred from silence rather than reported. */
+  presumed: boolean;
+  /** Why an otherwise-present rider cannot be offered work. */
+  impediments: RiderImpediment[];
+  /**
+   * The status dispatch and the owner see (2026-09-23): derived server-side
+   * from `availability`, with the reason in words and the last time the
+   * rider was heard from, so "signal lost" can say for how long.
+   */
+  riderStatus: ApiRiderStatus;
+  riderStatusReason: string;
+  riderStatusText: string;
+  lastBeaconAt: number | null;
+}
+
+export type ApiRiderStatus = "AVAILABLE_ONLINE" | "AVAILABLE_SIGNAL_LOST" | "OFFLINE";
+
+// Metadata for the category's hero photo (`store_cat_image`). The list
+// endpoint returns this shape and never the base64 payload, so a category grid
+// stays a couple of kilobytes; `updatedAt` doubles as the cache-busting key for
+// the separate image fetch.
+export interface ApiStoreCategoryImageMeta {
+  mimeType: string;
+  fileSize: number;
+  updatedAt: string;
+}
+
+export interface ApiStoreCategoryImage extends ApiStoreCategoryImageMeta {
+  categoryId: number;
+  imageData: string;
+  fileName: string | null;
+}
+
+// How the purchase handling fee is charged for stops of this kind. The AMOUNTS
+// live in RateConfig — only the mode is per-category, so the flat figure and the
+// percentage stay editable in one place.
+export type HandlingFeeMode = "THRESHOLD" | "FLAT" | "PERCENT" | "NONE";
+
+export interface ApiMerchantCategory {
+  id: number;
+  name: string;
+  description: string;
+  status: "Active" | "Inactive";
+  handlingFeeMode?: HandlingFeeMode;
+  /** How close the rider must get for a stop of this kind to count as reached. */
+  geofenceRadiusMeters?: number;
+  _count?: {
+    places: number;
+  };
+  image?: ApiStoreCategoryImageMeta | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// A verified place (location store) as returned by /places. Mirrors the shape
+// PlacesDirectoryScreen already declares; re-stated here so the Store
+// Categories module can list a category's stores without importing a screen.
+export interface ApiVerifiedPlace {
+  id: string;
+  name: string;
+  categoryId: number;
+  address: string;
+  barangay: string | null;
+  latitude: number;
+  longitude: number;
+  keywords: string | null;
+  isActive: boolean;
+}
+
+/** Server's NotificationPriority. Ordered lowest first. */
+export type NotificationPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
+
+export interface ApiNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  /** Rows written before 2026-10-21 on a server without the column have none. */
+  priority?: NotificationPriority;
+  /** `errand:<id>` or `rider:<id>`: what the row opens. */
+  refKey?: string | null;
+}
+
+export type NotificationSort = "newest" | "oldest" | "priority";
+
+export interface NotificationListParams {
+  q?: string;
+  sort?: NotificationSort;
+  priority?: NotificationPriority[];
+  type?: string[];
+  unread?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ApiRateConfig {
+  id: number;
+  baseFee: number;
+  perKmRate: number;
+  multiStoreFeePerStore: number;
+  maxAdditionalStores: number;
+  groceryFeeThreshold: number;
+  groceryFeePercent: number;
+  groceryFeeFlat: number;
+  nonCodThreshold: number;
+  nonCodFeeHigh: number;
+  nonCodFeeLow: number;
+  /**
+   * The parts of the pricing formula the owner cannot edit, published by the
+   * server so the rate simulator reads them instead of holding its own copy.
+   * Optional because an older server will not send it.
+   */
+  pricingRules?: {
+    /** Kilometres the base fare covers before the per-km rate applies. */
+    baseFeeDistanceKm: number;
+    /** Item units above which a handling fee applies regardless of value. */
+    handlingItemUnitsThreshold: number;
+    /** Basket value at or above which a handling fee applies regardless of size. */
+    handlingAmountThreshold: number;
+  };
+}
+
+export type ExceptionKind =
+  | "CASH_VARIANCE"
+  | "RECEIPT_DIVERGENCE"
+  | "UNVERIFIED_PURCHASE"
+  | "WRONG_BRANCH"
+  | "MISSING_RECEIPT"
+  | "STALLED_STOP"
+  | "OVERAGE_PENDING"
+  | "UNPAID_BALANCE"
+  | "CANCELLED_AFTER_PURCHASE";
+
+/** A Help Desk Report line's problem: its kind, with cash short and cash over apart. */
+export type ReportProblem = ExceptionKind | "CASH_SHORT" | "CASH_OVER";
+
+/**
+ * A suggested reason for clearing an exception, from the server's trained
+ * network. Below `threshold` (0.75) it is not confident, and `suggestion` is
+ * null: the model says nothing rather than guess into an audit record.
+ */
+export interface ApiReasonSuggestion {
+  confident: boolean;
+  /** The model's probability for its best reason, 0 to 1. */
+  confidence: number;
+  threshold: number;
+  reasonCode: string | null;
+  suggestion: string | null;
+  modelVersion: string;
+  /**
+   * The large model's reading of the same evidence (Gemini, or Gemma behind
+   * it), pooled into `confidence`. Null or absent when there was none.
+   * `reasonCode` null means it found that none of the reasons fits.
+   */
+  secondOpinion?: { reasonCode: string | null; confidence: number; model: string; label: string } | null;
+}
+
+export interface ApiErrandException {
+  errandId: string;
+  kind: ExceptionKind;
+  /** Owner's Help Desk Report only: what the line is counted and labelled under. */
+  problem?: ReportProblem;
+  amountAtRisk: number;
+  detail: string;
+  /** Cash short or over only: the handover's figures and what is still owed now. */
+  cash?: { expected: number; collected: number; short: number; stillOwed: number };
+  riderId: number | null;
+  riderName: string | null;
+  occurredAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolutionReason: string | null;
+}
+
+/**
+ * Where one item should be bought on a specific errand.
+ *
+ * Distinct from ApiCategoryInference in two ways that matter. It names one of
+ * THIS errand's pinned shops rather than a bare category, and it says where the
+ * answer came from: `learned` means a dispatcher filed this same item before,
+ * `model` means nobody has and the name was read. A learned answer carries the
+ * count behind it, because "filed here 9 of the last 10 times" and "someone did
+ * this once" deserve different amounts of trust.
+ */
+/**
+ * May a store be pinned at a spot. Mirrors the server's storeLocationGuard:
+ * "inside" Tacurong, "outside" the border but on the loaded road map (allowed
+ * once the dispatcher confirms), or "blocked" off the road map.
+ */
+export interface ApiStoreLocationVerdict {
+  status: "inside" | "outside" | "blocked";
+  reason: "inside_border" | "outside_border" | "off_road_map" | "beyond_cap";
+  kmBeyondBorder: number;
+  nearestRoadMeters: number | null;
+  graphChecked: boolean;
+  message: string;
+}
+
+/** One store the pin predictor proposes, with the items it is for. */
+export interface ApiPredictedStore {
+  storeName: string;
+  latitude: number;
+  longitude: number;
+  placeId: string | null;
+  categoryId: number | null;
+  categoryName: string | null;
+  items: string[];
+  confidence: number;
+  source: "named" | "learned" | "similar" | "category";
+  learnedFrom: number;
+  reason: string;
+  location: ApiStoreLocationVerdict;
+  alreadyPinned: boolean;
+}
+
+export interface ApiStorePrediction {
+  stores: ApiPredictedStore[];
+  uncovered: Array<{ name: string; reason: string }>;
+  trainingExamples: number;
+}
+
+/** The fee for stops being placed, from POST /errands/:id/pinpoints/quote. */
+export interface ApiPinQuote {
+  deliveryFee: number;
+  totalCost: number;
+  distanceFee: number | null;
+  multiStoreFee: number | null;
+  groceryFee: number | null;
+  nonCodFee: number | null;
+  distanceKm: number;
+  /** No routing engine answered, so the distance is a straight-line estimate. */
+  estimated: boolean;
+  /** The customer already agreed a fare; these stops do not change it. */
+  fareAgreed: boolean;
+  stops: number;
+}
+
+export interface ApiItemPlacement {
+  name: string;
+  categoryId: number | null;
+  categoryName: string | null;
+  pinpointId: number | null;
+  storeName: string | null;
+  confidence: number;
+  /** "learned" | "model" | "none" */
+  source: string;
+  learnedFrom: number;
+  reason: string;
+}
+
+/**
+ * A merchant-category guess, or an honest account of why there isn't one.
+ *
+ * Three distinct outcomes, kept distinct on purpose. `available: false` means
+ * the service could not be reached at all; `available: true` with a null
+ * category means it looked and was not confident enough to say; a populated
+ * category is an actual answer. The panel words all three differently, because
+ * "we didn't ask" and "we asked and it's genuinely ambiguous" are different
+ * things to tell a dispatcher.
+ */
+export interface ApiCategoryInference {
+  available: boolean;
+  categoryId?: number;
+  categoryName?: string;
+  confidence?: number;
+  /** True only well above the threshold. Selects wording, never behaviour. */
+  strong?: boolean;
+  /** "name" or "google+name" — what the answer was actually based on. */
+  source?: string;
+  alternatives?: Array<{ categoryId: number; categoryName: string; confidence: number }>;
+  reason?: string;
+}
+
+/** The shape every failure path returns, so no caller needs a special case. */
+const UNAVAILABLE_INFERENCE: ApiCategoryInference = {
+  available: false,
+  reason: "The category service is not reachable.",
+};
+
+/** Proof metadata — never the blob. Fetch one image by id to see the bytes. */
+export interface ApiProofImage {
+  id: number;
+  kind:
+    | "RECEIPT"
+    | "NO_RECEIPT"
+    | "PROOF_OF_DELIVERY"
+    | "PAYMENT_PROOF"
+    | "RIDER_BALANCE_PROOF"
+    | "CASH_COLLECTED"
+    | string;
+  pinpointId: number | null;
+  /** Exactly one of these is ever set — who captured this photo. */
+  riderId?: number | null;
+  customerId?: number | null;
+  mimeType: string;
+  byteSize: number;
+  clarityVerdict: string | null;
+  capturedAt: string;
+  verified: boolean;
+  declaredTotal: number | null;
+  /** Set once a later upload has replaced this one — null means "current". */
+  supersededAt?: string | null;
+  extraction: {
+    extractedTotal: number | null;
+    confirmedTotal: number | null;
+    status: string;
+    engine: string | null;
+    referenceNo?: string | null;
+    transactionId?: string | null;
+    extractedDate?: string | null;
+  } | null;
+}
+
+/** One recorded reason a dispatcher gave for declining an order. */
+export interface ApiDeclineReason {
+  id: number;
+  reason: string;
+  /** True when the dispatcher typed it rather than picking a listed reason. */
+  isCustom: boolean;
+  createdAt: string;
+  dispatcher?: { firstName: string | null; lastName: string | null } | null;
+}
+
+export interface ApiExceptionReport {
+  meta?: {
+    period: ReportPeriod | "CUSTOM";
+    rangeLabel: string;
+    coverageLabel?: string;
+    breakdownUnit?: BreakdownUnit;
+    start: string;
+    end: string;
+  };
+  /** Owner report only; the dispatcher's open queue has no breakdown. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & { count: number; openCount: number; resolvedCount: number; atRisk: number }
+  >;
+  exceptions: ApiErrandException[];
+  summary: {
+    openCount: number;
+    resolvedCount: number;
+    totalAtRisk: number;
+    byKind: Array<{ kind: ReportProblem; count: number; atRisk: number }>;
+  };
+  riders: Array<{
+    riderId: number;
+    riderName: string | null;
+    errandCount: number;
+    exceptionCount: number;
+    rate: number;
+    atRisk: number;
+  }>;
+  materialityPesos: number;
+}
+
+export type DashboardFrequency = "TODAY" | "WEEK" | "MONTH" | "YEAR";
+
+export interface ApiDashboardSummary {
+  /** What window these figures cover, so the page can say so. */
+  rangeLabel: string;
+  riders: {
+    total: number;
+    /** In contact and on duty right now — NOT the count of enabled accounts. */
+    active: number;
+    inactive: number;
+    signalLost: number;
+    offline: number;
+    offDuty: number;
+    /** Accounts an owner has disabled. What `active` used to mean, wrongly. */
+    disabledAccounts: number;
+  };
+  errands: { pending: number; active: number; completedAllTime: number; cancelled: number };
+  revenue: { gross: number; estimatedCommission: number; estimatedRiderPayouts: number; orderCount: number };
+  trend: Array<{ label: string; revenue: number }>;
+}
+
+export type ReportPeriod = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+
+/**
+ * The window a dated view is asking for.
+ *
+ * Either a named preset with a reference date, or an explicit `start`/`end` pair
+ * as `YYYY-MM-DD` with BOTH ENDS INCLUSIVE — the server pushes the end to the
+ * following midnight for its own `lt` bound, so no caller has to remember to.
+ * Where both are present the explicit range wins.
+ */
+export interface ApiDateRange {
+  period?: ReportPeriod;
+  date?: string;
+  start?: string;
+  end?: string;
+  /** Rider Performance only: narrows the report, and its printout, to one rider. */
+  riderId?: number;
+}
+
+/** Drops undefined keys so axios does not serialise `?start=undefined`. */
+function rangeParams(range: ApiDateRange): Record<string, string> {
+  const params: Record<string, string> = {};
+  if (range.period) params.period = range.period;
+  if (range.date) params.date = range.date;
+  if (range.start && range.end) {
+    params.start = range.start;
+    params.end = range.end;
+  }
+  if (range.riderId) params.riderId = String(range.riderId);
+  return params;
+}
+
+interface ReportMeta {
+  /** "CUSTOM" when the caller drew its own range. */
+  period: ReportPeriod | "CUSTOM";
+  rangeLabel: string;
+  /**
+   * The window in one plain sentence, naming the days:
+   * "This week, by day: Sunday, Oct 18, 2026 to Saturday, Oct 24, 2026".
+   * Optional so a server that predates it still renders.
+   */
+  coverageLabel?: string;
+  /** What each timelineBreakdown row is. */
+  breakdownUnit?: BreakdownUnit;
+  start: string;
+  end: string;
+}
+
+export type BreakdownUnit = "day" | "week" | "month" | "year";
+
+/**
+ * One row of a report's period breakdown: a day (Sunday to Saturday), a week,
+ * a month or a year. Each report adds its own figures; the printed PDF opens
+ * with the same rows.
+ */
+export interface ApiPeriodPoint {
+  /** "Sunday", "Week 2", "January", "2026". */
+  label: string;
+  /** The dates the row covers: "Oct 18", "Oct 8 to 14". */
+  dateLabel?: string;
+}
+
+/**
+ * One merchant category's share of a period.
+ *
+ * `orderCount` counts each errand once, in whichever category held most of its
+ * money, so it sums to `totalOrders`. `touchedOrderCount` counts every errand
+ * that touched the category and legitimately sums to MORE than `totalOrders` —
+ * never put the two in the same column.
+ */
+export interface ApiCategoryBreakdown {
+  category: string;
+  revenue: number;
+  itemCost: number;
+  deliveryFee: number;
+  tip: number;
+  /** Alias of orderCount, kept so older callers keep resolving. */
+  count: number;
+  orderCount: number;
+  touchedOrderCount: number;
+}
+
+export interface ApiSalesTimelinePoint extends ApiPeriodPoint {
+  orderCount: number;
+  revenue: number;
+  itemCost: number;
+  deliveryFee: number;
+  tip: number;
+}
+
+export interface ApiSalesReport extends ReportMeta {
+  totalRevenue: number;
+  totalOrders: number;
+  timelineBreakdown?: ApiSalesTimelinePoint[];
+  byCategory: ApiCategoryBreakdown[];
+  /** `difference` must be 0. Rendered, so a regression is visible on the page. */
+  reconciliation: { totalRevenue: number; allocatedRevenue: number; difference: number };
+  uncategorisedRevenue: number;
+  notes: string[];
+}
+
+export interface ApiRiderMetrics {
+  riderId: number;
+  name: string;
+  throughput: {
+    completedCount: number;
+    avgDeliveryMinutes: number | null;
+    deliveryTimedCount: number;
+    avgAcceptMinutes: number | null;
+    acceptTimedCount: number;
+    activeHours: number;
+    errandsPerActiveHour: number | null;
+  };
+  reliability: {
+    /** Delivered by the promise frozen when the rider set out for the door. */
+    onTimeRate: number | null;
+    /** Deliveries that could be checked: the only fair denominator, so it is shown. */
+    onTimeDenominator: number;
+    onTimeCount?: number;
+    /** Left out of On time: no usable promise, or no GPS at the door. */
+    notCheckedCount?: number;
+    noPromiseCount?: number;
+    unverifiedCount?: number;
+    /** Always 0 since 2026-10-22; a fallback estimate is never frozen as a promise. */
+    degradedEtaCount: number;
+    cancellationRate: number | null;
+    reachedCount: number;
+    cancelledCount: number;
+    connectivityDrops: number;
+    unresolvedDrops: number;
+    /** Offers turned down with Decline. Absent from a server older than 2026-10-25. */
+    declinedCount?: number;
+    /** Offers left to run out unanswered. */
+    expiredOfferCount?: number;
+  };
+  earnings: {
+    riderShareEarned: number;
+    commissionCount: number;
+    settlementVarianceTotal: number;
+    /** Cash short and cash over, apart. Optional: a server before 2026-10-27 sends only the net. */
+    cashShortTotal?: number;
+    cashOverTotal?: number;
+    shortageCount: number;
+    settlementCount: number;
+  };
+  quality: {
+    /** All-time, not period-scoped. The count beside it is not optional. */
+    averageRatingAllTime: number | null;
+    ratingCountAllTime: number;
+    exceptionCount: number;
+    exceptionErrandCount: number;
+    exceptionRate: number | null;
+    exceptionsAtRisk: number;
+  };
+  completedCount: number;
+  avgDeliveryMinutes: number | null;
+  averageRating: number | null;
+}
+
+/** One delivery's On Time verdict, as the server judged it. */
+export type ApiDeliveryCheck =
+  | { result: "ON_TIME"; minutesLate: number; nearestMeters: number }
+  | { result: "LATE"; minutesLate: number; nearestMeters: number }
+  | {
+      result: "NOT_CHECKED";
+      reason:
+        | "NO_PROMISE"
+        | "PROMISE_TOO_LATE"
+        | "PROMISE_TOO_CLOSE"
+        | "TIME_DOES_NOT_ADD_UP"
+        | "NO_GPS_AT_DELIVERY"
+        | "FAR_FROM_ADDRESS";
+      nearestMeters: number | null;
+    };
+
+export interface ApiRiderDelivery {
+  errandId: string;
+  referenceNo: string | null;
+  acceptedAt: string | null;
+  deliveredAt: string;
+  /** The frozen promise, or null when none was saved. */
+  promisedBy: string | null;
+  check: ApiDeliveryCheck | null;
+}
+
+/** One offer a rider declined or let run out, kept permanently since 2026-10-25. */
+export interface ApiRiderDecline {
+  id: number;
+  errandId: string;
+  referenceNo: string | null;
+  kind: "DECLINED" | "EXPIRED";
+  reason: string | null;
+  offeredAt: string | null;
+  declinedAt: string;
+}
+
+export interface ApiRiderPerformanceReport extends ReportMeta {
+  /** Every rider, for the rider picker, whichever one is being shown. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for the whole fleet. */
+  rider?: { riderId: number; name: string } | null;
+  /** One rider's report only: every delivery in the window, newest first. */
+  deliveries?: ApiRiderDelivery[];
+  /** One rider's report only: every offer declined or let lapse, newest first. */
+  declines?: ApiRiderDecline[];
+  /** The whole fleet per day / week / month / year. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & {
+      completedCount: number;
+      cancelledCount: number;
+      riderShareEarned: number;
+      settlementVarianceTotal: number;
+      cashShort?: number;
+      cashOver?: number;
+    }
+  >;
+  riders: ApiRiderMetrics[];
+  fleet: {
+    riderCount: number;
+    completedCount: number;
+    avgDeliveryMinutes: number | null;
+    deliveryTimedCount: number;
+    onTimeRate: number | null;
+    onTimeDenominator: number;
+    notCheckedCount?: number;
+    degradedEtaCount: number;
+    riderShareEarned: number;
+    settlementVarianceTotal: number;
+    cashShortTotal?: number;
+    cashOverTotal?: number;
+    shortageCount: number;
+    exceptionCount: number;
+    connectivityDrops: number;
+    declinedCount?: number;
+    expiredOfferCount?: number;
+  };
+  notes: string[];
+}
+
+export interface ApiCommissionReport extends ReportMeta {
+  estimatedCommission: number;
+  /** Sum of every category's rider share: the Total row's Rider's share. */
+  riderCommission: number;
+  totalDeliveryFees: number;
+  orderCount: number;
+  /** The rider's fraction of delivery fees. Captions derive from this. */
+  commissionRate: number;
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & { orderCount: number; deliveryFee: number; businessShare: number; riderShare: number }
+  >;
+  byCategory: Array<{
+    category: string;
+    orderCount: number;
+    touchedOrderCount: number;
+    revenue: number;
+    deliveryFee: number;
+    businessShare: number;
+    riderShare: number;
+  }>;
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
+  /** One rider's report only: each order in the window and how its fee was split. */
+  orders?: Array<{
+    errandId: string;
+    referenceNo: string | null;
+    placedAt: string;
+    deliveryFee: number;
+    tip: number;
+    businessShare: number;
+    riderShare: number;
+  }>;
+  notes: string[];
+}
+
+/** Money recorded against a short handover after the fact. */
+export type SettlementAdjustmentKind = "RIDER_PAID_BACK" | "CUSTOMER_PAID_GCASH" | "WRITTEN_OFF";
+
+export interface ApiSettlementFollowUp {
+  kind: SettlementAdjustmentKind;
+  label: string;
+  amount: number;
+  reference: string | null;
+  recordedAt: string;
+  recordedBy: string;
+}
+
+export interface ApiSettlementLine {
+  errandId: string;
+  referenceNo?: string | null;
+  riderName: string | null;
+  expected: number;
+  collected: number;
+  variance: number;
+  status: string;
+  shortReason: string | null;
+  settledAt: string;
+  /** What happened to a short since the handover, as of today. */
+  short?: number;
+  /** How much more cash came back than expected. 0 unless over. */
+  over?: number;
+  paidBackLater?: number;
+  writtenOff?: number;
+  stillOwed?: number;
+  followUps?: ApiSettlementFollowUp[];
+}
+
+/** Help Desk "Money still owed": one short handover with something left to pay. */
+export interface ApiMoneyOwed {
+  errandId: string;
+  referenceNo: string | null;
+  riderId: number;
+  riderName: string;
+  settledAt: string;
+  expected: number;
+  collected: number;
+  shortReason: string | null;
+  short: number;
+  paidSoFar: number;
+  writtenOff: number;
+  stillOwed: number;
+  adjustments: Array<{
+    id: number;
+    kind: SettlementAdjustmentKind;
+    label: string;
+    amount: number;
+    reference: string | null;
+    note: string | null;
+    recordedAt: string;
+    recordedBy: string;
+    /** Undone by the person who recorded it. Shown, struck through, for the record. */
+    voided: boolean;
+    /** The asking user recorded it within the last 10 minutes. */
+    canUndo: boolean;
+  }>;
+}
+
+/** What happened to a short, as chosen in the Resolve box. */
+export interface ApiCashOutcome {
+  kind: SettlementAdjustmentKind | "NOT_PAID_YET";
+  amount?: number;
+  reference?: string | null;
+}
+
+/**
+ * Two blocks on two different clocks, deliberately not merged.
+ *
+ * `revenue` is windowed on when errands were placed; `cash` on when they were
+ * settled. An errand placed at the end of a period settles in the next one, so
+ * the two are not expected to agree — and presenting them as one figure makes
+ * that ordinary gap read as missing money.
+ */
+export interface ApiSettlementReport extends ReportMeta {
+  commissionRate: number;
+  /** Cash handed over per day / week / month / year, on the settlement clock. */
+  timelineBreakdown?: Array<
+    ApiPeriodPoint & {
+      settlementCount: number;
+      expected: number;
+      collected: number;
+      variance: number;
+      /** Short and over apart, so one cannot hide the other. */
+      short?: number;
+      over?: number;
+      shortageCount: number;
+      stillOwed?: number;
+    }
+  >;
+  revenue: {
+    basis: string;
+    grossRevenue: number;
+    /**
+     * What grossRevenue is made of: money a rider reconciled, and money that is
+     * only priced. Optional because a server not yet carrying the split still
+     * returns a valid report — the view falls back to zero rather than NaN.
+     */
+    collectedRevenue?: number;
+    awaitingCollection?: number;
+    awaitingCount?: number;
+    totalDeliveryFees: number;
+    businessShare: number;
+    riderShare: number;
+    orderCount: number;
+  };
+  cash: {
+    basis: string;
+    expectedTotal: number;
+    collectedTotal: number;
+    varianceTotal: number;
+    settlementCount: number;
+    shortageCount: number;
+    /** Over handovers, apart from short ones. overTotal - shortTotal = varianceTotal. */
+    overTotal?: number;
+    overCount?: number;
+    /** shortTotal = paidBackLaterTotal + writtenOffTotal + stillOwedTotal. */
+    shortTotal?: number;
+    paidBackLaterTotal?: number;
+    writtenOffTotal?: number;
+    stillOwedTotal?: number;
+    byRider: Array<{
+      riderId: number;
+      riderName: string | null;
+      settlementCount: number;
+      expected: number;
+      collected: number;
+      variance: number;
+      short?: number;
+      over?: number;
+      shortageCount: number;
+      paidBackLater?: number;
+      writtenOff?: number;
+      stillOwed?: number;
+    }>;
+    lines: ApiSettlementLine[];
+  };
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
+  // Flat mirrors of the revenue block, kept so nothing breaks mid-migration.
+  grossRevenue: number;
+  collectedRevenue?: number;
+  awaitingCollection?: number;
+  totalDeliveryFees: number;
+  businessShare: number;
+  riderShare: number;
+  orderCount: number;
+  notes: string[];
+}
+
+export interface ApiTransactionSummaryReport extends ReportMeta {
+  timelineBreakdown?: Array<ApiPeriodPoint & { count: number; amount: number; deliveryFee: number }>;
+  transactions: Array<{
+    transactionId: number;
+    errandId: string;
+    /** The resolved merchant category, not the literal "Pabili". */
+    category: string;
+    /** Every category the errand touched; more than one on a multi-stop run. */
+    categories: string[];
+    riderName: string | null;
+    customerName: string | null;
+    deliveryAddress: string;
+    amount: number;
+    deliveryFee: number;
+    paymentMethod: string;
+    /** The GCash/Maya reference number read off whichever photo backed the payment. */
+    paymentReferenceNo: string | null;
+    paymentTransactionId: string | null;
+    /** Who attested the money arrived — the dispatcher/owner who confirmed it. */
+    paymentConfirmedBy: string | null;
+    /** Whose photo backed the confirmation, where one exists. */
+    paymentEvidenceSource: "customer" | "rider" | null;
+    /** The proof photo's id, for opening it; null where there is no photo. */
+    paymentProofImageId?: number | null;
+    status: string;
+    errandStatus: string;
+    /** Written once at creation and never advanced — see the report's notes. */
+    paymentStatus: string;
+    createdAt: string;
+  }>;
+  byPaymentMethod: Array<{ paymentMethod: string; count: number; amount: number }>;
+  byErrandStatus: Array<{ status: string; count: number; amount: number }>;
+  byPaymentStatus: Array<{ status: string; count: number; amount: number }>;
+  totals: { count: number; amount: number; deliveryFee: number };
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
+  notes: string[];
+}
+
+/** The six reports, matching the path segment the PDF endpoint expects. */
+export type ReportPdfType =
+  | "sales"
+  | "rider-performance"
+  | "commission"
+  | "settlement"
+  | "transactions"
+  | "exceptions";
+
+/**
+ * The message out of a failed blob request.
+ *
+ * When `responseType: "blob"` is set, axios hands back the ERROR body as a Blob
+ * too — so `err.response.data.error` is undefined and the naive path shows the
+ * owner "[object Blob]". The JSON has to be read out of the blob first.
+ */
+async function readBlobError(err: unknown): Promise<string> {
+  const fallback = "Could not generate this report. Please try again.";
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
+
+  if (data instanceof Blob) {
+    try {
+      const parsed = JSON.parse(await data.text());
+      return parsed?.error ?? parsed?.message ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  if (data && typeof data === "object") {
+    const body = data as { error?: string; message?: string };
+    return body.error ?? body.message ?? fallback;
+  }
+
+  return fallback;
+}
+
+// Shared by the 5 report methods below — same query shape ({period, date}), same
+// fetch-fails-soft behavior as every other method in this file.
+async function fetchReport<T>(endpoint: string, range: ApiDateRange): Promise<T | null> {
+  try {
+    const response = await apiClient.get<T>(endpoint, { params: rangeParams(range) });
+    return response.data;
+  } catch (err) {
+    console.warn(`API unavailable (${endpoint})`, err);
+    return null;
+  }
+}
+
+export const apiService = {
+  // Authentication API
+  // `identifier` is a username OR an email address — the server decides which by
+  // looking for "@". The wire key stays `username` because the rider mobile app
+  // is a separate deploy that still posts that field.
+  async login(identifier: string, password: string, confirmTakeover?: boolean): Promise<LoginResponse> {
+    try {
+      const response = await apiClient.post("/auth/login", {
+        username: identifier,
+        password,
+        confirmTakeover,
+      });
+      const data = response.data;
+      // A challenge or another-device prompt response carries no token, so this is correctly skipped
+      if (data.token) {
+        setMemoryAccessToken(data.token);
+      }
+      return data;
+    } catch (err: any) {
+      console.warn("Backend auth failed, error:", err);
+      const statusCode = err.response?.status;
+      const isRateLimit = statusCode === 429;
+      const headers = err.response?.headers ?? {};
+      const attemptsRemaining = headerNumber(headers["x-login-attempts-remaining"]);
+      const scopeHeader = headers["x-login-attempts-scope"];
+      const scopeCode = err.response?.data?.code;
+      const limitScope =
+        scopeCode === "LOGIN_NETWORK_LIMIT" || scopeHeader === "network"
+          ? "network"
+          : scopeCode === "LOGIN_DEVICE_LIMIT" || scopeHeader === "device"
+            ? "device"
+            : undefined;
+      // A 429 says how long it lasts. A refused password says when the count
+      // resets, which is the same thing once no attempts are left.
+      const retryAfterSeconds =
+        err.response?.data?.details?.retryAfterSeconds ||
+        headerNumber(headers["retry-after"]) ||
+        (isRateLimit ? 900 : headerNumber(headers["x-login-attempts-reset"]));
+
+      const errorMessage =
+        err.response?.data?.error || err.message || "Unable to connect to backend authentication server.";
+      return {
+        error: errorMessage,
+        statusCode,
+        isRateLimit,
+        retryAfterSeconds,
+        attemptsRemaining,
+        limitScope,
+      };
+    }
+  },
+
+  // Bootstrap admin only: supplies a real identity, then receives a fresh
+  // challenge at the OTP step (the token is re-minted because the email it is
+  // bound to just changed).
+  async completeLoginProfile(
+    input: CompleteLoginProfileInput
+  ): Promise<LoginChallengeResponse | ChallengeError> {
+    try {
+      const response = await apiClient.post<LoginChallengeResponse>("/auth/complete-profile", input);
+      return response.data;
+    } catch (err: any) {
+      return toChallengeError(err, "Could not save your details. Please try again.");
+    }
+  },
+
+  async verifyLoginOtp(
+    challengeToken: string,
+    code?: string,
+    firebaseIdToken?: string
+  ): Promise<LoginSuccessResponse | ChallengeError> {
+    try {
+      const response = await apiClient.post("/auth/verify-login-otp", {
+        challengeToken,
+        code,
+        firebaseIdToken,
+      });
+      const data = response.data;
+      // Mirrors login(): this is the point the session actually begins.
+      if (data.token) {
+        setMemoryAccessToken(data.token);
+      }
+      return data;
+    } catch (err: any) {
+      return toChallengeError(err, "Could not verify that code. Please try again.");
+    }
+  },
+
+  async resendLoginOtp(challengeToken: string): Promise<LoginChallengeResponse | ChallengeError> {
+    try {
+      const response = await apiClient.post<LoginChallengeResponse>("/auth/resend-login-otp", {
+        challengeToken,
+      });
+      return response.data;
+    } catch (err: any) {
+      return toChallengeError(err, "Could not send a new code. Please try again.");
+    }
+  },
+
+  // Users API
+  // Returns null (not []) on failure — callers need to tell "API failed" apart
+  // from "API succeeded with zero rows" so a real empty result isn't mistaken
+  // for an error and masked by stale fallback data.
+  async getUsers(): Promise<ApiUser[] | null> {
+    try {
+      const response = await apiClient.get<ApiUser[]>("/users");
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable or access denied", err);
+      return null;
+    }
+  },
+
+  async createUser(userData: Partial<ApiUser> & { password?: string }): Promise<ApiUser | null> {
+    try {
+      const response = await apiClient.post<ApiUser>("/users", userData);
+      return response.data;
+    } catch (err: any) {
+      console.warn("API Error (createUser):", err);
+      const message = err.response?.data?.error || err.message || "Failed to create user";
+      throw new Error(message);
+    }
+  },
+
+  async updateUser(id: number, userData: Record<string, unknown>): Promise<ApiUser | null> {
+    try {
+      const response = await apiClient.put<ApiUser>(`/users/${id}`, userData);
+      return response.data;
+    } catch (err: any) {
+      console.warn("API Error (updateUser):", err);
+      if (isConflictResponse(err)) {
+        const conflict = new Error(
+          err.response?.data?.error || "This user was modified by someone else."
+        ) as ConflictError;
+        conflict.isConflict = true;
+        conflict.latest = err.response?.data?.details?.latest ?? null;
+        throw conflict;
+      }
+      const message = err.response?.data?.error || err.message || "Failed to update user";
+      throw new Error(message);
+    }
+  },
+
+  // Riders API
+  // Same null-on-failure convention as getUsers() above.
+  async getRiders(): Promise<ApiRider[] | null> {
+    try {
+      const response = await apiClient.get<{ success: boolean; riders: ApiRider[] }>("/riders");
+      return response.data.riders;
+    } catch (err) {
+      console.warn("API unavailable or access denied", err);
+      return null;
+    }
+  },
+
+  // Merchant Categories API
+  // Same null-on-failure convention as getUsers() above.
+  // includeInactive: the endpoint returns only Active categories by default so
+  // a retired store type can never reach the customer's picker. The owner's
+  // management module is the one place that must still see and re-activate them.
+  async getMerchantCategories(includeInactive = true): Promise<ApiMerchantCategory[] | null> {
+    try {
+      const response = await apiClient.get<ApiMerchantCategory[]>(
+        `/merchant-categories${includeInactive ? "?includeInactive=true" : ""}`
+      );
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  async createMerchantCategory(data: { name: string; description: string }): Promise<ApiMerchantCategory | null> {
+    try {
+      const response = await apiClient.post<ApiMerchantCategory>("/merchant-categories", data);
+      return response.data;
+    } catch (err) {
+      console.warn("API Error:", err);
+      // Rethrown, not swallowed. The server rejects bills-payment category names
+      // with a message naming the exact term it matched — swallowing that and
+      // returning null left the owner with a generic "may already exist", which
+      // is both wrong and unactionable. Both call sites handle the throw.
+      throw err;
+    }
+  },
+
+  async updateMerchantCategory(
+    id: number,
+    data: Partial<{
+      name: string;
+      description: string;
+      status: "Active" | "Inactive";
+      handlingFeeMode: HandlingFeeMode;
+      geofenceRadiusMeters: number;
+    }>
+  ): Promise<ApiMerchantCategory | null> {
+    try {
+      const response = await apiClient.put<ApiMerchantCategory>(`/merchant-categories/${id}`, data);
+      return response.data;
+    } catch (err) {
+      console.warn("API Error:", err);
+      // Rethrown, not swallowed. The server rejects bills-payment category names
+      // with a message naming the exact term it matched — swallowing that and
+      // returning null left the owner with a generic "may already exist", which
+      // is both wrong and unactionable. Both call sites handle the throw.
+      throw err;
+      return null;
+    }
+  },
+
+  // The location stores filed under one category. includeInactive is passed so
+  // the owner sees retired pins too - this list is the entry point to the
+  // /places directory where a pin is brought back, and a store that is hidden
+  // here is a store the owner cannot find.
+  async getPlacesByCategory(categoryId: number): Promise<ApiVerifiedPlace[] | null> {
+    try {
+      const response = await apiClient.get<ApiVerifiedPlace[]>(
+        `/places?categoryId=${categoryId}&includeInactive=true`
+      );
+      return response.data;
+    } catch (err) {
+      console.warn("API Error:", err);
+      return null;
+    }
+  },
+
+  // Store Category Image API (`store_cat_image`)
+  // 404 is the documented "no photo set" answer, not a failure - it resolves to
+  // null so callers can render the placeholder without a try/catch of their own.
+  async getMerchantCategoryImage(id: number): Promise<ApiStoreCategoryImage | null> {
+    try {
+      const response = await apiClient.get<ApiStoreCategoryImage>(`/merchant-categories/${id}/image`);
+      return response.data;
+    } catch (err) {
+      return null;
+    }
+  },
+
+  // Throws on failure, unlike the null-returning readers above: an upload is a
+  // deliberate user action and the form must be able to show why it failed.
+  async uploadMerchantCategoryImage(
+    id: number,
+    data: { imageData: string; mimeType: string; fileSize: number; fileName?: string }
+  ): Promise<ApiStoreCategoryImageMeta> {
+    const response = await apiClient.put<ApiStoreCategoryImageMeta>(
+      `/merchant-categories/${id}/image`,
+      data
+    );
+    return response.data;
+  },
+
+  async deleteMerchantCategoryImage(id: number): Promise<void> {
+    await apiClient.delete(`/merchant-categories/${id}/image`);
+  },
+
+  // Rate Config API
+  async getRateConfig(): Promise<ApiRateConfig | null> {
+    try {
+      const response = await apiClient.get<ApiRateConfig>("/rate-config");
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  // Full object required, not partial — matches the backend, which always
+  // upserts the complete RateConfig row (server/src/validators/rateConfigValidators.ts).
+  async updateRateConfig(config: Omit<ApiRateConfig, "id">): Promise<ApiRateConfig | null> {
+    try {
+      const response = await apiClient.put<ApiRateConfig>("/rate-config", config);
+      return response.data;
+    } catch (err) {
+      console.warn("API Error:", err);
+      return null;
+    }
+  },
+
+  // Analytics API
+  async getDashboardSummary(
+    frequency: DashboardFrequency,
+    range?: { start: string; end: string },
+    date?: string
+  ): Promise<ApiDashboardSummary | null> {
+    try {
+      const response = await apiClient.get<ApiDashboardSummary>("/analytics/dashboard", {
+        params: {
+          frequency,
+          ...(range ? { start: range.start, end: range.end } : {}),
+          ...(date ? { date } : {}),
+        },
+      });
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  // Reports API
+  getSalesReport(range: ApiDateRange) {
+    return fetchReport<ApiSalesReport>("/reports/sales", range);
+  },
+  getRiderPerformanceReport(range: ApiDateRange) {
+    return fetchReport<ApiRiderPerformanceReport>("/reports/rider-performance", range);
+  },
+  getCommissionReport(range: ApiDateRange) {
+    return fetchReport<ApiCommissionReport>("/reports/commission", range);
+  },
+  getSettlementReport(range: ApiDateRange) {
+    return fetchReport<ApiSettlementReport>("/reports/settlement", range);
+  },
+  getTransactionSummary(range: ApiDateRange) {
+    return fetchReport<ApiTransactionSummaryReport>("/reports/transactions", range);
+  },
+  getExceptionReport(range: ApiDateRange) {
+    return fetchReport<ApiExceptionReport>("/reports/exceptions", range);
+  },
+
+  /**
+   * One report as a PDF, generated by the server in the standard format.
+   *
+   * Goes through `apiClient` rather than an anchor or `window.open`, and that is
+   * the whole point: the access token lives only in memory (apiClient.ts keeps
+   * it in a module variable, never localStorage) and is attached per request by
+   * the interceptor. A browser navigation never passes through axios, so it
+   * would carry no Authorization header and get a 401.
+   *
+   * The 401 refresh-and-retry path is already safe for this — the interceptor
+   * re-invokes with the ORIGINAL config object, and `responseType` lives on that
+   * config, so the retry still resolves to a Blob. Do not "simplify" it into
+   * rebuilding the request.
+   *
+   * Returns a discriminated result rather than throwing, matching how the rest
+   * of this file fails soft.
+   */
+  async downloadReportPdf(
+    reportType: ReportPdfType,
+    range: ApiDateRange
+  ): Promise<{ blob: Blob; filename: string } | { error: string }> {
+    try {
+      const response = await apiClient.get<Blob>(`/reports/${reportType}/pdf`, {
+        params: rangeParams(range),
+        responseType: "blob",
+      });
+
+      // The server names the file; this only covers the case where CORS is
+      // misconfigured and Content-Disposition is hidden from JS.
+      const window =
+        range.start && range.end ? `${range.start}_to_${range.end}` : range.period ?? "report";
+      const filename =
+        filenameFromDisposition(response.headers["content-disposition"]) ??
+        `Sugo_${reportType}_${window}.pdf`;
+
+      return { blob: response.data, filename };
+    } catch (err) {
+      return { error: await readBlobError(err) };
+    }
+  },
+
+  /** The dispatcher's working queue — what is still open, right now. */
+  async getOpenExceptions(days = 14): Promise<ApiExceptionReport | null> {
+    try {
+      const response = await apiClient.get<ApiExceptionReport>(`/errands/exceptions?days=${days}`);
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * The photos behind one errand — metadata only, so a queue of ten rows does
+   * not pull ten megabytes of base64 nobody has looked at yet.
+   */
+  async listProofImages(errandId: string, kind?: string): Promise<ApiProofImage[] | null> {
+    try {
+      const response = await apiClient.get<ApiProofImage[]>(`/errands/${errandId}/proof-images`, {
+        params: kind ? { kind } : undefined,
+      });
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /** One image's bytes, for a viewer that is about to display it. */
+  async getProofImage(
+    errandId: string,
+    imageId: number
+  ): Promise<{ id: number; mimeType: string; imageData: string } | null> {
+    try {
+      const response = await apiClient.get<{ id: number; mimeType: string; imageData: string }>(
+        `/errands/${errandId}/proof-images/${imageId}`
+      );
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * Why an order was declined, most recent first. An empty array means none
+   * was recorded (an order closed without one); null means the request failed.
+   */
+  async getDeclineReasons(errandId: string): Promise<ApiDeclineReason[] | null> {
+    try {
+      const response = await apiClient.get<ApiDeclineReason[]>(`/errands/${errandId}/decline-reasons`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /** Records that a person considered an exception and what they concluded. */
+  async resolveException(
+    errandId: string,
+    body: { kind: ExceptionKind; reason: string; amountAtRisk: number; cashOutcome?: ApiCashOutcome | null }
+  ): Promise<boolean> {
+    await apiClient.post(`/errands/${errandId}/exceptions/resolve`, body);
+    return true;
+  },
+
+  /** Help Desk "Money still owed". Null when the request failed. */
+  async getMoneyStillOwed(): Promise<ApiMoneyOwed[] | null> {
+    try {
+      const response = await apiClient.get<ApiMoneyOwed[]>("/errands/settlements/owed");
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /** Records money that came in (or was written off) after a short handover. Throws on refusal. */
+  async recordSettlementPayment(
+    errandId: string,
+    body: { kind: SettlementAdjustmentKind; amount: number; reference?: string | null; note?: string | null }
+  ): Promise<void> {
+    await apiClient.post(`/errands/${errandId}/settlement/adjustments`, body);
+  },
+
+  /** Undoes one the caller recorded within the last 10 minutes. Throws on refusal. */
+  async undoSettlementPayment(errandId: string, adjustmentId: number): Promise<void> {
+    await apiClient.post(`/errands/${errandId}/settlement/adjustments/${adjustmentId}/void`);
+  },
+
+  /**
+   * The model's suggested reason for clearing one exception. Null means the
+   * request failed, which is not the same as the model being unsure: an unsure
+   * model answers with `confident: false`.
+   */
+  async suggestExceptionReason(
+    errandId: string,
+    kind: ExceptionKind,
+    occurredAt: string
+  ): Promise<ApiReasonSuggestion | null> {
+    try {
+      const response = await apiClient.get<ApiReasonSuggestion>(
+        `/errands/${errandId}/exceptions/reason-suggestion`,
+        { params: { kind, occurredAt } }
+      );
+      return response.data;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * Whether a sysadmin has the Help Desk AI suggestions turned on. Null means
+   * the request failed; the caller treats that as off.
+   */
+  async getDispatcherAiSuggestionsEnabled(): Promise<boolean | null> {
+    try {
+      const response = await apiClient.get<{ enabled: boolean }>("/system/dispatcher-ai-suggestions");
+      return response.data.enabled === true;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  // Notifications API
+  /**
+   * One page of the caller's notifications, searched and sorted on the server.
+   * `total` is how many match in all (X-Total-Count), for "Load more".
+   */
+  async getNotifications(
+    params: NotificationListParams = {}
+  ): Promise<{ items: ApiNotification[]; total: number } | null> {
+    try {
+      const response = await apiClient.get<ApiNotification[]>("/notifications", {
+        params: {
+          q: params.q?.trim() || undefined,
+          sort: params.sort ?? "newest",
+          priority: params.priority?.length ? params.priority.join(",") : undefined,
+          type: params.type?.length ? params.type.join(",") : undefined,
+          unread: params.unread ? "1" : undefined,
+          limit: params.limit ?? 50,
+          offset: params.offset ?? 0,
+        },
+      });
+      const items = Array.isArray(response.data) ? response.data : [];
+      const header = Number(response.headers?.["x-total-count"]);
+      return { items, total: Number.isFinite(header) ? header : items.length };
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  async markNotificationRead(id: number): Promise<ApiNotification | null> {
+    try {
+      const response = await apiClient.patch<ApiNotification>(`/notifications/${id}/read`);
+      return response.data;
+    } catch (err) {
+      console.warn("API Error:", err);
+      return null;
+    }
+  },
+
+  async markAllNotificationsRead(): Promise<boolean> {
+    try {
+      await apiClient.patch("/notifications/read-all");
+      return true;
+    } catch (err) {
+      console.warn("Failed to mark all notifications as read:", err);
+      return false;
+    }
+  },
+
+  // Active Sessions & Account Logs
+  async getActiveSessions(): Promise<ActiveSession[]> {
+    try {
+      const response = await apiClient.get<{ sessions: ActiveSession[] }>("/account/sessions");
+      return response.data?.sessions || [];
+    } catch (err) {
+      console.warn("Failed to fetch active sessions:", err);
+      return [];
+    }
+  },
+
+  async revokeSession(sessionId: string): Promise<boolean> {
+    try {
+      await apiClient.delete(`/account/sessions/${sessionId}`);
+      return true;
+    } catch (err) {
+      console.warn("Failed to revoke session:", err);
+      return false;
+    }
+  },
+
+  async revokeOtherSessions(): Promise<boolean> {
+    try {
+      await apiClient.post("/account/sessions/revoke-others");
+      return true;
+    } catch (err) {
+      console.warn("Failed to revoke other sessions:", err);
+      return false;
+    }
+  },
+
+  /**
+   * What kind of shop this name refers to, from the category service.
+   *
+   * Never throws and never returns a rejected promise: this is a guess that
+   * improves a pin, not a step in placing one. An unreachable service, a 500,
+   * a timeout and "the model wasn't sure" all arrive as the same
+   * `available: false` / `category: null` shape, because the panel renders them
+   * the same way - the dispatcher picks the category by hand, exactly as they
+   * did before this service existed.
+   */
+  async inferStoreCategory(
+    name: string,
+    googleTypes?: string[] | null
+  ): Promise<ApiCategoryInference> {
+    try {
+      const response = await apiClient.post<ApiCategoryInference>("/category-inference/store", {
+        name,
+        googleTypes: googleTypes?.length ? googleTypes : undefined,
+      });
+      return response.data;
+    } catch (err) {
+      console.warn("Category inference unavailable:", err);
+      return { available: false, reason: "The category service is not reachable." };
+    }
+  },
+
+  /**
+   * What kind of shop each item is bought at. Index-aligned with `names`.
+   *
+   * Batched because stage 3 asks about a whole basket when the editor opens,
+   * and eleven round trips inside a panel someone is looking at is eleven
+   * chances to be slower than the dispatcher.
+   */
+  async inferItemCategories(names: string[]): Promise<ApiCategoryInference[]> {
+    if (names.length === 0) return [];
+    try {
+      const response = await apiClient.post<{ results: ApiCategoryInference[] }>(
+        "/category-inference/items",
+        { names }
+      );
+      return response.data?.results ?? names.map(() => UNAVAILABLE_INFERENCE);
+    } catch (err) {
+      console.warn("Category inference unavailable:", err);
+      return names.map(() => UNAVAILABLE_INFERENCE);
+    }
+  },
+
+  /**
+   * Where each item should be bought, for one errand.
+   *
+   * Index-aligned with `names`. Never throws: an unreachable service comes back
+   * as a row with source "none", which the panel renders as "no suggestion"
+   * rather than an error - the dispatcher's own dropdowns work regardless.
+   */
+  async suggestItemPlacements(errandId: string, names: string[]): Promise<ApiItemPlacement[]> {
+    if (names.length === 0) return [];
+    try {
+      const response = await apiClient.post<{ placements: ApiItemPlacement[] }>(
+        `/category-inference/errands/${errandId}/item-placements`,
+        { names }
+      );
+      return response.data?.placements ?? [];
+    } catch (err) {
+      console.warn("Item placement suggestion unavailable:", err);
+      return [];
+    }
+  },
+
+  /**
+   * Asks whether a store may be pinned at this spot. Resolves null when the
+   * check itself could not be made, so the caller can decide how to fail; the
+   * server re-checks on save either way.
+   */
+  async checkStoreLocation(latitude: number, longitude: number): Promise<ApiStoreLocationVerdict | null> {
+    try {
+      const response = await apiClient.post<ApiStoreLocationVerdict>("/places/location-check", {
+        latitude,
+        longitude,
+      });
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Store location check unavailable:", err);
+      return null;
+    }
+  },
+
+  /**
+   * What these stops would cost, before they are saved. Step 3 asks as pins are
+   * placed so the fee is on screen with the stores. Writes nothing and tells the
+   * customer nothing on the server (errandService.quotePinpoints). Throws, with
+   * the server's own sentence where it gave one, so the caller can show it.
+   */
+  async quotePinpoints(
+    errandId: string,
+    pinpoints: Array<{ storeName: string; latitude: number; longitude: number; placeId: string | null; categoryId: number | null }>
+  ): Promise<ApiPinQuote> {
+    const response = await apiClient.post<{ quote: ApiPinQuote }>(`/errands/${errandId}/pinpoints/quote`, {
+      pinpoints,
+    });
+    return response.data.quote;
+  },
+
+  /**
+   * The stores the predictor proposes for this errand's step 1 list. Null on
+   * failure, distinct from an empty prediction ("nothing to suggest").
+   */
+  async predictStores(errandId: string, names: string[]): Promise<ApiStorePrediction | null> {
+    try {
+      const response = await apiClient.post<ApiStorePrediction>(
+        `/category-inference/errands/${errandId}/store-predictions`,
+        names.length > 0 ? { names } : {}
+      );
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Store prediction unavailable:", err);
+      return null;
+    }
+  },
+
+  async getAccountLoginLogs(limit = 50): Promise<AccountLoginLog[]> {
+    try {
+      const response = await apiClient.get<{ logs: AccountLoginLog[] }>(`/account/login-logs?limit=${limit}`);
+      return response.data?.logs || [];
+    } catch (err) {
+      console.warn("Failed to fetch account login logs:", err);
+      return [];
+    }
+  },
+
+  async updateItemFulfillmentStatus(
+    errandId: string,
+    itemId: number,
+    fulfillmentStatus: "PENDING" | "PURCHASED" | "OUT_OF_STOCK"
+  ): Promise<{ item?: any; errand?: any } | null> {
+    try {
+      const response = await apiClient.patch(`/errands/${errandId}/items/${itemId}/status`, {
+        fulfillmentStatus,
+      });
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to update item fulfillment status:", err);
+      return null;
+    }
+  },
+
+  async suggestItemSubstitutes(
+    errandId: string,
+    itemId: number
+  ): Promise<{ substitutes: string[]; chatMessage: string; source: "ai" | "catalog" } | null> {
+    try {
+      const response = await apiClient.post(`/errands/${errandId}/items/${itemId}/suggest-substitutes`);
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to suggest item substitutes:", err);
+      return null;
+    }
+  },
+
+  async declineItemSubstitute(
+    errandId: string,
+    itemId: number
+  ): Promise<{ success: boolean; item?: any; errand?: any } | null> {
+    try {
+      const response = await apiClient.post(`/errands/${errandId}/items/${itemId}/decline-substitute`);
+      return response.data ?? null;
+    } catch (err) {
+      console.warn("Failed to decline item substitute:", err);
+      return null;
+    }
+  },
+};

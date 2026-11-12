@@ -1,0 +1,21 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Sugo Express Operations Portal",
+    "documentationUrl": "https://portal.sugo-express.org/llms.txt"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:portal.sugo-express.org:docs:operations",
+      "displayName": "Sugo Express Operations Documentation",
+      "description": "Logistics, fleet dispatch, and errand delivery management platform for Tacurong City, Philippines.",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://portal.sugo-express.org/llms.txt",
+      "tags": ["logistics", "dispatch", "errands", "tacurong", "fleet"],
+      "representativeQueries": [
+        "How does Sugo Express handle fleet dispatch?",
+        "What are the delivery and errand service types available in Tacurong City?"
+      ]
+    }
+  ]
+}

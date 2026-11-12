@@ -69,29 +69,29 @@ export const LogsTab: React.FC = () => {
 
   const formatLogLine = (line: string) => {
     if (line.includes("[ERROR]") || line.includes("error") || line.includes("FAILED") || line.includes("500")) {
-      return "text-rose-400";
+      return "text-status-act-ink";
     }
     if (line.includes("[WARN]") || line.includes("warn") || line.includes("404") || line.includes("401") || line.includes("403")) {
-      return "text-amber-300";
+      return "text-status-waiting-ink";
     }
     if (line.includes("[INFO]") || line.includes("200") || line.includes("201")) {
-      return "text-emerald-400";
+      return "text-status-done-ink";
     }
-    return "text-slate-300";
+    return "text-ink";
   };
 
   return (
     <div className="space-y-5">
       {/* Log Source Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap">
+      <div className="flex items-center gap-2 border-b border-edge pb-3 overflow-x-auto scrollbar-none flex-nowrap sm:flex-wrap">
         {LOG_SOURCES.map((s) => (
           <button
             key={s.key}
             onClick={() => setSelectedSource(s.key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               selectedSource === s.key
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                ? "bg-signal text-white shadow-sm"
+                : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
             }`}
           >
             <Terminal className="w-3 h-3" />
@@ -101,17 +101,17 @@ export const LogsTab: React.FC = () => {
       </div>
 
       {/* Controls Bar */}
-      <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="p-3.5 rounded-xl bg-board-plate border border-edge flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+            <Search className="w-3.5 h-3.5 text-ink-muted absolute left-2.5 top-2.5" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search / Filter log lines..."
-              className="pl-8 pr-3 py-1.5 rounded-lg bg-[#070D1B] border border-slate-800 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-red-500/60 w-48 sm:w-64 font-mono"
+              className="pl-8 pr-3 py-1.5 rounded-lg bg-board-ground border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 w-48 sm:w-64 font-mono"
             />
           </div>
 
@@ -119,7 +119,7 @@ export const LogsTab: React.FC = () => {
           <select
             value={lineCount}
             onChange={(e) => setLineCount(Number(e.target.value))}
-            className="px-2.5 py-1.5 rounded-lg bg-[#070D1B] border border-slate-800 text-xs font-mono text-slate-300 focus:outline-none focus:border-red-500/60"
+            className="px-2.5 py-1.5 rounded-lg bg-board-ground border border-edge text-xs font-mono text-ink focus:outline-none focus:border-status-act-ink/30"
           >
             <option value={50}>50 Lines</option>
             <option value={100}>100 Lines</option>
@@ -128,12 +128,12 @@ export const LogsTab: React.FC = () => {
           </select>
 
           {/* Auto scroll toggle */}
-          <label className="inline-flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
+          <label className="inline-flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer select-none">
             <input
               type="checkbox"
               checked={autoScroll}
               onChange={(e) => setAutoScroll(e.target.checked)}
-              className="rounded bg-[#070D1B] border-slate-800 text-red-600 focus:ring-0"
+              className="rounded bg-board-ground border-edge text-status-act-ink focus:ring-0"
             />
             <span>Auto-Scroll</span>
           </label>
@@ -143,17 +143,17 @@ export const LogsTab: React.FC = () => {
           <button
             onClick={handleCopy}
             disabled={!logData?.lines.length}
-            className="px-3 py-1.5 rounded-lg bg-[#0B132B] hover:bg-slate-800 border border-slate-800 text-xs text-slate-300 transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-board-ground hover:bg-board-ground border border-edge text-xs text-ink transition-colors flex items-center gap-1.5"
             title="Copy visible lines to clipboard"
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-medium">Copied!</span>
+                <Check className="w-3.5 h-3.5 text-status-done-ink" />
+                <span className="text-status-done-ink font-medium">Copied!</span>
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                <Copy className="w-3.5 h-3.5 text-ink-muted" />
                 <span>Copy Logs</span>
               </>
             )}
@@ -162,7 +162,7 @@ export const LogsTab: React.FC = () => {
           <button
             onClick={fetchLogs}
             disabled={isLoading}
-            className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-medium text-white transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-signal hover:bg-signal-deep disabled:opacity-50 text-xs font-medium text-white transition-colors flex items-center gap-1.5"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
             <span>Refresh</span>
@@ -171,38 +171,38 @@ export const LogsTab: React.FC = () => {
       </div>
 
       {/* Security Redaction Active Banner */}
-      <div className="px-4 py-2.5 rounded-xl bg-emerald-950/30 border border-emerald-800/40 text-[11px] text-emerald-300 font-mono flex items-center justify-between">
+      <div className="px-4 py-2.5 rounded-xl bg-status-done-fill border border-status-done-ink/30 text-[11px] text-status-done-ink font-mono flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+          <ShieldCheck className="w-4 h-4 text-status-done-ink shrink-0" />
           <span>
             Server-Side Credential Redaction Active: Passwords, JWT tokens, database connection strings, and API secrets are automatically sanitized before client streaming.
           </span>
         </div>
-        <span className="text-slate-400 shrink-0 hidden sm:inline">
+        <span className="text-ink-muted shrink-0 hidden sm:inline">
           {logData ? `${logData.totalLines} lines rendered` : ""}
         </span>
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-950/60 border border-rose-800/60 text-xs text-rose-300 font-mono flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+        <div className="p-3.5 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink font-mono flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-status-act-ink shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Terminal Display Container */}
-      <div className="rounded-xl bg-[#070D1B] border border-slate-800 overflow-hidden shadow-2xl flex flex-col">
+      <div className="rounded-xl bg-board-ground border border-edge overflow-hidden shadow-2xl flex flex-col">
         {/* Terminal Header */}
-        <div className="px-4 py-2 bg-[#0B132B] border-b border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+        <div className="px-4 py-2 bg-board-ground border-b border-edge flex items-center justify-between text-[11px] font-mono text-ink-muted">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-            <span className="text-slate-300 font-semibold ml-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-status-act-fill" />
+            <span className="w-2.5 h-2.5 rounded-full bg-status-waiting-fill" />
+            <span className="w-2.5 h-2.5 rounded-full bg-status-done-fill" />
+            <span className="text-ink font-semibold ml-2">
               {logData?.filePath || "Streaming..."}
             </span>
           </div>
-          <span className="text-[10px] text-slate-500">Read-Only Tail Stream</span>
+          <span className="text-[10px] text-ink-muted">Read-Only Tail Stream</span>
         </div>
 
         {/* Terminal Body */}
@@ -211,18 +211,18 @@ export const LogsTab: React.FC = () => {
           className="p-3 sm:p-4 overflow-x-auto overflow-y-auto max-h-[500px] min-h-[350px] font-mono text-[10px] sm:text-[11px] leading-relaxed space-y-0.5 select-text"
         >
           {isLoading && !logData ? (
-            <div className="flex items-center justify-center py-16 text-slate-500">
-              <RefreshCw className="w-4 h-4 animate-spin mr-2 text-red-400" />
+            <div className="flex items-center justify-center py-16 text-ink-muted">
+              <RefreshCw className="w-4 h-4 animate-spin mr-2 text-status-act-ink" />
               <span>Fetching remote system log stream...</span>
             </div>
           ) : !logData || logData.lines.length === 0 ? (
-            <div className="text-center py-16 text-slate-500">
+            <div className="text-center py-16 text-ink-muted">
               No matching log lines found in this stream.
             </div>
           ) : (
             logData.lines.map((line, idx) => (
-              <div key={idx} className="flex items-start gap-3 hover:bg-slate-900/60 px-1 py-0.5 rounded">
-                <span className="text-slate-600 select-none text-right w-8 shrink-0 tabular-nums">
+              <div key={idx} className="flex items-start gap-3 hover:bg-board-ground px-1 py-0.5 rounded">
+                <span className="text-ink-muted select-none text-right w-8 shrink-0 tabular-nums">
                   {idx + 1}
                 </span>
                 <span className={`break-all whitespace-pre-wrap ${formatLogLine(line)}`}>

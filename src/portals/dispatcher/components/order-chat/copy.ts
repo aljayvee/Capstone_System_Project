@@ -88,7 +88,7 @@ export const copy = {
     pinStores: (who: string) => `Pin the shops ${who} needs, then send them over.`,
     pinStoresNoMap: (who: string) => `Search for the shops ${who} needs. The map is down.`,
     noDropOffPin: (who: string) => `${who}'s order has no drop-off pin. Ask them for it before pinning stores.`,
-    outsideArea: (who: string) => `${who}'s drop-off is outside Tacurong. Ask them, or decline the order.`,
+    outsideArea: (who: string) => `${who}'s drop-off is outside Tacurong City and Banga. Ask them, or decline the order.`,
     sendItems: (who: string) =>
       `Check ${who}'s list and send it. They approve it and pick how to pay in one go.`,
     waitingOnItems: (who: string) => `Waiting for ${who} to approve the item list`,
@@ -155,7 +155,7 @@ export const copy = {
       "This order has no pinned delivery coordinates. Ask the customer in chat to provide their delivery address and pinpoint before sending the stores.",
     outOfAreaTitle: "Outside service area",
     outOfAreaDetail:
-      "This delivery location is outside Tacurong City limits. Decline the order or contact the customer.",
+      "This delivery location is outside the Tacurong City and Banga service areas. Decline the order or contact the customer.",
     askInChat: (who: string) => `Ask ${who} in chat`,
   },
 

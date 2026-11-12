@@ -1,0 +1,92 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+/* Browser surfaces for any element carrying data-surface: focus ring,
+   selection, caret, scrollbars, tabular figures, icon stroke, motion curve.
+   Every colour in it is a token, so each portal's skin re-paints it.
+
+   This replaces dispatch.css, which scoped the same rules to
+   [data-surface="dispatch"]. Nothing in them was dispatcher-specific once
+   the colours became tokens, and the dispatcher's root carried only
+   data-portal, so most of them had only ever reached its portalled overlays.
+
+   Order is not what lets these beat the global reset below; specificity is.
+   `[data-surface] *` outranks a bare `*` whatever the source order. */
+@import './surfaces.css';
+/* The Owner portal's eight-token re-skin of that same system. */
+@import './owner.css';
+/* Light Dispatcher palette and navigation, scoped away from the Owner portal. */
+@import './dispatch-light.css';
+/* Shared palette takes precedence over historical portal skin values. */
+@import './portal-palette.css';
+/* An Admin's own theme, colours and type size, set in Owner Settings. */
+@import './owner-appearance.css';
+@import './portal-responsive.css';
+
+/* Scrollbars are hidden app-wide, and handed back only inside a surface that
+   opts in above. The login page and the marketing shell keep them hidden. */
+* {
+  scrollbar-width: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 1px;
+  height: 1px;
+  background: transparent;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   MOBILE SMARTPHONE FOUNDATION & SAFE AREA INSETS (50-Point Mobile Architecture)
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Zero iOS Safari Auto-Zoom: Enforce 16px minimum font size on mobile inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Controlled Mobile Overscroll Physics */
+.mobile-scroll-contain {
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* App-Like Micro-Press Tactile Feedback */
+.active-press {
+  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
+}
+.active-press:active {
+  transform: scale(0.98);
+}
+
+/* Modern Dynamic Viewport Helpers */
+.min-h-dvh {
+  min-height: 100dvh;
+}
+.h-dvh {
+  height: 100dvh;
+}
+.max-h-dvh {
+  max-height: 100dvh;
+}
+
+/* Safe Area Inset Utility Classes */
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+.bottom-safe {
+  bottom: max(0px, env(safe-area-inset-bottom, 0px));
+}
+

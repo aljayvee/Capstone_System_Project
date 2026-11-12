@@ -70,23 +70,23 @@ export const FinancialChannelMixChart: React.FC<FinancialChannelMixChartProps> =
               <CartesianGrid
                 strokeDasharray="2 2"
                 vertical={false}
-                stroke="#E2E8F0"
+                stroke="var(--color-hairline)"
               />
               <XAxis
                 dataKey="name"
                 interval={0}
-                tick={{ fontSize: isPhone ? 10 : 12, fill: "#1E293B", fontWeight: 600 }}
+                tick={{ fontSize: isPhone ? 10 : 12, fill: "var(--color-ink)", fontWeight: 600 }}
                 tickLine={false}
-                axisLine={{ stroke: "#E2E8F0" }}
+                axisLine={{ stroke: "var(--color-hairline)" }}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "#64748B" }}
+                tick={{ fontSize: 11, fill: "var(--color-ink-muted)" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(v) => `₱${v >= 1000 ? `${Number((v / 1000).toFixed(1))}k` : v}`}
               />
               <Tooltip
-                cursor={{ fill: "#F1F5F9" }}
+                cursor={{ fill: "var(--color-board-ground)" }}
                 content={({ active, payload }) => {
                   if (!active || !payload || !payload.length) return null;
                   const bar = payload[0].payload as MixBar;

@@ -1,0 +1,58 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "contentType": "text/html",
+    "cache": "DYNAMIC",
+    "verified": "current release entry"
+  },
+  {
+    "path": "/owner",
+    "status": 200,
+    "contentType": "text/html",
+    "cache": "DYNAMIC",
+    "verified": "current release entry"
+  },
+  {
+    "path": "/dispatcher",
+    "status": 200,
+    "contentType": "text/html",
+    "cache": "DYNAMIC",
+    "verified": "current release entry"
+  },
+  {
+    "path": "assets/index-e4ljJuOU.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "cache": "MISS",
+    "verified": "checksum match"
+  },
+  {
+    "path": "assets/DispatcherPortal-DtxcotbC.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "cache": "MISS",
+    "verified": "checksum match"
+  },
+  {
+    "path": "assets/index--bFp_shh.css",
+    "status": 200,
+    "contentType": "text/css",
+    "cache": "MISS",
+    "verified": "checksum match"
+  },
+  {
+    "path": "assets/OwnerPortal-BdDeakKZ.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "cache": "MISS",
+    "verified": "checksum match"
+  },
+  {
+    "path": "assets/sidebar-Dryx96lm.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "cache": "MISS",
+    "verified": "checksum match"
+  }
+]

@@ -1,36 +1,40 @@
-import React, { useState } from "react";
+﻿import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { useMaintenanceCheck } from "../../hooks/useMaintenanceCheck";
 import { MaintenanceOverlay } from "../../components/MaintenanceOverlay";
 import { MaintenanceWarningBanner } from "../../components/MaintenanceWarningBanner";
+import { LiveEditNoticeModal } from "../../components/LiveEditNoticeModal";
 import { DashboardModule } from "./modules/dashboard/DashboardModule";
-import { UserManagementModule } from "./modules/users/UserManagementModule";
-import { RiderManagementModule } from "./modules/riders/RiderManagementModule";
-import { MerchantCategoryModule } from "./modules/merchants/MerchantCategoryModule";
-import { ServiceRatesModule } from "./modules/rates/ServiceRatesModule";
-import { FinancialReportsModule, type ReportTab } from "./modules/reports/FinancialReportsModule";
-import { RiderTrackingModule } from "./modules/tracking/RiderTrackingModule";
-import { AccountSecurityLogsView } from "@/components/account/AccountSecurityLogsView";
+import type { ReportTab } from "./modules/reports/FinancialReportsModule";
+import { lazyWithRetry, preloadWhenIdle } from "../../utils/lazyWithRetry";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDeviceTier } from "../../hooks/useDeviceTier";
 import { MobileHeader } from "../../components/navigation/MobileHeader";
-import { MobileBottomNav, type MobileNavTab } from "../../components/navigation/MobileBottomNav";
 import { ScrollToTopButton } from "../../components/common/ScrollToTopButton";
+import { OwnerWorkspaceSkeleton } from "./components/OwnerSkeletons";
+import { OwnerCopilotDrawer } from "./components/OwnerCopilotDrawer";
+import { apiService } from "../../services/apiService";
+import { KuyaSugoCharacter } from "./components/KuyaSugoCharacter";
+import { OwnerAppearanceProvider } from "./appearance/OwnerAppearanceContext";
+import { isAccessTab, isSettingsTab, type SettingsTab } from "./modules/settings/settingsTabs";
+import { PermissionsProvider, usePermissions } from "../../context/PermissionsContext";
 
 import {
   LayoutDashboard,
   Users,
-  Bike,
   Store,
   DollarSign,
   BarChart2,
   MapPin,
   LogOut,
-  Bike as BikeIcon,
+  Settings as SettingsIcon,
+  Lock,
+  TriangleAlert,
   X,
 } from "lucide-react";
+import { BrandMark } from "../../components/brand/BrandMark";
 import {
   Sidebar,
   SidebarContent,
@@ -59,7 +63,30 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-type ModuleId = "dashboard" | "users" | "riders" | "merchants" | "rates" | "reports" | "tracking" | "security";
+// Keep the dashboard eager; load other workspaces only when they are opened.
+const UserManagementModule = lazyWithRetry(() =>
+  import("./modules/users/UserManagementModule").then((m) => ({ default: m.UserManagementModule }))
+);
+const RiderManagementModule = lazyWithRetry(() =>
+  import("./modules/riders/RiderManagementModule").then((m) => ({ default: m.RiderManagementModule }))
+);
+const MerchantCategoryModule = lazyWithRetry(() =>
+  import("./modules/merchants/MerchantCategoryModule").then((m) => ({ default: m.MerchantCategoryModule }))
+);
+const ServiceRatesModule = lazyWithRetry(() =>
+  import("./modules/rates/ServiceRatesModule").then((m) => ({ default: m.ServiceRatesModule }))
+);
+const FinancialReportsModule = lazyWithRetry(() =>
+  import("./modules/reports/FinancialReportsModule").then((m) => ({ default: m.FinancialReportsModule }))
+);
+const RiderTrackingModule = lazyWithRetry(() =>
+  import("./modules/tracking/RiderTrackingModule").then((m) => ({ default: m.RiderTrackingModule }))
+);
+const SettingsModule = lazyWithRetry(() =>
+  import("./modules/settings/SettingsModule").then((m) => ({ default: m.SettingsModule }))
+);
+
+type ModuleId = "dashboard" | "users" | "riders" | "merchants" | "rates" | "reports" | "tracking" | "settings";
 
 const MODULE_IDS: ModuleId[] = [
   "dashboard",
@@ -69,7 +96,7 @@ const MODULE_IDS: ModuleId[] = [
   "rates",
   "reports",
   "tracking",
-  "security",
+  "settings",
 ];
 
 interface NavSection {
@@ -93,94 +120,153 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Operations",
     items: [
       { id: "users", label: "Users", icon: Users },
-      { id: "riders", label: "Riders", icon: Bike },
       { id: "tracking", label: "Tracking", icon: MapPin },
     ],
   },
   {
-    title: "Settings",
+    // "Configuration", not "Settings": the footer's Settings button opens the
+    // Admin's own settings, and the rail should never show the word twice.
+    title: "Configuration",
     items: [
-      { id: "merchants", label: "Merchants Category", icon: Store },
+      { id: "merchants", label: "Merchant Categories", icon: Store },
       { id: "rates", label: "Service Rates", icon: DollarSign },
     ],
   },
 ];
 
-export default function OwnerPortal() {
+// What each workspace needs from the Admin's access group. Settings has no key:
+// every Admin keeps their own Appearance and Account & security.
+const MODULE_PERMISSION: Record<ModuleId, string | null> = {
+  dashboard: "dashboard.view",
+  reports: "reports.view",
+  users: "users.view",
+  riders: "users.view",
+  tracking: "tracking.view",
+  merchants: "merchants.manage",
+  rates: "rates.manage",
+  settings: null,
+};
+
+const MODULE_LABEL: Record<ModuleId, string> = {
+  dashboard: "Dashboard",
+  reports: "Reports",
+  users: "Users",
+  riders: "Riders",
+  tracking: "Tracking",
+  merchants: "Merchant Categories",
+  rates: "Service Rates",
+  settings: "Settings",
+};
+
+// Where an Admin lands when the requested workspace is not theirs, in order.
+const LANDING_ORDER: ModuleId[] = ["dashboard", "reports", "users", "tracking", "merchants", "rates", "settings"];
+
+function OwnerPortalShell() {
   const { user, logout } = useAuth();
+  const access = usePermissions();
+  // Until the first answer, nothing is shown that the group might not include:
+  // a reports-only Admin should never see the Dashboard flash and 403.
+  const accessPending = access.status === "loading" && !access.permissions && !access.legacy;
+  const canOpen = (id: ModuleId) => {
+    const key = MODULE_PERMISSION[id];
+    return !key || access.can(key);
+  };
+  const copilotAllowed = !accessPending && access.can("copilot.use");
+
+  // Workspaces load on first open; fetch them in the background once the
+  // portal is idle, so switching modules does not wait on the network.
+  useEffect(
+    () =>
+      preloadWhenIdle([
+        FinancialReportsModule,
+        UserManagementModule,
+        RiderTrackingModule,
+        RiderManagementModule,
+        MerchantCategoryModule,
+        ServiceRatesModule,
+        SettingsModule,
+      ]),
+    []
+  );
   const [searchParams, setSearchParams] = useSearchParams();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [selectedReportTab, setSelectedReportTab] = useState<ReportTab>("sales");
+  const [merchantNavigationVersion, setMerchantNavigationVersion] = useState(0);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [isKuyaSugoEnabled, setIsKuyaSugoEnabled] = useState(true);
+  const closeCopilot = useCallback(() => setIsCopilotOpen(false), []);
   const maintenance = useMaintenanceCheck("owner");
 
-  const requestedModule = searchParams.get("module");
-  const activeModule: ModuleId = MODULE_IDS.includes(requestedModule as ModuleId)
+  // Global Ctrl+J / Cmd+J toggle for Kuya Sugo AI Executive Copilot
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        if (!isKuyaSugoEnabled || !copilotAllowed) return;
+        e.preventDefault();
+        setIsCopilotOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isKuyaSugoEnabled, copilotAllowed]);
+
+  // Check whether Kuya Sugo is turned on in SysAdmin Service Controls
+  useEffect(() => {
+    let mounted = true;
+    const fetchKuyaSugoStatus = async () => {
+      const enabled = await apiService.getKuyaSugoEnabled();
+      if (mounted && typeof enabled === "boolean") {
+        setIsKuyaSugoEnabled(enabled);
+        if (!enabled) setIsCopilotOpen(false);
+      }
+    };
+    fetchKuyaSugoStatus();
+    const onFocus = () => fetchKuyaSugoStatus();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      mounted = false;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  // `?module=security` was the Account & Security Logs screen before it moved
+  // into Settings. Old links and bookmarks still land on it.
+  const rawModule = searchParams.get("module");
+  const requestedModule = rawModule === "security" ? "settings" : rawModule;
+  const requested: ModuleId = MODULE_IDS.includes(requestedModule as ModuleId)
     ? (requestedModule as ModuleId)
     : "dashboard";
+  // A deep link, a bookmark, or access removed while the screen was open: the
+  // Admin lands on the first workspace their group does include.
+  const activeModule: ModuleId = canOpen(requested)
+    ? requested
+    : LANDING_ORDER.find((id) => canOpen(id)) ?? "settings";
+  const deniedModule: ModuleId | null =
+    !accessPending && rawModule && activeModule !== requested ? requested : null;
+  const [dismissedDenial, setDismissedDenial] = useState<string | null>(null);
+  const rawSettingsTab = rawModule === "security" ? "account" : searchParams.get("tab");
+  // The Access tabs are the Main Owner's; anyone else asking lands on Appearance.
+  const settingsTab: SettingsTab =
+    isSettingsTab(rawSettingsTab) && (access.isMainOwner || !isAccessTab(rawSettingsTab))
+      ? rawSettingsTab
+      : "appearance";
 
   const setActiveModule = (id: ModuleId) => {
+    if (id === "merchants") setMerchantNavigationVersion((version) => version + 1);
     setSearchParams({ module: id }, { replace: true });
+  };
+
+  const openSettings = (tab: SettingsTab) => {
+    setSearchParams({ module: "settings", tab }, { replace: true });
   };
 
   const { isMobile } = useDeviceTier();
 
-  const mobilePrimaryTabs: MobileNavTab[] = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-      isActive: activeModule === "dashboard",
-      onClick: () => setActiveModule("dashboard"),
-    },
-    {
-      id: "reports",
-      label: "Reports",
-      icon: <BarChart2 className="w-5 h-5" />,
-      isActive: activeModule === "reports",
-      onClick: () => setActiveModule("reports"),
-    },
-    {
-      id: "users",
-      label: "Users",
-      icon: <Users className="w-5 h-5" />,
-      isActive: activeModule === "users",
-      onClick: () => setActiveModule("users"),
-    },
-    {
-      id: "rates",
-      label: "Rates",
-      icon: <DollarSign className="w-5 h-5" />,
-      isActive: activeModule === "rates",
-      onClick: () => setActiveModule("rates"),
-    },
-  ];
-
-  const mobileMoreTabs: MobileNavTab[] = [
-    {
-      id: "riders",
-      label: "Riders",
-      icon: <Bike className="w-5 h-5" />,
-      isActive: activeModule === "riders",
-      onClick: () => setActiveModule("riders"),
-      description: "Manage rider profiles and delivery permissions",
-    },
-    {
-      id: "tracking",
-      label: "Tracking",
-      icon: <MapPin className="w-5 h-5" />,
-      isActive: activeModule === "tracking",
-      onClick: () => setActiveModule("tracking"),
-      description: "Live GPS map of online delivery fleet",
-    },
-    {
-      id: "merchants",
-      label: "Merchants Category",
-      icon: <Store className="w-5 h-5" />,
-      isActive: activeModule === "merchants",
-      onClick: () => setActiveModule("merchants"),
-      description: "Configure active merchant categories",
-    },
-  ];
+  const visibleSections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => canOpen(item.id)),
+  })).filter((section) => section.items.length > 0);
+  const showKuyaSugo = isKuyaSugoEnabled && copilotAllowed;
 
   return (
     <>
@@ -204,9 +290,20 @@ export default function OwnerPortal() {
           customColor={maintenance.customColor}
         />
       )}
+      {maintenance.showAdvisoryModal && (
+        <LiveEditNoticeModal
+          portal="owner"
+          header={maintenance.header}
+          message={maintenance.message}
+          footnote={maintenance.footnote}
+          customColor={maintenance.customColor}
+          onDismiss={() => maintenance.dismissAdvisory(false)}
+          onPermanentDismiss={() => maintenance.dismissAdvisory(true)}
+        />
+      )}
       <TooltipProvider>
 
-      <SidebarProvider defaultOpen={false}>
+      <SidebarProvider defaultOpen={false} className="h-dvh min-h-0">
         {/* data-surface opts this portal into src/styles/surfaces.css, which
             owns the parts nobody draws: the focus ring, themed scrollbars,
             ::selection, the caret, tabular figures and one motion curve. The
@@ -223,7 +320,7 @@ export default function OwnerPortal() {
         <div
           data-surface="owner"
           data-portal="owner"
-          className="flex h-screen w-full overflow-hidden bg-board-ground text-ink"
+          className="flex h-dvh min-w-0 w-full overflow-hidden bg-board-ground text-ink"
         >
           {/* Sidebar Navigation - Navy Theme */}
           {/* data-on-field marks the whole rail as painted navy. It inverts
@@ -231,18 +328,21 @@ export default function OwnerPortal() {
               navy outline on a navy rail is not a focus ring. The attribute
               lands on the primitive's sidebar-container, an ancestor of every
               row, so one declaration covers the lot. */}
-          {!isMobile && (
           <Sidebar
+            surface="owner"
+            data-portal-nav
             data-on-field
             collapsible="icon"
             className="border-r border-white/10 select-none"
             variant="sidebar"
             style={
               {
-                "--sidebar-background": "#0F2035",
+                // --owner-sidebar is set on <html> only when the Admin picked
+                // their own sidebar colour in Settings > Appearance.
+                "--sidebar-background": "var(--owner-sidebar, #0F2035)",
                 "--sidebar-foreground": "white",
                 "--sidebar-primary": "white",
-                "--sidebar-primary-foreground": "#0F2035",
+                "--sidebar-primary-foreground": "var(--owner-sidebar, #0F2035)",
                 "--sidebar-border": "rgba(255, 255, 255, 0.08)",
                 "--sidebar-accent": "rgba(255, 255, 255, 0.08)",
                 "--sidebar-accent-foreground": "white",
@@ -255,7 +355,7 @@ export default function OwnerPortal() {
               <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:gap-0 overflow-hidden w-full">
                 {/* Expanded Text Branding (Hidden when collapsed) */}
                 <div className="min-w-0 px-3 group-data-[collapsible=icon]:px-0 transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="truncate text-panel leading-tight text-board-plate">
+                  <p className="truncate text-panel leading-tight text-white">
                     SUGO ON THE GO
                   </p>
                   <p className="mt-0.5 truncate text-label text-board-trim">
@@ -265,18 +365,28 @@ export default function OwnerPortal() {
 
                 {/* Collapsed Brand Icon Logo (Shown ONLY when collapsed) */}
                 <div className="size-9 rounded-trim bg-signal hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 mx-auto">
-                  <BikeIcon size={20} className="text-board-plate" />
+                  <BrandMark className="w-6 text-white" label="Sugo on the Go" />
                 </div>
 
                 {/* Sidebar Trigger Button */}
-                <SidebarTrigger className="text-board-trim hover:text-board-plate hover:bg-white/10 size-8 rounded-trim shrink-0 group-data-[collapsible=icon]:hidden" />
+                <SidebarTrigger className="text-board-trim hover:text-white hover:bg-white/10 size-8 rounded-trim shrink-0 group-data-[collapsible=icon]:hidden" />
               </div>
-              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-board-trim hover:text-board-plate hover:bg-white/10 size-9 rounded-trim mx-auto mt-2" />
+              <SidebarTrigger className="hidden group-data-[collapsible=icon]:flex text-board-trim hover:text-white hover:bg-white/10 size-9 rounded-trim mx-auto mt-2" />
             </SidebarHeader>
 
             {/* Structured Navigation Groups */}
             <SidebarContent className="px-3 py-3 group-data-[collapsible=icon]:px-2.5 space-y-4 transition-all duration-300">
-              {NAV_SECTIONS.map((section) => (
+              {/* Row-shaped placeholders while the access group loads, so the
+                  rail never shows a workspace and then takes it away. */}
+              {accessPending && (
+                <div aria-busy="true" className="space-y-1">
+                  <span className="sr-only">Loading your menu</span>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-10 rounded-plate bg-white/5 group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:mx-auto" />
+                  ))}
+                </div>
+              )}
+              {!accessPending && visibleSections.map((section) => (
                 <SidebarGroup key={section.title} className="p-0 space-y-1">
                   <SidebarGroupLabel className="px-3 text-micro uppercase text-board-trim group-data-[collapsible=icon]:hidden">
                     {section.title}
@@ -309,8 +419,8 @@ export default function OwnerPortal() {
                               // this rendered before.
                               className={`w-full flex items-center justify-start px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                                 isActive
-                                  ? "bg-signal text-board-plate"
-                                  : "text-board-trim hover:bg-white/10 hover:text-board-plate"
+                                  ? "bg-signal text-white"
+                                  : "text-board-trim hover:bg-white/10 hover:text-white"
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0 group-data-[collapsible=icon]:gap-0">
@@ -318,8 +428,8 @@ export default function OwnerPortal() {
                                   size={16}
                                   className={`shrink-0 transition-colors ${
                                     isActive
-                                      ? "text-board-plate"
-                                      : "text-board-trim group-hover:text-board-plate"
+                                      ? "text-white"
+                                      : "text-board-trim group-hover:text-white"
                                   }`}
                                 />
                                 <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
@@ -340,12 +450,12 @@ export default function OwnerPortal() {
             <SidebarFooter className="p-3 border-t border-white/10 group-data-[collapsible=icon]:p-2.5 transition-all duration-300 gap-2">
               <button
                 type="button"
-                onClick={() => setActiveModule("security")}
+                onClick={() => openSettings("account")}
                 className="flex items-center gap-2.5 px-3 py-1 min-w-0 group-data-[collapsible=icon]:hidden text-left rounded-plate hover:bg-white/5 transition-colors cursor-pointer w-full"
                 title="View Account Logs & Security"
               >
                 <div
-                  className="w-9 h-9 rounded-plate bg-signal flex items-center justify-center text-board-plate text-micro shrink-0 ring-1 ring-white/10"
+                  className="w-9 h-9 rounded-plate bg-signal flex items-center justify-center text-white text-micro shrink-0 ring-1 ring-white/10"
                   title={user?.name || "System Administrator"}
                 >
                   {(user?.name || "System Administrator")
@@ -356,7 +466,7 @@ export default function OwnerPortal() {
                     .toUpperCase()}
                 </div>
                 <div className="min-w-0 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                  <p className="truncate text-label text-board-plate">
+                  <p className="truncate text-label text-white">
                     {user?.name || "System Administrator"}
                   </p>
                   <p className="truncate font-mono text-micro text-board-trim">
@@ -365,9 +475,30 @@ export default function OwnerPortal() {
                 </div>
               </button>
 
+              {/* Same row geometry as Sign Out below, so the collapsed rail
+                  keeps one 36px tile column. Neutral rather than red: red on
+                  this rail means "act", and opening settings is not that. */}
+              <button
+                type="button"
+                onClick={() => openSettings(settingsTab)}
+                aria-current={activeModule === "settings" ? "page" : undefined}
+                className={cn(
+                  "w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-plate text-label transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:mx-auto",
+                  activeModule === "settings"
+                    ? "bg-white/15 text-white"
+                    : "text-board-trim hover:bg-white/10 hover:text-white"
+                )}
+                title="Settings"
+              >
+                <SettingsIcon size={16} className="shrink-0" />
+                <span className="inline-block truncate opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
+                  Settings
+                </span>
+              </button>
+
               <button
                 onClick={() => setShowSignOutConfirm(true)}
-                className="w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-plate bg-signal hover:bg-signal-deep text-board-plate text-label transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:mx-auto"
+                className="w-full flex items-center justify-start gap-2.5 group-data-[collapsible=icon]:gap-0 h-10 px-3 rounded-plate bg-signal hover:bg-signal-deep text-white text-label transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:mx-auto"
                 title="Sign Out"
               >
                 <LogOut size={16} className="shrink-0" />
@@ -384,7 +515,6 @@ export default function OwnerPortal() {
             </SidebarFooter>
             <SidebarRail />
           </Sidebar>
-          )}
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
             {/* data-surface because DialogContent renders through a portal at
@@ -395,7 +525,7 @@ export default function OwnerPortal() {
             <DialogContent data-surface="owner" className="rounded-modal border-edge">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-panel text-ink">
-                  <LogOut className="text-signal" size={20} /> Sign Out
+                  <LogOut className="text-signal-ink" size={20} /> Sign Out
                 </DialogTitle>
                 <DialogClose
                   aria-label="Close dialog"
@@ -434,16 +564,17 @@ export default function OwnerPortal() {
           </Dialog>
 
           {/* Main Workspace Console */}
-          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full h-full min-h-0 flex flex-col overflow-hidden">
+          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full h-full min-h-0 min-w-0 flex flex-col overflow-hidden">
             {isMobile && (
               <MobileHeader
                 title="SUGO Owner"
+                leftElement={<SidebarTrigger aria-label="Open navigation" className="size-11 shrink-0" />}
                 subtitle={activeModule.toUpperCase()}
                 rightElement={
                   <button
                     type="button"
                     onClick={() => setShowSignOutConfirm(true)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="size-11 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Sign Out"
                     aria-label="Sign Out"
                   >
@@ -452,20 +583,55 @@ export default function OwnerPortal() {
                 }
               />
             )}
-            <main className={cn("flex-1 p-3 sm:p-4 md:p-5 flex flex-col h-full w-full min-h-0 overflow-hidden", isMobile && "pb-20 pt-1")}>
+            <main className="portal-main flex-1 p-3 sm:p-4 lg:p-5 flex flex-col w-full min-w-0 min-h-0 overflow-hidden">
+              {access.status === "error" && (
+                <div role="alert" className="mx-auto mb-3 flex w-full max-w-7xl flex-wrap items-center gap-3 rounded-plate bg-status-waiting-fill px-4 py-2.5 text-label text-status-waiting-ink">
+                  <TriangleAlert size={16} className="shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    Your access could not be loaded, so every workspace is showing. Some may refuse to open until it loads.
+                  </span>
+                  <PanelButton size="sm" variant="secondary" onClick={access.reload}>
+                    Retry
+                  </PanelButton>
+                </div>
+              )}
+              {deniedModule && dismissedDenial !== deniedModule && (
+                <div role="status" className="mx-auto mb-3 flex w-full max-w-7xl items-center gap-3 rounded-plate bg-status-moving-fill px-4 py-2.5 text-label text-status-moving-ink">
+                  <Lock size={15} className="shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    Your access group does not include {MODULE_LABEL[deniedModule]}, so {MODULE_LABEL[activeModule]} opened instead.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedDenial(deniedModule)}
+                    aria-label="Dismiss"
+                    className="shrink-0 rounded-trim p-1 hover:bg-white/40"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               {/* Dynamic Light Mode Modules */}
+              {accessPending ? (
+                <OwnerWorkspaceSkeleton hasStandingFigures={false} />
+              ) : (
+              <Suspense key={activeModule} fallback={<OwnerWorkspaceSkeleton hasStandingFigures={activeModule === "riders" || activeModule === "tracking"} />}>
               {activeModule === "dashboard" && (
                 <DashboardModule
                   onNavigateToReport={(tab) => {
                     setSelectedReportTab(tab);
                     setActiveModule("reports");
                   }}
-                  onNavigateToModule={(mod) => setActiveModule(mod as any)}
+                  onNavigateToModule={(mod) => {
+                    if (MODULE_IDS.includes(mod as ModuleId)) setActiveModule(mod as ModuleId);
+                  }}
                 />
               )}
               {activeModule === "users" && <UserManagementModule />}
               {activeModule === "riders" && <RiderManagementModule />}
-              {activeModule === "merchants" && <MerchantCategoryModule />}
+              {activeModule === "merchants" && (
+                <MerchantCategoryModule navigationVersion={merchantNavigationVersion} />
+              )}
               {activeModule === "rates" && <ServiceRatesModule />}
               {activeModule === "reports" && (
                 <FinancialReportsModule
@@ -474,21 +640,75 @@ export default function OwnerPortal() {
                 />
               )}
               {activeModule === "tracking" && <RiderTrackingModule />}
-              {activeModule === "security" && (
-                <div className="h-full overflow-y-auto pr-1">
-                  <AccountSecurityLogsView showHeader={true} />
-                </div>
+              {activeModule === "settings" && (
+                <SettingsModule
+                  tab={settingsTab}
+                  onTabChange={openSettings}
+                  canManageAccess={access.isMainOwner}
+                />
+              )}
+              </Suspense>
               )}
             </main>
 
-            {isMobile && (
-              <MobileBottomNav primaryTabs={mobilePrimaryTabs} moreTabs={mobileMoreTabs} />
-            )}
             <ScrollToTopButton />
+
+            {/* Kuya Sugo Floating Copilot Trigger Button & Drawer (Controlled
+                via SysAdmin, and by the Admin's access group: copilot.use) */}
+            {showKuyaSugo && (
+              <>
+            <button
+              type="button"
+              onClick={() => setIsCopilotOpen((prev) => !prev)}
+              aria-label="Open Kuya Sugo"
+              aria-expanded={isCopilotOpen}
+              aria-controls="owner-kuya-sugo"
+              className={cn(
+                "kuya-trigger",
+                isMobile ? "bottom-[max(1rem,env(safe-area-inset-bottom))] left-4" : "bottom-24 right-6"
+              )}
+            >
+              <span className="kuya-trigger__character"><KuyaSugoCharacter paused /></span>
+              <div className="kuya-trigger__copy">
+                <strong>Kuya Sugo</strong>
+                <small>Ask me a question</small>
+              </div>
+              {!isMobile && (
+                <kbd>
+                  Ctrl+J
+                </kbd>
+              )}
+            </button>
+
+            {/* Kuya Sugo Collapsible Slide-over Drawer */}
+            <OwnerCopilotDrawer
+              isOpen={isCopilotOpen}
+              onClose={closeCopilot}
+              activeModule={activeModule}
+              onNavigateToModule={(mod) => {
+                if (MODULE_IDS.includes(mod as ModuleId)) setActiveModule(mod as ModuleId);
+              }}
+              onNavigateToReport={(tab) => {
+                setSelectedReportTab(tab);
+                setActiveModule("reports");
+              }}
+            />
+              </>
+            )}
           </SidebarInset>
         </div>
       </SidebarProvider>
     </TooltipProvider>
     </>
+  );
+}
+
+export default function OwnerPortal() {
+  return (
+    <OwnerAppearanceProvider>
+      <PermissionsProvider>
+        <OwnerPortalShell />
+      </PermissionsProvider>
+    </OwnerAppearanceProvider>
   );
 }

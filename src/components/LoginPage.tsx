@@ -8,7 +8,14 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext";
 import { UserRole, User as UserType } from "../types/auth";
 import { apiService, isLoginChallenge, isAnotherDeviceActive } from "../services/apiService";
-import type { LoginSuccessResponse, LoginChallengeResponse, LoginErrorResponse } from "../services/apiService";
+import type {
+  LoginSuccessResponse,
+  LoginChallengeResponse,
+  LoginErrorResponse,
+  LoginChallengeReason,
+  LoginChallengeFactor,
+  ChallengeError,
+} from "../services/apiService";
 import { apiClient } from "../services/apiClient";
 import {
   subscribePublicServerError,
@@ -34,6 +41,10 @@ import { useMaintenanceCheck } from "../hooks/useMaintenanceCheck";
 import { MaintenanceOverlay } from "./MaintenanceOverlay";
 import { MaintenanceWarningBanner } from "./MaintenanceWarningBanner";
 import { LiveEditNoticeModal } from "./LiveEditNoticeModal";
+import { BrandMark } from "./brand/BrandMark";
+import "./login/login-page.css";
+
+const LOGIN_BACKGROUND_URL = new URL("../assets/login/scooter-fullscreen.jpg", import.meta.url).href;
 
 // Sign-in is a small state machine, not a single request. An account that has
 // not yet proven it owns its email is answered with a challenge instead of a
@@ -205,7 +216,15 @@ export default function LoginPage() {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
   const [maskedPhone, setMaskedPhone] = useState<string | null>(null);
-  const [phone, setPhone] = useState<string | null>(null);
+  const [phoneHint, setPhoneHint] = useState<string | null>(null);
+  const [challengeReason, setChallengeReason] = useState<LoginChallengeReason | null>(null);
+  const [challengeFactors, setChallengeFactors] = useState<LoginChallengeFactor[]>(["EMAIL"]);
+  // A two-step server waits for "Send code" before mailing anything; an older
+  // one mailed the code at the password step.
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  // Set when the server says the challenge itself is over (expired, used, or
+  // the account was disabled meanwhile): only signing in again can help.
+  const [challengeEnded, setChallengeEnded] = useState<{ title: string; message: string } | null>(null);
   const [challengeExpiresAt, setChallengeExpiresAt] = useState(0);
   const [resendAvailableAt, setResendAvailableAt] = useState(0);
   const [isResending, setIsResending] = useState(false);
@@ -384,7 +403,11 @@ export default function LoginPage() {
     setChallengeToken(null);
     setMaskedEmail(null);
     setMaskedPhone(null);
-    setPhone(null);
+    setPhoneHint(null);
+    setChallengeReason(null);
+    setChallengeFactors(["EMAIL"]);
+    setEmailCodeSent(false);
+    setChallengeEnded(null);
     setChallengeExpiresAt(0);
     setResendAvailableAt(0);
     setPassword("");
@@ -429,14 +452,33 @@ export default function LoginPage() {
     setChallengeToken(challenge.challengeToken);
     setMaskedEmail(challenge.maskedEmail ?? null);
     setMaskedPhone(challenge.maskedPhone ?? null);
-    setPhone(challenge.phone ?? null);
+    setPhoneHint(challenge.phoneHint ?? null);
+    setChallengeReason(challenge.reason ?? null);
+    setChallengeFactors(challenge.factors?.length ? challenge.factors : ["EMAIL"]);
+    setChallengeEnded(null);
     setChallengeExpiresAt(Date.now() + challenge.expiresInSeconds * 1000);
     setStage(challenge.profileSetupRequired ? "PROFILE_SETUP" : "OTP");
-    if (challenge.otpRequired) {
-      setResendAvailableAt(Date.now() + RESEND_COOLDOWN_MS);
-    }
+    const codeAlreadySent = Boolean(challenge.otpRequired) && !challenge.mfaRequired;
+    setEmailCodeSent(codeAlreadySent);
+    setResendAvailableAt(codeAlreadySent ? Date.now() + RESEND_COOLDOWN_MS : 0);
     setActiveAlert(null);
     setIsLoading(false);
+  };
+
+  // 401 on a challenge endpoint means the challenge is gone, and 403 that the
+  // account was disabled while it was open. Either way no code can finish this
+  // sign-in, so the step says so and offers to start over. Returns true when
+  // the error was one of those.
+  const endChallengeIfGone = (result: ChallengeError): boolean => {
+    if (result.statusCode === 401) {
+      setChallengeEnded({ title: "This sign-in expired", message: result.error });
+      return true;
+    }
+    if (result.statusCode === 403) {
+      setChallengeEnded({ title: "This sign-in can't continue", message: result.error });
+      return true;
+    }
+    return false;
   };
 
   const completeSession = (response: LoginSuccessResponse) => {
@@ -454,11 +496,7 @@ export default function LoginPage() {
     // challenge leaves before it, so a wrong password never touches what is kept.
     writeRememberedIdentifier(rememberMe ? identifier.trim() : null);
 
-    login(
-      toPortalUser(rawUser, identifier.trim(), response.token),
-      response.token,
-      (response as any).refreshToken
-    );
+    login(toPortalUser(rawUser, identifier.trim(), response.token), response.token);
     setIsLoading(false);
     navigate(`/${rawRole}`);
   };
@@ -629,45 +667,57 @@ export default function LoginPage() {
       return;
     }
     enterChallenge(result);
-    toast.success(`Verification code sent to ${result.maskedEmail || "your email"}.`);
+    toast.success(
+      result.mfaRequired
+        ? "Details saved. Confirm it's you to finish."
+        : `Verification code sent to ${result.maskedEmail || "your email"}.`
+    );
   };
 
-  const handleOtpSubmit = async (code: string) => {
-    if (!challengeToken) return;
+  // Both verify handlers resolve false on a refusal, so the step can clear
+  // the code it holds and let the user try again.
+  const handleOtpSubmit = async (code: string): Promise<boolean> => {
+    if (!challengeToken) return false;
     setActiveAlert(null);
     setIsLoading(true);
 
     const result = await apiService.verifyLoginOtp(challengeToken, code);
     if ("error" in result) {
+      setIsLoading(false);
+      if (endChallengeIfGone(result)) return false;
       setActiveAlert({
         variant: "error",
         title: "Verification Failed",
         message: result.error,
       });
-      setIsLoading(false);
-      return;
+      return false;
     }
     completeSession(result);
+    return true;
   };
 
-  const handleFirebasePhoneSubmit = async (firebaseIdToken: string) => {
-    if (!challengeToken) return;
+  const handleFirebasePhoneSubmit = async (firebaseIdToken: string): Promise<boolean> => {
+    if (!challengeToken) return false;
     setActiveAlert(null);
     setIsLoading(true);
 
     const result = await apiService.verifyLoginOtp(challengeToken, undefined, firebaseIdToken);
     if ("error" in result) {
+      setIsLoading(false);
+      if (endChallengeIfGone(result)) return false;
       setActiveAlert({
         variant: "error",
         title: "SMS Verification Failed",
         message: result.error,
       });
-      setIsLoading(false);
-      return;
+      return false;
     }
     completeSession(result);
+    return true;
   };
 
+  // "Send code" and "Resend code" alike: the server mails a code and answers
+  // with a fresh challenge, whose token replaces the one held here.
   const handleResend = async () => {
     if (!challengeToken) return;
     setActiveAlert(null);
@@ -677,6 +727,7 @@ export default function LoginPage() {
     setIsResending(false);
 
     if ("error" in result) {
+      if (endChallengeIfGone(result)) return;
       setActiveAlert({
         variant: "error",
         title: "Resend Failed",
@@ -688,18 +739,18 @@ export default function LoginPage() {
       return;
     }
 
+    const firstSend = !emailCodeSent;
     setChallengeToken(result.challengeToken);
-    setMaskedEmail(result.maskedEmail ?? null);
-    setMaskedPhone(result.maskedPhone ?? null);
-    setPhone(result.phone ?? null);
+    setMaskedEmail(result.maskedEmail ?? maskedEmail);
+    setMaskedPhone(result.maskedPhone ?? maskedPhone);
+    if (result.phoneHint) setPhoneHint(result.phoneHint);
+    if (result.factors?.length) setChallengeFactors(result.factors);
     setChallengeExpiresAt(Date.now() + result.expiresInSeconds * 1000);
     setResendAvailableAt(Date.now() + RESEND_COOLDOWN_MS);
-    toast.success(`A new code has been sent to ${result.maskedEmail || "your email"}.`);
+    setEmailCodeSent(true);
+    const sentTo = result.maskedEmail || maskedEmail || "your email";
+    toast.success(firstSend ? `Code sent to ${sentTo}.` : `A new code was sent to ${sentTo}.`);
   };
-
-  const handleChallengeExpired = useCallback(() => {
-    resetToCredentials("Your sign-in session expired. Please sign in again.");
-  }, [resetToCredentials]);
 
   const openForgotPassword = () => {
     setPassword("");
@@ -729,9 +780,17 @@ export default function LoginPage() {
   };
 
   const headings: Record<Stage, { title: string; description: string }> = {
-    CREDENTIALS: { title: "Sugo On the Go Portal", description: "Tacurong City Logistics & Fleet Management" },
+    CREDENTIALS: { title: "Sign in", description: "Use your staff account to continue." },
     PROFILE_SETUP: { title: "Complete Your Profile", description: "Finish setting up this administrator account" },
-    OTP: { title: "Two-Factor Authentication", description: "Verify your identity using Email (Gmail) or SMS OTP" },
+    OTP: {
+      title: "Two-step verification",
+      description:
+        challengeReason === "NEW_DEVICE"
+          ? "New device. Confirm it's you."
+          : challengeReason === "FIRST_LOGIN"
+          ? "First sign-in. Verify your account to continue."
+          : "Confirm it's you to finish signing in.",
+    },
     FORGOT_PASSWORD: { title: "Reset Your Password", description: "Sugo On the Go Portal" },
   };
 
@@ -761,16 +820,21 @@ export default function LoginPage() {
   return (
     <main
       role="main"
-      className="min-h-screen min-h-dvh flex flex-col items-center justify-center p-4 pt-safe pb-safe relative select-none bg-[#0B132B]"
+      className="login-page"
     >
-      {/* Flat Minimalist Form */}
-      <div className="relative w-full max-w-md z-10 my-auto selection:bg-red-950 selection:text-white">
-        {/* Header Section */}
-        <div className="pb-6 text-center pt-2">
-          <h1 className="text-white text-2xl sm:text-3xl font-bold tracking-tight">
+      <img className="login-background" src={LOGIN_BACKGROUND_URL} alt="" fetchPriority="high" />
+      <div className="login-photo-shade" aria-hidden="true" />
+      <header className="login-brand">
+        <BrandMark className="login-brand-mark" />
+        <span>Sugo on the Go</span>
+      </header>
+      <div className="login-workspace">
+      <section className="login-panel" aria-labelledby="login-heading">
+        <div className="login-heading">
+          <h1 id="login-heading">
             {headings[stage].title}
           </h1>
-          <p className="text-slate-400 text-xs sm:text-sm font-medium tracking-wide mt-1.5">
+          <p>
             {headings[stage].description}
           </p>
         </div>
@@ -819,8 +883,8 @@ export default function LoginPage() {
             {/* Email / Username Input */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="login-identifier" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
-                  Email
+                <label htmlFor="login-identifier" className="login-label">
+                  Email or username
                 </label>
                 {fieldErrors.email && (
                   <span className="text-rose-400 text-[11px] font-medium">
@@ -839,7 +903,7 @@ export default function LoginPage() {
                   if (activeAlert?.variant === "error") setActiveAlert(null);
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="Enter Email or Username"
+                placeholder="Email or username"
                 autoComplete="username"
                 autoFocus
                 disabled={isLoading || isCooldownActive}
@@ -855,7 +919,7 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <label htmlFor="login-password" className="text-slate-300 text-xs font-semibold uppercase tracking-wider">
+                  <label htmlFor="login-password" className="login-label">
                     Password
                   </label>
                   {isCapsLockOn && (
@@ -901,8 +965,7 @@ export default function LoginPage() {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   title={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors cursor-pointer p-1 rounded focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none"
+                  className="login-password-toggle"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -910,7 +973,7 @@ export default function LoginPage() {
             </div>
 
             {/* Remember Me: a native checkbox (Tab to reach, Space to toggle) styled flat */}
-            <div className="flex items-center justify-between gap-3">
+            <div className="login-options">
               <label
                 htmlFor="login-remember-me"
                 className="inline-flex items-center gap-2.5 py-1 text-sm text-slate-300 cursor-pointer select-none has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
@@ -961,10 +1024,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading || isCooldownActive}
-                className="w-full py-3.5 rounded-xl text-white flex items-center justify-center gap-2 font-bold text-sm tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:bg-red-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B132B]"
-                style={{
-                  background: isCooldownActive ? "#475569" : "#DC2626",
-                }}
+                className="login-submit"
               >
                 {isLoading ? (
                   <>
@@ -978,7 +1038,7 @@ export default function LoginPage() {
                   </>
                 ) : (
                   <>
-                    <span>Sign In</span>
+                    <span>Sign in</span>
                     <ChevronRight size={16} />
                   </>
                 )}
@@ -1020,49 +1080,34 @@ export default function LoginPage() {
         )}
 
         {/* STAGE 3: OTP VERIFICATION */}
+        {/* OtpStep shows the refusal itself, beside the action that
+            recovers from it, so no banner is repeated above it here. */}
         {stage === "OTP" && (
-          <div className="space-y-4">
-            {activeAlert && (
-              <div className="mb-4">
-                <LoginAlertBanner
-                  variant={activeAlert.variant}
-                  title={activeAlert.title}
-                  message={activeAlert.message}
-                  onDismiss={() => setActiveAlert(null)}
-                  autoDismissMs={activeAlert.autoDismissMs}
-                />
-              </div>
-            )}
-            <OtpStep
-              maskedEmail={maskedEmail}
-              maskedPhone={maskedPhone}
-              phone={phone}
-              expiresAt={challengeExpiresAt}
-              resendAvailableAt={resendAvailableAt}
-              serverError={activeAlert?.message || ""}
-              isSubmitting={isLoading}
-              isResending={isResending}
-              onSubmit={handleOtpSubmit}
-              onSubmitFirebasePhone={handleFirebasePhoneSubmit}
-              onResend={handleResend}
-              onExpire={handleChallengeExpired}
-              onCancel={() => resetToCredentials()}
-            />
-          </div>
+          <OtpStep
+            maskedEmail={maskedEmail}
+            maskedPhone={maskedPhone}
+            phoneHint={phoneHint}
+            factors={challengeFactors}
+            emailCodeSent={emailCodeSent}
+            ended={challengeEnded}
+            expiresAt={challengeExpiresAt}
+            resendAvailableAt={resendAvailableAt}
+            serverError={activeAlert?.variant === "error" ? activeAlert.message : ""}
+            onClearServerError={() => setActiveAlert(null)}
+            isSubmitting={isLoading}
+            isResending={isResending}
+            onSubmit={handleOtpSubmit}
+            onSubmitFirebasePhone={handleFirebasePhoneSubmit}
+            onSendEmailCode={handleResend}
+            onCancel={() => resetToCredentials()}
+          />
         )}
+      </section>
       </div>
 
-      {/* Website Copyright Footer at Bottom Edge. In normal flow at every width:
-          absolutely positioned on desktop it sat on top of any step tall enough
-          to reach it (the forgot-password steps on a 768px screen) and took
-          the clicks meant for the links underneath. */}
-      <footer className="w-full pt-6 pb-4 text-center select-none" role="contentinfo">
-        <p className="text-xs text-slate-400 font-medium tracking-wide">
-          &copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.
-        </p>
-        <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-          Tacurong City Logistics &amp; Fleet Operations
-        </p>
+      <footer className="login-footer" role="contentinfo">
+        <span>Tacurong City</span>
+        <span>&copy; {new Date().getFullYear()} Sugo on the Go. All rights reserved.</span>
       </footer>
 
       {/* Another Device Active Takeover Confirmation Modal */}

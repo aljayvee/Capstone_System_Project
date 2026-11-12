@@ -1,0 +1,13 @@
+import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {execFileSync} from 'node:child_process';
+const work='C:/Capstone_Project_Web/scratch/login-fullscreen-20261102/deployment',dist=path.join(work,'release/dist');
+const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const remote=execFileSync('C:/Windows/System32/OpenSSH/ssh.exe',['-o','BatchMode=yes','-o','ConnectTimeout=15','root@109.123.239.182','cd /var/www/web/dist && find . -type f -exec sha256sum {} +'],{encoding:'utf8'});
+fs.writeFileSync(path.join(work,'live-after.sha256'),remote);
+const hashes=new Map(remote.trim().split(/\r?\n/).map(l=>{const m=l.match(/^([a-f0-9]{64})\s+\.\/(.+)$/);return[m[2],m[1]];}));
+const walk=(d,p='')=>fs.readdirSync(path.join(d,p),{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(d,path.posix.join(p,e.name)):[path.posix.join(p,e.name)]);
+const files=walk(dist),mismatches=files.filter(p=>sha(fs.readFileSync(path.join(dist,p)))!==hashes.get(p));if(mismatches.length)throw Error(JSON.stringify(mismatches));
+const html=fs.readFileSync(path.join(dist,'index.html'),'utf8');
+const checks=['index.html',...files.filter(p=>/assets\/(?:index-.*\.(?:js|css)|LoginPage-.*\.(?:js|css)|scooter-fullscreen-.*\.jpg|geist-latin-wght-normal-.*\.woff2)$/.test(p))];
+const publicChecks=await Promise.all(checks.map(async p=>{const r=await fetch('https://portal.sugo-express.org/'+(p==='index.html'?'':p),{signal:AbortSignal.timeout(25000),cache:'no-store'});const b=Buffer.from(await r.arrayBuffer());let match=sha(b)===sha(fs.readFileSync(path.join(dist,p)));if(p==='index.html'){fs.writeFileSync(path.join(work,'public-index.html'),b);const entry=html.match(/src="([^"]+\.js)"/)[1];match=b.toString().includes(entry);console.log('Public HTML entry expected:',entry,'matches:',match);}if(r.status!==200||!match)throw Error('Public mismatch '+p+' '+r.status);return{path:p,status:r.status,bytes:b.length};}));
+const result={remoteFilesMatched:files.length,publicChecks,entry:html.match(/src="([^"]+\.js)"/)[1],backup:'/root/deploy-backups/web-login-20261102-113500',browserVerification:'Timed out; local browser QA passed before deployment.'};
+fs.writeFileSync(path.join(work,'verification.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

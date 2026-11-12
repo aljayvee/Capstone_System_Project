@@ -73,7 +73,7 @@ export function ConfirmDialog({
     tone === "danger"
       ? "text-status-act-ink"
       : tone === "info"
-        ? "text-board-field"
+        ? "text-field-ink"
         : tone === "success"
           ? "text-emerald-500"
           : "text-status-waiting-ink";

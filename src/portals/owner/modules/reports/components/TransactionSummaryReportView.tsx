@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { ChevronsLeftRight, Maximize2, Minimize2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronsLeftRight, Image as ImageIcon, Loader2, Maximize2, Minimize2, X } from "lucide-react";
 import { ReportState } from "./ReportState";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { ReportNotes } from "./ReportNotes";
 import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
 import { useReportPrint } from "../../../hooks/useReportPrint";
@@ -14,6 +14,7 @@ import { formatErrandId } from "../../../../../utils/formatErrandId";
 import { formatPeso } from "../../../../../utils/format";
 import { MobileResponsiveTable, TablePagination } from "../../../../../components/table";
 import { usePagination } from "../../../../../hooks/usePagination";
+import { RiderSearchPicker, type RiderOption } from "./RiderSearchPicker";
 
 type Transaction = ApiTransactionSummaryReport["transactions"][number];
 type TransactionPoint = NonNullable<ApiTransactionSummaryReport["timelineBreakdown"]>[number];
@@ -24,6 +25,105 @@ const plainStatus = (status: string) =>
 
 const proofFrom = (source: Transaction["paymentEvidenceSource"]) =>
   source === "customer" ? "Customer's upload" : source === "rider" ? "Rider's photo" : "—";
+
+/**
+ * "Customer's upload" / "Rider's photo", and the photo itself one click away
+ * (owner, 2026-10-27). Fetched only when asked for, through the same endpoint
+ * the dispatcher's viewers use, so a page of rows pulls no image bytes.
+ *
+ * The viewer is portalled to <body> above everything: it can open from the
+ * record inspector or the full-screen table, both of which close on Escape.
+ * Its own Escape listener runs first (capture) and stops there, so Escape
+ * closes the photo and leaves the inspector open.
+ */
+const ProofFrom: React.FC<{ t: Transaction }> = ({ t }) => {
+  const [state, setState] = useState<"idle" | "loading" | "failed">("idle");
+  const [src, setSrc] = useState<string | null>(null);
+  const label = proofFrom(t.paymentEvidenceSource);
+
+  useEffect(() => {
+    if (!src) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      setSrc(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [src]);
+
+  if (!t.paymentProofImageId) return <>{label}</>;
+  const imageId = t.paymentProofImageId;
+
+  const open = async () => {
+    setState("loading");
+    const full = await apiService.getProofImage(t.errandId, imageId);
+    if (!full) {
+      setState("failed");
+      return;
+    }
+    setState("idle");
+    setSrc(`data:${full.mimeType};base64,${full.imageData}`);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void open()}
+        disabled={state === "loading"}
+        className="inline-flex items-center gap-1.5 text-ink underline underline-offset-2 hover:text-field-ink cursor-pointer disabled:cursor-wait"
+        aria-label={`View the payment proof: ${label}`}
+      >
+        {state === "loading" ? (
+          <Loader2 size={13} className="shrink-0 animate-spin" />
+        ) : (
+          <ImageIcon size={13} className="shrink-0" />
+        )}
+        {label}
+      </button>
+      {state === "failed" ? (
+        <span role="alert" className="ml-2 text-status-act-ink">
+          Could not open the photo.{" "}
+          <button type="button" onClick={() => void open()} className="underline underline-offset-2 cursor-pointer">
+            Try again
+          </button>
+        </span>
+      ) : null}
+      {src
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/70 p-6"
+              onClick={() => setSrc(null)}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Payment proof, ${label}, ${formatErrandId(t.errandId)}`}
+            >
+              <button
+                type="button"
+                onClick={() => setSrc(null)}
+                className="absolute right-5 top-5 grid size-9 cursor-pointer place-items-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+                aria-label="Close the photo"
+              >
+                <X size={18} />
+              </button>
+              <img
+                src={src}
+                alt={`Payment proof for ${formatErrandId(t.errandId)}`}
+                className="max-h-[85%] max-w-full rounded-lg object-contain"
+                onClick={(event) => event.stopPropagation()}
+              />
+              <p className="text-label text-white/80">
+                {label} · {formatErrandId(t.errandId)}
+                {t.paymentReferenceNo ? ` · ref ${t.paymentReferenceNo}` : ""}
+              </p>
+            </div>,
+            document.body
+          )
+        : null}
+    </>
+  );
+};
 
 const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transactions }) => (
   <table className="w-full text-label min-w-[1100px] border-collapse">
@@ -48,7 +148,7 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
           Amount
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium text-right whitespace-nowrap">
-          Delivery fee
+          Service fee
         </th>
         <th scope="col" className="px-3 py-2.5 font-medium whitespace-nowrap">
           Payment
@@ -99,7 +199,7 @@ const TransactionTable: React.FC<{ transactions: Transaction[] }> = ({ transacti
           <td className="px-3 py-2.5 whitespace-nowrap">{t.paymentMethod}</td>
           <td className="px-3 py-2.5 font-mono text-ink-muted whitespace-nowrap">{t.paymentReferenceNo ?? "—"}</td>
           <td className="px-3 py-2.5 text-ink-muted whitespace-nowrap">
-            {proofFrom(t.paymentEvidenceSource)}
+            <ProofFrom t={t} />
           </td>
           <td className="px-3 py-2.5 text-center whitespace-nowrap">
             <span className="px-2 py-0.5 rounded-full bg-board-ground text-ink-muted text-label">
@@ -142,13 +242,21 @@ const SubtotalTable: React.FC<{
 export const TransactionSummaryReportView: React.FC = () => {
   const [preset, setPreset] = useState<RangePreset>("TODAY");
   const [range, setRange] = useState<DateRange | null>(null);
+  // One rider, or null for every rider (owner, 2026-10-27). Carried in the
+  // report query, so the screen and the printout are narrowed by the same call.
+  const [riderId, setRiderId] = useState<number | null>(null);
   // Rebuilt each render; the hooks key on its values, not its identity.
-  const apiRange = toApiRange(preset, range);
+  const apiRange = { ...toApiRange(preset, range), ...(riderId ? { riderId } : {}) };
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [tableSearch, setTableSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const { data, isLoading, error, reload } = useReport(apiService.getTransactionSummary, apiRange);
   const printer = useReportPrint("transactions", apiRange);
+  // Kept across reloads, so the picker does not vanish while a new window loads.
+  const [riderOptions, setRiderOptions] = useState<RiderOption[]>([]);
+  useEffect(() => {
+    if (data?.riderOptions) setRiderOptions(data.riderOptions);
+  }, [data]);
 
   const filteredTransactions = useMemo(() => {
     if (!data) return [];
@@ -167,7 +275,7 @@ export const TransactionSummaryReportView: React.FC = () => {
     });
   }, [data, tableSearch, statusFilter]);
 
-  const txPagination = usePagination(filteredTransactions, 25, [preset, range, statusFilter, tableSearch]);
+  const txPagination = usePagination(filteredTransactions, 25, [preset, range, riderId, statusFilter, tableSearch]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -186,8 +294,9 @@ export const TransactionSummaryReportView: React.FC = () => {
       filteredTransactions.length > 0 || statusFilter !== "ALL" || tableSearch
         ? filteredTransactions
         : data.transactions;
+    const who = data.rider ? `${data.rider.name.replace(/[^A-Za-z0-9]+/g, "_")}_` : "";
     downloadCSV(
-      `Sugo_Transaction_Summary_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
+      `Sugo_Transaction_Summary_${who}${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
         "Order Number",
         "Store Type",
@@ -195,7 +304,7 @@ export const TransactionSummaryReportView: React.FC = () => {
         "Customer",
         "Location",
         "Amount (PHP)",
-        "Delivery Fee (PHP)",
+        "Service Fee (PHP)",
         "Payment Method",
         "Payment Reference",
         "Proof From",
@@ -235,6 +344,8 @@ export const TransactionSummaryReportView: React.FC = () => {
         exportDisabled={!data}
         isPreparingPrint={printer.isPreparing}
         printError={printer.error}
+        filters={<RiderSearchPicker options={riderOptions} value={riderId} onChange={setRiderId} />}
+        printLabel={riderId ? "Print rider report" : "Print"}
       />
       <ReportState
         isLoading={isLoading}
@@ -246,10 +357,59 @@ export const TransactionSummaryReportView: React.FC = () => {
 
       {data && (
         <>
+          {data.rider && (
+            <p className="text-label text-ink-muted" data-testid="transactions-rider">
+              <span className="font-semibold text-ink">{data.rider.name}</span>
+              {" · only this rider's transactions · "}
+              <button
+                type="button"
+                onClick={() => setRiderId(null)}
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                Show all riders
+              </button>
+            </p>
+          )}
+
           <p className="text-label text-ink-muted">
             {data.coverageLabel ?? data.rangeLabel} · {data.totals.count} transaction
             {data.totals.count === 1 ? "" : "s"} · {formatPeso(data.totals.amount)}
           </p>
+
+          <div className="bg-hairline border border-edge rounded-plate overflow-hidden grid grid-cols-1 gap-px sm:grid-cols-2 xl:grid-cols-4">
+            <div className="bg-board-plate p-5">
+              <div className="text-body text-ink-muted">Total amount</div>
+              <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                {formatPeso(data.totals.amount)}
+              </div>
+            </div>
+            <div className="bg-board-plate p-5">
+              <div className="text-body text-ink-muted">Service fees</div>
+              <div className="text-xl font-bold font-mono text-ink mt-1 tabular-nums">
+                {formatPeso(data.totals.deliveryFee)}
+              </div>
+            </div>
+            <div className="bg-board-plate p-5" data-testid="transactions-unremitted-tile">
+              <div className="text-body text-ink-muted">Unremitted</div>
+              <div
+                className={`text-xl font-bold font-mono mt-1 tabular-nums ${
+                  (data.totals.unremitted ?? 0) > 0 ? "text-status-act-ink" : "text-ink"
+                }`}
+              >
+                {formatPeso(data.totals.unremitted ?? 0)}
+              </div>
+            </div>
+            <div className="bg-board-plate p-5" data-testid="transactions-uncollected-tile">
+              <div className="text-body text-ink-muted">Uncollected</div>
+              <div
+                className={`text-xl font-bold font-mono mt-1 tabular-nums ${
+                  (data.totals.uncollected ?? 0) > 0 ? "text-status-waiting-ink" : "text-ink"
+                }`}
+              >
+                {formatPeso(data.totals.uncollected ?? 0)}
+              </div>
+            </div>
+          </div>
 
           <PeriodBreakdownTable<TransactionPoint>
             subject="Transactions"
@@ -258,7 +418,7 @@ export const TransactionSummaryReportView: React.FC = () => {
             figures={[
               { header: "Transactions", format: "count", value: (p) => p.count },
               { header: "Amount", format: "money", value: (p) => p.amount, primary: true },
-              { header: "Delivery fees", format: "money", value: (p) => p.deliveryFee },
+              { header: "Service fees", format: "money", value: (p) => p.deliveryFee },
             ]}
           />
 
@@ -301,10 +461,9 @@ export const TransactionSummaryReportView: React.FC = () => {
                         type="button"
                         onClick={() => setIsFullScreen(true)}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-plate border border-edge bg-board-ground hover:bg-board-ground/70 text-label text-ink transition-colors text-xs"
-                        title="Open Full Screen (<>)"
+                        title="Open Full Screen"
                       >
                         <ChevronsLeftRight size={13} className="text-ink-muted" />
-                        <span className="font-mono text-[11px] font-bold text-ink-muted">&lt;&gt;</span>
                         <span>Full Screen</span>
                       </button>
                     </div>
@@ -367,7 +526,7 @@ export const TransactionSummaryReportView: React.FC = () => {
                           <span className="text-ink">{t.customerName ?? "--"}</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-ink-muted">Delivery fee</span>
+                          <span className="text-ink-muted">Service fee</span>
                           <span className="font-mono font-medium text-ink tabular-nums">
                             {formatPeso(t.deliveryFee)} ({t.paymentMethod})
                           </span>
@@ -396,7 +555,7 @@ export const TransactionSummaryReportView: React.FC = () => {
                         title: "Payment",
                         items: [
                           { label: "Amount", value: formatPeso(t.amount) },
-                          { label: "Delivery fee", value: formatPeso(t.deliveryFee) },
+                          { label: "Service fee", value: formatPeso(t.deliveryFee) },
                           { label: "Paid by", value: t.paymentMethod },
                           {
                             label: "Payment reference",
@@ -404,7 +563,7 @@ export const TransactionSummaryReportView: React.FC = () => {
                             copyable: !!t.paymentReferenceNo,
                             copyValue: t.paymentReferenceNo ?? "",
                           },
-                          { label: "Proof from", value: proofFrom(t.paymentEvidenceSource) },
+                          { label: "Proof from", value: <ProofFrom t={t} /> },
                         ],
                       },
                     ]}
@@ -454,7 +613,7 @@ export const TransactionSummaryReportView: React.FC = () => {
             </>
           )}
 
-          <ReportNotes notes={data.notes} />
+          {/* No "About these numbers" block on this report (owner, 2026-10-27). */}
         </>
       )}
 

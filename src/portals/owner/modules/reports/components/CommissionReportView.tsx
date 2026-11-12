@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { ReportState } from "./ReportState";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
-import { ReportNotes } from "./ReportNotes";
 import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
 import { useReport } from "../../../hooks/useReport";
 import { useReportPrint } from "../../../hooks/useReportPrint";
@@ -38,15 +37,15 @@ export const CommissionReportView: React.FC = () => {
   const handleExportCSV = () => {
     if (!data) return;
     if (data.rider) {
-      // One rider: their orders, the same lines as the printout.
+      // One rider: their errands, the same lines as the printout. No Tip
+      // column: the business takes no tips (owner, 2026-10-27).
       downloadCSV(
         `Sugo_Commission_${data.rider.name.replace(/[^A-Za-z0-9]+/g, "_")}_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
-        ["Order", "Placed", "Delivery Fee (PHP)", "Tip (PHP)", "Sugo's Share (PHP)", "Rider's Share (PHP)"],
+        ["Errand", "Placed", "Service Fee (PHP)", "Sugo's Share (PHP)", "Rider's Share (PHP)"],
         (data.orders ?? []).map((o) => [
           o.referenceNo ?? formatErrandId(o.errandId),
           o.placedAt,
           o.deliveryFee,
-          o.tip,
           o.businessShare,
           o.riderShare,
         ]),
@@ -56,17 +55,15 @@ export const CommissionReportView: React.FC = () => {
     downloadCSV(
       `Sugo_Commission_Report_${data.rangeLabel.replace(/[^A-Za-z0-9]+/g, "_")}.csv`,
       [
-        "Store Type",
-        "Orders",
-        "Total Sales (PHP)",
-        "Delivery Fees (PHP)",
+        "Merchant Category",
+        "Errands",
+        "Service Fees (PHP)",
         "Sugo's Share (PHP)",
         "Rider's Share (PHP)",
       ],
       data.byCategory.map((c) => [
         c.category,
         c.orderCount,
-        c.revenue,
         c.deliveryFee,
         c.businessShare,
         c.riderShare,
@@ -109,8 +106,8 @@ export const CommissionReportView: React.FC = () => {
               of the whole report rather than as a caption on a plate. */}
           <p className="text-label text-ink-muted">
             {data.rider && <span className="font-semibold text-ink">{data.rider.name} · </span>}
-            {data.coverageLabel ?? data.rangeLabel} · Sugo keeps {businessPct}% of each delivery
-            fee, from {data.orderCount} {data.orderCount === 1 ? "order" : "orders"}
+            {data.coverageLabel ?? data.rangeLabel} · Sugo keeps {businessPct}% of each service
+            fee, from {data.orderCount} {data.orderCount === 1 ? "errand" : "errands"}
             {data.rider && (
               <>
                 {" · "}
@@ -126,12 +123,12 @@ export const CommissionReportView: React.FC = () => {
           </p>
 
           <PeriodBreakdownTable<CommissionPoint>
-            subject="Sugo's earnings"
+            subject="Sugo and Rider's earnings"
             unit={data.breakdownUnit}
             points={data.timelineBreakdown}
             figures={[
-              { header: "Orders", format: "count", value: (p) => p.orderCount },
-              { header: "Delivery fees", format: "money", value: (p) => p.deliveryFee },
+              { header: "Errands", format: "count", value: (p) => p.orderCount },
+              { header: "Service fees", format: "money", value: (p) => p.deliveryFee },
               { header: "Sugo's share", format: "money", value: (p) => p.businessShare, primary: true },
               { header: "Rider's share", format: "money", value: (p) => p.riderShare },
             ]}
@@ -145,7 +142,7 @@ export const CommissionReportView: React.FC = () => {
             <>
               <div className="bg-board-plate border border-edge rounded-plate p-6">
                 <div className="text-body font-semibold text-ink mb-4">
-                  How each store type's delivery fees were split
+                  How each merchant category's service fees were split
                 </div>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={data.byCategory}>
@@ -164,7 +161,7 @@ export const CommissionReportView: React.FC = () => {
                     <Bar
                       dataKey="businessShare"
                       name="Sugo's share"
-                      fill="#1E3A5F"
+                      fill="var(--color-field-ink)"
                       radius={[4, 4, 0, 0]}
                     />
                     <Bar
@@ -185,16 +182,13 @@ export const CommissionReportView: React.FC = () => {
                       <thead className="bg-board-ground text-ink-muted">
                         <tr>
                           <th scope="col" className="text-left px-5 py-2 font-semibold">
-                            Store type
+                            Merchant Category
                           </th>
                           <th scope="col" className="text-right px-5 py-2 font-semibold">
-                            Orders
+                            Errands
                           </th>
                           <th scope="col" className="text-right px-5 py-2 font-semibold">
-                            Total sales
-                          </th>
-                          <th scope="col" className="text-right px-5 py-2 font-semibold">
-                            Delivery fees
+                            Service fees
                           </th>
                           <th scope="col" className="text-right px-5 py-2 font-semibold">
                             Sugo's share
@@ -212,12 +206,9 @@ export const CommissionReportView: React.FC = () => {
                               {c.orderCount}
                             </td>
                             <td className="px-5 py-2.5 text-right font-mono tabular-nums">
-                              {formatPeso(c.revenue)}
-                            </td>
-                            <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                               {formatPeso(c.deliveryFee)}
                             </td>
-                            <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold text-board-field">
+                            <td className="px-5 py-2.5 text-right font-mono tabular-nums font-semibold text-field-ink">
                               {formatPeso(c.businessShare)}
                             </td>
                             <td className="px-5 py-2.5 text-right font-mono tabular-nums text-status-done-ink">
@@ -230,14 +221,16 @@ export const CommissionReportView: React.FC = () => {
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                             {data.orderCount}
                           </td>
-                          <td />
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                             {formatPeso(data.totalDeliveryFees)}
                           </td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">
                             {formatPeso(data.estimatedCommission)}
                           </td>
-                          <td />
+                          {/* Owner, 2026-10-27: the rider's share gets its overall total too. */}
+                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">
+                            {formatPeso(data.riderCommission)}
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -250,7 +243,7 @@ export const CommissionReportView: React.FC = () => {
                   data={data.byCategory}
                   keyExtractor={(c) => c.category}
                   desktopView={desktopTable}
-                  primaryHeader="Store type and orders"
+                  primaryHeader="Merchant Category and errands"
                   secondaryHeader="Sugo's and rider's share"
                   renderPrimary={(c) => (
                     <div className="min-w-0">
@@ -258,13 +251,13 @@ export const CommissionReportView: React.FC = () => {
                         {c.category}
                       </div>
                       <div className="text-[10px] text-ink-muted">
-                        {c.orderCount} order{c.orderCount === 1 ? "" : "s"} · {formatPeso(c.revenue)}
+                        {c.orderCount} errand{c.orderCount === 1 ? "" : "s"}
                       </div>
                     </div>
                   )}
                   renderSecondary={(c) => (
                     <div className="text-right shrink-0">
-                      <div className="font-mono font-semibold text-board-field text-xs tabular-nums">
+                      <div className="font-mono font-semibold text-field-ink text-xs tabular-nums">
                         {formatPeso(c.businessShare)}
                       </div>
                       <div className="text-[10px] font-mono text-status-done-ink tabular-nums">
@@ -275,12 +268,12 @@ export const CommissionReportView: React.FC = () => {
                   renderPreview={(c) => (
                     <div className="space-y-1.5 pt-1 text-ink-muted">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-ink-muted">Delivery fees</span>
+                        <span className="text-ink-muted">Service fees</span>
                         <span className="font-mono font-medium text-ink tabular-nums">{formatPeso(c.deliveryFee)}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-ink-muted">Sugo's share</span>
-                        <span className="font-mono font-medium text-board-field tabular-nums">{formatPeso(c.businessShare)}</span>
+                        <span className="font-mono font-medium text-field-ink tabular-nums">{formatPeso(c.businessShare)}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-ink-muted">Rider's share</span>
@@ -289,20 +282,19 @@ export const CommissionReportView: React.FC = () => {
                     </div>
                   )}
                   inspectorTitle={(c) => c.category}
-                  inspectorSubtitle={(c) => `${c.orderCount} orders · ${formatPeso(c.deliveryFee)} in delivery fees`}
+                  inspectorSubtitle={(c) => `${c.orderCount} errand${c.orderCount === 1 ? "" : "s"} · ${formatPeso(c.deliveryFee)} in service fees`}
                   inspectorStatusBadge={(c) => (
-                    <span className="font-mono font-semibold text-xs text-board-field">
+                    <span className="font-mono font-semibold text-xs text-field-ink">
                       Sugo's: {formatPeso(c.businessShare)}
                     </span>
                   )}
                   inspectorSections={(c) => [
                     {
-                      title: "Orders and fees",
+                      title: "Errands and fees",
                       items: [
-                        { label: "Store type", value: c.category },
-                        { label: "Orders", value: `${c.orderCount}` },
-                        { label: "Total sales", value: formatPeso(c.revenue) },
-                        { label: "Delivery fees", value: formatPeso(c.deliveryFee) },
+                        { label: "Merchant Category", value: c.category },
+                        { label: "Errands", value: `${c.orderCount}` },
+                        { label: "Service fees", value: formatPeso(c.deliveryFee) },
                       ],
                     },
                     {
@@ -322,11 +314,11 @@ export const CommissionReportView: React.FC = () => {
           {data.rider && (
             <div className="bg-board-plate border border-edge rounded-plate overflow-hidden" data-testid="commission-rider-orders">
               <header className="px-5 py-3 border-b border-edge">
-                <h4 className="text-label text-ink">Every order {data.rider.name} delivered in these dates</h4>
+                <h4 className="text-label text-ink">Every errand {data.rider.name} delivered in these dates</h4>
               </header>
               {(data.orders ?? []).length === 0 ? (
                 <p className="p-6 text-center text-label text-ink-muted">
-                  {data.rider.name} delivered no orders in these dates.
+                  {data.rider.name} delivered no errands in these dates.
                 </p>
               ) : (
                 <>
@@ -334,10 +326,9 @@ export const CommissionReportView: React.FC = () => {
                   <table className="w-full text-label">
                     <thead className="bg-board-ground text-ink-muted">
                       <tr>
-                        <th scope="col" className="text-left px-5 py-2 font-semibold">Order</th>
+                        <th scope="col" className="text-left px-5 py-2 font-semibold">Errand</th>
                         <th scope="col" className="text-left px-5 py-2 font-semibold">Placed</th>
-                        <th scope="col" className="text-right px-5 py-2 font-semibold">Delivery fee</th>
-                        <th scope="col" className="text-right px-5 py-2 font-semibold">Tip</th>
+                        <th scope="col" className="text-right px-5 py-2 font-semibold">Service fee</th>
                         <th scope="col" className="text-right px-5 py-2 font-semibold">Sugo's share</th>
                         <th scope="col" className="text-right px-5 py-2 font-semibold">Rider's share</th>
                       </tr>
@@ -358,14 +349,13 @@ export const CommissionReportView: React.FC = () => {
                             })}
                           </td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(o.deliveryFee)}</td>
-                          <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(o.tip)}</td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(o.businessShare)}</td>
                           <td className="px-5 py-2.5 text-right font-mono tabular-nums">{formatPeso(o.riderShare)}</td>
                         </tr>
                       ))}
                       <tr className="border-t-2 border-edge font-bold text-ink">
                         <td className="px-5 py-2.5" colSpan={2}>Total</td>
-                        {(["deliveryFee", "tip", "businessShare", "riderShare"] as const).map((k) => (
+                        {(["deliveryFee", "businessShare", "riderShare"] as const).map((k) => (
                           <td key={k} className="px-5 py-2.5 text-right font-mono tabular-nums">
                             {formatPeso((data.orders ?? []).reduce((s, o) => s + o[k], 0))}
                           </td>
@@ -381,14 +371,14 @@ export const CommissionReportView: React.FC = () => {
                   startIndex={ordersPagination.startIndex}
                   endIndex={ordersPagination.endIndex}
                   onPageChange={ordersPagination.setCurrentPage}
-                  itemName="orders"
+                  itemName="errands"
                 />
               </>
               )}
             </div>
           )}
 
-          <ReportNotes notes={data.notes} />
+          {/* No "About these numbers" block on this report (owner, 2026-10-27). */}
         </>
       )}
 

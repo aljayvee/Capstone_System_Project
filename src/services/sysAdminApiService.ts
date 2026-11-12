@@ -28,6 +28,7 @@ import type {
   ModificationAuditResponse,
   SecurityThreatResponse,
   SystemActivityResponse,
+  ReportPrintLogResponse,
   TrafficSummary,
   SystemTelemetry,
   ItAdminUser,
@@ -43,6 +44,8 @@ import type {
   LogTailResult,
   ServiceControlResponse,
   PortalMaintenanceStatus,
+  PortalKey,
+  MaintenanceType,
   AppReleaseTarget,
   AppReleaseInfo,
   AppReleasesResponse,
@@ -353,6 +356,18 @@ export const sysAdminApiService = {
     return response.data;
   },
 
+  async getReportPrintLogs(params?: {
+    reportType?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ReportPrintLogResponse> {
+    const response = await sysAdminAxios.get<ReportPrintLogResponse>("/sysadmin/audit/report-prints", {
+      params,
+    });
+    return response.data;
+  },
+
   // ── Traffic & GoAccess ────────────────────────────────────────────────────
 
   async getTrafficSummary(): Promise<TrafficSummary> {
@@ -373,15 +388,16 @@ export const sysAdminApiService = {
   },
 
   async toggleMaintenance(
-    portal: "owner" | "dispatcher" | "rider" | "customer",
+    portal: PortalKey,
     active: boolean,
     options?: {
-      maintenanceType?: "SCHEDULED" | "EMERGENCY" | "UPGRADE" | "SECURITY";
+      maintenanceType?: MaintenanceType;
       header?: string;
       message?: string;
       notice?: string;
       supportContact?: string;
       customColor?: string;
+      footnote?: string;
       stepUpPassword?: string;
     }
   ): Promise<PortalMaintenanceStatus> {
@@ -395,6 +411,7 @@ export const sysAdminApiService = {
         message: options?.message || options?.notice,
         supportContact: options?.supportContact,
         customColor: options?.customColor,
+        footnote: options?.footnote,
         stepUpPassword: options?.stepUpPassword,
       }
     );
@@ -443,6 +460,14 @@ export const sysAdminApiService = {
   async toggleDispatcherAiSuggestions(enabled: boolean): Promise<{ enabled: boolean }> {
     const response = await sysAdminAxios.post<{ enabled: boolean }>(
       "/sysadmin/devops/dispatcher-ai-suggestions",
+      { enabled }
+    );
+    return response.data;
+  },
+
+  async toggleKuyaSugo(enabled: boolean): Promise<{ enabled: boolean }> {
+    const response = await sysAdminAxios.post<{ enabled: boolean }>(
+      "/sysadmin/devops/kuya-sugo",
       { enabled }
     );
     return response.data;

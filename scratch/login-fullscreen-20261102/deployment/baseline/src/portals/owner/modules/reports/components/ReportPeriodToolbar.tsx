@@ -1,0 +1,116 @@
+import React from "react";
+import { Printer, Download, Loader2, RotateCcw } from "lucide-react";
+import type { DateRange } from "../../../../../components/DateRangePicker";
+import { RangeSelector, type RangePreset } from "../../../../../components/RangeSelector";
+
+/**
+ * The CSV export is HIDDEN, not removed.
+ *
+ * Every view's `handleExportCSV` and `src/utils/downloadCSV.ts` stay intact and
+ * wired — `onExportCSV` is still a required prop, so the handlers remain
+ * type-checked and reachable. Only the button is unrendered. Flip this to `true`
+ * to bring it back; nothing else has to change.
+ *
+ * Annotated `: boolean` on purpose. Left to infer the literal `false`,
+ * TypeScript narrows the `&&` branch below to unreachable and editors start
+ * reporting the button as dead code.
+ */
+const SHOW_CSV_EXPORT: boolean = false;
+
+interface ReportPeriodToolbarProps {
+  preset: RangePreset;
+  onPresetChange: (preset: RangePreset) => void;
+  range: DateRange | null;
+  onRangeChange: (range: DateRange | null) => void;
+  /** Opens the browser's print screen on the server's PDF of this window. */
+  onPrint: () => void;
+  onExportCSV: () => void;
+  exportDisabled?: boolean;
+  isPreparingPrint?: boolean;
+  /** Why the last print did not open, with a retry beside it. */
+  printError?: string | null;
+  /** Report-specific filters shown beside the period, e.g. Rider Performance's rider picker. */
+  filters?: React.ReactNode;
+  /** Defaults to "Print". */
+  printLabel?: string;
+}
+
+/**
+ * Shared by all 6 report views — window selection and the export actions look
+ * and behave identically everywhere they appear.
+ *
+ * The period pills and the calendar come from RangeSelector, the same component
+ * the Dashboard header uses, so the two surfaces cannot drift apart in either
+ * appearance or behaviour.
+ */
+export const ReportPeriodToolbar: React.FC<ReportPeriodToolbarProps> = ({
+  preset,
+  onPresetChange,
+  range,
+  onRangeChange,
+  onPrint,
+  onExportCSV,
+  exportDisabled,
+  isPreparingPrint,
+  printError,
+  filters,
+  printLabel = "Print",
+}) => {
+  return (
+    <div className="space-y-2 border-b border-hairline pb-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <RangeSelector
+            preset={preset}
+            onPresetChange={onPresetChange}
+            range={range}
+            onRangeChange={onRangeChange}
+          />
+          {filters}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onPrint}
+            disabled={exportDisabled || isPreparingPrint}
+            aria-busy={isPreparingPrint || undefined}
+            className="flex items-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-4 py-2.5 rounded-plate transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPreparingPrint ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Printer size={15} />
+            )}
+            {isPreparingPrint ? "Opening print screen..." : printLabel}
+          </button>
+
+          {SHOW_CSV_EXPORT && (
+            <button
+              onClick={onExportCSV}
+              disabled={exportDisabled}
+              className="flex items-center gap-2 bg-board-plate border border-edge hover:bg-board-ground text-ink text-label px-4 py-2.5 rounded-plate transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download size={15} /> Export CSV
+            </button>
+          )}
+        </div>
+      </div>
+
+      {printError && !isPreparingPrint && (
+        <div
+          role="alert"
+          className="flex items-center justify-end gap-3 flex-wrap text-body text-status-act-ink"
+        >
+          <span>{printError}</span>
+          <button
+            type="button"
+            onClick={onPrint}
+            className="inline-flex items-center gap-1.5 rounded-plate border border-edge px-3 py-1.5 text-label text-ink hover:bg-board-ground transition"
+          >
+            <RotateCcw size={13} /> Try again
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

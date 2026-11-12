@@ -17,7 +17,7 @@ interface WeeklyHoursEditorProps {
 }
 
 const fieldClass =
-  "w-full rounded-plate border border-edge bg-board-ground px-2 py-1.5 text-label font-mono text-ink focus:bg-board-plate focus:outline-none focus:ring-2 focus:ring-board-field disabled:opacity-40";
+  "w-full rounded-plate border border-edge bg-board-ground px-2 py-1.5 text-label font-mono text-ink focus:bg-board-plate focus:outline-none focus:ring-2 focus:ring-field-ink disabled:opacity-40";
 
 /**
  * The store's opening and closing time for each day of the week (2026-10-13).
@@ -85,7 +85,7 @@ export function WeeklyHoursEditor({ value, onChange, sourceNote }: WeeklyHoursEd
           const d = value.days.find((x) => x.day === dayIndex)!;
           const allDay = isAllDay(d);
           return (
-            <div key={dayIndex} className="grid grid-cols-[5.5rem_1fr] items-center gap-2 px-3 py-1.5">
+            <div key={dayIndex} className="grid min-w-0 grid-cols-1 sm:grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-2 px-3 py-1.5">
               <label className="flex items-center gap-2 text-label text-ink">
                 <input
                   type="checkbox"
@@ -100,7 +100,7 @@ export function WeeklyHoursEditor({ value, onChange, sourceNote }: WeeklyHoursEd
               {d.closed ? (
                 <span className="text-label text-ink-muted">Closed</span>
               ) : (
-                <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1.5">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5">
                   <input
                     type="time"
                     value={allDay ? "00:00" : d.open}

@@ -30,12 +30,12 @@ export const DispatcherOperationalMetrics: React.FC<DispatcherOperationalMetrics
         <div className="flex items-center gap-2 pb-2.5 border-b border-hairline mb-2.5">
           <Store size={15} className="text-ink-muted" />
           <h3 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-            Top Store Visits Today
+            Store Visits Today
           </h3>
         </div>
 
         {topMerchantsToday.length === 0 ? (
-          <p className="text-label text-ink-muted py-4 text-center">No store stops recorded today</p>
+          <p className="text-label text-ink-muted py-4 text-center">No store visits today</p>
         ) : (
           <div className="space-y-1.5">
             {topMerchantsToday.map((merchant, idx) => (
@@ -63,12 +63,12 @@ export const DispatcherOperationalMetrics: React.FC<DispatcherOperationalMetrics
         <div className="flex items-center gap-2 pb-2.5 border-b border-hairline mb-2.5">
           <XCircle size={15} className="text-rose-500" />
           <h3 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-            Decline Patterns Today
+            Decline Reasons Today
           </h3>
         </div>
 
         {todayDeclines.length === 0 ? (
-          <p className="text-label text-ink-muted py-4 text-center">Zero declined orders today</p>
+          <p className="text-label text-ink-muted py-4 text-center">No declined orders today</p>
         ) : (
           <div className="space-y-1.5">
             {todayDeclines.map((decline) => (
@@ -92,24 +92,23 @@ export const DispatcherOperationalMetrics: React.FC<DispatcherOperationalMetrics
           <div className="flex items-center gap-2 pb-2.5 border-b border-hairline mb-3">
             <Award size={15} className="text-signal" />
             <h3 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-              My Shift Performance
+              My Shift
             </h3>
           </div>
 
           <div className="grid grid-cols-2 gap-2 mt-2">
             <div className="p-3 rounded-trim bg-board-ground/60 border border-hairline">
               <p className="text-micro uppercase tracking-wider text-ink-muted font-semibold">
-                Handled by Me
+                Orders Verified
               </p>
               <p data-figure className="font-mono text-title font-bold tabular-nums text-ink mt-1">
                 {myShiftStats.myHandledToday}
               </p>
-              <p className="text-micro text-ink-muted mt-0.5">orders verified</p>
             </div>
 
             <div className="p-3 rounded-trim bg-board-ground/60 border border-hairline">
               <p className="text-micro uppercase tracking-wider text-ink-muted font-semibold">
-                Avg Claim Speed
+                Average Claim Time
               </p>
               <p
                 data-figure
@@ -117,13 +116,12 @@ export const DispatcherOperationalMetrics: React.FC<DispatcherOperationalMetrics
               >
                 {formatLatency(myShiftStats.myAvgClaimLatencySeconds)}
               </p>
-              <p className="text-micro text-ink-muted mt-0.5">from customer order</p>
             </div>
           </div>
         </div>
 
         <p className="text-micro text-ink-muted mt-3 pt-2 border-t border-hairline">
-          Stats reset automatically at midnight Manila shift change
+          Resets daily at midnight (Manila time).
         </p>
       </div>
     </div>

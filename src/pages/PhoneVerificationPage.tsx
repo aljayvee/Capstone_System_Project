@@ -42,12 +42,43 @@ function formatToE164(input: string): string {
   return input.trim();
 }
 
+// The apps build their return address with Expo's Linking.createURL:
+// customerapp:// or sugorider:// in a release build, exp+<slug>:// in a dev
+// client, and exp:// at the developer's Metro server on the local network in
+// Expo Go.
+const PRIVATE_HOST =
+  /^(localhost|127(\.\d{1,3}){3}|10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2})$/;
+
+/**
+ * The redirect, or "" when it is not the Sugo app. A successful check sends a
+ * live Firebase ID token to this address, so a crafted link naming any other
+ * site would hand that site the customer's phone credential.
+ */
+function trustedAppRedirect(raw: string | null): string {
+  const value = (raw || "").trim();
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(value)?.[1]?.toLowerCase();
+  if (scheme === "customerapp" || scheme === "exp+customerapp") return value;
+  if (scheme === "sugorider" || scheme === "exp+ridermobileapp") return value;
+  if (scheme === "exp") {
+    // Parsed by hand: older Chrome gives no hostname for non-http URLs.
+    const host = /^exp:\/\/([^/:?#]+)/i.exec(value)?.[1] ?? "";
+    if (PRIVATE_HOST.test(host)) return value;
+  }
+  return "";
+}
+
 export const PhoneVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const rawPhone = searchParams.get("phone") || "";
-  const redirectUrl = searchParams.get("redirect") || "";
+  // purpose=mfa: the second step of an app sign-in. The app knows only the last
+  // 4 digits of the number (a password alone must not reveal it), so the user
+  // types it, and the server, not this page, makes the result single-use.
+  const isMfa = searchParams.get("purpose") === "mfa";
+  const rawHint = (searchParams.get("hint") || "").replace(/\D/g, "");
+  const hint = isMfa && rawHint.length === 4 ? rawHint : null;
+  const rawPhone = isMfa ? "" : searchParams.get("phone") || "";
+  const redirectUrl = trustedAppRedirect(searchParams.get("redirect"));
 
-  const [phone, setPhone] = useState(() => (rawPhone ? formatToE164(rawPhone) : "+63"));
+  const [phone, setPhone] = useState(() => (rawPhone ? formatToE164(rawPhone) : isMfa ? "" : "+63"));
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"PHONE" | "CODE" | "SUCCESS" | "EXPIRED">("PHONE");
   const [loading, setLoading] = useState(false);
@@ -55,12 +86,18 @@ export const PhoneVerificationPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [returnAppUrl, setReturnAppUrl] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
+  // Sign-in step only: SMS is refused for now, so the way on is the app's
+  // email code.
+  const [smsUnavailable, setSmsUnavailable] = useState(false);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
   // Check if this verification link or phone session has already been consumed/expired
   useEffect(() => {
+    // A sign-in asks again on the next new device, often within the hour; a
+    // lock here would refuse it. The server's challenge is what is single-use.
+    if (isMfa) return;
     const isCurrentSessionExpired = sessionStorage.getItem("sugo_current_otp_session_expired") === "true";
     const clean = rawPhone ? formatToE164(rawPhone) : "";
     let isPhoneExpired = false;
@@ -85,7 +122,7 @@ export const PhoneVerificationPage: React.FC = () => {
     if (isCurrentSessionExpired || isPhoneExpired) {
       setStep("EXPIRED");
     }
-  }, [rawPhone]);
+  }, [rawPhone, isMfa]);
 
   // Resend countdown timer effect
   useEffect(() => {
@@ -134,10 +171,17 @@ export const PhoneVerificationPage: React.FC = () => {
     if (e) e.preventDefault();
     setErrorMessage(null);
     setStatusMessage(null);
+    setSmsUnavailable(false);
 
     const cleanPhone = formatToE164(phone);
     if (!cleanPhone.startsWith("+63") || cleanPhone.length !== 13) {
       setErrorMessage("Please enter a valid Philippine mobile number (e.g. 09171234567 or +639171234567).");
+      return;
+    }
+    // Checked before any SMS goes out, so a typo costs neither a text nor an
+    // attempt. The server still compares the whole number.
+    if (hint && cleanPhone.slice(-4) !== hint) {
+      setErrorMessage(`That number doesn't end in ${hint}. Enter the mobile number on your account.`);
       return;
     }
 
@@ -167,6 +211,9 @@ export const PhoneVerificationPage: React.FC = () => {
       let msg = err?.message || "Failed to send verification SMS";
       if (err?.code === "auth/invalid-phone-number") {
         msg = "Invalid phone number format. Please ensure it begins with +639 followed by 9 digits.";
+      } else if (isMfa && (err?.code === "auth/quota-exceeded" || err?.code === "auth/too-many-requests")) {
+        msg = "Too many text messages were requested. Go back to the app and use the email code instead.";
+        setSmsUnavailable(true);
       } else if (err?.code === "auth/quota-exceeded") {
         msg = "Daily SMS quota exceeded. Please try again later or contact support.";
       } else if (err?.code === "auth/unauthorized-domain") {
@@ -216,18 +263,22 @@ export const PhoneVerificationPage: React.FC = () => {
       const cleanVerifiedPhone = formatToE164(verifiedPhone);
 
       // 1. Immediately invalidate & record expiration for this verification link/session
-      const expirationRecord = {
-        phone: cleanVerifiedPhone,
-        verifiedAt: Date.now(),
-        status: "EXPIRED",
-        reason: "LINK_CONSUMED",
-      };
-      try {
-        sessionStorage.setItem(`sugo_otp_consumed_${cleanVerifiedPhone}`, JSON.stringify(expirationRecord));
-        localStorage.setItem(`sugo_otp_consumed_${cleanVerifiedPhone}`, JSON.stringify(expirationRecord));
-        sessionStorage.setItem("sugo_current_otp_session_expired", "true");
-      } catch (e) {
-        console.warn("Could not record session expiration:", e);
+      // (not for a sign-in step: the server's challenge is single-use there,
+      // and this lock would refuse the next sign-in on a new device).
+      if (!isMfa) {
+        const expirationRecord = {
+          phone: cleanVerifiedPhone,
+          verifiedAt: Date.now(),
+          status: "EXPIRED",
+          reason: "LINK_CONSUMED",
+        };
+        try {
+          sessionStorage.setItem(`sugo_otp_consumed_${cleanVerifiedPhone}`, JSON.stringify(expirationRecord));
+          localStorage.setItem(`sugo_otp_consumed_${cleanVerifiedPhone}`, JSON.stringify(expirationRecord));
+          sessionStorage.setItem("sugo_current_otp_session_expired", "true");
+        } catch (e) {
+          console.warn("Could not record session expiration:", e);
+        }
       }
 
       // 2. Destroy confirmation result reference and reCAPTCHA verifier to prevent replay
@@ -260,7 +311,11 @@ export const PhoneVerificationPage: React.FC = () => {
 
       if (redirectUrl) {
         const separator = redirectUrl.includes("?") ? "&" : "?";
-        const finalUrl = `${redirectUrl}${separator}token=${encodeURIComponent(idToken)}&phone=${encodeURIComponent(verifiedPhone)}`;
+        // A sign-in step returns the token alone: the number stays off the
+        // app's URL, and the server reads it from the token anyway.
+        const finalUrl = isMfa
+          ? `${redirectUrl}${separator}token=${encodeURIComponent(idToken)}`
+          : `${redirectUrl}${separator}token=${encodeURIComponent(idToken)}&phone=${encodeURIComponent(verifiedPhone)}`;
         setReturnAppUrl(finalUrl);
 
         // Auto-redirect back to mobile app
@@ -275,6 +330,9 @@ export const PhoneVerificationPage: React.FC = () => {
       let msg = err?.message || "Invalid verification code";
       if (err?.code === "auth/invalid-verification-code") {
         msg = "Incorrect 6-digit verification code. Please check your SMS.";
+      } else if (isMfa && err?.code === "auth/too-many-requests") {
+        msg = "Too many tries. Go back to the app and use the email code instead.";
+        setSmsUnavailable(true);
       } else if (err?.code === "auth/code-expired") {
         msg = "The code has expired. Please request a new one.";
       }
@@ -308,7 +366,9 @@ export const PhoneVerificationPage: React.FC = () => {
               <h1 className="font-bold text-sm tracking-tight text-slate-900 leading-tight">
                 SUGO EXPRESS
               </h1>
-              <p className="text-[11px] text-slate-500 font-medium">Phone Verification</p>
+              <p className="text-[11px] text-slate-500 font-medium">
+                {isMfa ? "Two-step verification" : "Phone Verification"}
+              </p>
             </div>
           </div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 text-xs font-medium">
@@ -333,15 +393,19 @@ export const PhoneVerificationPage: React.FC = () => {
           {/* Section Title & Subtitle */}
           <div className="space-y-2">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-              {step === "PHONE" && "Verify your phone number"}
+              {step === "PHONE" && (isMfa ? "Confirm it's you" : "Verify your phone number")}
               {step === "CODE" && "Enter verification code"}
-              {step === "SUCCESS" && "Phone verified!"}
+              {step === "SUCCESS" && (isMfa ? "Number confirmed" : "Phone verified!")}
               {step === "EXPIRED" && "Verification link expired"}
             </h2>
 
             {step === "PHONE" && (
               <p className="text-sm text-slate-600 leading-relaxed">
-                Enter your mobile number to receive a 6-digit verification code via SMS.
+                {isMfa
+                  ? hint
+                    ? `Enter the number ending in ${hint}. We'll text it a 6-digit code.`
+                    : "Enter the mobile number on your account. We'll text it a 6-digit code."
+                  : "Enter your mobile number to receive a 6-digit verification code via SMS."}
               </p>
             )}
 
@@ -366,7 +430,8 @@ export const PhoneVerificationPage: React.FC = () => {
 
             {step === "SUCCESS" && (
               <p className="text-sm text-slate-600 leading-relaxed">
-                Your mobile number <span className="font-semibold text-slate-900 font-mono">{phone}</span> has been confirmed. Returning you to the app...
+                Your mobile number <span className="font-semibold text-slate-900 font-mono">{phone}</span> has been confirmed.{" "}
+                {isMfa ? "Returning you to the app to finish signing in..." : "Returning you to the app..."}
               </p>
             )}
 
@@ -381,7 +446,18 @@ export const PhoneVerificationPage: React.FC = () => {
           {errorMessage && (
             <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-              <div className="leading-relaxed font-medium">{errorMessage}</div>
+              <div className="space-y-2">
+                <div className="leading-relaxed font-medium">{errorMessage}</div>
+                {smsUnavailable && redirectUrl && (
+                  <a
+                    href={redirectUrl}
+                    className="inline-flex items-center gap-1.5 font-semibold text-red-700 underline underline-offset-2 hover:text-red-800"
+                  >
+                    <span>Back to the app</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
           )}
 
@@ -407,7 +483,7 @@ export const PhoneVerificationPage: React.FC = () => {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="0917 123 4567 or +63 917 123 4567"
+                    placeholder={hint ? `09XX XXX ${hint}` : "0917 123 4567 or +63 917 123 4567"}
                     className="w-full pl-10 pr-4 py-3.5 bg-white border border-slate-300 rounded-xl text-slate-900 font-mono text-base placeholder:text-slate-400 focus:outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15 transition-all shadow-2xs"
                     disabled={loading}
                     autoFocus

@@ -101,8 +101,8 @@ export const ItStaffModule: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-white tracking-wide">{t("staffHeaderTitle")}</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-base font-bold text-ink tracking-wide">{t("staffHeaderTitle")}</h2>
+          <p className="text-xs text-ink-muted">
             {t("staffHeaderSubtitle")}
           </p>
         </div>
@@ -110,7 +110,7 @@ export const ItStaffModule: React.FC = () => {
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-semibold text-white transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-signal hover:bg-signal-deep text-xs font-semibold text-white transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Provision New Admin</span>
@@ -119,43 +119,43 @@ export const ItStaffModule: React.FC = () => {
           <button
             onClick={fetchAdmins}
             disabled={isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F1A30] hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-board-plate hover:bg-board-ground border border-edge text-xs font-medium text-ink transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-red-400" : "text-slate-400"}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-status-act-ink" : "text-ink-muted"}`} />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Isolation Notice Banner */}
-      <div className="p-3.5 rounded-xl bg-[#0B132B] border border-slate-800 text-xs text-slate-400 flex items-start gap-3">
-        <ShieldCheck className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+      <div className="p-3.5 rounded-xl bg-board-ground border border-edge text-xs text-ink-muted flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-status-moving-ink shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold text-white">Database Isolation Invariant: </span>
+          <span className="font-semibold text-ink">Database Isolation Invariant: </span>
           All System Administrator accounts are securely housed in the dedicated{" "}
-          <span className="font-mono text-slate-200">tbl_sys_admin</span> table with dedicated session subjects, completely isolated from operational tables (<span className="font-mono text-slate-400">users</span> and <span className="font-mono text-slate-400">customer_accounts</span>).
+          <span className="font-mono text-ink">tbl_sys_admin</span> table with dedicated session subjects, completely isolated from operational tables (<span className="font-mono text-ink-muted">users</span> and <span className="font-mono text-ink-muted">customer_accounts</span>).
         </div>
       </div>
 
       {/* Error View */}
       {error && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/60 text-xs text-red-300 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-status-act-ink shrink-0" />
             <span>{error}</span>
           </div>
-          <button onClick={fetchAdmins} className="underline text-red-400 hover:text-red-300">
+          <button onClick={fetchAdmins} className="underline text-status-act-ink hover:text-status-act-ink">
             Retry
           </button>
         </div>
       )}
 
       {/* Table */}
-      <div className="rounded-xl bg-[#0F1A30] border border-slate-800 overflow-hidden shadow-sm">
+      <div className="rounded-xl bg-board-plate border border-edge overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-[#0B132B] border-b border-slate-800 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+              <tr className="bg-board-ground border-b border-edge text-ink-muted font-mono text-[11px] uppercase tracking-wider">
                 <th className="py-3 px-4">Admin Principal</th>
                 <th className="py-3 px-4">Contact Email</th>
                 <th className="py-3 px-4 text-center">Status</th>
@@ -164,58 +164,58 @@ export const ItStaffModule: React.FC = () => {
                 <th className="py-3 px-4 text-right">Last Sign In</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-hairline">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400 font-mono text-xs">
-                    <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <td colSpan={6} className="py-16 text-center text-ink-muted font-mono text-xs">
+                    <div className="w-6 h-6 border-2 border-status-act-ink/30 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                     Querying tbl_sys_admin...
                   </td>
                 </tr>
               ) : admins.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                  <td colSpan={6} className="py-16 text-center text-ink-muted">
                     No administrators found
                   </td>
                 </tr>
               ) : (
                 admins.map((admin) => (
-                  <tr key={admin.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={admin.id} className="hover:bg-board-ground transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-red-950/80 border border-red-800/60 flex items-center justify-center text-xs font-bold text-red-300">
+                        <div className="w-8 h-8 rounded-full bg-status-act-fill border border-status-act-ink/30 flex items-center justify-center text-xs font-bold text-status-act-ink">
                           {admin.nickname ? admin.nickname[0].toUpperCase() : admin.username[0].toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-semibold text-white flex items-center gap-2">
+                          <div className="font-semibold text-ink flex items-center gap-2">
                             <span>{admin.name}</span>
-                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+                            <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-board-ground text-ink">
                               @{admin.nickname || admin.username}
                             </span>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-400">ID: {admin.id} &bull; tbl_sys_admin</div>
+                          <div className="text-[11px] font-mono text-ink-muted">ID: {admin.id} &bull; tbl_sys_admin</div>
                         </div>
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 text-slate-300">
-                      {admin.email || <span className="text-slate-500 font-mono">Not specified</span>}
+                    <td className="py-3 px-4 text-ink">
+                      {admin.email || <span className="text-ink-muted font-mono">Not specified</span>}
                     </td>
 
                     <td className="py-3 px-4 text-center">
-                      <span className="inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800/50">
+                      <span className="inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-status-done-fill text-status-done-ink border border-status-done-ink/30">
                         {admin.status}
                       </span>
                     </td>
 
                     <td className="py-3 px-4 text-center">
                       {admin.profileCompleted ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-status-done-ink">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Completed</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-status-waiting-ink">
                           <Clock className="w-3.5 h-3.5" />
                           <span>Pending First Login</span>
                         </span>
@@ -224,18 +224,18 @@ export const ItStaffModule: React.FC = () => {
 
                     <td className="py-3 px-4 text-center">
                       {admin.emailVerified ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-status-done-ink">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Verified</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-ink-muted">
                           <span>Unverified</span>
                         </span>
                       )}
                     </td>
 
-                    <td className="py-3 px-4 text-right font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                    <td className="py-3 px-4 text-right font-mono text-[11px] text-ink-muted whitespace-nowrap">
                       {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleString() : "Never"}
                     </td>
                   </tr>
@@ -249,15 +249,15 @@ export const ItStaffModule: React.FC = () => {
       {/* Modal: Provision New IT Administrator */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-none">
-          <div className="w-full max-w-md rounded-2xl bg-[#0B132B] border border-slate-800 p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+          <div className="w-full max-w-md rounded-2xl bg-board-ground border border-edge p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-edge mb-4">
               <div className="flex items-center gap-2">
-                <UserCog className="w-5 h-5 text-red-500" />
-                <h3 className="text-sm font-bold text-white">Provision IT Administrator</h3>
+                <UserCog className="w-5 h-5 text-status-act-ink" />
+                <h3 className="text-sm font-bold text-ink">Provision IT Administrator</h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                className="p-1 rounded-lg text-ink-muted hover:text-ink"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -267,8 +267,8 @@ export const ItStaffModule: React.FC = () => {
               <div
                 className={`p-3 rounded-lg text-xs font-mono mb-4 border ${
                   modalMessage.type === "success"
-                    ? "bg-emerald-950/60 border-emerald-800 text-emerald-300"
-                    : "bg-red-950/60 border-red-800 text-red-300"
+                    ? "bg-status-done-fill border-status-done-ink/30 text-status-done-ink"
+                    : "bg-status-act-fill border-status-act-ink/30 text-status-act-ink"
                 }`}
               >
                 {modalMessage.text}
@@ -277,73 +277,73 @@ export const ItStaffModule: React.FC = () => {
 
             <form onSubmit={handleCreateAdmin} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Username *</label>
+                <label className="block text-xs font-medium text-ink mb-1">Username *</label>
                 <input
                   type="text"
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g., it_specialist"
-                  className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Temporary Password</label>
+                <label className="block text-xs font-medium text-ink mb-1">Temporary Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="12+ characters: upper and lower case, a number, a symbol"
-                  className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                 />
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-[10px] text-ink-muted mt-0.5">
                   The admin will be challenged with the profile setup wizard upon first sign-in.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">First Name</label>
+                  <label className="block text-xs font-medium text-ink mb-1">First Name</label>
                   <input
                     type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="First Name"
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Last Name</label>
+                  <label className="block text-xs font-medium text-ink mb-1">Last Name</label>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Last Name"
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Preferred Nickname</label>
+                  <label className="block text-xs font-medium text-ink mb-1">Preferred Nickname</label>
                   <input
                     type="text"
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="e.g., Alex"
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Email Address</label>
+                  <label className="block text-xs font-medium text-ink mb-1">Email Address</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="admin@sugo-express.org"
-                    className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
               </div>
@@ -352,14 +352,14 @@ export const ItStaffModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-xs font-semibold text-ink transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-signal hover:bg-signal-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors"
                 >
                   {isSubmitting ? "Provisioning..." : "Provision Account"}
                 </button>

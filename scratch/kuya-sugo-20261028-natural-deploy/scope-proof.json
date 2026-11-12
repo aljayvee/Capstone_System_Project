@@ -1,0 +1,12 @@
+{
+  "changedSource": [
+    "portals/owner/components/KuyaSugoCharacter.tsx",
+    "portals/owner/components/KuyaSugoScene.tsx",
+    "portals/owner/components/OwnerCopilotWelcome.tsx",
+    "styles/kuya-sugo.css"
+  ],
+  "releaseFiles": 124,
+  "expectedPreviousIndexHash": "88ab74847eefd25aa709b74011e2c84191510d3d4c525dc4d75ea280de0f9617",
+  "releaseEntry": "/assets/index-B_r3Rt79.js",
+  "checks": "All other source, build inputs, environment and public assets match the previously deployed white redesign."
+}

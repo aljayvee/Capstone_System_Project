@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from "react";
-import { Bike, BatteryLow, Phone, Package, WifiOff, Moon, Eye, EyeOff, Users } from "lucide-react";
+import { Bike, BatteryLow, Phone, Package, WifiOff, Moon, Eye, EyeOff, Users, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LiveFleetMap from "../../../components/LiveFleetMap";
 import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../../../hooks/useRiderFleetPresence";
-import { useRiderActiveRoute } from "../../../hooks/useRiderActiveRoute";
+import { describeReroute, useRiderActiveRoute } from "../../../hooks/useRiderActiveRoute";
 import type { Errand } from "../../../types/errand";
 import { RIDER_STATUS_THEMES, describeRiderStatus } from "../../../constants/riderPresence";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "./DispatcherFilterToolbar";
 
 interface RiderFleetRosterProps {
   riders: RiderFleetMember[];
@@ -96,6 +97,8 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
     filteredRiders.find((r) => r.id === selectedRiderId) || filteredRiders[0] || null;
 
   const selectedRoute = useRiderActiveRoute(selectedRider, errands);
+  // Re-read on each render; the roster re-renders with every position flush.
+  const rerouteLabel = describeReroute(selectedRoute.liveLine?.reroutedAt);
 
   const selectedTheme = selectedRider
     ? RIDER_STATUS_THEMES[selectedRider.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE
@@ -110,16 +113,12 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
   return (
     <PanelShell
       title="Tracking"
-      figure={{
-        label: "Available Online",
-        value: `${counts.AVAILABLE_ONLINE}/${counts.ALL}`,
-      }}
       detail={
         `${counts.AVAILABLE_ONLINE} of ${counts.ALL} can be assigned` +
         (counts.AVAILABLE_SIGNAL_LOST > 0 ? `, ${counts.AVAILABLE_SIGNAL_LOST} with signal lost` : "")
       }
       controls={
-        <div className="flex flex-col gap-2 rounded-plate border border-edge bg-board-plate p-3 md:flex-row md:items-center md:justify-between">
+        <DispatcherFilterToolbar className="rounded-plate border border-edge bg-board-plate p-3" filters={
           <div className="flex flex-wrap items-center gap-1.5">
             {FILTERS.map((f) => {
               const isActive = statusFilter === f.id;
@@ -146,13 +145,14 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
             })}
           </div>
 
-          <div className="flex items-center gap-2 md:w-72">
+        } search={
             <DispatcherSearchField
               aria-label="Search riders by name, phone or ID"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search rider or phone"
             />
+        } actions={
             <DispatcherButton
               variant={hideOffline ? "field" : "secondary"}
               size="sm"
@@ -161,15 +161,15 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
               icon={hideOffline ? <EyeOff size={15} /> : <Eye size={15} />}
               onClick={() => setHideOffline(!hideOffline)}
             />
-          </div>
-        </div>
+        }
+        />
       }
     >
-      <div className="grid h-full min-h-0 gap-3 lg:grid-cols-3">
+      <div className="grid min-h-0 min-w-0 gap-3 lg:h-full lg:grid-cols-3">
         {/* The map. A concrete height below lg, where the grid stacks, and the
             flex chain above it. Both columns used to be h-[560px] regardless
             of the window. */}
-        <div className="relative min-h-[320px] overflow-hidden rounded-plate border border-edge bg-board-plate lg:col-span-2 lg:min-h-0">
+        <div className="relative h-[clamp(14rem,40dvh,24rem)] min-w-0 overflow-hidden rounded-plate border border-edge bg-board-plate lg:col-span-2 lg:h-full lg:min-h-0">
           <LiveFleetMap
             riders={riders}
             telemetryError={telemetryError}
@@ -177,6 +177,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
             routeGeometry={selectedRoute.routeGeometry}
             routeStops={selectedRoute.routeStops}
             routeDestination={selectedRoute.routeDestination}
+            liveRoute={selectedRoute.liveLine}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRider?.id}
             onSelectRider={(riderId) => setSelectedRiderId(riderId)}
@@ -188,7 +189,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
             // `left-4` with `w-full` made this 100% of the map's width starting
             // 16px in, so it overflowed the map by 16px on every screen. Pinned
             // on both edges and capped instead.
-            <div className="absolute bottom-3 left-3 right-3 z-20 max-w-sm space-y-2.5 rounded-plate border border-edge bg-board-plate/95 backdrop-blur-sm p-3.5 shadow-sm">
+            <div className="absolute bottom-3 left-3 right-3 z-20 max-w-sm max-h-[calc(100%_-_1.5rem)] overflow-y-auto space-y-2.5 rounded-plate border border-edge bg-board-plate/95 backdrop-blur-sm p-3.5 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <span
@@ -230,6 +231,15 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
                 </div>
               </dl>
 
+              {/* The rider left the route and their app gave them another. Said
+                  plainly, not as an alarm: riders take legitimate shortcuts. */}
+              {rerouteLabel ? (
+                <p className="flex items-center gap-1.5 border-t border-hairline pt-2 text-label font-medium text-ink-muted">
+                  <Route size={13} className="shrink-0" />
+                  {rerouteLabel}
+                </p>
+              ) : null}
+
               {(() => {
                 const pct = batteryPercent(selectedRider.batteryLevel);
                 if (pct === null) return null;
@@ -257,7 +267,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
         </div>
 
         {/* The roster */}
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-plate border border-edge bg-board-plate">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-3.5 py-2.5 bg-board-ground/40">
             <h3 className="text-panel font-bold text-ink">Roster</h3>
             <span data-figure className="font-mono text-label font-semibold text-ink-muted tabular-nums">
@@ -265,7 +275,7 @@ export const RiderFleetRoster: React.FC<RiderFleetRosterProps> = ({
             </span>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-2.5">
+          <div className="min-h-0 flex-1 p-2.5 lg:overflow-y-auto">
             <PanelState
               isEmpty={filteredRiders.length === 0}
               hasFilters={hasFilters}

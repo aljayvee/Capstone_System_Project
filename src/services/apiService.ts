@@ -15,6 +15,10 @@ export interface ApiUser {
   status: "Active" | "Inactive";
   version: number;
   isOnline?: boolean;
+  /** The first Admin account; manages access groups (server lib/mainOwner.ts). */
+  isMainOwner?: boolean;
+  /** Null for Full access (no group). Absent from servers before access groups. */
+  accessGroup?: { id: number; name: string | null } | null;
 }
 
 export interface ConflictError extends Error {
@@ -26,14 +30,26 @@ export interface ConflictError extends Error {
 // it owns its email address (or, for the seeded bootstrap admin, still has to
 // supply an identity at all), the server answers 200 with one of these instead
 // of a token — see the server's loginChallengeService.
+//
+// Two-step sign-in (mfaRequired) asks for a second factor on any device that
+// has not passed one in 30 days. The raw phone number is never sent: a password
+// alone must not reveal it, so the SMS step has the user type the number that
+// ends in phoneHint and the server checks it matches.
+export type LoginChallengeReason = "FIRST_LOGIN" | "NEW_DEVICE";
+export type LoginChallengeFactor = "SMS" | "EMAIL";
+
 export interface LoginChallengeResponse {
   message?: string;
   otpRequired?: boolean;
+  mfaRequired?: boolean;
+  reason?: LoginChallengeReason;
+  factors?: LoginChallengeFactor[];
   profileSetupRequired?: boolean;
   challengeToken: string;
   maskedEmail?: string | null;
   maskedPhone?: string | null;
-  phone?: string | null;
+  // Last 4 digits of the account's mobile number.
+  phoneHint?: string | null;
   role: string;
   expiresInSeconds: number;
 }
@@ -100,12 +116,16 @@ export interface CompleteLoginProfileInput {
 export interface ChallengeError {
   error: string;
   retryAfterSeconds?: number;
+  // 401 means the challenge itself is gone (expired or already used): only a
+  // fresh sign-in helps. 400 is a wrong or stale code. Absent on network errors.
+  statusCode?: number;
 }
 
 function toChallengeError(err: any, fallback: string): ChallengeError {
   return {
     error: err?.response?.data?.error || err?.message || fallback,
     retryAfterSeconds: err?.response?.data?.details?.retryAfterSeconds,
+    statusCode: err?.response?.status,
   };
 }
 
@@ -277,6 +297,9 @@ export type ExceptionKind =
   | "UNPAID_BALANCE"
   | "CANCELLED_AFTER_PURCHASE";
 
+/** A Help Desk Report line's problem: its kind, with cash short and cash over apart. */
+export type ReportProblem = ExceptionKind | "CASH_SHORT" | "CASH_OVER";
+
 /**
  * A suggested reason for clearing an exception, from the server's trained
  * network. Below `threshold` (0.75) it is not confident, and `suggestion` is
@@ -301,6 +324,8 @@ export interface ApiReasonSuggestion {
 export interface ApiErrandException {
   errandId: string;
   kind: ExceptionKind;
+  /** Owner's Help Desk Report only: what the line is counted and labelled under. */
+  problem?: ReportProblem;
   amountAtRisk: number;
   detail: string;
   /** Cash short or over only: the handover's figures and what is still owed now. */
@@ -480,7 +505,7 @@ export interface ApiExceptionReport {
     openCount: number;
     resolvedCount: number;
     totalAtRisk: number;
-    byKind: Array<{ kind: ExceptionKind; count: number; atRisk: number }>;
+    byKind: Array<{ kind: ReportProblem; count: number; atRisk: number }>;
   };
   riders: Array<{
     riderId: number;
@@ -653,6 +678,9 @@ export interface ApiRiderMetrics {
     riderShareEarned: number;
     commissionCount: number;
     settlementVarianceTotal: number;
+    /** Cash short and cash over, apart. Optional: a server before 2026-10-27 sends only the net. */
+    cashShortTotal?: number;
+    cashOverTotal?: number;
     shortageCount: number;
     settlementCount: number;
   };
@@ -723,6 +751,8 @@ export interface ApiRiderPerformanceReport extends ReportMeta {
       cancelledCount: number;
       riderShareEarned: number;
       settlementVarianceTotal: number;
+      cashShort?: number;
+      cashOver?: number;
     }
   >;
   riders: ApiRiderMetrics[];
@@ -737,6 +767,8 @@ export interface ApiRiderPerformanceReport extends ReportMeta {
     degradedEtaCount: number;
     riderShareEarned: number;
     settlementVarianceTotal: number;
+    cashShortTotal?: number;
+    cashOverTotal?: number;
     shortageCount: number;
     exceptionCount: number;
     connectivityDrops: number;
@@ -748,6 +780,8 @@ export interface ApiRiderPerformanceReport extends ReportMeta {
 
 export interface ApiCommissionReport extends ReportMeta {
   estimatedCommission: number;
+  /** Sum of every category's rider share: the Total row's Rider's share. */
+  riderCommission: number;
   totalDeliveryFees: number;
   orderCount: number;
   /** The rider's fraction of delivery fees. Captions derive from this. */
@@ -794,6 +828,8 @@ export interface ApiSettlementFollowUp {
 }
 
 export interface ApiSettlementLine {
+  lineKey?: string;
+  lineKind?: "HANDOVER" | "REPAYMENT";
   errandId: string;
   referenceNo?: string | null;
   riderName: string | null;
@@ -805,6 +841,8 @@ export interface ApiSettlementLine {
   settledAt: string;
   /** What happened to a short since the handover, as of today. */
   short?: number;
+  /** How much more cash came back than expected. 0 unless over. */
+  over?: number;
   paidBackLater?: number;
   writtenOff?: number;
   stillOwed?: number;
@@ -865,6 +903,9 @@ export interface ApiSettlementReport extends ReportMeta {
       expected: number;
       collected: number;
       variance: number;
+      /** Short and over apart, so one cannot hide the other. */
+      short?: number;
+      over?: number;
       shortageCount: number;
       stillOwed?: number;
     }
@@ -907,6 +948,8 @@ export interface ApiSettlementReport extends ReportMeta {
       expected: number;
       collected: number;
       variance: number;
+      short?: number;
+      over?: number;
       shortageCount: number;
       paidBackLater?: number;
       writtenOff?: number;
@@ -951,6 +994,8 @@ export interface ApiTransactionSummaryReport extends ReportMeta {
     paymentConfirmedBy: string | null;
     /** Whose photo backed the confirmation, where one exists. */
     paymentEvidenceSource: "customer" | "rider" | null;
+    /** The proof photo's id, for opening it; null where there is no photo. */
+    paymentProofImageId?: number | null;
     status: string;
     errandStatus: string;
     /** Written once at creation and never advanced — see the report's notes. */
@@ -960,7 +1005,19 @@ export interface ApiTransactionSummaryReport extends ReportMeta {
   byPaymentMethod: Array<{ paymentMethod: string; count: number; amount: number }>;
   byErrandStatus: Array<{ status: string; count: number; amount: number }>;
   byPaymentStatus: Array<{ status: string; count: number; amount: number }>;
-  totals: { count: number; amount: number; deliveryFee: number };
+  totals: {
+    count: number;
+    amount: number;
+    deliveryFee: number;
+    unremitted?: number;
+    unremittedCount?: number;
+    uncollected?: number;
+    uncollectedCount?: number;
+  };
+  /** Every rider, for the report's rider picker. */
+  riderOptions?: Array<{ riderId: number; name: string }>;
+  /** The rider this report is narrowed to, or null for every rider. */
+  rider?: { riderId: number; name: string } | null;
   notes: string[];
 }
 
@@ -1492,6 +1549,20 @@ export const apiService = {
   async getDispatcherAiSuggestionsEnabled(): Promise<boolean | null> {
     try {
       const response = await apiClient.get<{ enabled: boolean }>("/system/dispatcher-ai-suggestions");
+      return response.data.enabled === true;
+    } catch (err) {
+      console.warn("API unavailable", err);
+      return null;
+    }
+  },
+
+  /**
+   * Whether a sysadmin has Kuya Sugo turned on for the Owner Portal. Null means
+   * the request failed; the caller defaults to true to avoid accidental disruption.
+   */
+  async getKuyaSugoEnabled(): Promise<boolean | null> {
+    try {
+      const response = await apiClient.get<{ enabled: boolean }>("/system/kuya-sugo");
       return response.data.enabled === true;
     } catch (err) {
       console.warn("API unavailable", err);

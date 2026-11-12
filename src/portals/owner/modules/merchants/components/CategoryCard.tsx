@@ -152,11 +152,11 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
   };
 
   return (
-    <div className="px-5 py-4 hover:bg-board-ground/60 transition-colors">
+    <div className="py-4 sm:px-2 hover:bg-board-ground/60 transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Left & Middle: Thumbnail + Category Info */}
         <div className="flex items-start sm:items-center gap-4 min-w-0 flex-1">
-          <div className="w-24 sm:w-28 shrink-0">
+          <div className="w-24 shrink-0">
             <CategoryImagePicker
               categoryId={category.id}
               categoryName={category.name}
@@ -187,28 +187,28 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
             <button
               type="button"
               onClick={() => onSelectCategoryForPlaces(category.id)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate border border-edge bg-board-plate hover:bg-board-ground text-label text-ink transition"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-board-field px-3 py-1.5 text-label font-medium text-white transition-colors hover:bg-board-field-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink"
               title={`View ${category.name} stores in Location Stores`}
             >
-              <MapPin size={14} className="text-ink-muted" />
-              <span className="font-mono font-semibold text-ink">
+              <MapPin size={14} />
+              <span className="font-mono font-semibold">
                 {placesCount === null ? "--" : placesCount}
               </span>
-              <span className="text-ink-muted">
+              <span>
                 {placesCount === 1 ? "store" : "stores"}
               </span>
             </button>
           ) : (
             <Link
               to={directoryHref}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate border border-edge bg-board-plate hover:bg-board-ground text-label text-ink transition"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-board-field px-3 py-1.5 text-label font-medium text-white transition-colors hover:bg-board-field-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink"
               title={`Manage ${category.name} locations in directory`}
             >
-              <MapPin size={14} className="text-ink-muted" />
-              <span className="font-mono font-semibold text-ink">
+              <MapPin size={14} />
+              <span className="font-mono font-semibold">
                 {placesCount === null ? "--" : placesCount}
               </span>
-              <span className="text-ink-muted">
+              <span>
                 {placesCount === 1 ? "store" : "stores"}
               </span>
             </Link>
@@ -217,7 +217,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-plate border border-edge bg-board-plate hover:bg-board-ground text-label text-ink-muted hover:text-ink transition"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-plate border border-field-ink bg-board-plate px-3 py-1.5 text-label font-medium text-field-ink transition-colors hover:bg-board-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink"
             title="Edit Category"
           >
             <Pencil size={14} />
@@ -258,7 +258,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full text-ink text-body bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
+                  className="w-full text-ink text-body bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink focus:bg-board-plate transition"
                   placeholder="Category name"
                 />
               </div>
@@ -271,7 +271,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full text-body text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition resize-none"
+                  className="w-full text-body text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink focus:bg-board-plate transition resize-none"
                   placeholder="Brief description of items or partner stores..."
                 />
               </div>
@@ -298,7 +298,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                       onClick={() => setStatus("Inactive")}
                       className={`flex-1 px-3 py-2 rounded-plate text-label border transition ${
                         status === "Inactive"
-                          ? "bg-board-field text-white border-board-field"
+                          ? "bg-board-field text-white border-field-ink"
                           : "bg-board-ground text-ink-muted border-edge hover:text-ink"
                       }`}
                     >
@@ -320,7 +320,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                       value={geofenceRadius}
                       onChange={(e) => setGeofenceRadius(e.target.value)}
                       data-testid="category-geofence-radius"
-                      className="w-full text-body font-mono text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
+                      className="w-full text-body font-mono text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink focus:bg-board-plate transition"
                     />
                     <span className="text-label text-ink-muted shrink-0">m</span>
                   </div>
@@ -334,7 +334,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                 <select
                   value={handlingFeeMode}
                   onChange={(e) => setHandlingFeeMode(e.target.value as HandlingFeeMode)}
-                  className="w-full text-body text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
+                  className="w-full text-body text-ink bg-board-ground border border-edge rounded-plate px-3.5 py-2 outline-none focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink focus:bg-board-plate transition"
                 >
                   {HANDLING_FEE_MODES.map((mode) => (
                     <option key={mode} value={mode}>
@@ -386,7 +386,7 @@ export const CategoryRowCard: React.FC<CategoryRowCardProps> = ({
                   <span className="text-ink-muted shrink-0">{change.label}:</span>
                   <span className="text-ink text-right font-medium">
                     <span className="line-through text-ink-muted mr-1.5">{change.from}</span>
-                    <span className="text-board-field font-semibold">→ {change.to}</span>
+                    <span className="text-field-ink font-semibold">→ {change.to}</span>
                   </span>
                 </div>
               ))}

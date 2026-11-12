@@ -55,6 +55,12 @@ export interface OrderChatScreenProps {
    */
   onVerify?: (orderId: string) => Promise<void>;
   onDecline?: (orderId: string, reason: string) => Promise<void>;
+  /**
+   * Opens a stage from outside, with the reason shown, as jumpToStage does from
+   * inside: the bell's "Open Stage 2" on an out-of-stock notification. A new
+   * `nonce` jumps again even when this order is already open.
+   */
+  jumpRequest?: { stage: StageId; reason?: string; nonce: number } | null;
 }
 
 /** Statuses that make this a read-only record rather than live work. */
@@ -68,6 +74,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
   readOnly = false,
   onVerify,
   onDecline,
+  jumpRequest = null,
 }) => {
   const {
     orderDetails,
@@ -173,6 +180,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     // completes step 1 and must survive a reload.
     messages: chat.messages,
     onOrderUpdated: setOrderDetails,
+    rateConfig,
     postCard: chat.postCard,
     mapVisible: showAll || openStageId === 1,
     // The fee is priced live as pins change, except on a closed order.
@@ -305,6 +313,13 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
     window.setTimeout(() => setJumpReason(null), 9000);
   }, []);
 
+  // A jump asked for from outside (the bell), once per request.
+  useEffect(() => {
+    if (jumpRequest) jumpToStage(jumpRequest.stage, jumpRequest.reason);
+    // Only a new request moves the view.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpRequest?.nonce]);
+
   // ── moving on when the customer answers ─────────────────────────────────
   /**
    * The moment this screen had finished loading what already happened.
@@ -373,8 +388,11 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
       // write returned the dispatcher to the queue believing this errand had
       // been closed as a passing-by visit when the server still had it open.
       console.error("Failed to close errand as passing by:", e);
+      // A refusal from the access group is not worth retrying; say why.
+      const refusal = (e as any)?.response?.status === 403 ? (e as any)?.response?.data?.error : null;
       setCloseError(
-        "This run could not be closed as a passing-by visit. It is still open, so nothing has been lost, and it is safe to try again."
+        refusal ||
+          "This run could not be closed as a passing-by visit. It is still open, so nothing has been lost, and it is safe to try again."
       );
     }
   }, [orderId, onRefreshOrders, onClose]);
@@ -509,7 +527,7 @@ export const OrderChatScreen: React.FC<OrderChatScreenProps> = ({
   return (
     <div
       data-surface="dispatch"
-      className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-board-ground"
+      className="fixed inset-0 z-50 flex h-dvh w-full min-w-0 flex-col overflow-hidden bg-board-ground"
     >
       {/* ── header ───────────────────────────────────────────────────────── */}
       <header

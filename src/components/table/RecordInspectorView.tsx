@@ -63,7 +63,7 @@ export const RecordInspectorView: React.FC<RecordInspectorViewProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 bg-[#070D1B] sm:bg-[#0B132B] flex flex-col overflow-hidden animate-in fade-in duration-150"
+      className="fixed inset-0 h-dvh min-w-0 z-50 bg-[#070D1B] sm:bg-[#0B132B] flex flex-col overflow-hidden animate-in fade-in duration-150"
     >
       {/* Top Sticky Header */}
       <header className="sticky top-0 z-10 shrink-0 bg-[#0B132B]/95 border-b border-slate-800/80 px-4 pt-safe pb-3 flex items-center justify-between gap-3 backdrop-blur-md">
@@ -91,7 +91,7 @@ export const RecordInspectorView: React.FC<RecordInspectorViewProps> = ({
 
       {/* Title & Metadata Banner */}
       <div className="px-5 pt-4 pb-3 bg-gradient-to-b from-slate-900/60 to-transparent border-b border-slate-800/40 shrink-0">
-        <h2 className="text-base font-bold text-white tracking-tight truncate">{title}</h2>
+        <h2 className="text-base font-bold text-white tracking-tight break-words">{title}</h2>
         {subtitle && (
           <p className="text-xs text-slate-400 mt-0.5 truncate">{subtitle}</p>
         )}

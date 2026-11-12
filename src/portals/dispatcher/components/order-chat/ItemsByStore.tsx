@@ -49,6 +49,8 @@ interface ItemsByStoreProps {
   onNameSettled: (key: string, name: string) => void;
   /** What the rider reported on one store's line (out of stock), under it. */
   renderLineExtras?: (rowIndex: number) => ReactNode;
+  /** One shared substitute workspace for the store's out-of-stock items. */
+  renderStoreExtras?: (storeIndex: number) => ReactNode;
   /** The suggestion and "store needed" card for an item no store buys. */
   renderUnassignedExtras?: (line: ItemLine) => ReactNode;
 }
@@ -130,6 +132,7 @@ export function ItemsByStore({
   onOpenStore,
   onNameSettled,
   renderLineExtras,
+  renderStoreExtras,
   renderUnassignedExtras,
 }: ItemsByStoreProps) {
   const unassigned = lines.filter((line) => line.unassignedRow !== null);
@@ -288,6 +291,7 @@ export function ItemsByStore({
               </div>
             )}
 
+            {renderStoreExtras?.(storeIndex)}
             <button
               type="button"
               onClick={() => onAdd(storeIndex)}

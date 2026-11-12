@@ -1,0 +1,338 @@
+{
+  "_LegalDocumentView-CYQhXHFd.js": {
+    "file": "assets/LegalDocumentView-CYQhXHFd.js",
+    "name": "LegalDocumentView",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_vendor-icons-BxUidVmU.js"
+    ]
+  },
+  "_MobileResponsiveTable-_Ehj89lS.js": {
+    "file": "assets/MobileResponsiveTable-_Ehj89lS.js",
+    "name": "MobileResponsiveTable",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js"
+    ]
+  },
+  "_PlacesTab-ctxBu2Fl.js": {
+    "file": "assets/PlacesTab-ctxBu2Fl.js",
+    "name": "PlacesTab",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_storeName-p01yk-Nt.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_MobileResponsiveTable-_Ehj89lS.js"
+    ]
+  },
+  "_ScrollToTopButton-8YzyIakx.js": {
+    "file": "assets/ScrollToTopButton-8YzyIakx.js",
+    "name": "ScrollToTopButton",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_vendor-icons-BxUidVmU.js"
+    ]
+  },
+  "_sidebar-Du3nQN8q.js": {
+    "file": "assets/sidebar-Du3nQN8q.js",
+    "name": "sidebar",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_storeName-p01yk-Nt.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "_storeName-p01yk-Nt.js": {
+    "file": "assets/storeName-p01yk-Nt.js",
+    "name": "storeName",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-maps-BmXNOHR3.js"
+    ]
+  },
+  "_vendor-charts-yIpWqwcD.js": {
+    "file": "assets/vendor-charts-yIpWqwcD.js",
+    "name": "vendor-charts",
+    "imports": [
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-react-CuWHhWe6.js"
+    ]
+  },
+  "_vendor-firebase-DyT7cgPc.js": {
+    "file": "assets/vendor-firebase-DyT7cgPc.js",
+    "name": "vendor-firebase"
+  },
+  "_vendor-icons-BxUidVmU.js": {
+    "file": "assets/vendor-icons-BxUidVmU.js",
+    "name": "vendor-icons",
+    "imports": [
+      "_vendor-react-CuWHhWe6.js"
+    ]
+  },
+  "_vendor-maps-BmXNOHR3.js": {
+    "file": "assets/vendor-maps-BmXNOHR3.js",
+    "name": "vendor-maps"
+  },
+  "_vendor-react-CuWHhWe6.js": {
+    "file": "assets/vendor-react-CuWHhWe6.js",
+    "name": "vendor-react"
+  },
+  "_vendor-utils-bWqjuwkH.js": {
+    "file": "assets/vendor-utils-bWqjuwkH.js",
+    "name": "vendor-utils"
+  },
+  "index.html": {
+    "file": "assets/index-DRSi7Knl.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-icons-BxUidVmU.js"
+    ],
+    "dynamicImports": [
+      "src/components/MobileAppNoticeModal.tsx",
+      "src/components/MobileAppNoticeModal.tsx",
+      "src/portals/owner/OwnerPortal.tsx",
+      "src/portals/dispatcher/DispatcherPortal.tsx",
+      "src/portals/owner/screens/PlacesDirectoryScreen.tsx",
+      "src/components/MobileAppNoticeModal.tsx",
+      "src/components/NotFoundPage.tsx",
+      "src/portals/sysadmin/SysAdminPortal.tsx",
+      "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx",
+      "src/pages/PrivacyPolicyPage.tsx",
+      "src/pages/TermsOfServicePage.tsx",
+      "src/pages/TestPhoneVerificationPage.tsx",
+      "src/pages/PhoneVerificationPage.tsx"
+    ],
+    "css": [
+      "assets/index-DhDxdkMf.css"
+    ],
+    "assets": [
+      "assets/geist-cyrillic-ext-wght-normal-DjL33-gN.woff2",
+      "assets/geist-cyrillic-wght-normal-BEAKL7Jp.woff2",
+      "assets/geist-vietnamese-wght-normal-6IgcOCM7.woff2",
+      "assets/geist-latin-ext-wght-normal-DC-KSUi6.woff2",
+      "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+      "assets/geist-mono-cyrillic-ext-wght-normal-X_5orZeX.woff2",
+      "assets/geist-mono-cyrillic-wght-normal-DiZS0aHC.woff2",
+      "assets/geist-mono-symbols2-wght-normal-CO5SzqOn.woff2",
+      "assets/geist-mono-vietnamese-wght-normal-DadHysG0.woff2",
+      "assets/geist-mono-latin-ext-wght-normal-Bwz-egvJ.woff2",
+      "assets/geist-mono-latin-wght-normal-XN7g48iV.woff2"
+    ]
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/geist-mono-cyrillic-ext-wght-normal-X_5orZeX.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-wght-normal.woff2": {
+    "file": "assets/geist-mono-cyrillic-wght-normal-DiZS0aHC.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-cyrillic-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-ext-wght-normal.woff2": {
+    "file": "assets/geist-mono-latin-ext-wght-normal-Bwz-egvJ.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2": {
+    "file": "assets/geist-mono-latin-wght-normal-XN7g48iV.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-symbols2-wght-normal.woff2": {
+    "file": "assets/geist-mono-symbols2-wght-normal-CO5SzqOn.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-symbols2-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist-mono/files/geist-mono-vietnamese-wght-normal.woff2": {
+    "file": "assets/geist-mono-vietnamese-wght-normal-DadHysG0.woff2",
+    "src": "node_modules/@fontsource-variable/geist-mono/files/geist-mono-vietnamese-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-cyrillic-ext-wght-normal.woff2": {
+    "file": "assets/geist-cyrillic-ext-wght-normal-DjL33-gN.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-cyrillic-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-cyrillic-wght-normal.woff2": {
+    "file": "assets/geist-cyrillic-wght-normal-BEAKL7Jp.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-cyrillic-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2": {
+    "file": "assets/geist-latin-ext-wght-normal-DC-KSUi6.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2": {
+    "file": "assets/geist-latin-wght-normal-BgDaEnEv.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2"
+  },
+  "node_modules/@fontsource-variable/geist/files/geist-vietnamese-wght-normal.woff2": {
+    "file": "assets/geist-vietnamese-wght-normal-6IgcOCM7.woff2",
+    "src": "node_modules/@fontsource-variable/geist/files/geist-vietnamese-wght-normal.woff2"
+  },
+  "src/components/MobileAppNoticeModal.tsx": {
+    "file": "assets/MobileAppNoticeModal-BYbqyBUY.js",
+    "name": "MobileAppNoticeModal",
+    "src": "src/components/MobileAppNoticeModal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/components/NotFoundPage.tsx": {
+    "file": "assets/NotFoundPage-Cw5keTvb.js",
+    "name": "NotFoundPage",
+    "src": "src/components/NotFoundPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/pages/PhoneVerificationPage.tsx": {
+    "file": "assets/PhoneVerificationPage-DmdMjWpR.js",
+    "name": "PhoneVerificationPage",
+    "src": "src/pages/PhoneVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/pages/PrivacyPolicyPage.tsx": {
+    "file": "assets/PrivacyPolicyPage-YKkVXrfb.js",
+    "name": "PrivacyPolicyPage",
+    "src": "src/pages/PrivacyPolicyPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_LegalDocumentView-CYQhXHFd.js",
+      "_vendor-icons-BxUidVmU.js"
+    ]
+  },
+  "src/pages/TermsOfServicePage.tsx": {
+    "file": "assets/TermsOfServicePage-TZNsV1WB.js",
+    "name": "TermsOfServicePage",
+    "src": "src/pages/TermsOfServicePage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_LegalDocumentView-CYQhXHFd.js",
+      "_vendor-icons-BxUidVmU.js"
+    ]
+  },
+  "src/pages/TestPhoneVerificationPage.tsx": {
+    "file": "assets/TestPhoneVerificationPage-CkuzQrRt.js",
+    "name": "TestPhoneVerificationPage",
+    "src": "src/pages/TestPhoneVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/dispatcher/DispatcherPortal.tsx": {
+    "file": "assets/DispatcherPortal-BiUqyqpW.js",
+    "name": "DispatcherPortal",
+    "src": "src/portals/dispatcher/DispatcherPortal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_sidebar-Du3nQN8q.js",
+      "_ScrollToTopButton-8YzyIakx.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_storeName-p01yk-Nt.js",
+      "_vendor-icons-BxUidVmU.js",
+      "_MobileResponsiveTable-_Ehj89lS.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-maps-BmXNOHR3.js"
+    ]
+  },
+  "src/portals/owner/OwnerPortal.tsx": {
+    "file": "assets/OwnerPortal-DXhMKgxz.js",
+    "name": "OwnerPortal",
+    "src": "src/portals/owner/OwnerPortal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_sidebar-Du3nQN8q.js",
+      "_ScrollToTopButton-8YzyIakx.js",
+      "_vendor-charts-yIpWqwcD.js",
+      "_vendor-icons-BxUidVmU.js",
+      "_PlacesTab-ctxBu2Fl.js",
+      "_MobileResponsiveTable-_Ehj89lS.js",
+      "_storeName-p01yk-Nt.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-maps-BmXNOHR3.js"
+    ],
+    "css": [
+      "assets/OwnerPortal-8gPzODVy.css"
+    ]
+  },
+  "src/portals/owner/screens/PlacesDirectoryScreen.tsx": {
+    "file": "assets/PlacesDirectoryScreen-DxxJbuQ8.js",
+    "name": "PlacesDirectoryScreen",
+    "src": "src/portals/owner/screens/PlacesDirectoryScreen.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "_PlacesTab-ctxBu2Fl.js",
+      "_vendor-icons-BxUidVmU.js",
+      "_storeName-p01yk-Nt.js",
+      "index.html",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js",
+      "_vendor-maps-BmXNOHR3.js",
+      "_MobileResponsiveTable-_Ehj89lS.js"
+    ]
+  },
+  "src/portals/sysadmin/SysAdminPortal.tsx": {
+    "file": "assets/SysAdminPortal-vanptp9V.js",
+    "name": "SysAdminPortal",
+    "src": "src/portals/sysadmin/SysAdminPortal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_MobileResponsiveTable-_Ehj89lS.js",
+      "_ScrollToTopButton-8YzyIakx.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  },
+  "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx": {
+    "file": "assets/SysAdminMagicLinkVerificationPage-BVx9sgCL.js",
+    "name": "SysAdminMagicLinkVerificationPage",
+    "src": "src/portals/sysadmin/components/SysAdminMagicLinkVerificationPage.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vendor-react-CuWHhWe6.js",
+      "index.html",
+      "_vendor-icons-BxUidVmU.js",
+      "_vendor-firebase-DyT7cgPc.js",
+      "_vendor-utils-bWqjuwkH.js"
+    ]
+  }
+}

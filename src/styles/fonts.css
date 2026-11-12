@@ -1,14 +1,17 @@
-@import '@fontsource-variable/geist';
+@import '@fontsource-variable/urbanist';
 @import '@fontsource-variable/geist-mono';
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/500.css';
+@import '@fontsource/roboto/700.css';
 
 :root {
-  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: 'Urbanist Variable', 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-roboto: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 body {
   font-family: var(--font-sans);
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -21,4 +24,12 @@ table td,
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
+
+/* Owner Portal & Web Login: Scoped strictly to Roboto per design mandate */
+[data-surface="owner"],
+.login-page {
+  --font-sans: var(--font-roboto);
+  font-family: var(--font-roboto);
+}
+
 

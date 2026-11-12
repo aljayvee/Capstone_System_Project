@@ -153,6 +153,15 @@
   --color-signal-deep: #C62828;
   --color-signal-on-field: #FF8A85;
 
+  /* Red and navy as TEXT or a line, as opposed to a fill. In the light skins
+     they equal the fills (each clears 4.5:1 on white), so nothing renders
+     differently. They exist for the Owner portal's dark theme
+     (owner-appearance.css): a fill under white text needs a luminance below
+     0.18, and text on the dark plate needs one above 0.24, so one value
+     cannot do both jobs there. */
+  --color-signal-ink: #DC2626;
+  --color-field-ink: #0F2035;
+
   /* Go green: the forward action in dispatch (accept, continue, send, assign),
      by the user's override of 2026-10-07. Red stays on the acts that end or
      refuse an order. White on #15803D is 5.01:1 and on the hover #166534 is

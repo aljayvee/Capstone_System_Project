@@ -9,9 +9,9 @@ import type { PredictionAnswer, PredictionStatus } from "./hooks/useStorePredict
  * "These are the stores for this list. Is this accurate?"
  *
  * The step 3 end of the store predictor (server storePredictionService). It
- * proposes up to three stores for the step 1 items and asks the dispatcher to
- * judge it, rather than pinning anything by itself: a wrong shop sends a rider
- * across town, so the machine suggests and a person decides.
+ * proposes up to the errand's store limit for the step 1 items and asks the
+ * dispatcher to judge it, rather than pinning anything by itself: a wrong shop
+ * sends a rider across town, so the machine suggests and a person decides.
  *
  * "Yes" pins them. "No" steps aside so the dispatcher pins the right ones, and
  * says plainly how that correction is learned: the next prediction reads the

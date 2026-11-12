@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Clock, Copy, RefreshCw, Sparkles, User } from "lucide-react";
-import { apiService, type ExceptionKind } from "../../../services/apiService";
+import { apiService, type ApiCashOutcome, type ApiMoneyOwed, type ExceptionKind } from "../../../services/apiService";
 import { cn } from "@/lib/utils";
 import { type ExceptionGroup, type OpenExceptions } from "../hooks/useOpenExceptions";
 import { ExceptionEvidence } from "./ExceptionEvidence";
@@ -9,9 +9,20 @@ import { formatErrandId } from "../../../utils/formatErrandId";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "./DispatcherFilterToolbar";
 import { Field, fieldInputClasses } from "@/components/panel/Field";
 import { useDraft } from "../lib/useDraft";
 import { useDispatcherAiSettings } from "../hooks/useDispatcherAiSettings";
+import {
+  CashChoiceFields,
+  MoneyOwedRow,
+  cashChoiceError,
+  emptyCashChoice,
+  toCashOutcome,
+  useMoneyStillOwed,
+  type CashChoiceValue,
+} from "./MoneyStillOwed";
 
 const formatTimestamp = (dateStr?: string | null) => {
   if (!dateStr) return "Just now";
@@ -29,23 +40,107 @@ const formatTimestamp = (dateStr?: string | null) => {
   }
 };
 
-/** Plain names, so a reader never needs the enum to read the queue. */
+/** Plain names, so a reader never needs the enum, or accounting, to read the queue. */
 const KIND_LABEL: Record<ExceptionKind, string> = {
-  CASH_VARIANCE: "Cash variance",
-  RECEIPT_DIVERGENCE: "Receipt divergence",
-  UNVERIFIED_PURCHASE: "Unverified purchase",
-  WRONG_BRANCH: "Wrong branch",
-  MISSING_RECEIPT: "No receipt at a stop",
-  STALLED_STOP: "Long stop",
+  CASH_VARIANCE: "Cash short or over",
+  RECEIPT_DIVERGENCE: "Receipt amount does not match",
+  UNVERIFIED_PURCHASE: "Purchase with no receipt",
+  WRONG_BRANCH: "Bought at a different store",
+  MISSING_RECEIPT: "No receipt for a stop",
+  STALLED_STOP: "Rider stayed too long at a store",
   // The dispatcher's version is an instruction, not a category: this queue is
   // today's work, and a rider is standing at a door waiting for someone here to
   // ring the customer.
-  OVERAGE_PENDING: "Goods held, call the customer",
-  UNPAID_BALANCE: "Balance never collected",
+  OVERAGE_PENDING: "Items on hold: call the customer",
+  UNPAID_BALANCE: "Balance not paid",
   // An instruction too: the rider is holding goods nobody will pay for, and
   // someone here has to decide whether they go back to the store.
-  CANCELLED_AFTER_PURCHASE: "Cancelled after purchase, decide on the goods",
+  CANCELLED_AFTER_PURCHASE: "Cancelled after buying: decide on the items",
 };
+
+type SortKey = "urgent" | "oldest" | "newest" | "riderAsc" | "riderDesc";
+
+const SORTS: Array<{ key: SortKey; label: string }> = [
+  { key: "urgent", label: "Most money first" },
+  { key: "oldest", label: "Oldest first" },
+  { key: "newest", label: "Newest first" },
+  { key: "riderAsc", label: "Rider name A to Z" },
+  { key: "riderDesc", label: "Rider name Z to A" },
+];
+
+/** When a row last changed: its newest member, since a group can grow. */
+const latestAt = (g: ExceptionGroup) =>
+  Math.max(...g.members.map((m) => new Date(m.occurredAt).getTime()).filter((t) => !Number.isNaN(t)), 0);
+const oldestAt = (g: ExceptionGroup) => new Date(g.occurredAt).getTime() || 0;
+
+/**
+ * Every word of the query must appear in the order number (with or without
+ * its dashes) or the rider's name, so "juan 0003" finds Juan's order ...-0003.
+ */
+export function matchesHelpDeskQuery(g: ExceptionGroup, query: string): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const ref = formatErrandId(g.errandId).toLowerCase();
+  const haystack = [ref, ref.replace(/-/g, ""), g.errandId.toLowerCase(), (g.riderName ?? "").toLowerCase()].join(" ");
+  return words.every((w) => haystack.includes(w));
+}
+
+/** The same search for the Money still owed list: order number or rider name. */
+function matchesOwedQuery(row: ApiMoneyOwed, query: string): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const ref = (row.referenceNo ?? formatErrandId(row.errandId)).toLowerCase();
+  const haystack = [ref, ref.replace(/-/g, ""), row.errandId.toLowerCase(), row.riderName.toLowerCase()].join(" ");
+  return words.every((w) => haystack.includes(w));
+}
+
+/** The same sorts for Money still owed; "urgent" there means the most still owed first. */
+function sortOwed(rows: ApiMoneyOwed[], sort: SortKey): ApiMoneyOwed[] {
+  const at = (r: ApiMoneyOwed) => new Date(r.settledAt).getTime() || 0;
+  const copy = [...rows];
+  switch (sort) {
+    case "urgent":
+      return copy.sort((a, b) => b.stillOwed - a.stillOwed || at(a) - at(b));
+    case "oldest":
+      return copy.sort((a, b) => at(a) - at(b));
+    case "newest":
+      return copy.sort((a, b) => at(b) - at(a));
+    case "riderAsc":
+    case "riderDesc": {
+      const dir = sort === "riderAsc" ? 1 : -1;
+      return copy.sort(
+        (a, b) => dir * a.riderName.localeCompare(b.riderName, undefined, { sensitivity: "base" }) || at(a) - at(b)
+      );
+    }
+  }
+}
+
+/**
+ * "urgent" keeps the server's order (most money first, then oldest). Riders
+ * sort by name with rows that have no rider kept last either way, and ties
+ * fall back to oldest first so the order never shuffles between refreshes.
+ */
+export function sortHelpDesk(groups: ExceptionGroup[], sort: SortKey): ExceptionGroup[] {
+  if (sort === "urgent") return groups;
+  const byOldest = (a: ExceptionGroup, b: ExceptionGroup) => oldestAt(a) - oldestAt(b);
+  const copy = [...groups];
+  switch (sort) {
+    case "oldest":
+      return copy.sort(byOldest);
+    case "newest":
+      return copy.sort((a, b) => latestAt(b) - latestAt(a) || byOldest(a, b));
+    case "riderAsc":
+    case "riderDesc": {
+      const dir = sort === "riderAsc" ? 1 : -1;
+      return copy.sort((a, b) => {
+        if (!a.riderName && !b.riderName) return byOldest(a, b);
+        if (!a.riderName) return 1;
+        if (!b.riderName) return -1;
+        return dir * a.riderName.localeCompare(b.riderName, undefined, { sensitivity: "base" }) || byOldest(a, b);
+      });
+    }
+  }
+}
 
 /**
  * Errands that did not reconcile and nobody has decided on yet.
@@ -79,45 +174,164 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("urgent");
+  // Open problems, or shorts already cleared whose money is still owed.
+  const [view, setView] = useState<"open" | "owed">("open");
+  const owed = useMoneyStillOwed();
+
+  const shown = useMemo(
+    () => sortHelpDesk(groups.filter((g) => matchesHelpDeskQuery(g, query)), sort),
+    [groups, query, sort]
+  );
+  // A short still open above is answered in its own Resolve box; it joins the
+  // owed list once cleared, so one short is never listed twice.
+  const owedRows = useMemo(() => {
+    const openShorts = new Set(groups.filter((g) => g.kind === "CASH_VARIANCE").map((g) => g.errandId));
+    return owed.rows.filter((r) => !openShorts.has(r.errandId));
+  }, [groups, owed.rows]);
+  const shownOwed = useMemo(
+    () => sortOwed(owedRows.filter((r) => matchesOwedQuery(r, query)), sort),
+    [owedRows, query, sort]
+  );
+  const searching = query.trim() !== "";
+  const owedCount = owedRows.filter((r) => r.stillOwed > 0).length;
 
   return (
     <PanelShell
       title="Help Desk"
-      figure={{
-        label: "Open",
-        // A dash when the queue never loaded, so this cannot report a
-        // confident zero over money nobody has reconciled.
-        value: queue.isLoading || queue.loadError ? "--" : String(queue.openCount),
-        urgent: queue.openCount > 0,
-      }}
       detail={
         totalAtRisk > 0
-          ? `${formatPeso(totalAtRisk)} is held against these runs`
-          : "Runs that did not reconcile and nobody has decided on yet"
+          ? `${formatPeso(totalAtRisk)} is involved in these orders`
+          : "Orders with a problem that someone needs to look at"
       }
-      aside={
-        <DispatcherButton
-          variant="secondary"
-          size="sm"
-          iconOnly
-          aria-label="Refresh the queue"
-          icon={<RefreshCw size={15} />}
-          onClick={() => void reload()}
+      controls={
+        <DispatcherFilterToolbar
+          search={
+            <DispatcherSearchField
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search order number or rider"
+              aria-label="Search the Help Desk by order number or rider name"
+            />
+          }
+          actions={
+          <DispatcherButton
+            variant="secondary"
+            size="sm"
+            iconOnly
+            aria-label="Refresh the queue"
+            icon={<RefreshCw size={15} />}
+            onClick={() => void reload()}
+          />
+          }
+          filters={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5" role="group" aria-label="Help Desk lists">
+              {(
+                [
+                  { id: "open", label: "Open problems", count: isLoading || loadError ? "--" : String(groups.length) },
+                  { id: "owed", label: "Money still owed", count: owed.isLoading || owed.loadError ? "--" : String(owedCount) },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setView(tab.id)}
+                  aria-pressed={view === tab.id}
+                  data-testid={`helpdesk-view-${tab.id}`}
+                  className={cn(
+                    "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim border px-3 text-micro font-semibold uppercase tracking-[0.06em] transition-colors",
+                    view === tab.id
+                      ? "border-board-field bg-board-field text-board-plate"
+                      : "border-edge bg-board-plate text-ink-muted hover:border-board-trim hover:text-ink"
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  <span data-figure className="font-mono tabular-nums font-bold">
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <span className="text-label text-ink-muted" aria-live="polite">
+              {searching && view === "open" && !isLoading && !loadError
+                ? `${shown.length} of ${groups.length} shown`
+                : searching && view === "owed" && !owed.isLoading && !owed.loadError
+                  ? `${shownOwed.length} of ${owedRows.length} shown`
+                  : null}
+            </span>
+          </div>
+          }
+          sort={<label className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+            Sort
+            <select
+              value={sort}
+              onChange={(event) => setSort(event.target.value as SortKey)}
+              className="min-h-9 cursor-pointer rounded-trim border border-edge bg-board-plate px-2 text-label normal-case text-ink transition-colors hover:border-board-trim"
+              data-testid="helpdesk-sort"
+            >
+              {SORTS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>}
         />
       }
     >
+      {view === "owed" ? (
+        <PanelState
+          isLoading={owed.isLoading}
+          error={owed.loadError}
+          onRetry={() => void owed.reload()}
+          isEmpty={owedRows.length === 0}
+          emptyTitle="Nothing is owed"
+          emptyBody="Every short cash handover has been paid back or written off."
+          errorTitle="Money still owed did not load"
+          loadingRows={3}
+        >
+          {searching && shownOwed.length === 0 ? (
+            <div className="rounded-plate border border-edge bg-board-plate p-6 text-center">
+              <p className="text-body font-semibold text-ink">Nothing matches "{query.trim()}"</p>
+              <div className="mt-3 flex justify-center">
+                <DispatcherButton variant="secondary" size="sm" onClick={() => setQuery("")} className="font-semibold">
+                  Clear search
+                </DispatcherButton>
+              </div>
+            </div>
+          ) : null}
+          <ul className="space-y-2.5" data-testid="money-still-owed">
+            {shownOwed.map((row) => (
+              <MoneyOwedRow key={row.errandId} row={row} onChanged={owed.reload} />
+            ))}
+          </ul>
+        </PanelState>
+      ) : (
       <PanelState
         isLoading={isLoading}
         error={loadError}
         onRetry={() => void reload()}
         isEmpty={isConfirmedClear}
-        emptyTitle="Everything reconciles"
-        emptyBody="Nothing is waiting on you. Every run that came through has been accounted for."
-        errorTitle="The exception queue did not load"
+        emptyTitle="No problems right now"
+        emptyBody="Every order checks out. Nothing is waiting for you."
+        errorTitle="The Help Desk did not load"
         loadingRows={3}
       >
+        {searching && shown.length === 0 ? (
+          <div className="rounded-plate border border-edge bg-board-plate p-6 text-center" data-testid="helpdesk-no-match">
+            <p className="text-body font-semibold text-ink">Nothing matches "{query.trim()}"</p>
+            <p className="mt-1 text-label text-ink-muted">Try part of the order number, or the rider's first or last name.</p>
+            <div className="mt-3 flex justify-center">
+              <DispatcherButton variant="secondary" size="sm" onClick={() => setQuery("")} className="font-semibold">
+                Clear search
+              </DispatcherButton>
+            </div>
+          </div>
+        ) : null}
         <ul className="space-y-2.5" data-testid="exception-queue">
-          {groups.map((e) => {
+          {shown.map((e) => {
             const key = e.key;
             const isResolving = resolving === key;
             const count = e.members.length;
@@ -139,7 +353,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                       <h3 className="text-panel font-bold text-ink">{KIND_LABEL[e.kind]}</h3>
                       {count > 1 ? (
                         <span className="text-label font-semibold text-ink-muted" data-testid={`exception-count-${key}`}>
-                          <span data-figure className="tabular-nums">{count}</span> on this errand
+                          <span data-figure className="tabular-nums">{count}</span> on this order
                         </span>
                       ) : null}
                       <button
@@ -151,7 +365,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                           setTimeout(() => setCopiedId(null), 1500);
                         }}
                         className="group/copy inline-flex items-center gap-1.5 rounded-trim bg-board-ground/60 px-2 py-0.5 border border-edge text-ink hover:border-board-trim hover:bg-board-ground transition-colors cursor-pointer"
-                        title="Click to copy Errand ID"
+                        title="Copy the order number"
                       >
                         <span data-figure className="font-mono text-data font-bold tabular-nums tracking-wide">
                           {formatErrandId(e.errandId)}
@@ -205,7 +419,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                     {e.amountAtRisk > 0 ? (
                       <div className="text-right">
                         <span className="block text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
-                          {count > 1 ? "At risk, all" : "At risk"}
+                          {count > 1 ? "Money involved, all" : "Money involved"}
                         </span>
                         <span data-figure className="font-mono text-data font-bold tabular-nums text-status-act-ink">
                           {formatPeso(e.amountAtRisk)}
@@ -245,7 +459,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                       setResolving(null);
                       setErrors((prev) => ({ ...prev, [key]: null }));
                     }}
-                    onSubmit={async (reason) => {
+                    onSubmit={async (reason, cashOutcome) => {
                       if (reason.trim().length < 3) {
                         setErrors((prev) => ({ ...prev, [key]: "Say why this is being cleared." }));
                         return false;
@@ -255,8 +469,10 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
                       try {
                         // The group's sum: the record freezes what this one
                         // reason was written against, which is all of them.
-                        await resolve(e.errandId, e.kind, reason.trim(), e.amountAtRisk);
+                        await resolve(e.errandId, e.kind, reason.trim(), e.amountAtRisk, cashOutcome);
                         setResolving(null);
+                        // A short cleared with money still owed moves to that list.
+                        void owed.reload();
                         return true;
                       } catch (err: any) {
                         setErrors((prev) => ({
@@ -275,6 +491,7 @@ export const ExceptionQueuePanel: React.FC<{ queue: OpenExceptions }> = ({ queue
           })}
         </ul>
       </PanelState>
+      )}
     </PanelShell>
   );
 };
@@ -318,11 +535,18 @@ function ResolveForm({
   busy: boolean;
   error: string | null;
   onCancel: () => void;
-  onSubmit: (reason: string) => Promise<boolean>;
+  onSubmit: (reason: string, cashOutcome: ApiCashOutcome | null) => Promise<boolean>;
 }) {
   const { aiSuggestionsEnabled } = useDispatcherAiSettings();
   const [reason, setReason, clearReason] = useDraft(`exception-reason:${rowKey}`);
   const [suggest, setSuggest] = useState<SuggestState>({ status: "idle" });
+
+  // A cash short with money still owed asks what happened to it. The handover
+  // itself never changes; the answer is recorded beside it.
+  const cash = group.kind === "CASH_VARIANCE" ? group.members[0].cash : undefined;
+  const asksMoney = !!cash && cash.short > 0 && cash.stillOwed > 0;
+  const [cashValue, setCashValue] = useState<CashChoiceValue>(() => emptyCashChoice(cash?.stillOwed ?? 0));
+  const [cashError, setCashError] = useState<string | null>(null);
 
   // The box as it is NOW, read after the request returns. The value captured
   // when the request started would miss anything typed while it was in flight.
@@ -392,10 +616,25 @@ function ResolveForm({
           {aiSuggestionsEnabled ? " A suggestion describes only the first, so edit it to fit the rest." : null}
         </p>
       ) : null}
+      {asksMoney && cash ? (
+        <div className="mb-3">
+          <CashChoiceFields
+            owed={cash.stillOwed}
+            value={cashValue}
+            onChange={(next) => {
+              setCashValue(next);
+              setCashError(null);
+            }}
+            allowNotPaid
+            name={rowKey}
+            error={cashError}
+          />
+        </div>
+      ) : null}
       <Field
         label={count > 1 ? "Why are these being cleared?" : "Why is this being cleared?"}
         error={error}
-        hint="This is the record anyone reviewing the money will read."
+        hint="Anyone checking the money later will read this."
         required
       >
         {(control) => (
@@ -414,7 +653,7 @@ function ResolveForm({
             placeholder={
               aiSuggestionsEnabled
                 ? "What happened? Press Tab for a suggestion"
-                : "What happened? Describe the discrepancy resolution"
+                : "What happened? Explain how it was sorted out"
             }
             maxLength={500}
             // A suggestion is a full sentence; a one-line input showed its
@@ -450,7 +689,7 @@ function ResolveForm({
             </span>
           </div>
           <p className="mt-1 m-0 text-micro text-ink-muted">
-            Model can make mistakes. Please verify the suggested reason against the receipt and rider notes before updating.
+            Suggestions can be wrong. Check them against the receipt and the rider's note before saving.
           </p>
 
           <div aria-live="polite" data-testid="suggest-status">
@@ -473,7 +712,14 @@ function ResolveForm({
           loading={busy}
           loadingText="Updating"
           onClick={async () => {
-            const ok = await onSubmit(reason);
+            if (asksMoney && cash) {
+              const problem = cashChoiceError(cashValue, cash.stillOwed, true);
+              if (problem) {
+                setCashError(problem);
+                return;
+              }
+            }
+            const ok = await onSubmit(reason, asksMoney ? toCashOutcome(cashValue) : null);
             if (ok) clearReason();
           }}
           data-testid="resolve-confirm"
@@ -511,8 +757,8 @@ function SuggestionStatus({
         <p className="mt-1.5 flex items-start gap-1.5 text-label font-medium text-ink-muted">
           <Sparkles size={13} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
-            Suggested based on settlement figures and rider notes (<span className="font-mono tabular-nums">{percent(state.confidence)}</span>{" "}
-            confidence). Please review against the receipt evidence and adjust any details if needed.
+            Suggested from the cash handover and the rider's note (<span className="font-mono tabular-nums">{percent(state.confidence)}</span>{" "}
+            sure). Check it against the receipt photo and fix any details that are off.
           </span>
         </p>
       );
@@ -522,7 +768,7 @@ function SuggestionStatus({
         <div className="mt-2 rounded-trim border border-edge bg-board-ground p-3">
           <p className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
             <Sparkles size={12} className="shrink-0 text-amber-500" />
-            <span>Suggested reason &bull; <span className="font-mono tabular-nums">{percent(state.confidence)}</span> confidence</span>
+            <span>Suggested reason &bull; <span className="font-mono tabular-nums">{percent(state.confidence)}</span> sure</span>
           </p>
           <p className="mt-1 text-body font-medium text-ink leading-relaxed">{state.text}</p>
           <div className="mt-2">
@@ -544,22 +790,21 @@ function SuggestionStatus({
       if (state.noneFits) {
         return (
           <p className="mt-1.5 text-label font-medium text-status-waiting-ink">
-            The settlement figures and rider notes do not match a standard reason pattern. Please
-            describe what happened manually.
+            None of the usual reasons fit this one. Please write what happened.
           </p>
         );
       }
       return (
         <p className="mt-1.5 text-label font-medium text-status-waiting-ink">
-          Not enough evidence for an automatic suggestion (<span className="font-mono tabular-nums">{percent(state.confidence)}</span> confidence;{" "}
-          <span className="font-mono tabular-nums">{percent(state.threshold)}</span> required). Please enter the resolution reason manually.
+          Not sure enough to suggest a reason (<span className="font-mono tabular-nums">{percent(state.confidence)}</span> sure;{" "}
+          needs <span className="font-mono tabular-nums">{percent(state.threshold)}</span>). Please write what happened.
         </p>
       );
 
     case "failed":
       return (
         <p role="alert" className="mt-1.5 text-label font-medium text-status-act-ink">
-          Could not generate a suggestion right now. Please try again or enter the reason manually.
+          Could not get a suggestion right now. Try again, or write the reason yourself.
         </p>
       );
 

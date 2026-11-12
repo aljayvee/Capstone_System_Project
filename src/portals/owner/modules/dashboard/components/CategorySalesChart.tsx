@@ -74,22 +74,22 @@ export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
                 strokeDasharray="2 2"
                 vertical={isPhone}
                 horizontal={!isPhone}
-                stroke="#E2E8F0"
+                stroke="var(--color-hairline)"
               />
               {isPhone ? (
                 <>
                   <XAxis
                     type="number"
-                    tick={{ fontSize: 10, fill: "#64748B" }}
+                    tick={{ fontSize: 10, fill: "var(--color-ink-muted)" }}
                     tickLine={false}
-                    axisLine={{ stroke: "#E2E8F0" }}
+                    axisLine={{ stroke: "var(--color-hairline)" }}
                     tickFormatter={(v) => `₱${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}
                   />
                   <YAxis
                     type="category"
                     dataKey="name"
                     width={75}
-                    tick={{ fontSize: 10, fill: "#64748B" }}
+                    tick={{ fontSize: 10, fill: "var(--color-ink-muted)" }}
                     tickLine={false}
                     axisLine={false}
                   />
@@ -98,15 +98,15 @@ export const CategorySalesChart: React.FC<CategorySalesChartProps> = ({
                 <>
                   <XAxis
                     dataKey="name"
-                    tick={{ fontSize: 11, fill: "#64748B" }}
+                    tick={{ fontSize: 11, fill: "var(--color-ink-muted)" }}
                     tickLine={false}
-                    axisLine={{ stroke: "#E2E8F0" }}
+                    axisLine={{ stroke: "var(--color-hairline)" }}
                     interval={0}
                     angle={-18}
                     textAnchor="end"
                   />
                   <YAxis
-                    tick={{ fontSize: 11, fill: "#64748B" }}
+                    tick={{ fontSize: 11, fill: "var(--color-ink-muted)" }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => `₱${v >= 1000 ? `${Math.round(v / 1000)}k` : v}`}

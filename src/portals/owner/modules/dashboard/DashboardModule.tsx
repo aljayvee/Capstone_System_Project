@@ -92,6 +92,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
   return (
     <OwnerPanelShell
       title="Dashboard"
+      className="owner-dashboard-enter"
       // Period presets + calendar, the same control the reports use.
       aside={
         <RangeSelector
@@ -119,7 +120,7 @@ export const DashboardModule: React.FC<DashboardModuleProps> = ({
         )
       }
     >
-      <div className="space-y-4">
+      <div className="owner-dashboard-sections space-y-4">
         {/* RIGHT NOW. One band, three readings, divided by column rules. */}
         <StandingFigures
           label="The operation right now"

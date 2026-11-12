@@ -94,30 +94,30 @@ export const SysAdminProfileWizard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#070D1B] text-slate-100 flex items-center justify-center p-4 select-none">
-      <div className="w-full max-w-xl bg-[#0F1A30] border border-slate-800 rounded-xl shadow-2xl p-6 md:p-8">
+    <div className="min-h-screen bg-board-ground text-ink flex items-center justify-center p-4 select-none">
+      <div className="w-full max-w-xl bg-board-plate border border-edge rounded-xl shadow-2xl p-6 md:p-8">
         {step === "FORM" ? (
           <>
-            <div className="flex items-start justify-between border-b border-slate-800 pb-5 mb-6">
+            <div className="flex items-start justify-between border-b border-edge pb-5 mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                <div className="w-10 h-10 rounded-lg bg-status-act-fill border border-status-act-ink/30 flex items-center justify-center text-status-act-ink">
                   <UserCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold text-white tracking-tight">Setup Administrator Profile</h1>
-                  <p className="text-xs text-slate-400">
-                    Welcome <span className="font-mono text-red-400">sysadminit</span>. Complete your details below.
+                  <h1 className="text-lg font-bold text-ink tracking-tight">Setup Administrator Profile</h1>
+                  <p className="text-xs text-ink-muted">
+                    Welcome <span className="font-mono text-status-act-ink">sysadminit</span>. Complete your details below.
                   </p>
                 </div>
               </div>
-              <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-slate-800/80 text-slate-400 border border-slate-700">
+              <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-board-ground text-ink-muted border border-edge">
                 Step 1 of 2
               </span>
             </div>
 
             {errorMessage && (
-              <div className="mb-5 p-3.5 rounded-lg bg-red-950/50 border border-red-800/60 text-red-200 text-xs flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+              <div className="mb-5 p-3.5 rounded-lg bg-status-act-fill border border-status-act-ink/30 text-status-act-ink text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-status-act-ink shrink-0 mt-0.5" />
                 <div className="flex-1 leading-relaxed">{errorMessage}</div>
               </div>
             )}
@@ -125,8 +125,8 @@ export const SysAdminProfileWizard: React.FC = () => {
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5" htmlFor="first-name">
-                    First Name <span className="text-red-400">*</span>
+                  <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="first-name">
+                    First Name <span className="text-status-act-ink">*</span>
                   </label>
                   <input
                     id="first-name"
@@ -135,13 +135,13 @@ export const SysAdminProfileWizard: React.FC = () => {
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="e.g. Alexander"
-                    className="w-full px-3 py-2 bg-[#0B132B] border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                    className="w-full px-3 py-2 bg-board-ground border border-edge rounded-lg text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5" htmlFor="middle-name">
-                    Middle Name <span className="text-slate-500">(Optional)</span>
+                  <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="middle-name">
+                    Middle Name <span className="text-ink-muted">(Optional)</span>
                   </label>
                   <input
                     id="middle-name"
@@ -149,15 +149,15 @@ export const SysAdminProfileWizard: React.FC = () => {
                     value={middleName}
                     onChange={(e) => setMiddleName(e.target.value)}
                     placeholder="e.g. Vance"
-                    className="w-full px-3 py-2 bg-[#0B132B] border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                    className="w-full px-3 py-2 bg-board-ground border border-edge rounded-lg text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 transition-colors"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5" htmlFor="last-name">
-                    Last Name <span className="text-red-400">*</span>
+                  <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="last-name">
+                    Last Name <span className="text-status-act-ink">*</span>
                   </label>
                   <input
                     id="last-name"
@@ -166,13 +166,13 @@ export const SysAdminProfileWizard: React.FC = () => {
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="e.g. Wright"
-                    className="w-full px-3 py-2 bg-[#0B132B] border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                    className="w-full px-3 py-2 bg-board-ground border border-edge rounded-lg text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 transition-colors"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5" htmlFor="nickname">
-                    Preferred Nickname <span className="text-red-400">*</span>
+                  <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="nickname">
+                    Preferred Nickname <span className="text-status-act-ink">*</span>
                   </label>
                   <input
                     id="nickname"
@@ -181,15 +181,15 @@ export const SysAdminProfileWizard: React.FC = () => {
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="e.g. Astro / RootAdmin"
-                    className="w-full px-3 py-2 bg-[#0B132B] border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                    className="w-full px-3 py-2 bg-board-ground border border-edge rounded-lg text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 transition-colors"
                   />
-                  <p className="mt-1 text-[11px] text-slate-500">Displayed in portal headers and audit trails.</p>
+                  <p className="mt-1 text-[11px] text-ink-muted">Displayed in portal headers and audit trails.</p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5" htmlFor="email-account">
-                  Email Address for Verification Link <span className="text-red-400">*</span>
+                <label className="block text-xs font-medium text-ink mb-1.5" htmlFor="email-account">
+                  Email Address for Verification Link <span className="text-status-act-ink">*</span>
                 </label>
                 <input
                   id="email-account"
@@ -198,18 +198,18 @@ export const SysAdminProfileWizard: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin.it@sugo-express.org"
-                  className="w-full px-3 py-2 bg-[#0B132B] border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
+                  className="w-full px-3 py-2 bg-board-ground border border-edge rounded-lg text-sm text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30 transition-colors"
                 />
-                <p className="mt-1 text-[11px] text-slate-500">
+                <p className="mt-1 text-[11px] text-ink-muted">
                   A 1-click verification link will be sent here (valid for 5 minutes).
                 </p>
               </div>
 
-              <div className="pt-4 flex items-center justify-between border-t border-slate-800">
+              <div className="pt-4 flex items-center justify-between border-t border-edge">
                 <button
                   type="button"
                   onClick={cancelSetupWizard}
-                  className="text-xs text-slate-400 hover:text-slate-200"
+                  className="text-xs text-ink-muted hover:text-ink"
                 >
                   Cancel &amp; Sign Out
                 </button>
@@ -217,7 +217,7 @@ export const SysAdminProfileWizard: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="py-2 px-5 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-2"
+                  className="py-2 px-5 bg-signal hover:bg-signal-deep disabled:bg-board-ground disabled:text-ink-muted text-white font-semibold text-xs rounded-lg transition-colors flex items-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
@@ -237,43 +237,43 @@ export const SysAdminProfileWizard: React.FC = () => {
         ) : (
           /* Step 2: Magic Link Dispatched State */
           <div className="text-center py-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 mx-auto flex items-center justify-center mb-5">
+            <div className="w-14 h-14 rounded-2xl bg-status-act-fill border border-status-act-ink/30 text-status-act-ink mx-auto flex items-center justify-center mb-5">
               <Mail className="w-7 h-7" />
             </div>
 
-            <h2 className="text-lg font-bold text-white mb-2">Check Your Email</h2>
-            <p className="text-xs text-slate-300 max-w-sm mx-auto leading-relaxed mb-4">
-              We sent a 1-click verification link to <span className="font-semibold text-white">{email}</span>. Click the link in your inbox to verify your administrator account.
+            <h2 className="text-lg font-bold text-ink mb-2">Check Your Email</h2>
+            <p className="text-xs text-ink max-w-sm mx-auto leading-relaxed mb-4">
+              We sent a 1-click verification link to <span className="font-semibold text-ink">{email}</span>. Click the link in your inbox to verify your administrator account.
             </p>
 
             {successNotice && (
-              <div className="mb-4 p-2.5 rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-200 text-xs flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <div className="mb-4 p-2.5 rounded-lg bg-status-done-fill border border-status-done-ink/30 text-status-done-ink text-xs flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-status-done-ink" />
                 <span>{successNotice}</span>
               </div>
             )}
 
             {errorMessage && (
-              <div className="mb-4 p-2.5 rounded-lg bg-red-950/60 border border-red-800/60 text-red-200 text-xs flex items-center justify-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400" />
+              <div className="mb-4 p-2.5 rounded-lg bg-status-act-fill border border-status-act-ink/30 text-status-act-ink text-xs flex items-center justify-center gap-2">
+                <AlertCircle className="w-4 h-4 text-status-act-ink" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             {/* Live 5-minute countdown card */}
-            <div className="my-6 p-4 rounded-xl bg-[#0B132B] border border-slate-800/80 inline-flex flex-col items-center">
-              <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5 font-medium">
-                <Clock className="w-3.5 h-3.5 text-red-400" /> Link Validity Window
+            <div className="my-6 p-4 rounded-xl bg-board-ground border border-edge inline-flex flex-col items-center">
+              <div className="text-[11px] uppercase tracking-wider text-ink-muted mb-1 flex items-center gap-1.5 font-medium">
+                <Clock className="w-3.5 h-3.5 text-status-act-ink" /> Link Validity Window
               </div>
               <div
                 className={`text-2xl font-mono font-bold tabular-nums tracking-wider ${
-                  secondsRemaining < 60 ? "text-red-400 animate-pulse" : "text-white"
+                  secondsRemaining < 60 ? "text-status-act-ink animate-pulse" : "text-ink"
                 }`}
               >
                 {formatCountdown(secondsRemaining)}
               </div>
               {secondsRemaining === 0 && (
-                <div className="text-[11px] text-red-400 mt-1 font-medium">
+                <div className="text-[11px] text-status-act-ink mt-1 font-medium">
                   Link expired. Please click resend below.
                 </div>
               )}
@@ -284,7 +284,7 @@ export const SysAdminProfileWizard: React.FC = () => {
                 type="button"
                 onClick={handleResendLink}
                 disabled={resendCooldown > 0 || isResending}
-                className="py-2 px-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 text-xs font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="py-2 px-4 bg-board-ground hover:bg-board-ground disabled:opacity-50 text-ink text-xs font-medium rounded-lg transition-colors flex items-center gap-2"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isResending ? "animate-spin" : ""}`} />
                 {resendCooldown > 0 ? (
@@ -297,7 +297,7 @@ export const SysAdminProfileWizard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStep("FORM")}
-                className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                className="text-xs text-ink-muted hover:text-ink transition-colors"
               >
                 &larr; Change Email or Edit Information
               </button>

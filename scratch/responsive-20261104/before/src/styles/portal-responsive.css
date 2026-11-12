@@ -1,0 +1,65 @@
+/* Shared layout only: the portal palettes and Owner appearance still own color. */
+[data-portal="owner"],
+[data-portal="dispatch"] {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.portal-main {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.portal-mobile-drawer {
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+@media (width < 768px) {
+  :is([data-surface="owner"], [data-surface="dispatch"]) :is(button, [role="tab"], select) {
+    min-height: 44px;
+  }
+
+  /* The bell has its own stable 40px geometry shared by all page headers. */
+  :is([data-surface="owner"], [data-surface="dispatch"]) [data-bell] {
+    min-height: 40px;
+  }
+
+  :is([data-surface="owner"], [data-surface="dispatch"]) :is(input, textarea, select) {
+    font-size: 16px;
+    max-width: 100%;
+  }
+
+  :is([data-surface="owner"], [data-surface="dispatch"]) [data-slot="dialog-popup"] {
+    max-height: calc(100dvh - 2rem);
+    padding: 1rem;
+  }
+
+  [data-owner-header] h1 {
+    font-size: var(--text-panel);
+  }
+
+  [data-dispatcher-filter-toolbar] > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .kuya-header {
+    padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  }
+}
+
+/* Short landscape screens need a content viewport even with pinned controls. */
+@media (width < 1024px) and (height < 500px) and (orientation: landscape) {
+  [data-mobile-header] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .portal-main {
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  .owner-tracking-summary-enter {
+    display: none;
+  }
+}

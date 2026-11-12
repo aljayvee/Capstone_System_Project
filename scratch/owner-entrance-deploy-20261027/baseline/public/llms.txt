@@ -1,0 +1,19 @@
+# Sugo on the Go - Express Errand & Dispatch Portal
+
+> Official logistics, fleet dispatch, and errand delivery management platform for Tacurong City, Sultan Kudarat, Philippines.
+
+Sugo on the Go is an on-demand logistics system providing pabili (purchasing), padala (courier), bill payment, and multi-stop merchant deliveries with real-time GPS telemetry, verified municipal POI navigation, and dispatcher-rider operations.
+
+## Web Applications & Portals
+- [System Portal (Sign In)](https://sugoonthego.online/): Authorized login for operations personnel (Administrators and Dispatchers).
+- [Owner Portal](https://sugoonthego.online/owner): Operational console for fleet oversight, rate configuration, user administration, and system audit logs.
+- [Dispatcher Portal](https://sugoonthego.online/dispatcher): Real-time queue management, interactive 4-state rider map, BOLA-scoped chat, and order fulfillment.
+- [Places Directory](https://sugoonthego.online/places): Verified municipal POI registry for Tacurong City commercial venues, stores, and landmarks.
+
+## Mobile Applications
+- Customer App: Mobile application for ordering errands, real-time live map tracking, and dispatcher messaging.
+- Rider Mobile App: Mobile application for riders with turn-by-turn navigation, order acceptance, and geofenced status updates.
+
+## Technical Architecture & APIs
+- [API Service](https://api.sugoonthego.online): RESTful API backend handling authentication, errand lifecycle, rates, and dispatch operations.
+- Data Model: 3NF relational database architecture on MariaDB with Prisma ORM coupled with Firebase Realtime Database for live telemetry.

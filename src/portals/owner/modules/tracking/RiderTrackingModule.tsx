@@ -2,15 +2,12 @@ import React, { useState, useMemo } from "react";
 import {
   Bike,
   Radio,
-  BatteryLow,
-  Battery,
   Search,
   X,
   Check,
   Copy,
   WifiOff,
   Phone,
-  MapPin,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,11 +16,36 @@ import { StandingFigures } from "../../components/StandingFigures";
 import { useRiderFleetPresence, RiderFleetMember } from "../../../../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES, describeRiderStatus, RiderPresenceState } from "../../../../constants/riderPresence";
 import { useRiderActiveRoute } from "../../../../hooks/useRiderActiveRoute";
-import { NotificationBell } from "../../../../components/NotificationBell";
-import { HeaderClock } from "../../../../components/HeaderClock";
+import { OwnerPageHeader } from "../../components/OwnerPageHeader";
+import { RiderRosterSkeleton } from "../../components/OwnerSkeletons";
 import { cn } from "@/lib/utils";
 
 const TACURONG_CENTER = { lat: 6.671, lng: 124.6644 };
+
+const toBatteryPercent = (level: number | null | undefined): number | null => {
+  if (level == null || !Number.isFinite(level) || level < 0) return null;
+  return Math.max(0, Math.min(100, Math.round(level <= 1 ? level * 100 : level)));
+};
+
+const BatteryBars: React.FC<{ percent: number; size?: number }> = ({ percent, size = 18 }) => {
+  const filledBars = Math.ceil(percent / 20);
+  return (
+    <svg
+      width={size}
+      height={size * 0.6}
+      viewBox="0 0 23 13"
+      fill="none"
+      aria-hidden="true"
+      className={percent <= 20 ? "text-status-act-ink" : "text-field-ink"}
+    >
+      <rect x="0.75" y="0.75" width="19" height="11.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M21 4.25v4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      {[3, 6, 9, 12, 15].map((x, index) => (
+        <rect key={x} x={x} y="3" width="2" height="7" rx="0.5" fill={index < filledBars ? "currentColor" : "none"} />
+      ))}
+    </svg>
+  );
+};
 
 export const RiderTrackingModule: React.FC = () => {
   const { riders, isLoading, loadError, telemetryError, reload, liveLink } = useRiderFleetPresence();
@@ -32,7 +54,6 @@ export const RiderTrackingModule: React.FC = () => {
   const [selectedPresence, setSelectedPresence] = useState<"ALL" | RiderPresenceState>("ALL");
   const [hideOffline, setHideOffline] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<"map" | "roster">("map");
 
   // Selected rider resolution
   const selectedRider: RiderFleetMember | undefined = useMemo(() => {
@@ -41,6 +62,7 @@ export const RiderTrackingModule: React.FC = () => {
     }
     return undefined;
   }, [riders, selectedRiderId]);
+  const selectedBatteryPercent = toBatteryPercent(selectedRider?.batteryLevel);
 
   // The owner portal holds no errand list, so this fetches the one route.
   const selectedRoute = useRiderActiveRoute(selectedRider);
@@ -111,31 +133,13 @@ export const RiderTrackingModule: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-3 sm:space-y-3.5 max-w-7xl mx-auto w-full overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-col h-full space-y-3 sm:space-y-3.5 max-w-7xl mx-auto w-full overflow-hidden">
       {/* ───────────────────────────────────────────────────────────── */}
       {/* 1. TOP HERO HEADER & QUICK TELEMETRY ACTIONS (PINNED) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-hairline pb-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            {/* The pulsing green dot that used to sit here is gone. It was
-                painted unconditionally, so it announced a live feed even while
-                /riders was returning 401 and every count below it read zero.
-                An indicator that never checks the thing it indicates is not an
-                indicator. Presence is now reported by the chip on the right,
-                which reads the hook's error channel. */}
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-title uppercase text-ink">Tracking</h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
-          {/* Three states, not one. This chip was a single emerald pill with
-              an animating radio icon that rendered whatever the counts were,
-              so "0 Ready, 0 Delivering" over a dead endpoint looked exactly
-              like a quiet afternoon. */}
-          {loadError ? (
+      <div className="owner-tracking-header-enter shrink-0 border-b border-hairline pb-3 pt-1">
+        <OwnerPageHeader title="Tracking" controls={
+          loadError ? (
             <button
               type="button"
               onClick={reload}
@@ -149,17 +153,8 @@ export const RiderTrackingModule: React.FC = () => {
               <Radio size={13} className="shrink-0" />
               <span>Reading presence</span>
             </span>
-          ) : (
-            <span className="flex items-center gap-1.5 rounded-trim bg-status-done-fill px-3 py-1.5 text-micro uppercase text-status-done-ink">
-              <Radio size={13} className="shrink-0" />
-              <span data-figure>
-                {countReady} Online, {countBusy} On delivery
-              </span>
-            </span>
-          )}
-          <HeaderClock />
-          <NotificationBell />
-        </div>
+          ) : null
+        } />
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
@@ -182,7 +177,7 @@ export const RiderTrackingModule: React.FC = () => {
       <StandingFigures
         label="The fleet right now"
         columns={4}
-        className="shrink-0"
+        className="owner-tracking-summary-enter shrink-0"
         figures={[
           {
             label: "Available Online",
@@ -224,41 +219,10 @@ export const RiderTrackingModule: React.FC = () => {
         ]}
       />
 
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 3. MOBILE VIEW SWITCHER (Visible on Mobile only) */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex sm:hidden bg-board-ground p-1 rounded-plate border border-edge">
-        <button
-          type="button"
-          onClick={() => setMobileTab("map")}
-          className={`flex-1 py-1.5 rounded-plate text-label transition flex items-center justify-center gap-1.5 ${
-            mobileTab === "map" ? "bg-board-plate text-board-field" : "text-ink-muted"
-          }`}
-        >
-          <MapPin size={13} />
-          <span>Map View</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("roster")}
-          className={`flex-1 py-1.5 rounded-plate text-label transition flex items-center justify-center gap-1.5 ${
-            mobileTab === "roster" ? "bg-board-plate text-board-field" : "text-ink-muted"
-          }`}
-        >
-          <Bike size={13} />
-          <span>Fleet Roster ({fig(filteredRoster.length)})</span>
-        </button>
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────── */}
-      {/* 4. MAIN 12-COLUMN RESPONSIVE SECTION (Map + Sidebar Roster) */}
-      {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-[360px] grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-stretch overflow-hidden">
+      <div className="owner-tracking-workspace-enter flex-1 min-h-0 min-w-0 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-start lg:items-stretch overflow-y-auto lg:overflow-hidden">
         {/* Left Column: Interactive Map (8 cols on desktop) */}
         <div
-          className={`lg:col-span-8 h-full min-h-[320px] relative rounded-plate overflow-hidden border border-edge ${
-            mobileTab === "roster" ? "hidden sm:block" : "block"
-          }`}
+          className="lg:col-span-8 h-[clamp(14rem,40dvh,24rem)] lg:h-full min-h-0 min-w-0 relative overflow-hidden"
         >
           <LiveFleetMap
             presenceUnknown={unknown}
@@ -267,6 +231,7 @@ export const RiderTrackingModule: React.FC = () => {
             routeGeometry={selectedRoute.routeGeometry}
             routeStops={selectedRoute.routeStops}
             routeDestination={selectedRoute.routeDestination}
+            liveRoute={selectedRoute.liveLine}
             riders={riders}
             center={TACURONG_CENTER}
             selectedRiderId={selectedRiderId}
@@ -278,7 +243,7 @@ export const RiderTrackingModule: React.FC = () => {
 
           {/* Selected Rider Floating Mission Control Card */}
           {selectedRider && (
-            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 sm:right-auto bg-board-plate border border-edge rounded-plate p-4 max-w-sm sm:max-w-md w-auto sm:w-full space-y-3 z-20 shadow-md animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 right-3 bg-board-plate border border-edge rounded-plate p-3 sm:p-4 max-h-[calc(100%_-_1.5rem)] overflow-y-auto max-w-sm sm:max-w-md w-auto space-y-3 z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
               {/* Header: Rider Name, ID, Badge, Close */}
               <div className="flex items-center justify-between gap-3 pb-2.5 border-b border-hairline">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -337,7 +302,7 @@ export const RiderTrackingModule: React.FC = () => {
                       selectedRider.phone &&
                       handleCopy(selectedRider.phone, `floating-phone-${selectedRider.id}`)
                     }
-                    className="flex items-center gap-1.5 font-mono text-ink hover:text-board-field transition font-medium"
+                    className="flex items-center gap-1.5 font-mono text-ink hover:text-field-ink transition font-medium"
                     title="Click to copy phone"
                   >
                     <Phone size={12} className="text-ink-muted" />
@@ -370,37 +335,19 @@ export const RiderTrackingModule: React.FC = () => {
                 </div>
 
                 {/* Battery Telemetry */}
-                {selectedRider.batteryLevel !== null && selectedRider.batteryLevel !== undefined && (
+                {selectedBatteryPercent !== null && (
                   <div className="flex items-center justify-between py-1 border-t border-hairline">
                     <span className="flex items-center gap-1.5 text-ink-muted">
-                      {(() => {
-                        const pct =
-                          selectedRider.batteryLevel <= 1
-                            ? Math.round(selectedRider.batteryLevel * 100)
-                            : Math.round(selectedRider.batteryLevel);
-                        return pct <= 20 ? (
-                          <BatteryLow size={14} className="text-signal" />
-                        ) : (
-                          <Battery size={14} className="text-ink-muted" />
-                        );
-                      })()}
+                      <BatteryBars percent={selectedBatteryPercent} />
                       <span>Battery Level</span>
                     </span>
                     <span
                       className={cn(
                         "font-mono font-medium",
-                        (() => {
-                          const pct =
-                            selectedRider.batteryLevel <= 1
-                              ? Math.round(selectedRider.batteryLevel * 100)
-                              : Math.round(selectedRider.batteryLevel);
-                          return pct <= 20 ? "text-status-act-ink font-bold" : "text-ink";
-                        })(),
+                        selectedBatteryPercent <= 20 ? "text-status-act-ink font-bold" : "text-ink",
                       )}
                     >
-                      {selectedRider.batteryLevel <= 1
-                        ? `${Math.round(selectedRider.batteryLevel * 100)}%`
-                        : `${Math.round(selectedRider.batteryLevel)}%`}
+                      {selectedBatteryPercent}%
                     </span>
                   </div>
                 )}
@@ -411,30 +358,28 @@ export const RiderTrackingModule: React.FC = () => {
 
         {/* Right Column: Fleet Roster Sidebar (4 cols on desktop) */}
         <div
-          className={`lg:col-span-4 bg-board-plate border border-edge rounded-plate flex flex-col h-full min-h-0 overflow-hidden ${
-            mobileTab === "map" ? "hidden sm:flex" : "flex"
-          }`}
+          className="lg:col-span-4 flex min-w-0 flex-col lg:h-full min-h-0 lg:overflow-hidden"
         >
           {/* Sidebar Header */}
-          <div className="p-3 sm:p-3.5 border-b border-hairline shrink-0 space-y-2.5 bg-board-plate">
+          <div className="py-3 border-b border-hairline shrink-0 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3 className="text-label font-medium text-ink flex items-center gap-2">
-                  <Bike size={16} className="text-board-field" />
+                  <Bike size={16} className="text-field-ink" />
                   <span>Fleet Roster</span>
                 </h3>
                 {selectedPresence !== "ALL" && (
                   <button
                     type="button"
                     onClick={() => setSelectedPresence("ALL")}
-                    className="text-micro text-board-field hover:underline"
+                    className="rounded-plate border border-field-ink bg-board-plate px-2 py-1 text-micro text-field-ink transition-colors hover:bg-board-ground"
                     title="Clear status filter"
                   >
                     Reset
                   </button>
                 )}
               </div>
-              <span className="text-label font-mono text-ink-muted bg-board-ground px-2 py-0.5 rounded-trim border border-edge">
+              <span className="text-label font-mono text-ink-muted">
                 {unknown ? "-- of --" : `${filteredRoster.length} of ${totalRiders}`}
               </span>
             </div>
@@ -451,7 +396,7 @@ export const RiderTrackingModule: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search riders by name, ID, or phone..."
-                className="w-full pl-9 pr-8 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field/20 focus:border-board-field focus:bg-board-plate transition"
+                className="w-full pl-9 pr-8 py-1.5 bg-board-ground border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-field-ink/20 focus:border-field-ink focus:bg-board-plate transition"
               />
               {search && (
                 <button
@@ -466,12 +411,9 @@ export const RiderTrackingModule: React.FC = () => {
           </div>
 
           {/* Roster Scrollable Plate: Single continuous list with hairlines */}
-          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-hairline">
+          <div className="flex-1 min-h-0 lg:overflow-y-auto divide-y divide-hairline">
             {isLoading ? (
-              <div className="p-8 text-center text-ink-muted space-y-2">
-                <RefreshCw size={22} className="animate-spin text-board-field mx-auto" />
-                <p className="text-label text-ink-muted">Streaming live rider fleet...</p>
-              </div>
+              <RiderRosterSkeleton />
             ) : unknown ? (
               <div className="p-6 text-center space-y-2.5 my-auto">
                 <WifiOff size={22} className="mx-auto text-status-act-ink" />
@@ -482,7 +424,7 @@ export const RiderTrackingModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={reload}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-white transition-colors hover:bg-signal-deep"
                 >
                   <RefreshCw size={14} />
                   <span>Try again</span>
@@ -501,7 +443,7 @@ export const RiderTrackingModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-trim bg-board-ground hover:bg-board-ground text-ink text-label transition"
+                    className="inline-flex min-h-9 items-center gap-1 rounded-plate border border-field-ink bg-board-plate px-3 py-1.5 text-field-ink text-label transition-colors hover:bg-board-ground"
                   >
                     <span>Reset Filter</span>
                   </button>
@@ -511,19 +453,19 @@ export const RiderTrackingModule: React.FC = () => {
               filteredRoster.map((r) => {
                 const isSelected = r.id === selectedRiderId;
                 const theme = RIDER_STATUS_THEMES[r.presence] || RIDER_STATUS_THEMES.AVAILABLE_ONLINE;
+                const batteryPercent = toBatteryPercent(r.batteryLevel);
 
                 return (
                   <div
                     key={r.id}
                     onClick={() => {
                       setSelectedRiderId(r.id);
-                      if (mobileTab === "roster") setMobileTab("map");
                     }}
                     className={cn(
                       "px-3.5 py-3 transition-colors cursor-pointer text-left relative",
                       isSelected
-                        ? "bg-board-ground border-l-2 border-board-field"
-                        : "hover:bg-board-ground/60 bg-board-plate",
+                        ? "bg-board-ground border-l-2 border-field-ink"
+                        : "hover:bg-board-ground/60",
                     )}
                   >
                     {/* Row 1: Name, Status Pill */}
@@ -573,17 +515,11 @@ export const RiderTrackingModule: React.FC = () => {
                         </button>
 
                         {/* Battery */}
-                        {r.batteryLevel !== null && r.batteryLevel !== undefined && (
+                        {batteryPercent !== null && (
                           <span className="flex items-center gap-1 font-mono">
-                            {r.batteryLevel <= 0.2 ? (
-                              <BatteryLow size={12} className="text-signal" />
-                            ) : (
-                              <Battery size={12} className="text-ink-muted" />
-                            )}
-                            <span className={r.batteryLevel <= 0.2 ? "text-status-act-ink font-semibold" : ""}>
-                              {r.batteryLevel <= 1
-                                ? `${Math.round(r.batteryLevel * 100)}%`
-                                : `${Math.round(r.batteryLevel)}%`}
+                            <BatteryBars percent={batteryPercent} size={15} />
+                            <span className={batteryPercent <= 20 ? "text-status-act-ink font-semibold" : ""}>
+                              {batteryPercent}%
                             </span>
                           </span>
                         )}

@@ -1,32 +1,19 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { Suspense, useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "../../context/AuthContext";
+import { PermissionsProvider, usePermissions } from "../../context/PermissionsContext";
 import { useMaintenanceCheck } from "../../hooks/useMaintenanceCheck";
 import { MaintenanceOverlay } from "../../components/MaintenanceOverlay";
 import { MaintenanceWarningBanner } from "../../components/MaintenanceWarningBanner";
+import { LiveEditNoticeModal } from "../../components/LiveEditNoticeModal";
 import { useDispatcherPortal } from "./hooks/useDispatcherPortal";
 
-// Straight to the workspace. `ErrandQueueTable` was a 21-line file whose entire
-// body was `return <DispatchManagementWorkspace {...props} />`, so it added a
-// second props interface to keep in sync and a name that promised a table this
-// console does not have.
-import { DispatchManagementWorkspace } from "./components/workspace/DispatchManagementWorkspace";
-import { RiderFleetRoster } from "./components/RiderFleetRoster";
-import { OrderChatScreen } from "./components/order-chat/OrderChatScreen";
-import { RecentChatsPanel } from "./components/RecentChatsPanel";
-import { DispatcherRiderMessagesPanel } from "./components/DispatcherRiderMessagesPanel";
-import { ActiveErrandsPanel } from "./components/ActiveErrandsPanel";
-import { ExceptionQueuePanel } from "./components/ExceptionQueuePanel";
-import { DispatcherProfilePanel } from "./components/DispatcherProfilePanel";
+import { lazyWithRetry, preloadWhenIdle } from "../../utils/lazyWithRetry";
 import { DispatcherDashboardView } from "./components/dashboard/DispatcherDashboardView";
 import { useOpenExceptions } from "./hooks/useOpenExceptions";
 import {
-  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle, History, LayoutDashboard
+  ClipboardList, Bike, LogOut, Bike as BikeIcon, MessageSquare, MessageCircle, X, Activity, AlertTriangle, History, LayoutDashboard, Lock
 } from "lucide-react";
-import { DispatcherHistoryPanel } from "./components/history/DispatcherHistoryPanel";
-import { NotificationBell } from "../../components/NotificationBell";
-import { HeaderClock } from "../../components/HeaderClock";
-import { HeaderAudioStatus } from "../../components/HeaderAudioStatus";
 import { useCustomerChatAlerts } from "./hooks/useCustomerChatAlerts";
 import { CustomerChatToastContainer } from "./components/CustomerChatToastContainer";
 import { useRiderChatAlerts } from "./hooks/useRiderChatAlerts";
@@ -35,7 +22,10 @@ import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
 import { fetchStaffPhoto } from "../../services/staffPhotoService";
 import { useDeviceTier } from "../../hooks/useDeviceTier";
 import { MobileHeader } from "../../components/navigation/MobileHeader";
-import { MobileBottomNav, type MobileNavTab } from "../../components/navigation/MobileBottomNav";
+import { BrandMark } from "../../components/brand/BrandMark";
+import { NotificationFeedProvider } from "../../components/NotificationBell";
+import { DispatcherHeaderActions } from "./components/DispatcherHeaderActions";
+import { PanelTitleVisibilityContext } from "@/components/panel/PanelShell";
 import { ScrollToTopButton } from "../../components/common/ScrollToTopButton";
 import {
   Sidebar,
@@ -55,7 +45,6 @@ import {
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
-import { formatErrandId } from "../../utils/formatErrandId";
 import {
   Dialog,
   DialogContent,
@@ -66,9 +55,117 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// Keep the dashboard and portal-wide alert subscriptions eager. Other screens
+// load when opened, including the order workspace selected by a notification.
+const DispatchManagementWorkspace = lazyWithRetry(() =>
+  import("./components/workspace/DispatchManagementWorkspace").then((m) => ({ default: m.DispatchManagementWorkspace }))
+);
+const RiderFleetRoster = lazyWithRetry(() =>
+  import("./components/RiderFleetRoster").then((m) => ({ default: m.RiderFleetRoster }))
+);
+const OrderChatScreen = lazyWithRetry(() =>
+  import("./components/order-chat/OrderChatScreen").then((m) => ({ default: m.OrderChatScreen }))
+);
+const RecentChatsPanel = lazyWithRetry(() =>
+  import("./components/RecentChatsPanel").then((m) => ({ default: m.RecentChatsPanel }))
+);
+const DispatcherRiderMessagesPanel = lazyWithRetry(() =>
+  import("./components/DispatcherRiderMessagesPanel").then((m) => ({ default: m.DispatcherRiderMessagesPanel }))
+);
+const ActiveErrandsPanel = lazyWithRetry(() =>
+  import("./components/ActiveErrandsPanel").then((m) => ({ default: m.ActiveErrandsPanel }))
+);
+const ExceptionQueuePanel = lazyWithRetry(() =>
+  import("./components/ExceptionQueuePanel").then((m) => ({ default: m.ExceptionQueuePanel }))
+);
+const DispatcherProfilePanel = lazyWithRetry(() =>
+  import("./components/DispatcherProfilePanel").then((m) => ({ default: m.DispatcherProfilePanel }))
+);
+const DispatcherHistoryPanel = lazyWithRetry(() =>
+  import("./components/history/DispatcherHistoryPanel").then((m) => ({ default: m.DispatcherHistoryPanel }))
+);
+
+const SCREEN_TITLES = {
+  dashboard: "Dashboard",
+  queue: "Dispatch Management",
+  active_errands: "Active errands",
+  exceptions: "Help Desk",
+  riders: "Tracking",
+  messages: "Rider Messages",
+  recent_chats: "Customer Chat History",
+  history: "Errand Transaction",
+  profile: "Your profile",
+} as const;
+
+// What each workspace needs from the dispatcher's access group. Tabs not listed
+// (tracking, chats, profile) are open to every dispatcher: chat runs on
+// Firebase and is gated by role there, not by group.
+const TAB_PERMISSION: Record<string, string> = {
+  dashboard: "queue.view",
+  queue: "queue.view",
+  active_errands: "queue.view",
+  history: "queue.view",
+  exceptions: "exceptions.resolve",
+};
+
+const TAB_LABEL: Record<string, string> = {
+  dashboard: "the Dashboard",
+  queue: "Dispatch Management",
+  active_errands: "Active Errands",
+  history: "Errand Transaction",
+  exceptions: "the Help Desk",
+};
+
+/** In place of a workspace the dispatcher's access group does not include. */
+function LockedTab({ label }: { label: string }) {
+  return (
+    <div role="status" className="flex flex-col items-center px-6 pb-10 pt-12 text-center">
+      <Lock size={20} className="mb-2.5 text-ink-muted" />
+      <p className="text-panel text-ink">Not in your access group</p>
+      <p className="mt-1.5 max-w-sm text-body text-ink-muted">
+        Your access group does not include {label}. The Main Owner can change it in Settings.
+      </p>
+    </div>
+  );
+}
+
 export default function DispatcherPortal() {
+  return (
+    <PermissionsProvider>
+      <DispatcherPortalShell />
+    </PermissionsProvider>
+  );
+}
+
+function DispatcherPortalShell() {
   const { user, logout } = useAuth();
+  const { isMobile, width } = useDeviceTier();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const access = usePermissions();
+  const accessPending = access.status === "loading" && !access.permissions && !access.legacy;
+  const canTab = (tab: string) => {
+    const key = TAB_PERMISSION[tab];
+    return !key || access.can(key);
+  };
+
+  // The screens above load on first open; fetch them in the background once
+  // the portal is idle, so opening an order or switching tabs does not wait
+  // on the network (lazyWithRetry.preloadWhenIdle). Most used first.
+  useEffect(
+    () =>
+      preloadWhenIdle([
+        OrderChatScreen,
+        DispatchManagementWorkspace,
+        RecentChatsPanel,
+        ActiveErrandsPanel,
+        ExceptionQueuePanel,
+        RiderFleetRoster,
+        DispatcherRiderMessagesPanel,
+        DispatcherHistoryPanel,
+        DispatcherProfilePanel,
+      ]),
+    []
+  );
   const {
     activeTab,
     setActiveTab,
@@ -94,7 +191,10 @@ export default function DispatcherPortal() {
     handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,
+    openChatToReply,
   } = useDispatcherPortal(user?.id, user?.name);
+  // A workspace outside the access group renders LockedTab instead.
+  const visibleTab = canTab(activeTab) ? activeTab : "locked";
 
   const handleClaimAndSelect = useCallback(async (orderId: string) => {
     try {
@@ -107,7 +207,7 @@ export default function DispatcherPortal() {
   const { riders, telemetryError: fleetTelemetryError, liveLink: fleetLiveLink } = useRiderFleetPresence({
     alertOnSignalLost: true,
   });
-  const exceptionQueue = useOpenExceptions();
+  const exceptionQueue = useOpenExceptions(undefined, !accessPending && access.can("exceptions.resolve"));
   const maintenance = useMaintenanceCheck("dispatcher");
 
   const [sidebarPhotoUri, setSidebarPhotoUri] = useState<string | null>(null);
@@ -138,9 +238,12 @@ export default function DispatcherPortal() {
   });
 
   const [selectedRiderIdForChat, setSelectedRiderIdForChat] = useState<string | null>(null);
+  const [riderChatOpenRequest, setRiderChatOpenRequest] = useState(0);
+  const [riderConversationVisible, setRiderConversationVisible] = useState(false);
 
   const handleOpenRiderChat = useCallback((riderId: string) => {
     setSelectedRiderIdForChat(riderId);
+    setRiderChatOpenRequest((request) => request + 1);
     setActiveTab("messages");
   }, [setActiveTab]);
 
@@ -153,125 +256,56 @@ export default function DispatcherPortal() {
   } = useRiderChatAlerts({
     riders,
     dispatcherId: user?.id ?? null,
-    activeRiderId: activeTab === "messages" ? selectedRiderIdForChat : null,
+    activeRiderId: activeTab === "messages" && (width >= 1024 || riderConversationVisible) ? selectedRiderIdForChat : null,
     onOpenRiderChat: handleOpenRiderChat,
   });
 
+  // A stage the order screen should open on, from the bell ("Open Stage 2").
+  const [chatJumpRequest, setChatJumpRequest] = useState<{
+    errandId: string;
+    stage: 1 | 2 | 3;
+    reason?: string;
+    nonce: number;
+  } | null>(null);
+
   useEffect(() => {
     const handleOpenErrandEvent = (e: Event) => {
-      const customEvent = e as CustomEvent<{ errandId?: string }>;
+      const customEvent = e as CustomEvent<{ errandId?: string; stage?: number; reason?: string }>;
       const errandId = customEvent.detail?.errandId;
       if (errandId) {
         markErrandAsRead(errandId);
         handleOpenChat(errandId);
+        const stage = customEvent.detail?.stage;
+        if (stage === 1 || stage === 2 || stage === 3) {
+          setChatJumpRequest({ errandId, stage, reason: customEvent.detail?.reason, nonce: Date.now() });
+        }
       }
     };
+    // A rider's chat notification opens that rider's conversation.
+    const handleOpenRiderChatEvent = (e: Event) => {
+      const riderId = (e as CustomEvent<{ riderId?: string }>).detail?.riderId;
+      if (riderId) handleOpenRiderChat(String(riderId));
+    };
     window.addEventListener("sugo:open-errand", handleOpenErrandEvent);
-    return () => window.removeEventListener("sugo:open-errand", handleOpenErrandEvent);
-  }, [handleOpenChat, markErrandAsRead]);
+    window.addEventListener("sugo:open-rider-chat", handleOpenRiderChatEvent);
+    return () => {
+      window.removeEventListener("sugo:open-errand", handleOpenErrandEvent);
+      window.removeEventListener("sugo:open-rider-chat", handleOpenRiderChatEvent);
+    };
+  }, [handleOpenChat, markErrandAsRead, handleOpenRiderChat]);
 
   const availableCount = errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE").length;
   const activeCount = errands.filter((e) => {
     const s = String(e.status).toUpperCase();
     return s !== "AVAILABLE" && s !== "CANCELLED" && s !== "COMPLETED" && s !== "DELIVERED" && s !== "PASSING BY";
   }).length;
-  /**
-   * The run the board is currently signed to.
-   *
-   * Reported up by the queue workspace, which stays the owner of its own
-   * selection. Holding it here is what lets the destination band repaint to
-   * the selected run, which the direction contract names as this surface's
-   * signature interaction and which was previously only claimed in a comment.
-   */
-  const [signedRun, setSignedRun] = useState<any | null>(null);
-
   const exceptionCount = exceptionQueue.openCount;
   const onlineRidersCount = riders.filter((r) => r.online).length;
 
-  const { isMobile } = useDeviceTier();
-
-  const mobilePrimaryTabs: MobileNavTab[] = [
-    {
-      id: "dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-      badge: (dashboardSummary?.urgentUnclaimedCount || 0) > 0 ? `${dashboardSummary?.urgentUnclaimedCount} urgent` : undefined,
-      isActive: activeTab === "dashboard",
-      onClick: () => setActiveTab("dashboard"),
-    },
-    {
-      id: "queue",
-      label: "Queue",
-      icon: <ClipboardList className="w-5 h-5" />,
-      badge: availableCount > 0 ? availableCount : undefined,
-      isActive: activeTab === "queue",
-      onClick: () => setActiveTab("queue"),
-    },
-    {
-      id: "active_errands",
-      label: "Active",
-      icon: <Bike className="w-5 h-5" />,
-      badge: totalUnreadCount > 0 ? `${totalUnreadCount} new` : activeCount > 0 ? activeCount : undefined,
-      isActive: activeTab === "active_errands",
-      onClick: () => setActiveTab("active_errands"),
-    },
-    {
-      id: "exceptions",
-      label: "Help Desk",
-      icon: <AlertTriangle className="w-5 h-5" />,
-      badge: exceptionCount > 0 ? exceptionCount : undefined,
-      isActive: activeTab === "exceptions",
-      onClick: () => setActiveTab("exceptions"),
-    },
-    {
-      id: "riders",
-      label: "Tracking",
-      icon: <Activity className="w-5 h-5" />,
-      badge: onlineRidersCount > 0 ? onlineRidersCount : undefined,
-      isActive: activeTab === "riders",
-      onClick: () => setActiveTab("riders"),
-    },
-  ];
-
-  const mobileMoreTabs: MobileNavTab[] = [
-    {
-      id: "messages",
-      label: "Rider Messages",
-      icon: <MessageSquare className="w-5 h-5" />,
-      badge: totalRiderUnreadCount > 0 ? totalRiderUnreadCount : undefined,
-      isActive: activeTab === "messages",
-      onClick: () => setActiveTab("messages"),
-      description: "Internal communication with on-duty riders",
-    },
-    {
-      id: "recent_chats",
-      label: "Customer Chats",
-      icon: <MessageCircle className="w-5 h-5" />,
-      badge: totalUnreadCount > 0 ? totalUnreadCount : undefined,
-      isActive: activeTab === "recent_chats",
-      onClick: () => setActiveTab("recent_chats"),
-      description: "Customer support inquiry logs & active chats",
-    },
-    {
-      id: "history",
-      label: "Errand Transaction",
-      icon: <History className="w-5 h-5" />,
-      isActive: activeTab === "history",
-      onClick: () => setActiveTab("history"),
-      description: "Orders you handled that were delivered or cancelled",
-    },
-    {
-      id: "profile",
-      label: "Profile & Settings",
-      icon: <BikeIcon className="w-5 h-5" />,
-      isActive: activeTab === "profile",
-      onClick: () => setActiveTab("profile"),
-      description: "Dispatcher account, security logs & active sessions",
-    },
-  ];
 
   return (
-    <>
+    // The persistent header and every workspace share one notification feed.
+    <NotificationFeedProvider>
       {maintenance.showWarningBanner && (
         <MaintenanceWarningBanner
           portal="dispatcher"
@@ -292,8 +326,19 @@ export default function DispatcherPortal() {
           customColor={maintenance.customColor}
         />
       )}
+      {maintenance.showAdvisoryModal && (
+        <LiveEditNoticeModal
+          portal="dispatcher"
+          header={maintenance.header}
+          message={maintenance.message}
+          footnote={maintenance.footnote}
+          customColor={maintenance.customColor}
+          onDismiss={() => maintenance.dismissAdvisory(false)}
+          onPermanentDismiss={() => maintenance.dismissAdvisory(true)}
+        />
+      )}
       <TooltipProvider>
-      <SidebarProvider defaultOpen={false}>
+      <SidebarProvider defaultOpen={false} className="h-dvh min-h-0">
 
         {/* data-portal marks the whole dispatcher shell, rail included. It
             carries nothing but the icon stroke: the navigation rail sits an
@@ -324,7 +369,7 @@ export default function DispatcherPortal() {
         <div
           data-surface="dispatch"
           data-portal="dispatch"
-          className="relative flex h-screen w-full overflow-hidden bg-board-ground text-ink"
+          className="relative flex h-dvh min-w-0 w-full overflow-hidden bg-board-ground text-ink"
         >
           {/* Sidebar Navigation - Sugo Midnight Navy */}
           {/* data-on-field is required now that the root carries data-surface.
@@ -332,9 +377,11 @@ export default function DispatcherPortal() {
               #0F2035, so on a #0F2035 rail it would be an invisible outline.
               This flips it to the ground. Styling only: no geometry rides on
               it, so the alignment contract is untouched. */}
-          {!isMobile && (
           <Sidebar
             data-on-field
+            data-dispatch-nav
+            surface="dispatch"
+            data-portal-nav
             collapsible="icon"
             className="border-r border-white/10 select-none"
             variant="sidebar"
@@ -366,7 +413,7 @@ export default function DispatcherPortal() {
 
                 {/* Collapsed Brand Icon Logo (Shown ONLY when collapsed) */}
                 <div className="size-9 rounded-trim bg-signal hidden group-data-[collapsible=icon]:flex items-center justify-center shrink-0 mx-auto">
-                  <BikeIcon size={20} className="text-board-plate" />
+                  <BrandMark className="w-6 text-board-plate" label="Sugo on the Go" />
                 </div>
 
                 {/* Sidebar Trigger Button */}
@@ -385,7 +432,7 @@ export default function DispatcherPortal() {
                 <SidebarGroupContent>
                   <SidebarMenu className="gap-1">
                     {/* Dashboard */}
-                    <SidebarMenuItem>
+                    <SidebarMenuItem hidden={!canTab("dashboard")}>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("dashboard")}
                         isActive={activeTab === "dashboard"}
@@ -431,12 +478,12 @@ export default function DispatcherPortal() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
 
-                    {/* Dispatcher Management (formerly Order Queue) */}
-                    <SidebarMenuItem>
+                    {/* Dispatch Management (formerly Order Queue) */}
+                    <SidebarMenuItem hidden={!canTab("queue")}>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("queue")}
                         isActive={activeTab === "queue"}
-                        tooltip={availableCount > 0 ? `Dispatcher Management (${availableCount} available)` : "Dispatcher Management"}
+                        tooltip={availableCount > 0 ? `Dispatch Management (${availableCount} available)` : "Dispatch Management"}
                         size="default"
                         className={`w-full flex items-center justify-between px-3 h-10 rounded-plate text-label transition-colors duration-200 group-data-[collapsible=icon]:rounded-trim group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:size-9! ${
                           activeTab === "queue"
@@ -457,7 +504,7 @@ export default function DispatcherPortal() {
                             )}
                           </div>
                           <span className="inline-block truncate transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:pointer-events-none overflow-hidden whitespace-nowrap">
-                            Dispatcher Management
+                            Dispatch Management
                           </span>
                         </div>
                         {availableCount > 0 && (
@@ -475,7 +522,7 @@ export default function DispatcherPortal() {
                     </SidebarMenuItem>
 
                     {/* Active Errands */}
-                    <SidebarMenuItem>
+                    <SidebarMenuItem hidden>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("active_errands")}
                         isActive={activeTab === "active_errands"}
@@ -529,7 +576,7 @@ export default function DispatcherPortal() {
                     </SidebarMenuItem>
 
                     {/* Help Desk (formerly Conflict Management, before that Needs a Decision) */}
-                    <SidebarMenuItem>
+                    <SidebarMenuItem hidden={!canTab("exceptions")}>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("exceptions")}
                         isActive={activeTab === "exceptions"}
@@ -615,7 +662,7 @@ export default function DispatcherPortal() {
                     </SidebarMenuItem>
 
                     {/* Errand Transaction (formerly Customer Transaction, before that My History): this dispatcher's delivered and cancelled orders */}
-                    <SidebarMenuItem>
+                    <SidebarMenuItem hidden={!canTab("history")}>
                       <SidebarMenuButton
                         onClick={() => setActiveTab("history")}
                         isActive={activeTab === "history"}
@@ -797,7 +844,6 @@ export default function DispatcherPortal() {
             </SidebarFooter>
             <SidebarRail />
           </Sidebar>
-          )}
 
           <Dialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
             {/* data-surface because DialogContent portals to document.body,
@@ -851,26 +897,22 @@ export default function DispatcherPortal() {
           </Dialog>
 
           {/* Main Operations Console */}
-          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full relative flex flex-col h-full min-h-0 overflow-hidden">
+          <SidebarInset className="bg-transparent shadow-none rounded-none m-0 peer-data-[variant=inset]:m-0 peer-data-[variant=inset]:rounded-none peer-data-[variant=inset]:shadow-none w-full min-w-0 relative flex flex-col h-full min-h-0 overflow-hidden">
             {isMobile && (
               <MobileHeader
                 title="SUGO Dispatch"
-                subtitle={signedRun ? formatErrandId(signedRun.id) : `${(user?.name || "Duty Dispatcher").split(" ")[0]} • Tacurong`}
+                leftElement={<SidebarTrigger aria-label="Open navigation" className="size-11 shrink-0" />}
+                subtitle={`${(user?.name || "Duty Dispatcher").split(" ")[0]} • Tacurong`}
                 rightElement={
-                  <div className="flex items-center gap-1.5">
-                    <HeaderAudioStatus />
-                    <HeaderClock />
-                    <NotificationBell />
                     <button
                       type="button"
                       onClick={() => setShowSignOutConfirm(true)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="size-11 grid place-items-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                       title="Sign Out"
                       aria-label="Sign Out"
                     >
                       <LogOut className="w-4 h-4 text-rose-400" />
                     </button>
-                  </div>
                 }
               />
             )}
@@ -880,101 +922,16 @@ export default function DispatcherPortal() {
             <main
               data-surface="dispatch"
               className={cn(
-                "flex h-screen w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4",
-                isMobile && "pb-20 pt-1"
+                "portal-main flex min-w-0 w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4 lg:p-5"
               )}
             >
-              {/* ───────────────────────────────────────────────────────────── */}
-              {/* 1. THE DESTINATION BAND (pinned)                              */}
-              {/*                                                               */}
-              {/* The shift itself, read across the room: who is on duty, the    */}
-              {/* time, and what is owed a decision right now. It replaces a     */}
-              {/* white card carrying a tinted icon chip and a 20px title, which */}
-              {/* scrolled away with the page and was the most interchangeable   */}
-              {/* element on the surface.                                        */}
-              {/* ───────────────────────────────────────────────────────────── */}
-              {activeTab === "queue" && (
-                <div
-                  data-on-field
-                  className="shrink-0 rounded-plate bg-board-field-deep px-3 py-2.5 shadow-field sm:px-4"
-                >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  {/* No SidebarTrigger here. The rail carries its own in
-                      both states, as part of the alignment contract recorded
-                      in AGENT_HANDSHAKE.md, and this was a third identical
-                      panel-left control sitting 35px from one of them. */}
-                  <div className="min-w-0">
-                    {/* The board re-signs to the selected run. With nothing
-                        picked it names itself; with a run picked it carries
-                        that run's destination and route number. This is the
-                        contract's signature interaction, and the reason the
-                        band is a board rather than a page title. */}
-                    <h1 className="truncate text-title uppercase text-board-plate">
-                      {signedRun
-                        ? signedRun.pinpoints?.[0]?.storeName ||
-                          signedRun.category ||
-                          "Dispatch Management"
-                        : "Dispatch Management"}
-                    </h1>
-                    {signedRun ? (
-                      <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-label text-board-trim">
-                        <span data-figure className="font-mono text-data text-board-plate">
-                          {formatErrandId(signedRun.id)}
-                        </span>
-                        <span className="truncate">{signedRun.customerName || "Customer"}</span>
-                        <span className="truncate">
-                          {signedRun.deliveryAddress || "Tacurong City"}
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="truncate text-label text-board-trim">
-                        {user?.name || "Duty dispatcher"} on duty, Tacurong City
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {/* What is owed a decision, at board scale. Red only when
-                        something is actually owed: on this surface red means
-                        "you must act" and nothing else. */}
-                    <div className="text-right">
-                      <p className="text-micro uppercase text-board-trim">Help Desk</p>
-                      <p
-                        data-figure
-                        className={cn(
-                          "text-board tabular-nums",
-                          exceptionQueue.openCount > 0 ? "text-signal-on-field" : "text-board-plate"
-                        )}
-                      >
-                        {exceptionQueue.isLoading || exceptionQueue.loadError
-                          ? "--"
-                          : exceptionQueue.openCount}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <HeaderAudioStatus />
-                      <HeaderClock />
-                      <NotificationBell />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Everywhere EXCEPT the exceptions tab.
-                    This rendered on all seven tabs, so a profile form
-                    announced a queue failure, and on the exceptions tab the
-                    identical sentence appeared twice 400px apart. The count
-                    above shows "--" wherever the dispatcher is, and this line
-                    is what explains that dash — but on the exceptions tab the
-                    panel itself says it in full, so the band stays quiet and
-                    lets the failing region do the talking. */}
-                {exceptionQueue.loadError ? (
-                  <p role="status" className="mt-2 text-label text-board-trim">
-                    {exceptionQueue.loadError}
-                  </p>
-                ) : null}
-              </div>
-              )}
-
+              {/* One aligned title and utility row stays mounted across tabs. */}
+              <header data-dispatcher-page-header className="flex min-h-10 shrink-0 items-center justify-between gap-3">
+                <h1 className="min-w-0 truncate text-panel uppercase text-ink sm:text-title" title={SCREEN_TITLES[activeTab]}>
+                  {SCREEN_TITLES[activeTab]}
+                </h1>
+                <DispatcherHeaderActions />
+              </header>
               {/* A failed claim, status change or decline. This is where the
                   two alert() dialogs used to interrupt the shift. */}
               {actionError ? (
@@ -1006,7 +963,16 @@ export default function DispatcherPortal() {
                   one needing an overflow of its own here; nesting that inside
                   a PanelShell scroller would have made two. */}
               <div className="min-h-0 min-w-0 flex-1">
-                {activeTab === "dashboard" && (
+                <PanelTitleVisibilityContext.Provider value={false}>
+                <Suspense key={activeTab} fallback={
+                  <div role="status" className="flex h-full items-center justify-center text-label text-ink-muted">
+                    Loading workspace...
+                  </div>
+                }>
+                {visibleTab === "locked" && (
+                  <LockedTab label={TAB_LABEL[activeTab] ?? "This workspace"} />
+                )}
+                {visibleTab === "dashboard" && (
                   <DispatcherDashboardView
                     summary={dashboardSummary}
                     isLoading={isSummaryLoading}
@@ -1021,7 +987,7 @@ export default function DispatcherPortal() {
                     onNavigateTab={(tab) => setActiveTab(tab as any)}
                   />
                 )}
-                {activeTab === "queue" && (
+                {visibleTab === "queue" && (
                   <DispatchManagementWorkspace
                     errands={errands}
                     currentUser={user}
@@ -1032,7 +998,6 @@ export default function DispatcherPortal() {
                     isLoading={isLoading}
                     loadError={loadError}
                     onRetry={fetchOrders}
-                    onSignedRunChange={setSignedRun}
                     selectedErrandId={selectedQueueErrandId}
                     onSelectErrand={(id) => {
                       if (id) {
@@ -1041,7 +1006,7 @@ export default function DispatcherPortal() {
                     }}
                   />
                 )}
-                {activeTab === "active_errands" && (
+                {visibleTab === "active_errands" && (
                   <ActiveErrandsPanel
                     errands={errands}
                     onOpenChat={handleOpenChat}
@@ -1051,8 +1016,8 @@ export default function DispatcherPortal() {
                     onRetry={fetchOrders}
                   />
                 )}
-                {activeTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
-                {activeTab === "riders" && (
+                {visibleTab === "exceptions" && <ExceptionQueuePanel queue={exceptionQueue} />}
+                {visibleTab === "riders" && (
                   <RiderFleetRoster
                     riders={riders}
                     telemetryError={fleetTelemetryError}
@@ -1060,12 +1025,14 @@ export default function DispatcherPortal() {
                     liveLink={fleetLiveLink}
                   />
                 )}
-                {activeTab === "messages" && (
+                {visibleTab === "messages" && (
                   <DispatcherRiderMessagesPanel
                     errands={errands}
                     riders={riders}
                     dispatcher={user}
                     selectedRiderId={selectedRiderIdForChat}
+                    openRequest={riderChatOpenRequest}
+                    onConversationVisibleChange={setRiderConversationVisible}
                     onSelectRiderId={(rId) => {
                       setSelectedRiderIdForChat(rId);
                       markRiderAsRead(rId);
@@ -1073,16 +1040,22 @@ export default function DispatcherPortal() {
                     unreadCounts={riderUnreadCounts}
                   />
                 )}
-                {activeTab === "recent_chats" && (
+                {visibleTab === "recent_chats" && (
                   <RecentChatsPanel
                     errands={errands}
                     onOpenChat={handleOpenChat}
+                    // The sidebar's unread count, row by row, so it leads somewhere.
+                    unreadCounts={unreadCounts}
+                    onReply={(id) => {
+                      markErrandAsRead(id);
+                      openChatToReply(id);
+                    }}
                     isLoading={isLoading}
                     loadError={loadError}
                     onRetry={fetchOrders}
                   />
                 )}
-                {activeTab === "history" && (
+                {visibleTab === "history" && (
                   <DispatcherHistoryPanel
                     errands={errands}
                     currentUserId={user?.id}
@@ -1092,7 +1065,9 @@ export default function DispatcherPortal() {
                     onRetry={fetchOrders}
                   />
                 )}
-                {activeTab === "profile" && <DispatcherProfilePanel />}
+                {visibleTab === "profile" && <DispatcherProfilePanel />}
+                </Suspense>
+                </PanelTitleVisibilityContext.Provider>
               </div>
             </main>
           
@@ -1100,7 +1075,22 @@ export default function DispatcherPortal() {
               steps. Opening it accepts the order (onVerify), so there is no
               return-to-queue from inside it any more. */}
           {selectedErrandId && (
+            <Suspense fallback={
+              <Dialog open onOpenChange={(open) => { if (!open) handleCloseChat(); }}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Loading order</DialogTitle>
+                  </DialogHeader>
+                  <DialogDescription role="status">The order workspace is loading.</DialogDescription>
+                  <DispatcherButton variant="secondary" onClick={handleCloseChat}>Close</DispatcherButton>
+                </DialogContent>
+              </Dialog>
+            }>
             <OrderChatScreen
+              // A fresh screen per errand. Switching errands in place (a
+              // notification opened over another order) kept the previous
+              // order's details and item list until the new ones loaded.
+              key={selectedErrandId}
               orderId={selectedErrandId}
               dispatcher={user}
               onClose={handleCloseChat}
@@ -1114,12 +1104,11 @@ export default function DispatcherPortal() {
                 await handleDeclineOrder(id, reason);
                 handleCloseChat();
               }}
+              jumpRequest={chatJumpRequest?.errandId === selectedErrandId ? chatJumpRequest : null}
             />
+            </Suspense>
           )}
 
-          {isMobile && (
-            <MobileBottomNav primaryTabs={mobilePrimaryTabs} moreTabs={mobileMoreTabs} />
-          )}
           <ScrollToTopButton />
           <CustomerChatToastContainer
             toasts={activeToasts}
@@ -1138,6 +1127,6 @@ export default function DispatcherPortal() {
       </div>
     </SidebarProvider>
       </TooltipProvider>
-    </>
+    </NotificationFeedProvider>
   );
 }

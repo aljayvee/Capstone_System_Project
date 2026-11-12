@@ -310,41 +310,41 @@ export const SysAdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       {/* 15-Minute Idle Warning Modal */}
       {showIdleWarning && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#0F1A30] border border-amber-500/40 rounded-xl p-6 shadow-2xl animate-fade-in text-white">
+        <div data-surface="sysadmin" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-board-plate border border-status-waiting-ink/30 rounded-xl p-6 shadow-2xl animate-fade-in text-ink">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <div className="w-10 h-10 rounded-lg bg-status-waiting-fill border border-status-waiting-ink/30 flex items-center justify-center text-status-waiting-ink">
                 <Clock className="w-5 h-5 animate-pulse" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">Session Inactivity Warning</h3>
-                <p className="text-xs text-slate-400">High-privilege console security timeout</p>
+                <h3 className="text-base font-bold text-ink">Session Inactivity Warning</h3>
+                <p className="text-xs text-ink-muted">High-privilege console security timeout</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+            <p className="text-xs text-ink leading-relaxed mb-4">
               You have been inactive for over 13 minutes. To protect sensitive infrastructure resources, your administrator session will automatically terminate in:
             </p>
 
-            <div className="bg-[#0B132B] border border-slate-700/80 rounded-lg py-3 text-center mb-5">
-              <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
+            <div className="bg-board-ground border border-edge rounded-lg py-3 text-center mb-5">
+              <span className="text-2xl font-mono font-bold text-status-waiting-ink tracking-wider">
                 {Math.floor(countdownSeconds / 60)}:{(countdownSeconds % 60).toString().padStart(2, "0")}
               </span>
-              <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-semibold">Remaining time before auto-logout</p>
+              <p className="text-[10px] text-ink-muted mt-1 uppercase tracking-wider font-semibold">Remaining time before auto-logout</p>
             </div>
 
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={logout}
-                className="flex-1 py-2.5 rounded-lg border border-slate-700 text-xs font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                className="flex-1 py-2.5 rounded-lg border border-edge text-xs font-medium text-ink hover:bg-board-ground transition-colors"
               >
                 Sign Out Now
               </button>
               <button
                 type="button"
                 onClick={resetActivity}
-                className="flex-1 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-semibold text-white shadow-lg shadow-red-900/40 transition-colors"
+                className="flex-1 py-2.5 rounded-lg bg-signal hover:bg-signal-deep text-xs font-semibold text-white shadow-lg shadow-red-900/40 transition-colors"
               >
                 Stay Logged In
               </button>

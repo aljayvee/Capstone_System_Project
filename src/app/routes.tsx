@@ -1,11 +1,11 @@
 import React, { Suspense } from "react";
 import { createBrowserRouter } from "react-router";
-import LoginPage from "../components/LoginPage";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { GuestRoute } from "../components/GuestRoute";
 import { lazyWithRetry } from "../utils/lazyWithRetry";
 import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 
+const LoginPage = lazyWithRetry(() => import("../components/LoginPage"));
 const OwnerPortal = lazyWithRetry(() => import("../portals/owner/OwnerPortal"));
 const DispatcherPortal = lazyWithRetry(() => import("../portals/dispatcher/DispatcherPortal"));
 const PlacesDirectoryScreen = lazyWithRetry(() => import("../portals/owner/screens/PlacesDirectoryScreen"));
@@ -46,7 +46,9 @@ export const router = createBrowserRouter([
     path: "/",
     element: (
       <GuestRoute>
-        <LoginPage />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <LoginPage />
+        </Suspense>
       </GuestRoute>
     ),
     errorElement: <RouteErrorBoundary />,

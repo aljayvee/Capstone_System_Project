@@ -23,13 +23,13 @@ import { CategoryRowCard } from "./components/CategoryCard";
 import PlacesTab from "./components/PlacesTab";
 import { ArchiveTab, type ArchivedPlace } from "./components/ArchiveTab";
 import { ConfirmDialog } from "@/components/panel";
-import { NotificationBell } from "../../../../components/NotificationBell";
-import { HeaderClock } from "../../../../components/HeaderClock";
+import { CategoryListSkeleton } from "../../components/OwnerSkeletons";
+import { OwnerPageHeader } from "../../components/OwnerPageHeader";
 
 type CategorySortOption =
   "name-asc" | "name-desc" | "stores-desc" | "stores-asc" | "newest" | "oldest";
 
-export const MerchantCategoryModule: React.FC = () => {
+export const MerchantCategoryModule: React.FC<{ navigationVersion?: number }> = ({ navigationVersion }) => {
   const [categories, setCategories] = useState<ApiMerchantCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -38,6 +38,9 @@ export const MerchantCategoryModule: React.FC = () => {
   const [sortBy, setSortBy] = useState<CategorySortOption>("name-asc");
 
   const [activeTab, setActiveTab] = useState<"categories" | "places" | "archive">("categories");
+  useEffect(() => {
+    setActiveTab("categories");
+  }, [navigationVersion]);
   /**
    * Retired stores, fetched here rather than inside the Archive tab so the tab
    * badge can show a count before anyone opens it - an archive nobody knows has
@@ -231,17 +234,9 @@ export const MerchantCategoryModule: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────── */}
       {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-hairline pb-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="truncate text-title uppercase text-ink">Merchants Category</h1>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          <HeaderClock />
-          <NotificationBell />
-          {activeTab === "categories" && (
+      <div className="owner-merchants-header-enter shrink-0 border-b border-hairline pb-3 pt-1">
+        <OwnerPageHeader title="Merchant Categories" controls={
+          activeTab === "categories" && (
             <button
               onClick={() => setShowAddForm(true)}
               className="flex items-center gap-1.5 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 py-2 rounded-plate transition ml-1"
@@ -249,8 +244,8 @@ export const MerchantCategoryModule: React.FC = () => {
               <Plus size={15} />
               <span>Add Category</span>
             </button>
-          )}
-        </div>
+          )
+        } />
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
@@ -267,6 +262,7 @@ export const MerchantCategoryModule: React.FC = () => {
           answered. */}
       <OwnerTabs
         label="Merchant category view"
+        className="owner-merchants-tabs-enter"
         idPrefix="merchants"
         active={activeTab}
         onChange={(id) => setActiveTab(id)}
@@ -302,13 +298,14 @@ export const MerchantCategoryModule: React.FC = () => {
           OwnerTabs' aria-controls resolves to a real element. */}
       {activeTab === "categories" ? (
         <div
+          key={activeTab}
           role="tabpanel"
           id="merchants-panel-categories"
           aria-labelledby="merchants-tab-categories"
-          className="flex-1 min-h-0 bg-board-plate rounded-plate border border-edge flex flex-col overflow-hidden"
+          className="owner-merchants-panel-enter flex-1 min-h-0 flex flex-col overflow-hidden"
         >
           {/* Search & Sort Header Bar */}
-          <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
+          <div className="shrink-0 py-3 border-b border-hairline flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             <div className="relative flex-1">
               <Search
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted"
@@ -320,12 +317,12 @@ export const MerchantCategoryModule: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search category name or description..."
-                className="w-full pl-9 pr-4 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field transition"
+                className="w-full pl-9 pr-4 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-field-ink transition"
               />
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              <div className="flex items-center gap-1.5 bg-board-plate border border-edge px-3 py-1.5 rounded-plate">
+              <div className="flex items-center gap-1.5 px-1 py-1.5">
                 <ArrowUpDown size={14} className="text-ink-muted" />
                 <span className="text-label text-ink-muted">Sort:</span>
                 <select
@@ -354,10 +351,7 @@ export const MerchantCategoryModule: React.FC = () => {
 
           {/* Category Rows List */}
           {isLoading ? (
-            <div className="flex-1 min-h-0 p-12 text-center text-ink-muted space-y-3 flex flex-col items-center justify-center">
-              <Loader2 size={28} className="animate-spin text-board-field" />
-              <p className="text-body">Loading merchant categories...</p>
-            </div>
+            <CategoryListSkeleton />
           ) : categories.length === 0 && loadError ? (
             <div className="flex-1 min-h-0 p-12 text-center space-y-3 flex flex-col items-center justify-center">
               <AlertCircle size={22} className="text-status-act-ink" />
@@ -367,7 +361,7 @@ export const MerchantCategoryModule: React.FC = () => {
               </p>
               <button
                 onClick={loadCategories}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-white transition-colors hover:bg-signal-deep"
               >
                 <RotateCcw size={14} />
                 <span>Try again</span>
@@ -399,19 +393,31 @@ export const MerchantCategoryModule: React.FC = () => {
         </div>
       ) : activeTab === "places" ? (
         <div
+          key={activeTab}
           role="tabpanel"
           id="merchants-panel-places"
           aria-labelledby="merchants-tab-places"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          className="owner-merchants-panel-enter flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <PlacesTab categories={categories} preSelectedCategory={selectedCategoryForPlaces} />
+          <PlacesTab
+            categories={categories}
+            preSelectedCategory={selectedCategoryForPlaces}
+            // The same directory the Archive tab reads: a store archived in
+            // the form is in the Archive, and counted there, without a reload.
+            onPlacesChanged={(all) => {
+              setArchivedPlaces(all.filter((p) => !p.isActive));
+              setArchivedPlacesError(null);
+              setIsLoadingArchivedPlaces(false);
+            }}
+          />
         </div>
       ) : (
         <div
+          key={activeTab}
           role="tabpanel"
           id="merchants-panel-archive"
           aria-labelledby="merchants-tab-archive"
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+          className="owner-merchants-panel-enter flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           <ArchiveTab
             categories={categories}
@@ -462,7 +468,7 @@ export const MerchantCategoryModule: React.FC = () => {
                   value={newCatName}
                   onChange={(e) => setNewCatName(e.target.value)}
                   placeholder="e.g. Bakeries & Pastries, Hardware & Construction"
-                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition"
                 />
               </div>
 
@@ -473,7 +479,7 @@ export const MerchantCategoryModule: React.FC = () => {
                   value={newCatDesc}
                   onChange={(e) => setNewCatDesc(e.target.value)}
                   placeholder="Describe the types of items, partner shops, and services included in this category..."
-                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-board-field focus:bg-board-plate transition resize-none"
+                  className="w-full bg-board-ground border border-edge rounded-plate px-3.5 py-2 text-ink text-body outline-none focus:ring-2 focus:ring-field-ink focus:bg-board-plate transition resize-none"
                 />
               </div>
 

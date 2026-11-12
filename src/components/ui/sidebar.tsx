@@ -23,7 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { PanelLeftIcon } from "lucide-react"
+import { MenuIcon, PanelLeftIcon, XIcon } from "lucide-react"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -78,6 +78,11 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+
+  // A drawer opened on a phone must not reappear after visiting desktop.
+  React.useEffect(() => {
+    if (!isMobile) setOpenMobile(false)
+  }, [isMobile])
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -166,11 +171,14 @@ function Sidebar({
   className,
   children,
   dir,
+  surface,
+  style,
   ...props
-}: React.ComponentProps<"div"> & {
+}: React.ComponentPropsWithoutRef<"div"> & {
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  surface?: "owner" | "dispatch"
 }) {
   const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar()
 
@@ -182,6 +190,7 @@ function Sidebar({
           "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
           className
         )}
+        style={style}
         {...props}
       >
         {children}
@@ -191,26 +200,40 @@ function Sidebar({
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
+      <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+        {openMobile && <SheetContent
           dir={dir}
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          data-surface={surface}
+          className={cn("portal-mobile-drawer gap-0 bg-(--sidebar-background) p-0 text-white", className)}
+          showCloseButton={false}
+          finalFocus={() => document.querySelector<HTMLElement>('[data-mobile-header] [data-sidebar="trigger"]')}
           style={
             {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              ...style,
+              "--color-board-trim": "#B8CAD7",
+              "--sidebar-width": `min(${SIDEBAR_WIDTH_MOBILE}, calc(100vw - 2rem))`,
+              width: "var(--sidebar-width)",
             } as React.CSSProperties
           }
           side={side}
+          {...props}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>Navigation</SheetTitle>
+            <SheetDescription>Choose a workspace.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
+          <div className="flex shrink-0 justify-end px-3 pt-[max(.5rem,env(safe-area-inset-top))]">
+            <button type="button" aria-label="Close navigation" className="grid size-11 place-items-center rounded-trim hover:bg-white/10" onClick={() => setOpenMobile(false)}><XIcon size={20} /></button>
+          </div>
+          <div className="flex min-h-0 w-full flex-1 flex-col pb-[env(safe-area-inset-bottom)]" onClick={(event) => {
+            const destination = (event.target as HTMLElement).closest('button, a')
+            if (destination && !destination.hasAttribute('disabled') && !destination.hasAttribute('data-sidebar')) setOpenMobile(false)
+            if (destination?.getAttribute('data-sidebar') === 'menu-button') setOpenMobile(false)
+          }}>{children}</div>
+        </SheetContent>}
       </Sheet>
     )
   }
@@ -247,6 +270,7 @@ function Sidebar({
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
           className
         )}
+        style={style}
         {...props}
       >
         <div
@@ -266,7 +290,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile, openMobile } = useSidebar()
 
   return (
     <Button
@@ -275,13 +299,15 @@ function SidebarTrigger({
       variant="ghost"
       size="icon-sm"
       className={cn(className)}
+      aria-expanded={isMobile ? openMobile : undefined}
+      aria-haspopup={isMobile ? "dialog" : undefined}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeftIcon />
+      {isMobile ? <MenuIcon /> : <PanelLeftIcon />}
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
@@ -520,6 +546,7 @@ function SidebarMenuButton({
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const { isMobile, state } = useSidebar()
+  const showTooltip = Boolean(tooltip) && !isMobile && state === "collapsed"
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -528,7 +555,7 @@ function SidebarMenuButton({
       },
       props
     ),
-    render: !tooltip ? render : <TooltipTrigger render={render} />,
+    render: showTooltip ? <TooltipTrigger render={render} /> : render,
     state: {
       slot: "sidebar-menu-button",
       sidebar: "menu-button",
@@ -537,7 +564,7 @@ function SidebarMenuButton({
     },
   })
 
-  if (!tooltip) {
+  if (!showTooltip) {
     return comp
   }
 

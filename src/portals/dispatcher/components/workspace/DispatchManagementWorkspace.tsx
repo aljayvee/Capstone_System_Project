@@ -3,10 +3,9 @@ import { cn } from "@/lib/utils";
 import { Errand } from "../../../../types/errand";
 import { apiClient } from "../../../../services/apiClient";
 import { postUnderReview } from "../../../../services/chatSystemMessages";
-import { useRiderFleetPresence } from "../../../../hooks/useRiderFleetPresence";
-import { DispatchKpiCards } from "./DispatchKpiCards";
 import { DispatchMasterStream } from "./DispatchMasterStream";
 import { DispatchDetailInspector } from "./DispatchDetailInspector";
+import { PanelShell } from "@/components/panel/PanelShell";
 
 interface DispatchManagementWorkspaceProps {
   errands: Errand[];
@@ -19,12 +18,6 @@ interface DispatchManagementWorkspaceProps {
   isLoading?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
-  /**
-   * Reports which run is selected so the destination band can re-sign to it.
-   * The contract's signature interaction: picking a run repaints the board's
-   * own header, which is what makes the band a board rather than a title.
-   */
-  onSignedRunChange?: (errand: Errand | null) => void;
   selectedErrandId?: string | null;
   onSelectErrand?: (id: string | null) => void;
 }
@@ -46,11 +39,9 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   isLoading = false,
   loadError = null,
   onRetry,
-  onSignedRunChange,
   selectedErrandId: externalSelectedErrandId,
   onSelectErrand,
 }) => {
-  const { riders } = useRiderFleetPresence();
   // Below the side-by-side breakpoint the board and the run share the screen
   // one at a time. Stacking them was the old behaviour and it did not work:
   // the columns carried `min-h-[580px]` and `min-h-[400px]`, so a tablet got
@@ -87,10 +78,25 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
   }, []);
 
   // Filter pools
-  const availableErrands = useMemo(
-    () => errands.filter((e) => String(e.status).toUpperCase() === "AVAILABLE"),
-    [errands]
-  );
+  // Incoming is first in, first out: the run that has waited longest sits on
+  // top and is the one auto-selected. Sorted here rather than taken from the
+  // array, because the server sends newest first (Recent Chats and the Active
+  // panel rely on that) and live `order:new` events prepend.
+  const availableErrands = useMemo(() => {
+    const placedAt = (e: Errand) => {
+      const t = Date.parse(e.createdAt);
+      // An unreadable time goes to the back rather than jumping the queue.
+      return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+    };
+    return errands
+      .filter((e) => String(e.status).toUpperCase() === "AVAILABLE")
+      .sort((a, b) => {
+        const ta = placedAt(a);
+        const tb = placedAt(b);
+        if (ta !== tb) return ta < tb ? -1 : 1;
+        return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+      });
+  }, [errands]);
 
   const activeErrands = useMemo(
     () =>
@@ -187,12 +193,6 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
     [errands, selectedErrandId]
   );
 
-  // Reported up rather than lifted: the workspace stays the owner of its own
-  // selection, and the band becomes a reader of it.
-  useEffect(() => {
-    onSignedRunChange?.(selectedErrand);
-  }, [selectedErrand, onSignedRunChange]);
-
   // Claim & review flow
   const handleClaimAndReview = async (errand: Errand) => {
     const id = String(errand.id);
@@ -226,8 +226,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
       onSelectErrand={(e) => {
         setSelectedErrandId(e.id);
         onSelectErrand?.(e.id);
-        // Picking a run re-signs the board. On a narrow screen that means
-        // handing the screen to the run itself.
+        // On a narrow screen, picking a run opens its detail pane.
         setNarrowPane("run");
       }}
       searchQuery={searchQuery}
@@ -266,16 +265,8 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
     // This was `h-[calc(100vh-250px)] min-h-[580px]`, a guess about the height
     // of a header this component cannot see, with a floor that guaranteed
     // overflow on a 1280x720 laptop and on every tablet.
-    <div className="flex h-full min-h-0 w-full flex-col gap-3">
-      <DispatchKpiCards
-        awaitingCount={availableErrands.length}
-        activeCount={activeErrands.length}
-        totalRiders={riders.length}
-        onlineRiders={riders.filter((r) => r.online).length}
-        isLoading={isLoading}
-        isStale={Boolean(loadError)}
-      />
-
+    <PanelShell title="Dispatch Management" headingLevel="h1" scrollable={false}>
+    <div className="flex h-full min-h-0 w-full flex-col gap-4">
       {/* Narrow: one pane at a time, switched here. */}
       <div className="flex shrink-0 items-center gap-1 rounded-plate border border-edge bg-board-plate p-1 lg:hidden">
         <button
@@ -310,7 +301,7 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
       {/* The documented ratio, expressed as the documented ratio. This was
           `lg:grid-cols-12` with a 5/7 split, which is 41.7/58.3, not the
           38/62 AGENTS.md 8.30 specifies. */}
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[38fr_62fr]">
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[38fr_62fr]">
         {/* min-w-0 on both, not just min-h-0. A grid item defaults to
             min-width:auto, so a pane whose content is wider than its track
             refuses to shrink and pushes the whole page into horizontal
@@ -324,5 +315,6 @@ export const DispatchManagementWorkspace: React.FC<DispatchManagementWorkspacePr
         </div>
       </div>
     </div>
+    </PanelShell>
   );
 };

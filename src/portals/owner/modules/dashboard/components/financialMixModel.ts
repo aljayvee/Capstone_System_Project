@@ -20,7 +20,7 @@ export interface MixBar {
 
 export function feeBars(commission: Commission): MixBar[] {
   return [
-    { name: "Sugo's share", amount: commission?.businessShare ?? 0, fill: "#1E3A5F" },
+    { name: "Sugo's share", amount: commission?.businessShare ?? 0, fill: "var(--color-field-ink)" },
     { name: "Rider's share", amount: commission?.riderShare ?? 0, fill: "#10B981" },
   ];
 }

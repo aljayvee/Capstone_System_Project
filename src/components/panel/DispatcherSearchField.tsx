@@ -44,7 +44,7 @@ export function DispatcherSearchField(props: DispatcherSearchFieldProps) {
   const { mode = "filter", className, ...inputProps } = props;
 
   const input = (
-    <div className="relative flex-1">
+    <div className="relative min-w-0 flex-1">
       <Search
         size={15}
         className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
@@ -55,7 +55,7 @@ export function DispatcherSearchField(props: DispatcherSearchFieldProps) {
         // focus ring is the console's single themed :focus-visible outline
         // from surfaces.css rather than a per-field glow.
         className={cn(
-          "w-full min-h-9 rounded-plate border border-edge bg-board-ground pl-9 text-label text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate",
+          "w-full min-h-9 rounded-plate border border-edge bg-board-ground pl-9 text-label text-ink placeholder:text-ink-muted transition-colors focus:border-field-ink focus:bg-board-plate",
           mode === "submit" ? "pr-10" : "pr-3",
           className,
         )}

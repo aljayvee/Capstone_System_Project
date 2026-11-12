@@ -100,7 +100,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
       className={cn(
         "block w-full cursor-pointer rounded-plate px-4 py-3 text-left transition-all duration-150",
         isSelected
-          ? "border-l-4 border-l-signal border-t border-r border-b border-board-field bg-board-field shadow-sm"
+          ? "border-l-4 border-l-board-field border-t border-r border-b border-edge bg-[#EAF2F8]"
           : "border border-edge bg-board-plate hover:border-board-trim hover:bg-board-ground/30"
       )}
     >
@@ -108,10 +108,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <h3
-            className={cn(
-              "truncate text-title font-bold uppercase tracking-tight",
-              isSelected ? "text-board-plate" : "text-ink"
-            )}
+            className="truncate text-title font-bold uppercase tracking-tight text-ink"
           >
             {customerDisplayName}
           </h3>
@@ -133,13 +130,7 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
           data-figure
           className={cn(
             "shrink-0 font-mono text-label font-semibold tabular-nums",
-            isWaitingTooLong
-              ? isSelected
-                ? "text-signal-on-field"
-                : "text-status-act-ink"
-              : isSelected
-                ? "text-board-trim"
-                : "text-ink-muted"
+            isWaitingTooLong ? "text-status-act-ink" : "text-ink-muted"
           )}
         >
           {timeLabel}
@@ -150,18 +141,12 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
       <div className="mt-1 flex items-center justify-between gap-3">
         <span
           data-figure
-          className={cn(
-            "shrink-0 font-mono text-data font-bold tabular-nums tracking-wide",
-            isSelected ? "text-board-plate" : "text-ink"
-          )}
+          className="shrink-0 font-mono text-data font-bold tabular-nums tracking-wide text-ink"
         >
           {formatErrandId(errand.id)}
         </span>
         <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-right text-label font-medium",
-            isSelected ? "text-board-plate/90" : "text-ink-muted"
-          )}
+          className="min-w-0 flex-1 truncate text-right text-label font-medium text-ink-muted"
         >
           {secondaryStoreLabel}
         </span>
@@ -169,27 +154,21 @@ export const DispatchErrandCard: React.FC<DispatchErrandCardProps> = ({
 
       {/* Drop-off and state. Separated by a rule rather than a second box. */}
       <div
-        className={cn(
-          "mt-2.5 flex items-center justify-between gap-3 border-t pt-2.5",
-          isSelected ? "border-field-line" : "border-hairline"
-        )}
+        className="mt-2.5 flex items-center justify-between gap-3 border-t border-hairline pt-2.5"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span
-            className={cn(
-              "truncate text-label font-medium",
-              isSelected ? "text-board-plate/90" : "text-ink"
-            )}
+            className="truncate text-label font-medium text-ink"
           >
             {errand.deliveryAddress || "Tacurong City"}
           </span>
           <span
             data-figure
-            className={cn("text-label font-medium", isSelected ? "text-board-trim" : "text-ink-muted")}
+            className="text-label font-medium text-ink-muted"
           >
             {itemCount > 0 ? `${itemCount} item${itemCount > 1 ? "s" : ""}` : "General errand"}
             {" · "}
-            <span className={cn("font-mono font-semibold tabular-nums", isSelected ? "text-board-plate" : "text-ink")}>
+            <span className="font-mono font-semibold tabular-nums text-ink">
               {formatPeso(totalDisplay)}
             </span>
             {errand.totalCost ? "" : " fee"}

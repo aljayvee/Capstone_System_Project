@@ -1,0 +1,24 @@
+[
+  {
+    "role": "dispatcher",
+    "viewport": "390x844",
+    "liveAssets": true,
+    "privateApi": "isolated fixtures; no production API or websocket traffic",
+    "layout": "passed",
+    "drawer": "passed",
+    "focusAndResize": "passed",
+    "notifications": "passed",
+    "uncaughtErrors": []
+  },
+  {
+    "role": "owner",
+    "viewport": "390x844",
+    "liveAssets": true,
+    "privateApi": "isolated fixtures; no production API or websocket traffic",
+    "layout": "passed",
+    "drawer": "passed",
+    "focusAndResize": "passed",
+    "notifications": "passed",
+    "uncaughtErrors": []
+  }
+]

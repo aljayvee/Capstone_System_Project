@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUGO System Portal — Login Screen & Alert Redesign Proposals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0A0F1D;
+      --card: #131B2E;
+      --border: rgba(255, 255, 255, 0.08);
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --primary: #E53935;
+      --accent-blue: #38BDF8;
+      --accent-amber: #F59E0B;
+      --accent-emerald: #10B981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 32px 20px 80px;
+      line-height: 1.5;
+    }
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 36px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(229, 57, 53, 0.12);
+      border: 1px solid rgba(229, 57, 53, 0.25);
+      border-radius: 9999px;
+      color: #FF6B6B;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    p.sub {
+      color: var(--text-muted);
+      font-size: 15px;
+      max-width: 650px;
+      margin: 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto 48px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .img-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      overflow: hidden;
+    }
+    .img-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .content {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+    .opt-tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-blue);
+      margin-bottom: 4px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    p.desc {
+      color: var(--text-muted);
+      font-size: 13.5px;
+      margin-bottom: 16px;
+      flex-grow: 1;
+    }
+    .specs {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      font-size: 12px;
+      color: #CBD5E1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .spec-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+    }
+    .section-title {
+      max-width: 1200px;
+      margin: 40px auto 20px;
+      font-size: 22px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .full-card {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+    .full-card .img-container {
+      aspect-ratio: 16 / 9;
+    }
+    .full-card .content {
+      padding: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="badge">Design Proposals & Architecture</div>
+    <h1>SUGO System Portal Login Redesign</h1>
+    <p class="sub">3 modern architectural layouts and a unified multi-tier alert & warning design system for Tacurong City logistics and dispatch operations.</p>
+  </div>
+
+  <div class="grid">
+    <!-- Option 1 -->
+    <div class="card">
+      <div class="img-container">
+        <img src="/preview/login_split_screen.jpg" alt="Option 1: Split-Screen Editorial">
+      </div>
+      <div class="content">
+        <span class="opt-tag">Layout Option 1 (Recommended)</span>
+        <h2>Split-Screen Editorial Deck</h2>
+        <p class="desc">Left side features deep navy Tacurong GIS topography branding and live server health beacon. Right side hosts the focused, high-density authentication console with prominent warning banners.</p>
+        <div class="specs">
+          <div class="spec-item"><span class="dot"></span> 50/50 Dual-Pane Split (Brand Storytelling + Precision Form)</div>
+          <div class="spec-item"><span class="dot"></span> Prominent contextual error card above form</div>
+          <div class="spec-item"><span class="dot"></span> Optimal for dispatchers on desktop & wide screens</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 2 -->
+    <div class="card">
+      <div class="img-container">
+        <img src="/preview/login_floating_glass.jpg" alt="Option 2: Floating Command Glass">
+      </div>
+      <div class="content">
+        <span class="opt-tag">Layout Option 2</span>
+        <h2>Floating Command Glass</h2>
+        <p class="desc">Centered translucent dark-mode glass card with crisp 1px borders on subtle ambient backdrop. Designed with linear ergonomics and dedicated countdown cooldown alert cards.</p>
+        <div class="specs">
+          <div class="spec-item"><span class="dot"></span> Centered compact footprint (macOS HIG glass aesthetics)</div>
+          <div class="spec-item"><span class="dot"></span> Built-in security cooldown & rate-limit alert block</div>
+          <div class="spec-item"><span class="dot"></span> Minimalist, distraction-free authentication experience</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 3 -->
+    <div class="card">
+      <div class="img-container">
+        <img src="/preview/login_operator_deck.jpg" alt="Option 3: High-Density Operator Console">
+      </div>
+      <div class="content">
+        <span class="opt-tag">Layout Option 3</span>
+        <h2>High-Density Operator Console</h2>
+        <p class="desc">Top navigation ribbon with live real-time clock and SSL encryption verification. Central high-contrast elevated card with integrated mobile-only role redirection notice.</p>
+        <div class="specs">
+          <div class="spec-item"><span class="dot"></span> Top status ribbon with live synchronization clock</div>
+          <div class="spec-item"><span class="dot"></span> Dedicated inline mobile-role redirect card with QR code</div>
+          <div class="spec-item"><span class="dot"></span> High contrast Swiss-style operational interface</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span>Unified Alert & Error Design System (All Layouts)</span>
+  </div>
+
+  <div class="full-card">
+    <div class="img-container">
+      <img src="/preview/login_alert_states.jpg" alt="Alert and Error States Design System">
+    </div>
+    <div class="content">
+      <h2>4-Tier Warning, Error & Security Feedback Architecture</h2>
+      <p class="desc">Every alert state is structurally differentiated by severity, visual grammar, and actionable recovery cues rather than generic red error text.</p>
+      <div class="specs" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+        <div><strong>1. Critical Error:</strong> Red accent hairline with icon, concise message, and 1-tap retry button.</div>
+        <div><strong>2. Security Cooldown:</strong> Amber/Orange theme with live countdown timer pill for 429 rate limits.</div>
+        <div><strong>3. Role Notice:</strong> Blue informational card for Rider/Customer accounts with QR code link.</div>
+        <div><strong>4. In-Field Micro-Alert:</strong> Inline boundary validation preventing invalid submission before API calls.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

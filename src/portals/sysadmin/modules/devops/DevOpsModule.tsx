@@ -52,10 +52,10 @@ export const DevOpsModule: React.FC = () => {
       {/* Module Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-white tracking-wide">
+          <h2 className="text-base font-bold text-ink tracking-wide">
             {t("devopsHeaderTitle")}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5">
             {t("devopsHeaderSubtitle")}
           </p>
         </div>
@@ -64,22 +64,22 @@ export const DevOpsModule: React.FC = () => {
           <button
             onClick={fetchTelemetry}
             disabled={isLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F1A30] hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition-colors self-start sm:self-auto"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-board-plate hover:bg-board-ground border border-edge text-xs font-medium text-ink transition-colors self-start sm:self-auto"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-red-400" : "text-slate-400"}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-status-act-ink" : "text-ink-muted"}`} />
             <span>Refresh</span>
           </button>
         )}
       </div>
 
       {/* Top 5-Tab Navigation Bar */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-edge pb-3">
         <button
           onClick={() => setActiveTab("telemetry")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "telemetry"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Activity className="w-4 h-4" />
@@ -90,8 +90,8 @@ export const DevOpsModule: React.FC = () => {
           onClick={() => setActiveTab("services")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "services"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Power className="w-4 h-4" />
@@ -102,8 +102,8 @@ export const DevOpsModule: React.FC = () => {
           onClick={() => setActiveTab("backups")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "backups"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Database className="w-4 h-4" />
@@ -114,8 +114,8 @@ export const DevOpsModule: React.FC = () => {
           onClick={() => setActiveTab("logs")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "logs"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Terminal className="w-4 h-4" />
@@ -126,8 +126,8 @@ export const DevOpsModule: React.FC = () => {
           onClick={() => setActiveTab("alerts")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "alerts"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Bell className="w-4 h-4" />
@@ -138,8 +138,8 @@ export const DevOpsModule: React.FC = () => {
           onClick={() => setActiveTab("releases")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "releases"
-              ? "bg-red-600 text-white font-semibold shadow-sm"
-              : "bg-[#0F1A30] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
           }`}
         >
           <Smartphone className="w-4 h-4" />
@@ -149,12 +149,12 @@ export const DevOpsModule: React.FC = () => {
 
       {/* Global Error Banner */}
       {error && (
-        <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/60 text-xs text-red-300 flex items-center justify-between">
+        <div className="p-4 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-status-act-ink shrink-0" />
             <span>{error}</span>
           </div>
-          <button onClick={fetchTelemetry} className="underline text-red-400 hover:text-red-300">
+          <button onClick={fetchTelemetry} className="underline text-status-act-ink hover:text-status-act-ink">
             Retry
           </button>
         </div>

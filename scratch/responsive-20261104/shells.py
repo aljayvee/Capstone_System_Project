@@ -1,0 +1,17 @@
+from edits import edit,root
+for role,portal in [('dispatcher','Dispatcher'),('owner','Owner')]:
+ name=f'src/portals/{role}/{portal}Portal.tsx'; s=(root/name).read_text(encoding='utf-8')
+ start=s.index('  const mobilePrimaryTabs: MobileNavTab[] = ['); end=s.index('  return (',start) if role=='dispatcher' else s.index('  const visibleSections =',start)
+ changes=[(s[start:end],''),('import { MobileBottomNav, type MobileNavTab } from "../../components/navigation/MobileBottomNav";\n',''),('<SidebarProvider defaultOpen={false}>','<SidebarProvider defaultOpen={false} className="h-dvh min-h-0">'),('          {!isMobile && (\n          <Sidebar','          <Sidebar'),('          </Sidebar>\n          )}','          </Sidebar>'),('            data-portal-nav','            surface="'+('dispatch' if role=='dispatcher' else 'owner')+'"\n            data-portal-nav'),('flex h-screen w-full','flex h-dvh min-w-0 w-full'),('title="SUGO '+('Dispatch' if role=='dispatcher' else 'Owner')+'"','title="SUGO '+('Dispatch' if role=='dispatcher' else 'Owner')+'"\n                leftElement={<SidebarTrigger aria-label="Open navigation" className="size-11 shrink-0" />}'),('className="p-1.5 rounded-lg','className="size-11 grid place-items-center rounded-lg')]
+ if role=='dispatcher':
+  nav=s[s.index('          {isMobile && (\n            <div data-dispatch-mobile-nav>'):s.index('          <ScrollToTopButton />')]
+  changes.extend([(nav,''),('w-full relative flex','w-full min-w-0 relative flex'),('"flex h-dvh min-w-0 w-full min-h-0 flex-1 flex-col gap-4 overflow-hidden p-3 sm:p-4 lg:p-5",\n                isMobile && "pb-20 pt-1"','"portal-main flex min-w-0 w-full min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4 lg:p-5"')])
+ else:
+  changes.extend([('w-full h-full min-h-0 flex','w-full h-full min-h-0 min-w-0 flex'),('  const visiblePrimaryTabs = mobilePrimaryTabs.filter((tab) => canOpen(tab.id as ModuleId));\n  const visibleMoreTabs = mobileMoreTabs.filter((tab) => canOpen(tab.id as ModuleId));\n',''),('className={cn("flex-1 p-3 sm:p-4 md:p-5 flex flex-col h-full w-full min-h-0 overflow-hidden", isMobile && "pb-20 pt-1")}','className="portal-main flex-1 p-3 sm:p-4 lg:p-5 flex flex-col w-full min-w-0 min-h-0 overflow-hidden"'),('            {isMobile && (\n              <MobileBottomNav primaryTabs={visiblePrimaryTabs} moreTabs={visibleMoreTabs} />\n            )}\n',''),('"bottom-20 left-4"','"bottom-[max(1rem,env(safe-area-inset-bottom))] left-4"')])
+ edit(name,changes)
+edit('src/components/navigation/MobileHeader.tsx', [('sticky top-0 z-30 w-full','sticky top-0 z-30 shrink-0 w-full'),('<h1 className=','<p className='),('</h1>','</p>')])
+edit('src/components/panel/PanelShell.tsx',[('flex h-full min-h-0 w-full flex-col','flex h-full min-h-0 min-w-0 w-full flex-col'),('"min-h-0 flex-1 pt-3"','"min-h-0 min-w-0 flex-1 pt-3"')])
+edit('src/components/table/MobileResponsiveTable.tsx', [('w-full flex flex-col space-y-3','w-full min-w-0 flex flex-col space-y-3'),('className="relative flex-1"','className="relative min-w-0 flex-1"'),('className="flex items-center gap-2">\n            {onSearchChange','className="flex flex-wrap items-center gap-2">\n            {onSearchChange')])
+edit('src/portals/dispatcher/components/order-chat/OrderChatScreen.tsx',[('flex h-screen w-screen','flex h-dvh w-full min-w-0')])
+edit('src/components/common/ScrollToTopButton.tsx',[('fixed bottom-20 right-4','fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4')])
+print('Updated shells and shared sizing')

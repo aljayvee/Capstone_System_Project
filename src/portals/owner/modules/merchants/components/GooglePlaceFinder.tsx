@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AlertCircle, Check, Loader2, MapPin, Search } from "lucide-react";
 import { apiClient } from "../../../../../services/apiClient";
 import type { WeeklyHours } from "../../../../../utils/storeHours";
+import { GooglePlaceResultsSkeleton } from "../../../components/OwnerSkeletons";
 
 export interface GoogleDirectoryResult {
   googlePlaceId: string;
@@ -113,7 +114,7 @@ export function GooglePlaceFinder({ initialQuery, categories, editingId, selecte
             }}
             placeholder="Store name on Google Maps, e.g. Mercury Drug"
             aria-label="Search Google Maps for the store"
-            className="w-full rounded-plate border border-edge bg-board-ground py-2 pl-8 pr-3 text-body text-ink focus:bg-board-plate focus:outline-none focus:ring-2 focus:ring-board-field"
+            className="w-full rounded-plate border border-edge bg-board-ground py-2 pl-8 pr-3 text-body text-ink focus:bg-board-plate focus:outline-none focus:ring-2 focus:ring-field-ink"
           />
         </div>
         <button
@@ -156,10 +157,7 @@ export function GooglePlaceFinder({ initialQuery, categories, editingId, selecte
       ) : null}
 
       {isSearching ? (
-        <div className="flex items-center gap-2 rounded-plate border border-edge px-3 py-3 text-label text-ink-muted">
-          <Loader2 size={14} className="animate-spin" />
-          Searching Google Maps...
-        </div>
+        <GooglePlaceResultsSkeleton count={3} />
       ) : results && results.length === 0 ? (
         <p className="m-0 rounded-plate border border-edge px-3 py-3 text-label text-ink-muted">
           Google Maps found no store in Tacurong by that name. Try a shorter name, or the brand alone.

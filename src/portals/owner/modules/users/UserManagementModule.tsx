@@ -11,7 +11,6 @@ import {
   XCircle,
   Mail,
   Phone,
-  Loader2,
   AlertCircle,
   ArrowUp,
   ArrowDown,
@@ -20,15 +19,19 @@ import {
   Copy,
   Check,
   RotateCcw,
+  Crown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router";
+import { usePermissions } from "../../../../context/PermissionsContext";
+import { useAuth } from "../../../../context/AuthContext";
 import { MobileResponsiveTable } from "../../../../components/table";
+import { UserTableSkeleton } from "../../components/OwnerSkeletons";
 import { AddUserModal } from "./components/AddUserModal";
 import { EditUserModal } from "./components/EditUserModal";
 import { UserRole } from "../../../../types/auth";
 import { apiService } from "../../../../services/apiService";
-import { NotificationBell } from "../../../../components/NotificationBell";
-import { HeaderClock } from "../../../../components/HeaderClock";
+import { OwnerPageHeader } from "../../components/OwnerPageHeader";
 import { StaffAvatar } from "../../../../components/StaffAvatar";
 import { ROLE_BADGE_LABELS, ROLE_SORT_RANK } from "../../../../constants/userRoles";
 import { io, Socket } from "socket.io-client";
@@ -46,6 +49,9 @@ export interface UserRecord {
   status: "Active" | "Inactive";
   version: number;
   isOnline?: boolean;
+  isMainOwner?: boolean;
+  /** Null means Full access; undefined means the server does not say (riders, older servers). */
+  groupName?: string | null;
 }
 
 type SortKey = "name" | "role" | "username" | "phone" | "status";
@@ -65,6 +71,26 @@ export const UserManagementModule: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // The server enforces both rules; these only stop offering what it refuses.
+  const access = usePermissions();
+  const { user: signedIn } = useAuth();
+  const [, setSearchParams] = useSearchParams();
+  const canManage = access.can("users.manage");
+  const mainOwnerRules = !access.legacy;
+  const editBlockedReason = (u: UserRecord): string | null => {
+    if (!canManage) return "Your access group does not include managing accounts.";
+    // Your own details stay yours to edit; the server refuses only your own
+    // role and status changes, and the modal already says so.
+    if (signedIn && signedIn.id === u.id) return null;
+    if (mainOwnerRules && u.isMainOwner && !access.isMainOwner) return "Only the Main Owner can change the Main Owner's account.";
+    if (mainOwnerRules && u.role === "owner" && !access.isMainOwner) return "Only the Main Owner can change Admin accounts.";
+    return null;
+  };
+  const groupLabel = (u: UserRecord): string =>
+    u.role === "rider" || u.groupName === undefined ? "--" : u.isMainOwner ? "Main Owner" : u.groupName ?? "Full access";
+  const openAccountAccess = (id: number) =>
+    setSearchParams({ module: "settings", tab: "accounts", account: String(id) }, { replace: true });
 
   const loadBackendUsers = async () => {
     setIsLoading(true);
@@ -86,6 +112,8 @@ export const UserManagementModule: React.FC = () => {
             status: u.status || "Active",
             version: u.version,
             isOnline: Boolean(u.isOnline),
+            isMainOwner: Boolean(u.isMainOwner),
+            groupName: u.accessGroup === undefined ? undefined : u.accessGroup?.name ?? null,
           })),
         );
       } else {
@@ -305,7 +333,7 @@ export const UserManagementModule: React.FC = () => {
         title={`Sort by ${label}`}
         className={`group inline-flex items-center gap-1 rounded-trim px-2 py-1 -ml-2 uppercase text-micro transition ${
           isActive
-            ? "text-board-field bg-board-ground"
+            ? "text-field-ink bg-board-ground"
             : "text-ink-muted hover:text-ink hover:bg-board-ground"
         } ${className}`}
       >
@@ -348,21 +376,9 @@ export const UserManagementModule: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────── */}
       {/* 1. TOP HEADER & PRIMARY ACTION (STATIC NON-SCROLLING) */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 border-b border-hairline pb-3">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div>
-              <h1 className="truncate text-title uppercase text-ink">User Management</h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 w-full sm:w-auto">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <HeaderClock />
-            <NotificationBell />
-          </div>
-
+      <div className="owner-users-header-enter shrink-0 border-b border-hairline pb-3 pt-1">
+        <OwnerPageHeader title="User Management" controls={
+          canManage ? (
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center justify-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 sm:px-4 py-2 rounded-plate transition-colors"
@@ -370,15 +386,16 @@ export const UserManagementModule: React.FC = () => {
             <Plus size={15} />
             <span>Add User</span>
           </button>
-        </div>
+          ) : undefined
+        } />
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* 2. DIRECTORY CONTAINER (SINGLE COHESIVE FLAT PLATE) */}
+      {/* 2. USER DIRECTORY */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 bg-board-plate rounded-plate border border-edge flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Search, Filter & Sort Header Bar */}
-        <div className="shrink-0 p-2.5 sm:p-3 border-b border-edge bg-board-ground space-y-2">
+        <div className="owner-users-controls-enter shrink-0 py-3 border-b border-hairline space-y-2">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5">
             {/* Search Bar with Clear Button */}
             <div className="relative flex-1 w-full">
@@ -392,7 +409,7 @@ export const UserManagementModule: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name, username, email, or phone number..."
-                className="w-full pl-9 pr-8 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-board-field transition"
+                className="w-full pl-9 pr-8 py-1.5 bg-board-plate border border-edge rounded-plate text-body text-ink placeholder-ink-muted focus:outline-none focus:ring-2 focus:ring-field-ink transition"
               />
               {search && (
                 <button
@@ -476,7 +493,7 @@ export const UserManagementModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="px-2.5 py-1.5 rounded-plate border border-edge text-label text-ink-muted hover:text-ink hover:bg-board-ground transition"
+                  className="px-2.5 py-1.5 rounded-plate border border-field-ink bg-board-plate text-label text-field-ink hover:bg-board-ground transition-colors"
                   title="Reset filters"
                 >
                   Reset
@@ -494,12 +511,9 @@ export const UserManagementModule: React.FC = () => {
         )}
 
         {/* Directory Content Table Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto relative">
+        <div className="owner-users-list-enter flex-1 min-h-0 overflow-y-auto overflow-x-auto relative">
           {isLoading ? (
-            <div className="h-full min-h-[300px] flex items-center justify-center p-12 text-ink-muted space-y-3 flex-col">
-              <Loader2 size={28} className="animate-spin text-board-field" />
-              <span className="text-label text-ink-muted">Loading user accounts...</span>
-            </div>
+            <UserTableSkeleton />
           ) : users.length === 0 && loadError ? (
             <div className="flex h-full min-h-[300px] flex-col items-center justify-center space-y-3 p-12 text-center">
               <AlertCircle size={22} className="text-status-act-ink" />
@@ -511,7 +525,7 @@ export const UserManagementModule: React.FC = () => {
               </div>
               <button
                 onClick={loadBackendUsers}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-white transition-colors hover:bg-signal-deep"
               >
                 <RotateCcw size={14} />
                 <span>Try again</span>
@@ -540,6 +554,7 @@ export const UserManagementModule: React.FC = () => {
           ) : (
             <MobileResponsiveTable<UserRecord>
               data={sortedUsers}
+              appearance="flat"
               keyExtractor={(u) => u.id}
               primaryHeader="User Profile"
               secondaryHeader="Role & Status"
@@ -609,8 +624,10 @@ export const UserManagementModule: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingUser(u)}
-                    className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
-                    title="Edit User Details"
+                    disabled={Boolean(editBlockedReason(u))}
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-plate border border-field-ink bg-board-plate p-2 text-field-ink transition-colors hover:bg-board-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink disabled:cursor-not-allowed disabled:border-edge disabled:text-ink-muted disabled:hover:bg-board-plate"
+                    title={editBlockedReason(u) ?? "Edit User Details"}
+                    aria-label={`Edit ${u.name}`}
                   >
                     <Pencil size={15} />
                   </button>
@@ -625,6 +642,7 @@ export const UserManagementModule: React.FC = () => {
                     { label: "Full Name", value: u.name },
                     { label: "Username", value: `@${u.username}` },
                     { label: "Assigned Role", value: getRoleBadge(u.role).label },
+                    { label: "Access Group", value: groupLabel(u) },
                     { label: "Status", value: u.status },
                   ],
                 },
@@ -642,10 +660,13 @@ export const UserManagementModule: React.FC = () => {
               ]}
               desktopView={
                 <table className="w-full text-left text-label text-ink">
-                  <thead className="sticky top-0 z-10 select-none border-b border-edge bg-board-ground text-micro uppercase text-ink-muted">
+                  <thead className="sticky top-0 z-10 select-none border-b border-hairline bg-board-ground text-micro uppercase text-ink-muted">
                     <tr>
                       <SortTh label="User Profile" sortBy="name" className="p-4" />
                       <SortTh label="Assigned Role" sortBy="role" className="p-4" />
+                      <th scope="col" className="p-4">
+                        Access Group
+                      </th>
                       <SortTh label="Username" sortBy="username" className="p-4" />
                       <SortTh label="Contact Phone" sortBy="phone" className="p-4" />
                       <SortTh label="Account Status" sortBy="status" className="p-4" />
@@ -666,7 +687,14 @@ export const UserManagementModule: React.FC = () => {
                             <div className="flex items-center gap-3">
                               <StaffAvatar userId={u.id} name={u.name} size={40} isOnline={u.isOnline} />
                               <div className="min-w-0">
-                                <p className="font-semibold text-ink text-label truncate">{u.name}</p>
+                                <p className="flex items-center gap-1.5 font-semibold text-ink text-label">
+                                  <span className="truncate">{u.name}</span>
+                                  {u.isMainOwner ? (
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-status-waiting-fill px-2 py-0.5 text-micro uppercase text-status-waiting-ink">
+                                      <Crown size={10} /> Main Owner
+                                    </span>
+                                  ) : null}
+                                </p>
                                 <p className="text-label text-ink-muted truncate flex items-center gap-1 mt-0.5">
                                   <Mail size={12} className="text-ink-muted" />
                                   <span>{u.email || "No email provided"}</span>
@@ -683,6 +711,25 @@ export const UserManagementModule: React.FC = () => {
                               <RoleIcon size={12} />
                               <span>{roleBadge.label}</span>
                             </span>
+                          </td>
+
+                          {/* Access Group: a link into Account access for the
+                              Main Owner, plain text for everyone else. */}
+                          <td className="p-4 max-w-48">
+                            {access.isMainOwner && !u.isMainOwner && groupLabel(u) !== "--" ? (
+                              <button
+                                type="button"
+                                onClick={() => openAccountAccess(u.id)}
+                                className="max-w-full cursor-pointer truncate text-left text-label text-field-ink underline-offset-2 hover:underline"
+                                title={`Change ${u.name}'s access`}
+                              >
+                                {groupLabel(u)}
+                              </button>
+                            ) : (
+                              <span className="block truncate text-label text-ink-muted" title={groupLabel(u)}>
+                                {groupLabel(u)}
+                              </span>
+                            )}
                           </td>
 
                           {/* Username */}
@@ -734,10 +781,12 @@ export const UserManagementModule: React.FC = () => {
                           <td className="p-4 text-right">
                             <button
                               onClick={() => setEditingUser(u)}
-                              className="p-2 text-ink-muted hover:text-ink hover:bg-board-ground rounded-plate transition-colors"
-                              title="Edit User Details"
+                              disabled={Boolean(editBlockedReason(u))}
+                              className="inline-flex min-h-9 items-center gap-1.5 rounded-plate border border-field-ink bg-board-plate px-3 py-1.5 text-label font-medium text-field-ink transition-colors hover:bg-board-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-field-ink disabled:cursor-not-allowed disabled:border-edge disabled:text-ink-muted disabled:hover:bg-board-plate"
+                              title={editBlockedReason(u) ?? "Edit User Details"}
                             >
                               <Pencil size={15} />
+                              <span>Edit</span>
                             </button>
                           </td>
                         </tr>

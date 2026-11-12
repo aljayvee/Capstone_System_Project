@@ -14,10 +14,10 @@ import {
   type GoogleMapsStatus,
 } from "../../../../../utils/loadGoogleMaps";
 import {
-  SERVICE_AREA_BOUNDS,
-  TACURONG_CENTER,
-  TACURONG_MASK_PATHS,
-  isWithinTacurong,
+  SERVICE_AREA_MASK_PATHS,
+  SERVICE_ZONES,
+  detectServiceZone,
+  type ServiceZone,
 } from "../../../../../constants/serviceArea";
 import { useInlineMessage } from "@/components/panel/DispatcherInlineBanner";
 import { metresBetween } from "../../../../../utils/geo";
@@ -39,7 +39,17 @@ import type {
   OrderChatMessage,
 } from "../types";
 
-export const MAX_PINPOINTS = 3;
+/**
+ * How many stores one errand may visit: the first store plus the owner's
+ * "Max Additional Stores Allowed" (Service Rates). This was a literal 3, so
+ * raising the setting changed nothing here (2026-10-25). The server enforces
+ * the same figure (server lib/storeLimit.ts); 2 is its column default, used
+ * until the rate card has loaded.
+ */
+export function maxPinpointsFor(rateConfig: { maxAdditionalStores?: number | null } | null | undefined): number {
+  const extra = Number(rateConfig?.maxAdditionalStores);
+  return 1 + (Number.isFinite(extra) ? Math.min(Math.max(Math.round(extra), 0), 5) : 2);
+}
 
 /** Illegal Firebase RTDB key characters: . # $ / [ ] */
 const cleanName = (s: string) => (s || "").replace(/[.#$/[\]]/g, " ").replace(/\s+/g, " ").trim();
@@ -147,6 +157,8 @@ interface UseStorePinsArgs {
    */
   messages: OrderChatMessage[];
   onOrderUpdated: (errand: any) => void;
+  /** The owner's rate card; only maxAdditionalStores is read here. */
+  rateConfig?: { maxAdditionalStores?: number | null } | null;
   /** One store-locations card in the chat, updated or moved (useOrderChat.postCard). */
   postCard: (card: Record<string, any> & { type: string }, opts: PostCardOptions) => Promise<{ moved: boolean }>;
   /** Only mount the map when stage 2 is actually open. */
@@ -186,10 +198,15 @@ export function useStorePins({
   initialPinpoints,
   messages,
   onOrderUpdated,
+  rateConfig,
   postCard,
   mapVisible,
   liveQuote = true,
 }: UseStorePinsArgs) {
+  const maxPinpoints = maxPinpointsFor(rateConfig);
+  // Read by the map and search callbacks, which are not rebuilt on its change.
+  const maxPinpointsRef = useRef(maxPinpoints);
+  maxPinpointsRef.current = maxPinpoints;
   const [pinpoints, setPinpoints] = useState<StorePinpoint[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -219,6 +236,18 @@ export function useStorePins({
   searchInputRef.current = searchInput;
   const categoriesRef = useRef<MerchantCategory[]>([]);
   categoriesRef.current = merchantCategories;
+  /**
+   * The order's service zone (2026-11-09): the drop-off's, else the first
+   * pin's, else Tacurong. Pins, searches and the map stay inside it, and the
+   * server refuses a cross-zone set again on save. In a ref because the map
+   * and search callbacks are not rebuilt when it changes.
+   */
+  const orderZone: ServiceZone =
+    detectServiceZone(Number(orderDetails?.deliveryLatitude), Number(orderDetails?.deliveryLongitude)) ??
+    (pinpoints[0] ? detectServiceZone(Number(pinpoints[0].latitude), Number(pinpoints[0].longitude)) : null) ??
+    "TACURONG";
+  const orderZoneRef = useRef<ServiceZone>(orderZone);
+  orderZoneRef.current = orderZone;
 
   /** True when the map cannot be shown, for whatever reason. */
   const mapUnavailable = mapsStatus !== "ok";
@@ -238,7 +267,7 @@ export function useStorePins({
   }, []);
 
   const notifyAtLimit = useCallback(() => {
-    toast.warning(copy.stage2.atLimit(MAX_PINPOINTS));
+    toast.warning(copy.stage2.atLimit(maxPinpointsRef.current));
   }, []);
 
   /**
@@ -297,7 +326,7 @@ export function useStorePins({
     (pin: StorePinpoint): boolean => {
       let added = false;
       setPinpoints((prev) => {
-        if (prev.length >= MAX_PINPOINTS) {
+        if (prev.length >= maxPinpointsRef.current) {
           notifyAtLimit();
           return prev;
         }
@@ -327,17 +356,26 @@ export function useStorePins({
   const [isCheckingLocation, setIsCheckingLocation] = useState(false);
 
   /**
-   * The location half of the gate: is this spot inside Tacurong?
-   * Evaluated client-side against the official 649-point Tacurong polygon and verified by the server.
-   * Any store pin > 100m outside Tacurong City is strictly blocked outright with an instant notification.
+   * The location half of the gate: is this spot inside the order's zone?
+   * Evaluated client-side against the official Tacurong and Banga polygons and verified by the server.
+   * Any store pin > 100m outside every zone, or in a different zone from the drop-off, is strictly
+   * blocked outright with an instant notification.
    */
   const guardLocation = useCallback(
     async (pin: StorePinpoint) => {
-      // Instant client-side check against official 649-point Tacurong boundary
-      if (!isWithinTacurong(pin.latitude, pin.longitude, 0.1)) {
-        const message = `${pin.storeName} is outside Tacurong City. SUGO Express currently operates exclusively within Tacurong City.`;
+      // Instant client-side check against the official zone boundaries
+      const pinZone = detectServiceZone(pin.latitude, pin.longitude, 0.1);
+      if (pinZone === null) {
+        const message = `${pin.storeName} is outside all supported service areas. SUGO Express currently operates within Tacurong City and Banga.`;
         setBlockedPin({ storeName: pin.storeName, message });
-        toast.error(`Outside Service Area: ${pin.storeName} is outside Tacurong City.`);
+        toast.error(`Outside Service Area: ${pin.storeName} is outside Tacurong City and Banga.`);
+        return;
+      }
+      if (pinZone !== orderZoneRef.current) {
+        const orderZoneName = SERVICE_ZONES[orderZoneRef.current].name;
+        const message = `${pin.storeName} is in ${SERVICE_ZONES[pinZone].name}, but this order is delivered in ${orderZoneName}. Every store must be in the same municipality as the drop-off.`;
+        setBlockedPin({ storeName: pin.storeName, message });
+        toast.error(`Different service area: ${pin.storeName} is not in ${orderZoneName}.`);
         return;
       }
 
@@ -404,7 +442,7 @@ export function useStorePins({
         if (
           store.alreadyPinned ||
           store.location.status === "blocked" ||
-          !isWithinTacurong(store.latitude, store.longitude, 0.1)
+          detectServiceZone(store.latitude, store.longitude, 0.1) !== orderZoneRef.current
         ) {
           continue;
         }
@@ -445,7 +483,7 @@ export function useStorePins({
               ) < SAME_PLACE_METERS)
         );
         if (sameShopPinned) continue;
-        if (pinsRef.current.length + batch.length >= MAX_PINPOINTS) {
+        if (pinsRef.current.length + batch.length >= maxPinpointsRef.current) {
           notifyAtLimit();
           break;
         }
@@ -535,7 +573,7 @@ export function useStorePins({
 
         const googleMapId = GOOGLE_MAP_ID;
         const mapOptions: any = {
-          center: TACURONG_CENTER,
+          center: SERVICE_ZONES[orderZoneRef.current].center,
           zoom: 14,
           mapTypeControl: false,
           streetViewControl: false,
@@ -544,13 +582,13 @@ export function useStorePins({
 
         const map = new MapClass(mapRef.current, mapOptions);
 
-        // Inverted polygon mask: dims out everything outside Tacurong City at 35% navy opacity.
-        // Tacurong City is completely transparent and bright; outside areas are dimmed.
+        // Inverted polygon mask: dims out everything outside the service zones at 35% navy opacity.
+        // Tacurong City and Banga are completely transparent and bright; outside areas are dimmed.
         const PolygonClass = (window as any).google?.maps?.Polygon;
         if (PolygonClass) {
           new PolygonClass({
             map,
-            paths: TACURONG_MASK_PATHS,
+            paths: SERVICE_AREA_MASK_PATHS,
             strokeColor: "#1E3A5F",
             strokeOpacity: 0.8,
             strokeWeight: 2,
@@ -621,7 +659,7 @@ export function useStorePins({
           const ev = (window as any).google?.maps?.event;
           if (mapInstance.current && ev) {
             ev.trigger(mapInstance.current, "resize");
-            mapInstance.current.setCenter(TACURONG_CENTER);
+            mapInstance.current.setCenter(SERVICE_ZONES[orderZoneRef.current].center);
           }
         }, 300);
       } catch (err) {
@@ -642,7 +680,7 @@ export function useStorePins({
       ev.trigger(mapInstance.current, "resize");
       const last = pinpoints[pinpoints.length - 1];
       mapInstance.current.setCenter(
-        last ? { lat: Number(last.latitude), lng: Number(last.longitude) } : TACURONG_CENTER
+        last ? { lat: Number(last.latitude), lng: Number(last.longitude) } : SERVICE_ZONES[orderZoneRef.current].center
       );
     }, 150);
     return () => clearTimeout(timer);
@@ -811,7 +849,7 @@ export function useStorePins({
 
   const selectResult = useCallback(
     (result: any) => {
-      if (pinpoints.length >= MAX_PINPOINTS) {
+      if (pinpoints.length >= maxPinpointsRef.current) {
         notifyAtLimit();
         return;
       }
@@ -856,7 +894,7 @@ export function useStorePins({
         toast.error("Type a store name to search for.");
         return;
       }
-      if (pinpoints.length >= MAX_PINPOINTS) {
+      if (pinpoints.length >= maxPinpointsRef.current) {
         notifyAtLimit();
         return;
       }
@@ -870,7 +908,7 @@ export function useStorePins({
         const dbPlaces: any[] = (dbRes.data || []).filter((p: any) => {
           const lat = Number(p.latitude);
           const lng = Number(p.longitude);
-          return isWithinTacurong(lat, lng, 0.1);
+          return detectServiceZone(lat, lng, 0.1) === orderZoneRef.current;
         });
         catalogueHits = dbPlaces;
 
@@ -936,16 +974,18 @@ export function useStorePins({
           return;
         }
 
+        // The order's own town: a Banga order searches Banga, not Tacurong.
+        const zone = SERVICE_ZONES[orderZoneRef.current];
         const bounds = new g.maps.LatLngBounds(
-          new g.maps.LatLng(SERVICE_AREA_BOUNDS.south, SERVICE_AREA_BOUNDS.west),
-          new g.maps.LatLng(SERVICE_AREA_BOUNDS.north, SERVICE_AREA_BOUNDS.east)
+          new g.maps.LatLng(zone.bounds.south, zone.bounds.west),
+          new g.maps.LatLng(zone.bounds.north, zone.bounds.east)
         );
         const placesService = new g.maps.places.PlacesService(mapInstance.current);
 
         placesService.textSearch(
           {
-            query: `${trimmed} Tacurong City`,
-            location: new g.maps.LatLng(TACURONG_CENTER.lat, TACURONG_CENTER.lng),
+            query: `${trimmed} ${zone.searchSuffix}`,
+            location: new g.maps.LatLng(zone.center.lat, zone.center.lng),
             radius: 7000,
             bounds,
           },
@@ -967,7 +1007,7 @@ export function useStorePins({
                 if (!loc) return false;
                 const pLat = typeof loc.lat === "function" ? loc.lat() : loc.lat;
                 const pLng = typeof loc.lng === "function" ? loc.lng() : loc.lng;
-                return isWithinTacurong(pLat, pLng, 0.1);
+                return detectServiceZone(pLat, pLng, 0.1) === orderZoneRef.current;
               });
 
               if (local.length > 1) {
@@ -975,7 +1015,7 @@ export function useStorePins({
                   local.slice(0, 5).map((place: any) => ({
                     name: place.name,
                     formatted_address:
-                      place.formatted_address || place.vicinity || "Tacurong City",
+                      place.formatted_address || place.vicinity || zone.name,
                     geometry: place.geometry,
                     isPlaceResult: true,
                     // Google tells us what kind of business this is on every
@@ -1025,7 +1065,7 @@ export function useStorePins({
             }
 
             toast.error(
-              `Couldn't find "${trimmed}" in Tacurong City. Check the spelling, or click the map to drop a pin.`
+              `Couldn't find "${trimmed}" in ${zone.name}. Check the spelling, or click the map to drop a pin.`
             );
           }
         );
@@ -1204,6 +1244,7 @@ export function useStorePins({
 
   return {
     pinpoints,
+    maxPinpoints,
     mapRef,
     mapInstance,
     customerMarkerRef,

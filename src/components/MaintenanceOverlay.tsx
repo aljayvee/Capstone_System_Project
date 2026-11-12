@@ -1,5 +1,5 @@
 import React from "react";
-import { Wrench, AlertTriangle, RefreshCw, ShieldAlert, LifeBuoy } from "lucide-react";
+import { Wrench, AlertTriangle, RefreshCw, ShieldAlert, LifeBuoy, TrafficCone } from "lucide-react";
 import type { MaintenanceType } from "../types/sysAdmin";
 
 export interface MaintenanceOverlayProps {
@@ -70,6 +70,26 @@ const THEME_MAP: Record<MaintenanceType, ThemeConfig> = {
     dotColor: "bg-purple-400",
     badgeLabel: "SECURITY LOCKDOWN",
     typeLabel: "Security Maintenance",
+  },
+  ADVISORY: {
+    icon: TrafficCone,
+    accentColor: "#DC2626",
+    badgeBg: "bg-red-500/10",
+    badgeBorder: "border-red-500/30",
+    badgeText: "text-red-400",
+    dotColor: "bg-red-400",
+    badgeLabel: "LIVE NOTICE",
+    typeLabel: "Live Polish Notice",
+  },
+  LIVE_NOTICE: {
+    icon: TrafficCone,
+    accentColor: "#DC2626",
+    badgeBg: "bg-red-500/10",
+    badgeBorder: "border-red-500/30",
+    badgeText: "text-red-400",
+    dotColor: "bg-red-400",
+    badgeLabel: "LIVE NOTICE",
+    typeLabel: "Live Polish Notice",
   },
 };
 

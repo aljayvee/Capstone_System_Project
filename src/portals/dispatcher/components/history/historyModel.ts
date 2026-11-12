@@ -10,7 +10,7 @@
  * delivery fee and what the customer paid rather than a share.
  */
 import type { Errand, ErrandItem } from "../../../../types/errand";
-import { formatErrandId } from "../../../../utils/formatErrandId";
+import { compareErrandIds, formatErrandId } from "../../../../utils/formatErrandId";
 import { formatItemLabel } from "../../../../utils/format";
 
 export type Outcome = "delivered" | "cancelled";
@@ -238,7 +238,7 @@ export function sortErrands(list: Errand[], key: SortKey): Errand[] {
     case "date-asc":
       return byNewest.reverse();
     case "id":
-      return byNewest.sort((a, b) => formatErrandId(a.id).localeCompare(formatErrandId(b.id)));
+      return byNewest.sort((a, b) => compareErrandIds(a.id, b.id));
     case "fee-desc":
       return byNewest.sort(byMoney(feeOf, -1));
     case "fee-asc":

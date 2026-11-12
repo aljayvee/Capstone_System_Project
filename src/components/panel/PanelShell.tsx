@@ -59,7 +59,12 @@ export interface PanelFigure {
   urgent?: boolean;
 }
 
+/** A portal can supply one persistent page title above its tab panels. */
+export const PanelTitleVisibilityContext = React.createContext(true);
+
 interface PanelShellProps {
+  /** Optional portal-specific title row within the pinned zone. */
+  header?: React.ReactNode;
   /** Rendered as the panel's heading, in board caps. */
   title: React.ReactNode;
   /**
@@ -87,9 +92,12 @@ interface PanelShellProps {
   className?: string;
   /** Set when the panel supplies its own plate, as the messenger does. */
   bare?: boolean;
+  /** Disable when the workspace supplies its own list and detail scrollers. */
+  scrollable?: boolean;
 }
 
 export function PanelShell({
+  header,
   title,
   headingLevel: Heading = "h2",
   detail,
@@ -100,15 +108,18 @@ export function PanelShell({
   children,
   className,
   bare = false,
+  scrollable = true,
 }: PanelShellProps) {
+  const showTitle = React.useContext(PanelTitleVisibilityContext);
+  const hasPinnedContent = header || showTitle || detail || figure || aside || controls;
   return (
-    <section className={cn("flex h-full min-h-0 w-full flex-col", className)}>
+    <section className={cn("flex h-full min-h-0 min-w-0 w-full flex-col", className)}>
       {/* The pinned zone is one group under one rule. AGENTS.md 8.12 says the
           title and controls do not scroll, but nothing on the surface said
           where that boundary was, so a scrolled list slid up behind the title
           with no line to pass under. A hairline is the whole fix, and it also
           gives the title something to sit on. */}
-      <div
+      {hasPinnedContent ? <div
         className={cn(
           "shrink-0 flex flex-col gap-3 border-b border-hairline pb-3",
           !bare && "pt-1",
@@ -120,11 +131,11 @@ export function PanelShell({
             allocation and then ellipsised, so a panel could announce itself as
             "Cust...". A dropped search field costs one row; an unreadable panel
             title costs the reader the only thing telling them where they are. */}
-        <header className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
-          <div className="min-w-0">
-            <Heading className="truncate text-title uppercase text-ink">{title}</Heading>
+        {header ?? <header className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
+          {showTitle || detail ? <div className="min-w-0">
+            {showTitle ? <Heading className="truncate text-title uppercase text-ink">{title}</Heading> : null}
             {detail ? <p className="mt-0.5 text-label text-ink-muted">{detail}</p> : null}
-          </div>
+          </div> : null}
           {figure || aside ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {figure ? (
@@ -137,7 +148,7 @@ export function PanelShell({
                     data-figure
                     className={cn(
                       "text-title tabular-nums",
-                      figure.urgent ? "text-signal-on-field" : "text-board-plate",
+                      figure.urgent ? "text-signal-on-field" : "text-white",
                     )}
                   >
                     {figure.value}
@@ -147,14 +158,16 @@ export function PanelShell({
               {aside}
             </div>
           ) : null}
-        </header>
+        </header>}
 
         {controls ? <div>{controls}</div> : null}
-      </div>
+      </div> : null}
 
-      {/* The only scroller. min-h-0 is what lets it actually shrink inside the
-          flex column rather than pushing the panel past its bounds. */}
-      <div className="min-h-0 flex-1 overflow-y-auto pt-3">{children}</div>
+      {/* Simple panels scroll here; split workspaces own their scrollers.
+          min-h-0 lets either layout shrink inside the flex column. */}
+      <div className={cn("min-h-0 min-w-0 flex-1 pt-3", scrollable ? "overflow-y-auto" : "overflow-hidden")}>
+        {children}
+      </div>
 
       {footer ? <div className="shrink-0 pt-3">{footer}</div> : null}
     </section>

@@ -6,6 +6,7 @@ import { DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { copy } from "./copy";
+import { useOptionalPermissions } from "../../../../context/PermissionsContext";
 import type { useOrderPayments } from "./hooks/useOrderPayments";
 
 /**
@@ -35,6 +36,9 @@ export function PaymentLedgerPanel({
   readOnly = false,
 }: PaymentLedgerPanelProps) {
   const { ledger, pending, feedback, recordRefund } = payments;
+  // The server refuses a refund outside the access group; this says so first.
+  const permissions = useOptionalPermissions();
+  const canRefund = !permissions || permissions.can("payments.refund");
 
   const [showRefund, setShowRefund] = React.useState(false);
 
@@ -125,6 +129,8 @@ export function PaymentLedgerPanel({
               size="sm"
               icon={<Undo2 size={14} />}
               onClick={() => setShowRefund(true)}
+              disabled={!canRefund}
+              title={canRefund ? undefined : "Your access group does not include recording refunds."}
             >
               {c.refund}
             </DispatcherButton>

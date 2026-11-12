@@ -19,8 +19,8 @@ export default function RevenuePlot({ data }: RevenuePlotProps) {
         <Area
           type="monotone"
           dataKey="revenue"
-          stroke="var(--color-board-field)"
-          fill="var(--color-board-field)"
+          stroke="var(--color-field-ink)"
+          fill="var(--color-field-ink)"
           fillOpacity={0.12}
           strokeWidth={2}
           isAnimationActive={false}

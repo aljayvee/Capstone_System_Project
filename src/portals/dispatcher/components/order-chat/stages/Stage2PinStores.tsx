@@ -14,7 +14,6 @@ import { DispatcherCard } from "@/components/panel/DispatcherCard";
 import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanner";
 import { formatPeso } from "../../../../../utils/format";
 import { copy } from "../copy";
-import { MAX_PINPOINTS } from "../hooks/useStorePins";
 import { useStorePredictions } from "../hooks/useStorePredictions";
 import { StorePredictionCard } from "../StorePredictionCard";
 import { useMemo, useState, useEffect } from "react";
@@ -228,7 +227,7 @@ export function Stage2PinStores({
       (predictions.status === "ready" &&
         (predictions.prediction?.stores ?? []).some((s) => s.location.status !== "blocked")));
 
-  const atLimit = pinpoints.length >= MAX_PINPOINTS;
+  const atLimit = pinpoints.length >= pins.maxPinpoints;
 
   // What one more shop actually costs. Taken from the server's rate config
   // rather than hard-coded, and left unnamed in the copy if it isn't loaded -

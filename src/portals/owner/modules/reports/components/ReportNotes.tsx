@@ -16,7 +16,7 @@ export const ReportNotes: React.FC<{ notes?: string[] }> = ({ notes }) => {
     <section className="rounded-plate border border-edge bg-board-ground p-4">
       <header className="flex items-center gap-1.5 mb-2">
         <Info size={13} className="text-ink-muted" />
-        <h4 className="text-micro uppercase text-ink-muted">How to read this</h4>
+        <h4 className="text-micro uppercase text-ink-muted">About these numbers</h4>
       </header>
       <ul className="space-y-1.5">
         {notes.map((note, i) => (

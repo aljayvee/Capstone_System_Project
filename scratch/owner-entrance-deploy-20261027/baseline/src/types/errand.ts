@@ -1,0 +1,206 @@
+export type ErrandStatus =
+  | "Available"
+  | "AVAILABLE"
+  | "Pending"
+  | "PENDING"
+  | "ACCEPTED"
+  | "Assigned"
+  | "Traveling"
+  | "At Store"
+  | "Purchased"
+  | "In Route"
+  | "Delivered"
+  | "Completed"
+  | "Cancelled"
+  | "Disputed";
+
+export interface ErrandPinpoint {
+  id: number;
+  storeName: string;
+  latitude: number;
+  longitude: number;
+  sequence: number;
+  /** The merchant category the stop was filed under, added by the server. */
+  storeCategory?: string | null;
+}
+
+export interface ErrandItem {
+  id?: number;
+  errandId?: string;
+  itemName: string;
+  storeCategory?: string;
+  quantity?: number;
+  /** How big one of them is ("5 kg"); show it with formatItemLabel. */
+  size?: string | null;
+  unitPrice?: number;
+  estimatedSubtotal?: number;
+  fulfillmentStatus?: "PENDING" | "PURCHASED" | "OUT_OF_STOCK";
+  /** What the customer asked the rider to mind about this item. */
+  notes?: string | null;
+  /** The stop this item is bought at. Null when it was never pinned to one. */
+  pinpointId?: number | null;
+}
+
+export interface Errand {
+  /** The payment mode the customer confirmed, if they have. */
+  paymentSelection?: { paymentMode: { name: string } } | null;
+  /**
+   * Where this errand's money stands, server-derived. Null on COD and on any
+   * errand with no ledger behind it.
+   */
+  paymentPlan?: {
+    hasLedger: boolean;
+    /** Half the goods — what must arrive before a rider is sent. */
+    dueUpFront: number;
+    amountPaid: number;
+    /** What the rider collects at the door. */
+    balanceDue: number;
+    state:
+      | "AWAITING_UPFRONT"
+      | "OVERAGE_PENDING"
+      | "AWAITING_BALANCE"
+      | "SETTLED"
+      | "REFUNDED"
+      | "CANCELLED";
+  } | null;
+  /**
+   * What the customer pays, server-derived (buildFeeBreakdown). `isFinal` is
+   * false while the fee is still the default and has not been routed.
+   */
+  feeBreakdown?: {
+    fees: {
+      baseFee: number;
+      distanceFee: number;
+      multiStoreFee: number;
+      groceryFee: number;
+      nonCodFee: number;
+      subtotal: number;
+    };
+    itemsSubtotal: number;
+    tip: number;
+    grandTotal: number;
+    isFinal: boolean;
+  } | null;
+  /**
+   * What the rider takes home, server-derived (buildRiderEarnings). `isFinal`
+   * is true once a commission row has been written for the errand.
+   */
+  riderEarnings?: {
+    riderShare: number;
+    deliveryFee: number;
+    tip: number;
+    commissionRate: number;
+    isFinal: boolean;
+  } | null;
+  /** The basket the customer agreed to; the handling fee is never billed above it. */
+  quotedHandlingBasket?: number | null;
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  customerPhoneVerified?: boolean;
+  customerPhoneVerifiedAt?: string | null;
+  category: string;
+  description: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  deliveryLatitude?: number | null;
+  deliveryLongitude?: number | null;
+  pinpoints?: ErrandPinpoint[];
+  pabiliDetails?: ErrandItem[];
+  pabiliItemRequests?: ErrandItem[];
+  storeCount?: number;
+
+  // Road-network route the fare was actually billed on, persisted by
+  // errandService.recalculateFee. routeGeometry is an encoded polyline.
+  distanceKm?: number | null;
+  routeDistanceMeters?: number | null;
+  routeDurationSeconds?: number | null;
+  routeGeometry?: string | null;
+  routeProvider?: string | null;
+
+  // Estimated arrival as a RANGE, not a single time: most of an errand is the
+  // rider standing in a shop, which varies far more than the ride. See the
+  // server's etaStrategy.ts.
+  etaLowAt?: string | null;
+  etaHighAt?: string | null;
+  etaComputedAt?: string | null;
+  etaIsDegraded?: boolean;
+
+  // Lifecycle timestamps.
+  assignedAt?: string | null;
+  acceptedAt?: string | null;
+  deliveredAt?: string | null;
+  completedAt?: string | null;
+  overageEscalatedAt?: string | null;
+  overageResolvedAt?: string | null;
+  proximityAlertSentAt?: string | null;
+  estimatedCost: number;
+  deliveryFee: number;
+  tip: number;
+  totalCost: number;
+  status: ErrandStatus;
+  dispatcherId?: number | string;
+  dispatcherName?: string;
+  dispatchLogs?: any[];
+  riderId?: string;
+  riderName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DashboardAttentionItem {
+  id: string;
+  errandId: string;
+  kind: "UNCLAIMED_STALE" | "STALLED_STOP" | "OVERAGE_DISPUTE" | "CANCELLED_AFTER_PURCHASE";
+  title: string;
+  detail: string;
+  severity: "critical" | "warning";
+  action: "claim" | "chat" | "exceptions";
+  createdAt: string;
+}
+
+export interface DispatcherDashboardSummary {
+  unclaimedCount: number;
+  urgentUnclaimedCount: number;
+  activeInMotionCount: number;
+  deliveredTodayCount: number;
+  helpDeskCount: number;
+  pipeline: {
+    claimed: number;
+    toStore: number;
+    bought: number;
+    onTheWay: number;
+    delivered: number;
+  };
+  attentionItems: DashboardAttentionItem[];
+  topMerchantsToday: Array<{ name: string; count: number }>;
+  todayDeclines: Array<{ reason: string; count: number }>;
+  myShiftStats: {
+    myHandledToday: number;
+    myAvgClaimLatencySeconds: number | null;
+  };
+}
+
+// Strict legal state transitions matrix for anti-happy-path validation
+const VALID_TRANSITIONS: Record<ErrandStatus, ErrandStatus[]> = {
+  Available: ["Pending", "Cancelled"],
+  AVAILABLE: ["PENDING", "Cancelled"],
+  Pending: ["ACCEPTED", "Assigned", "Cancelled"],
+  PENDING: ["ACCEPTED", "Assigned", "Cancelled"],
+  ACCEPTED: ["Assigned", "Traveling", "Cancelled"],
+  Assigned: ["Traveling", "Cancelled"],
+  Traveling: ["At Store", "Cancelled"],
+  "At Store": ["Purchased", "Cancelled"],
+  Purchased: ["In Route", "Cancelled"],
+  "In Route": ["Delivered", "Cancelled"],
+  Delivered: ["Completed", "Disputed"],
+  Completed: [],
+  Cancelled: [],
+  Disputed: ["Completed", "Cancelled"],
+};
+
+export function isValidErrandTransition(current: ErrandStatus, target: ErrandStatus): boolean {
+  if (current === target) return true;
+  const allowed = VALID_TRANSITIONS[current] || [];
+  return allowed.includes(target);
+}

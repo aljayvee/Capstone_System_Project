@@ -50,7 +50,7 @@ export const ScrollToTopButton: React.FC<ScrollToTopButtonProps> = ({
       type="button"
       onClick={scrollToTop}
       aria-label="Scroll to top of page"
-      className="fixed bottom-20 right-4 z-30 w-11 h-11 rounded-full bg-[#0F1A30] hover:bg-slate-800 border border-slate-700/80 text-slate-200 shadow-xl flex items-center justify-center active-press cursor-pointer transition-all animate-fade-in"
+      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 w-11 h-11 rounded-full bg-[#0F1A30] hover:bg-slate-800 border border-slate-700/80 text-slate-200 shadow-xl flex items-center justify-center active-press cursor-pointer transition-all animate-fade-in"
     >
       <ArrowUp className="w-5 h-5 text-red-500" />
     </button>

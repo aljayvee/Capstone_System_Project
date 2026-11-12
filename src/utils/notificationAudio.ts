@@ -300,12 +300,25 @@ if (typeof window !== "undefined") {
   initAutoplayUnlock();
 }
 
+const CHIME_COALESCE_MS = 1500;
+const SEVERITY_RANK: Record<NotificationSeverity, number> = { info: 0, warning: 1, critical: 2 };
+let lastChimeAt = 0;
+let lastChimeSeverity: NotificationSeverity = "info";
+
 /**
  * Plays a synthesized harmonic chime based on severity level.
  * Handles async AudioContext resumption and falls back seamlessly to HTML5 Audio.
  */
 export async function playNotificationChime(severity: NotificationSeverity = "info"): Promise<void> {
   if (isNotificationSoundMuted()) return;
+
+  // One event often arrives twice: a chat message reaches the bell over the
+  // socket and the chat toast over Firebase within a second of each other.
+  // A chime no louder than one just played is the same news; skip it.
+  const now = Date.now();
+  if (now - lastChimeAt < CHIME_COALESCE_MS && SEVERITY_RANK[severity] <= SEVERITY_RANK[lastChimeSeverity]) return;
+  lastChimeAt = now;
+  lastChimeSeverity = severity;
 
   // Background tab protection:
   // When a tab is in the background (document.hidden === true), Chrome suspends

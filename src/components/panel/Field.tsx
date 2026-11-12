@@ -76,6 +76,6 @@ export function Field({ label, hint, error, required = false, className, childre
  */
 export const fieldInputClasses = cn(
   "w-full min-h-10 rounded-plate border border-edge bg-board-plate px-3 text-body text-ink",
-  "placeholder:text-ink-muted transition-colors focus:border-board-field",
+  "placeholder:text-ink-muted transition-colors focus:border-field-ink",
   "aria-[invalid=true]:border-status-act-ink",
 );

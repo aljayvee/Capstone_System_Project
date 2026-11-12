@@ -1,0 +1,241 @@
+/* Kuya Sugo owns its palette so portal themes cannot darken the chat. */
+.kuya-drawer {
+  --kuya-ink: #292524;
+  --kuya-muted: #66615d;
+  --kuya-red: #c92525;
+  position: fixed; inset: 0 0 0 auto; z-index: 60;
+  display: flex; flex-direction: column; width: min(100%, 500px);
+  height: 100dvh; background: #fff; color: var(--kuya-ink);
+  color-scheme: light; border-left: 1px solid #e7e5e4;
+  transform: translateX(100%); visibility: hidden;
+  transition: transform 300ms cubic-bezier(.22, 1, .36, 1), visibility 300ms;
+  font-family: inherit; text-align: left;
+}
+.kuya-drawer[data-open="true"] { transform: translateX(0); visibility: visible; }
+.kuya-backdrop { position: fixed; inset: 0; z-index: 59; background: #29252466; animation: kuya-fade 180ms ease-out; }
+.kuya-drawer button, .kuya-trigger { cursor: pointer; font-family: inherit; }
+.kuya-drawer button:disabled { cursor: not-allowed; opacity: .5; }
+.kuya-drawer button:focus-visible, .kuya-trigger:focus-visible { outline: 2px solid #c92525; outline-offset: 3px; }
+.kuya-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; padding: 20px 24px; border-bottom: 1px solid #eeecea; background: #fff; }
+.kuya-header__identity { display: flex; align-items: center; gap: 12px; }
+.kuya-header__mark { position: relative; display: grid; place-items: center; width: 40px; height: 40px; background: #c92525; color: #fff; border-radius: 12px; font-size: 24px; font-weight: 800; font-style: italic; }
+.kuya-header h2 { margin: 0; color: #292524; font-size: 17px; font-weight: 750; letter-spacing: -.4px; line-height: 1.4; }
+.kuya-header p { margin: 0; color: #66615d; font-size: 12px; line-height: 1.5; }
+.kuya-header__actions { display: flex; gap: 4px; }
+.kuya-header__actions button { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: #f5f5f4; color: #66615d; border: 0; }
+.kuya-header__actions button:hover { background: #e7e5e4; color: #292524; }
+.kuya-stream { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; scrollbar-width: thin; }
+.kuya-welcome__intro { display: flex; align-items: center; gap: 14px; padding: 8px 0 24px; }
+.kuya-welcome__art { position: relative; flex: 0 0 166px; perspective: 700px; }
+.kuya-welcome__disc { position: absolute; width: 154px; height: 154px; border-radius: 50%; background: #f5f3ef; left: 5px; top: 71px; }
+.kuya-welcome__art > svg { position: relative; display: block; width: 100%; height: auto; }
+.kuya-welcome h3 { font-size: 26px; font-weight: 750; line-height: 1.15; letter-spacing: -.9px; margin: 0 0 10px; color: #292524; }
+.kuya-welcome__copy > p { font-size: 13px; line-height: 1.65; color: #66615d; margin: 0; }
+.kuya-motion-button { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; margin-top: 8px; padding: 2px 0; color: #66615d; background: transparent; border: 0; font-size: 12px; }
+.kuya-motion-button:hover { color: #a42020; }
+.kuya-welcome__prompt { font-size: 12px; font-weight: 600; color: #66615d; margin: 0 0 10px; }
+.kuya-questions { display: flex; flex-direction: column; }
+.kuya-question { display: grid; grid-template-columns: 18px 1fr 14px; gap: 12px; align-items: center; text-align: left; min-height: 46px; padding: 10px 4px; background: #fff; border: 0; border-bottom: 1px solid #eeecea; border-radius: 0; color: #44403c; min-width: 0; font-size: 13px; line-height: 1.5; transition: background 150ms; }
+.kuya-question:hover { background: #f5f5f4; }
+.kuya-question__icon, .kuya-question__arrow { color: #78716c; }
+.kuya-welcome[data-compact="true"] .kuya-welcome__intro { padding: 0 0 12px; gap: 12px; }
+.kuya-welcome[data-compact="true"] .kuya-welcome__art { flex-basis: 112px; }
+.kuya-welcome[data-compact="true"] .kuya-welcome__disc { width: 104px; height: 104px; top: 60px; left: 0; }
+.kuya-welcome[data-compact="true"] h3 { font-size: 17px; letter-spacing: -.3px; margin-bottom: 4px; }
+.kuya-welcome[data-compact="true"] .kuya-welcome__copy > p { font-size: 12px; }
+.kuya-conversation { display: flex; flex-direction: column; gap: 20px; margin-top: 28px; }
+.kuya-conversation:empty { margin: 0; }
+.kuya-message { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; animation: kuya-message-enter 240ms ease-out; }
+.kuya-message[data-user="true"] { align-items: flex-end; }
+.kuya-message__name { padding: 0 2px; font-size: 12px; color: #66615d; font-weight: 600; }
+.kuya-message__bubble { max-width: 95%; padding: 14px 16px; border-radius: 2px 14px 14px; background: #f5f5f4; color: #44403c; overflow-wrap: anywhere; }
+.kuya-message[data-user="true"] .kuya-message__bubble { background: #fdf0ee; color: #572a25; border-radius: 14px 2px 14px 14px; max-width: 88%; }
+.kuya-message__text { font-size: 13px; line-height: 1.75; }
+.kuya-message__text p { margin: 0; color: inherit; }
+.kuya-message__text h4 { margin: 6px 0; color: #292524; font-size: 14px; font-weight: 700; }
+.kuya-message__text strong { font-weight: 650; color: inherit; }
+.kuya-message__text code { background: #e7e5e4; color: #44403c; padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+.kuya-message__break { height: 8px; }
+.kuya-message__bullet { display: flex; align-items: flex-start; gap: 8px; }
+.kuya-message__bullet > span { color: #a42020; }
+.kuya-message__time { display: block; font-size: 12px; margin-top: 8px; color: #66615d; }
+.kuya-message__links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.kuya-message__links button { min-height: 36px; display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: #fff; color: #a42020; border: 0; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.kuya-message__links button:hover { background: #fdf0ee; }
+.kuya-thinking { display: flex; align-items: center; gap: 8px; padding: 18px 0 4px; font-size: 12px; color: #66615d; }
+.kuya-thinking svg { color: #c92525; animation: kuya-spin 1.2s linear infinite; }
+.kuya-footer { flex-shrink: 0; padding: 16px 24px max(16px, env(safe-area-inset-bottom)); border-top: 1px solid #eeecea; background: #fff; }
+.kuya-composer-label { display: block; color: #44403c; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.kuya-composer { position: relative; }
+.kuya-composer textarea { display: block; box-sizing: border-box; width: 100%; min-height: 84px; max-height: 160px; resize: vertical; padding: 12px 60px 12px 14px; border: 1px solid #d6d3d1; border-radius: 12px; background: #fafaf9; color: #292524; font: inherit; font-size: 14px; line-height: 1.6; }
+.kuya-composer textarea::placeholder { color: #78716c; }
+.kuya-composer textarea:focus { outline: 2px solid #c92525; outline-offset: 1px; background: #fff; }
+.kuya-composer > button { position: absolute; right: 8px; bottom: 8px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; border: 0; background: #c92525; color: #fff; }
+.kuya-composer > button:hover { background: #a42020; }
+.kuya-composer > button:disabled { background: #e7e5e4; color: #78716c; opacity: 1; }
+.kuya-footer__hint { display: flex; justify-content: space-between; gap: 8px; margin-top: 9px; color: #66615d; font-size: 12px; }
+.kuya-footer__hint kbd { font: inherit; white-space: nowrap; }
+.kuya-footer__note { margin: 10px 0 0; text-align: center; font-size: 12px; line-height: 1.5; color: #66615d; }
+.kuya-trigger { position: fixed; z-index: 40; display: flex; align-items: center; gap: 9px; padding: 6px 12px 6px 5px; min-height: 56px; background: #fff; color: #292524; border: 1px solid #d6d3d1; border-radius: 14px; transition: background 150ms, transform 150ms; }
+.kuya-trigger:hover { background: #fafaf9; transform: translateY(-2px); }
+.kuya-trigger__character { display: block; width: 43px; height: 43px; overflow: hidden; background: #f5f3ef; border-radius: 10px; }
+.kuya-trigger__character svg { width: 53px; height: 58px; margin: -1px 0 0 -5px; }
+.kuya-trigger__copy { display: flex; flex-direction: column; text-align: left; }
+.kuya-trigger__copy strong { font-size: 12px; font-weight: 700; line-height: 1.5; }
+.kuya-trigger__copy small { color: #66615d; font-size: 12px; line-height: 1.5; }
+.kuya-trigger kbd { margin-left: 4px; padding: 3px 5px; border-radius: 4px; background: #f5f5f4; color: #66615d; font-size: 12px; }
+
+/* Transform-only gestures; each action remains readable when motion is disabled. */
+.kuya-character { overflow: visible; }
+.kuya-character__body { transform-origin: 120px 220px; animation: kuya-breathe 4s ease-in-out infinite; }
+.kuya-character__head { transform-origin: 123px 135px; }
+.kuya-character__arm { transform-origin: 164px 149px; }
+.kuya-character__hand { transform-origin: 205px 149px; }
+.kuya-character__eyes { transform-origin: 117px 102px; animation: kuya-blink 5s infinite; }
+.kuya-character__loose-parcel, .kuya-character__impact { display: none; }
+.kuya-character__thought, .kuya-character__check, .kuya-character__clipboard { display: none; }
+.kuya-character[data-action="wave"] .kuya-character__hand { animation: kuya-wave 2.8s ease-in-out infinite; }
+.kuya-character[data-action="listen"] .kuya-character__head { transform: rotate(-7deg); animation: kuya-listen 3s ease-in-out infinite; }
+.kuya-character[data-action="listen"] .kuya-character__arm { transform: rotate(-12deg); }
+.kuya-character[data-action="think"] .kuya-character__head { transform: rotate(8deg); }
+.kuya-character[data-action="think"] .kuya-character__arm { transform: rotate(35deg); }
+.kuya-character[data-action="think"] .kuya-character__clipboard { display: block; }
+.kuya-character[data-action="think"] .kuya-character__thought { display: block; animation: kuya-thought 1.5s ease-in-out infinite; }
+.kuya-character[data-action="ready"] .kuya-character__check { display: block; }
+.kuya-character[data-action="ready"] .kuya-character__arm { transform: rotate(12deg); }
+.kuya-character[data-paused="true"] *, .kuya-drawer[data-paused="true"] .kuya-character *, .kuya-drawer[data-paused="true"] .kuya-thinking svg { animation-play-state: paused !important; }
+/* One shared clock keeps steps, the falling parcel and overhead dialogue together. */
+.kuya-scene { --kuya-skit-duration: 20s; position: relative; padding-top: 46px; }
+.kuya-scene > svg { display: block; width: 100%; height: auto; }
+.kuya-scene__bubble { position: absolute; top: 0; left: 50%; width: max-content; max-width: 100%; transform: translateX(-50%); padding: 7px 9px; border: 1px solid #d6d3d1; border-radius: 10px; background: #fff; color: #44403c; text-align: center; font-size: 12px; line-height: 1.4; }
+.kuya-scene__bubble::after { content: ""; position: absolute; bottom: -5px; left: calc(50% - 4px); width: 8px; height: 8px; transform: rotate(45deg); background: #fff; border-right: 1px solid #d6d3d1; border-bottom: 1px solid #d6d3d1; }
+.kuya-scene__dialogue { display: grid; }
+.kuya-scene__dialogue > span { grid-area: 1 / 1; opacity: 0; animation: var(--kuya-line) var(--kuya-skit-duration) steps(1, end) infinite; }
+.kuya-scene__dialogue > [data-line="0"] { --kuya-line: kuya-line-walk; }
+.kuya-scene__dialogue > [data-line="1"] { --kuya-line: kuya-line-trip; }
+.kuya-scene__dialogue > [data-line="2"] { --kuya-line: kuya-line-drop; }
+.kuya-scene__dialogue > [data-line="3"] { --kuya-line: kuya-line-pickup; }
+.kuya-scene__dialogue > [data-line="4"] { --kuya-line: kuya-line-okay; }
+.kuya-scene__still { display: none; }
+.kuya-scene[data-playful="true"] .kuya-scene__bubble { animation: kuya-skit-speech var(--kuya-skit-duration) ease-out infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__body { animation: kuya-skit-body var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-character__torso { transform-origin: 122px 198px; }
+.kuya-scene[data-playful="true"] .kuya-character__torso { animation: kuya-skit-torso var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__head { animation: kuya-skit-head var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-character__leg--left { transform-origin: 107px 198px; }
+.kuya-character__leg--right { transform-origin: 145px 198px; }
+.kuya-scene[data-playful="true"] .kuya-character__leg { animation: kuya-skit-step var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__leg--right { animation-name: kuya-skit-other-step; }
+.kuya-scene[data-playful="true"] .kuya-character__check { display: none; }
+.kuya-scene[data-playful="true"] .kuya-character__parcel { animation: kuya-parcel-held var(--kuya-skit-duration) steps(1, end) infinite; }
+.kuya-character__loose-parcel-motion { display: none; }
+.kuya-scene[data-playful="true"] .kuya-character__loose-parcel-motion { display: block; animation: kuya-box-travel var(--kuya-skit-duration) linear infinite, kuya-parcel-loose var(--kuya-skit-duration) steps(1, end) infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__loose-parcel { display: block; transform-origin: 80px 200px; animation: kuya-skit-box var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__impact { display: block; transform-origin: 65px 240px; animation: kuya-skit-impact var(--kuya-skit-duration) linear infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__arm { animation: kuya-skit-arm var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-scene[data-playful="true"] .kuya-character__hand { animation: none; }
+.kuya-character__carry-arm { transform-origin: 77px 145px; }
+.kuya-scene[data-playful="true"] .kuya-character__carry-arm { animation: kuya-skit-reach var(--kuya-skit-duration) ease-in-out infinite; }
+.kuya-scene[data-paused="true"] *, .kuya-drawer[data-paused="true"] .kuya-scene * { animation-play-state: paused !important; }
+/* Weight shifts at the hips; planted feet compensate for the body's small rise. */
+@keyframes kuya-skit-body {
+  0%, 10%, 90%, 100% { transform: translate(-8px, 0); }
+  12.5% { transform: translate(-6px, -1.5px); } 15% { transform: translate(-4px, 0); }
+  17.5% { transform: translate(-2px, -1.5px); } 20% { transform: translate(0, 0); }
+  22.5% { transform: translate(2px, -1.5px); } 25% { transform: translate(4px, 0); }
+  27.5% { transform: translate(6px, -1.5px); } 30% { transform: translate(8px, 0); }
+  31.5% { transform: translate(10px, -1px); } 33.5% { transform: translate(4px, -1px); }
+  35% { transform: translate(4px, 0); } 39% { transform: translate(1px, 0); }
+  43%, 47%, 67%, 72% { transform: translate(0, 0); }
+  51% { transform: translate(-3px, 0); } 55%, 58% { transform: translate(-5px, 0); }
+  80% { transform: translate(-2px, 0); }
+}
+@keyframes kuya-skit-torso {
+  0%, 10%, 30%, 40%, 47%, 67%, 80%, 100% { transform: rotate(0); }
+  12.5%, 22.5% { transform: rotate(-1deg); } 17.5%, 27.5% { transform: rotate(1deg); }
+  31.5% { transform: rotate(-3deg); } 33.5% { transform: rotate(8deg); }
+  34.5% { transform: rotate(11deg); } 35.8% { transform: rotate(4deg); }
+  37% { transform: rotate(-3deg); } 48% { transform: rotate(-2deg); }
+  55%, 58% { transform: rotate(-22deg); } 72% { transform: rotate(1deg); }
+}
+@keyframes kuya-skit-head {
+  0%, 30%, 40%, 67%, 80%, 100% { transform: rotate(0); }
+  31.5% { transform: rotate(3deg); } 34.5% { transform: rotate(-6deg); }
+  43%, 48% { transform: rotate(-7deg); } 55%, 58% { transform: rotate(4deg); }
+  69% { transform: rotate(3deg); } 72% { transform: rotate(-2deg); }
+}
+@keyframes kuya-skit-step {
+  0%, 8%, 39%, 47%, 67%, 100% { transform: translate(0, 0); }
+  10%, 15%, 20%, 25%, 30% { transform: translate(2px, 0); }
+  12.5%, 17.5%, 22.5%, 27.5% { transform: translate(0, 1.5px); }
+  13.75%, 18.75%, 23.75%, 28.75% { transform: translate(1px, -4px) rotate(8deg); }
+  33.5% { transform: translate(-2px, 1px) rotate(-5deg); }
+  55%, 58% { transform: translate(5px, 0); }
+}
+@keyframes kuya-skit-other-step {
+  0%, 10%, 15%, 20%, 25%, 30%, 43%, 47%, 67%, 100% { transform: translate(0, 0); }
+  11.25%, 16.25%, 21.25%, 26.25% { transform: translate(1px, -4px) rotate(8deg); }
+  12.5%, 17.5%, 22.5%, 27.5% { transform: translate(2px, 1.5px); }
+  33.5% { transform: translate(6px, -1px) rotate(14deg); }
+  35%, 39% { transform: translate(5px, 0); }
+  55%, 58% { transform: translate(5px, 0); }
+}
+/* The box follows the hand until release, then gravity takes over independently. */
+@keyframes kuya-parcel-held { 0%, 33.49%, 56%, 100% { opacity: 1; } 33.5%, 55.99% { opacity: 0; } }
+@keyframes kuya-parcel-loose { 0%, 33.49%, 56%, 100% { opacity: 0; } 33.5%, 55.99% { opacity: 1; } }
+@keyframes kuya-box-travel {
+  0%, 33.5%, 100% { transform: translateX(7px); }
+  36%, 99.99% { transform: translateX(-18px); }
+}
+@keyframes kuya-skit-box {
+  0%, 33.5%, 100% { transform: translateY(-6.7px) rotate(5deg); animation-timing-function: cubic-bezier(.55, 0, .9, .6); }
+  36% { transform: translateY(20px) rotate(-4deg); animation-timing-function: cubic-bezier(0, .4, .4, 1); }
+  36.8% { transform: translateY(17px) rotate(-5deg); animation-timing-function: cubic-bezier(.5, 0, 1, 1); }
+  37.8%, 99.99% { transform: translateY(20px) rotate(-4deg); }
+}
+@keyframes kuya-skit-arm {
+  0%, 10%, 30%, 47%, 67%, 100% { transform: rotate(48deg); }
+  12.5%, 22.5% { transform: rotate(43deg); } 17.5%, 27.5% { transform: rotate(53deg); }
+  31.5% { transform: rotate(35deg); } 34.5% { transform: rotate(8deg); }
+  38% { transform: rotate(38deg); } 55%, 58% { transform: rotate(55deg); }
+  70% { transform: rotate(30deg); } 74% { transform: rotate(34deg); } 80% { transform: rotate(48deg); }
+}
+@keyframes kuya-skit-reach {
+  0%, 30%, 47%, 67%, 100% { transform: rotate(0); }
+  31.5% { transform: rotate(-2deg); } 33.5% { transform: rotate(-3deg); }
+  34.5% { transform: rotate(12deg); } 40% { transform: rotate(4deg); }
+  55%, 58% { transform: rotate(18deg); }
+}
+@keyframes kuya-skit-impact { 0%, 35.9%, 39%, 100% { opacity: 0; transform: scale(.8); } 36% { opacity: .7; transform: scale(.8); } 38% { opacity: 0; transform: scale(1.1); } }
+@keyframes kuya-skit-speech {
+  0%, 11%, 24%, 29%, 34.5%, 35.5%, 43%, 47%, 59%, 65%, 76%, 100% { opacity: 0; }
+  12%, 22.5%, 30%, 33%, 36.5%, 41%, 49%, 57%, 67%, 74% { opacity: 1; }
+}
+@keyframes kuya-line-walk { 0%, 29.99% { opacity: 1; } 30%, 100% { opacity: 0; } }
+@keyframes kuya-line-trip { 0%, 29.99%, 36%, 100% { opacity: 0; } 30%, 35.99% { opacity: 1; } }
+@keyframes kuya-line-drop { 0%, 35.99%, 48%, 100% { opacity: 0; } 36%, 47.99% { opacity: 1; } }
+@keyframes kuya-line-pickup { 0%, 47.99%, 66%, 100% { opacity: 0; } 48%, 65.99% { opacity: 1; } }
+@keyframes kuya-line-okay { 0%, 65.99%, 100% { opacity: 0; } 66%, 99.99% { opacity: 1; } }
+@keyframes kuya-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kuya-message-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes kuya-breathe { 0%, 100% { transform: perspective(700px) rotateY(-5deg) translateY(0); } 50% { transform: perspective(700px) rotateY(4deg) translateY(-3px); } }
+@keyframes kuya-wave { 0%, 45%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } }
+@keyframes kuya-blink { 0%, 43%, 47%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.12); } }
+@keyframes kuya-listen { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(-3deg); } }
+@keyframes kuya-thought { 0%, 100% { opacity: .45; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+@keyframes kuya-spin { to { transform: rotate(360deg); } }
+@media (max-width: 420px) {
+  .kuya-header { padding: 16px; }
+  .kuya-stream { padding: 20px 16px; }
+  .kuya-welcome__art { flex-basis: 132px; }
+  .kuya-welcome__disc { width: 124px; height: 124px; top: 64px; }
+  .kuya-welcome h3 { font-size: 24px; }
+  .kuya-footer { padding: 14px 16px max(14px, env(safe-area-inset-bottom)); }
+  .kuya-composer textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kuya-drawer, .kuya-drawer *, .kuya-trigger, .kuya-trigger *, .kuya-backdrop { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .kuya-scene .kuya-character * { transform: none !important; }
+  .kuya-scene[data-playful="true"] .kuya-character__parcel, .kuya-scene__still { display: block; }
+  .kuya-scene[data-playful="true"] .kuya-character__loose-parcel-motion, .kuya-scene[data-playful="true"] .kuya-character__loose-parcel, .kuya-scene[data-playful="true"] .kuya-character__impact, .kuya-scene__dialogue { display: none; }
+}

@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Conceptual Framework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --head: #F9CF4F;
+    --body: #F4E7A6;
+    --ink: #2B2410;
+    --ink-soft: #4E4117;
+    --line: #2B2410;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #ffffff; }
+  body { font-family: 'Poppins', 'Segoe UI', Arial, sans-serif; color: var(--ink); }
+
+  .stage {
+    position: relative;
+    width: 1400px;
+    padding: 36px 40px 40px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 540px 56px 380px 56px 1fr;
+    align-items: stretch;
+  }
+  .col {
+    background: var(--body);
+    border-radius: 26px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.18);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .col-head {
+    background: var(--head);
+    border-radius: 26px;
+    box-shadow: 0 3px 6px rgba(0,0,0,.18);
+    text-align: center;
+    font-weight: 800;
+    font-size: 30px;
+    letter-spacing: .5px;
+    padding: 14px 0 12px;
+  }
+  .col-body { padding: 26px 28px 30px; flex: 1; display: flex; flex-direction: column; }
+
+  .chev {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chev svg { width: 30px; height: 56px; }
+
+  /* INPUT */
+  .group + .group { margin-top: 24px; }
+  .group h3 {
+    font-size: 19px; font-weight: 700; color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .group ul { list-style: none; padding-left: 8px; }
+  .group li {
+    position: relative;
+    font-size: 15.5px; font-weight: 500; color: var(--ink-soft);
+    line-height: 1.38; padding: 3.5px 0 3.5px 22px;
+  }
+  .group li::before {
+    content: ""; position: absolute; left: 4px; top: 13px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ink-soft);
+  }
+  .group li b { font-weight: 600; color: var(--ink); }
+
+  /* PROCESS */
+  .proc-title {
+    text-align: center; font-weight: 700; font-size: 20px; line-height: 1.35;
+    margin: 6px 0 26px;
+  }
+  .proc-title span { display: block; font-weight: 600; font-size: 17px; color: var(--ink-soft); margin-top: 4px; }
+  .phases {
+    flex: 1; display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; padding: 4px 0 8px;
+  }
+  .phases::before {
+    content: ""; position: absolute; left: 36px; top: 30px; bottom: 34px;
+    border-left: 2.5px dashed rgba(43,36,16,.45);
+  }
+  .phase {
+    display: flex; align-items: center; gap: 16px; position: relative;
+    background: rgba(255,255,255,.55); border-radius: 12px;
+    padding: 16px 14px;
+  }
+  .num {
+    flex: none; width: 44px; height: 44px; border-radius: 50%;
+    background: var(--head); box-shadow: 0 2px 4px rgba(0,0,0,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+  }
+  .phase-text { font-size: 17.5px; font-weight: 600; line-height: 1.3; }
+
+  /* OUTPUT */
+  .out-body { justify-content: center; align-items: center; text-align: center; }
+  .out-text {
+    font-weight: 800; font-size: 22px; line-height: 1.45; letter-spacing: .3px;
+    text-transform: uppercase;
+  }
+
+  /* FEEDBACK */
+  .fb-row { position: relative; height: 140px; }
+  .fb-pill {
+    position: absolute; left: 50%; top: 52px; transform: translateX(-50%);
+    width: 440px; height: 68px; border-radius: 34px;
+    background: var(--head); box-shadow: 0 3px 8px rgba(0,0,0,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 26px; letter-spacing: .5px;
+  }
+  #wires { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <svg id="wires"></svg>
+
+  <div class="row">
+    <!-- INPUT -->
+    <section class="col" id="input">
+      <div class="col-head">INPUT</div>
+      <div class="col-body">
+        <div class="group">
+          <h3>Knowledge Requirements</h3>
+          <ul>
+            <li>Theory of Web Application</li>
+            <li>Theory of Mobile Applications</li>
+            <li>Theory of Relational Database Management System</li>
+            <li>Theory of Non-relational Database Management System</li>
+            <li>Theory of JavaScript Programming Languages</li>
+            <li>Theory of Global Positioning System (GPS)</li>
+            <li>Theory of Digital Payment</li>
+            <li>Theory of Push Notifications</li>
+            <li>Agile Methodology</li>
+            <li>Spiral Methodology</li>
+            <li>Scrum Methodology</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <h3>Software Requirements</h3>
+          <ul>
+            <li><b>Operating System:</b> Windows, Android, Linux Server</li>
+            <li><b>RDBMS:</b> MariaDB with Prisma ORM</li>
+            <li><b>Real-time NoSQL Database:</b> Firebase Realtime Database</li>
+            <li><b>Mobile Framework:</b> React Native (Expo)</li>
+            <li><b>Web Framework:</b> React, Vite, Tailwind CSS</li>
+            <li><b>Backend Framework:</b> Node.js, Express.js, Socket.IO</li>
+            <li><b>Programming Languages:</b> TypeScript, JavaScript</li>
+            <li><b>APIs and Services:</b> Google Maps Platform, Firebase Cloud Messaging</li>
+            <li><b>Integrated Development Environment:</b> Visual Studio Code</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <h3>Hardware Requirements</h3>
+          <ul>
+            <li>CPU</li>
+            <li>RAM</li>
+            <li>Storage</li>
+            <li>Android Smartphone with GPS</li>
+            <li>Cloud Server (VPS)</li>
+            <li>Internet Connection</li>
+            <li>Monitor, Keyboard, and Mouse</li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <h3>Operational / Data Inputs</h3>
+          <ul>
+            <li>Customer Account and Profile Information</li>
+            <li>Errand and Pabili Item Requests</li>
+            <li>Pickup Stores and Delivery Locations</li>
+            <li>Rider Profiles, Availability, and GPS Location</li>
+            <li>Payment Details (Cash on Delivery, GCash)</li>
+            <li>Service Rates and Rider Commission Rules</li>
+            <li>Customer Ratings and Feedback</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="chev"><svg viewBox="0 0 30 56"><path d="M5 4 L25 28 L5 52" fill="none" stroke="#2B2410" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- PROCESS -->
+    <section class="col" id="process">
+      <div class="col-head">PROCESS</div>
+      <div class="col-body">
+        <div class="proc-title">Software Development<br>Life Cycle (SDLC)<span>Scrum Methodology</span></div>
+        <div class="phases">
+          <div class="phase"><div class="num">1</div><div class="phase-text">System Analysis and Requirements Gathering</div></div>
+          <div class="phase"><div class="num">2</div><div class="phase-text">Backlog Refinement and Sprint Planning</div></div>
+          <div class="phase"><div class="num">3</div><div class="phase-text">System Design</div></div>
+          <div class="phase"><div class="num">4</div><div class="phase-text">Development and Implementation</div></div>
+          <div class="phase"><div class="num">5</div><div class="phase-text">System Testing</div></div>
+          <div class="phase"><div class="num">6</div><div class="phase-text">Deployment and Maintenance</div></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="chev"><svg viewBox="0 0 30 56"><path d="M5 4 L25 28 L5 52" fill="none" stroke="#2B2410" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- OUTPUT -->
+    <section class="col" id="output">
+      <div class="col-head">OUTPUT</div>
+      <div class="col-body out-body">
+        <div class="out-text">Mobile-based Delivery Management System for Sugo Express On the Go Logistics Services</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="fb-row" id="fbrow">
+    <div class="fb-pill" id="fb">FEEDBACK</div>
+  </div>
+</div>
+
+<script>
+  function wire() {
+    const stage = document.getElementById('stage').getBoundingClientRect();
+    const r = id => {
+      const b = document.getElementById(id).getBoundingClientRect();
+      return { l: b.left - stage.left, r: b.right - stage.left, t: b.top - stage.top, b: b.bottom - stage.top, cx: (b.left + b.right) / 2 - stage.left, cy: (b.top + b.bottom) / 2 - stage.top };
+    };
+    const inp = r('input'), out = r('output'), fb = r('fb');
+    const svg = document.getElementById('wires');
+    svg.setAttribute('width', stage.width);
+    svg.setAttribute('height', stage.height);
+    const s = 'stroke="#2B2410" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round"';
+    const ix = inp.cx, ox = out.cx;
+    svg.innerHTML =
+      `<path d="M${ox} ${out.b} V${fb.cy} H${fb.r}" ${s}/>` +
+      `<path d="M${fb.l} ${fb.cy} H${ix} V${inp.b + 20}" ${s}/>` +
+      `<path d="M${ix - 15} ${inp.b + 24} L${ix} ${inp.b + 4} L${ix + 15} ${inp.b + 24} Z" fill="#2B2410" stroke="#2B2410" stroke-width="3" stroke-linejoin="round"/>`;
+  }
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(wire);
+</script>
+</body>
+</html>

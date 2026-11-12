@@ -1,0 +1,94 @@
+{
+  "status": "deployed_and_verified",
+  "verified_at": "2026-11-05T02:03:51.387607+08:00",
+  "url": "https://portal.sugo-express.org",
+  "release": "web-responsive-20261105-015317",
+  "previous_entry": "assets/index-DeXauquc.js",
+  "entry": "assets/index-e4ljJuOU.js",
+  "release_files": 191,
+  "previous_non_html_files_retained": 592,
+  "backup": "/root/deploy-backups/web-responsive-20261105-015317/dist-before",
+  "staged_archive": "/root/deploy-backups/web-responsive-20261105-015317/staged",
+  "public_checks": [
+    {
+      "path": "/",
+      "status": 200,
+      "contentType": "text/html",
+      "cache": "DYNAMIC",
+      "verified": "current release entry"
+    },
+    {
+      "path": "/owner",
+      "status": 200,
+      "contentType": "text/html",
+      "cache": "DYNAMIC",
+      "verified": "current release entry"
+    },
+    {
+      "path": "/dispatcher",
+      "status": 200,
+      "contentType": "text/html",
+      "cache": "DYNAMIC",
+      "verified": "current release entry"
+    },
+    {
+      "path": "assets/index-e4ljJuOU.js",
+      "status": 200,
+      "contentType": "application/javascript",
+      "cache": "MISS",
+      "verified": "checksum match"
+    },
+    {
+      "path": "assets/DispatcherPortal-DtxcotbC.js",
+      "status": 200,
+      "contentType": "application/javascript",
+      "cache": "MISS",
+      "verified": "checksum match"
+    },
+    {
+      "path": "assets/index--bFp_shh.css",
+      "status": 200,
+      "contentType": "text/css",
+      "cache": "MISS",
+      "verified": "checksum match"
+    },
+    {
+      "path": "assets/OwnerPortal-BdDeakKZ.js",
+      "status": 200,
+      "contentType": "application/javascript",
+      "cache": "MISS",
+      "verified": "checksum match"
+    },
+    {
+      "path": "assets/sidebar-Dryx96lm.js",
+      "status": 200,
+      "contentType": "application/javascript",
+      "cache": "MISS",
+      "verified": "checksum match"
+    }
+  ],
+  "browser_checks": [
+    {
+      "role": "dispatcher",
+      "viewport": "390x844",
+      "liveAssets": true,
+      "privateApi": "isolated fixtures; no production API or websocket traffic",
+      "layout": "passed",
+      "drawer": "passed",
+      "focusAndResize": "passed",
+      "notifications": "passed",
+      "uncaughtErrors": []
+    },
+    {
+      "role": "owner",
+      "viewport": "390x844",
+      "liveAssets": true,
+      "privateApi": "isolated fixtures; no production API or websocket traffic",
+      "layout": "passed",
+      "drawer": "passed",
+      "focusAndResize": "passed",
+      "notifications": "passed",
+      "uncaughtErrors": []
+    }
+  ]
+}

@@ -66,6 +66,7 @@ export function OwnerTabs<T extends string>({
     const next = (from + delta + tabs.length) % tabs.length;
     onChange(tabs[next].id);
     refs.current[next]?.focus();
+    refs.current[next]?.scrollIntoView({ block: "nearest", inline: "nearest" });
   };
 
   const onKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -94,7 +95,7 @@ export function OwnerTabs<T extends string>({
       role="tablist"
       aria-label={label}
       className={cn(
-        "flex shrink-0 flex-wrap overflow-hidden rounded-plate border border-edge bg-board-plate",
+        "flex min-w-0 shrink-0 overflow-x-auto rounded-plate border border-edge bg-board-plate",
         className,
       )}
     >
@@ -124,14 +125,14 @@ export function OwnerTabs<T extends string>({
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              "flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 border-l border-hairline px-3 text-micro uppercase transition-colors first:border-l-0",
+              "flex min-h-11 shrink-0 sm:min-h-9 sm:flex-1 cursor-pointer items-center justify-center gap-1.5 border-l border-hairline px-3 text-micro uppercase transition-colors first:border-l-0",
               isActive
-                ? "bg-board-field text-board-plate"
+                ? "bg-board-field text-white"
                 : "text-ink-muted hover:bg-board-ground hover:text-ink",
             )}
           >
             {Icon ? <Icon size={13} className="shrink-0" /> : null}
-            <span className="truncate">{tab.label}</span>
+            <span className="whitespace-nowrap">{tab.label}</span>
             {tab.count !== undefined ? (
               <span
                 data-figure

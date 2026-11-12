@@ -20,6 +20,40 @@
         "dev"
       ],
       "port": 5000
+    },
+    {
+      "name": "api-server-mfa",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:\\Capstone_Server\\server",
+        "run",
+        "dev"
+      ],
+      "env": {
+        "MFA_ENFORCED_AUDIENCES": "WEB_PORTAL"
+      },
+      "port": 5000
+    },
+    {
+      "name": "customer-onboarding-2-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:\\Capstone_Project_Web\\node_modules\\vite\\bin\\vite.js",
+        "--config",
+        "C:\\Capstone_Project_Mobile_App\\CustomerApp\\scratch\\kuya-sugo-blender\\delivery-preview.vite.config.mjs"
+      ],
+      "port": 4191
+    },
+    {
+      "name": "customer-splash-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:\\Capstone_Project_Web\\node_modules\\vite\\bin\\vite.js",
+        "--config",
+        "C:\\Capstone_Project_Mobile_App\\CustomerApp\\scratch\\kuya-sugo-blender\\splash-preview.vite.config.mjs"
+      ],
+      "port": 4192
     }
   ]
 }

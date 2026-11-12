@@ -70,7 +70,7 @@ export interface AnotherDeviceActivePayload {
 export interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (user: User, token?: string, refreshToken?: string) => void;
+  login: (user: User, token?: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   isInitializing: boolean;

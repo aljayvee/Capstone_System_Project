@@ -7,6 +7,7 @@ import { postAccepted, postDeclined } from "../../../services/chatSystemMessages
 import { getMemoryAccessToken, onMemoryAccessTokenChange } from "../../../services/apiClient";
 import { Errand, ErrandStatus, DispatcherDashboardSummary } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
+import { rememberErrandReferences } from "../../../utils/formatErrandId";
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
@@ -249,6 +250,9 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     const stopWaitingForToken = onMemoryAccessTokenChange((token) => {
       if (token && !socket.active) socket.connect();
     });
+    // A new order reaches the queue by socket, never by API: learn its number
+    // before the handlers below render it (onAny runs first).
+    socket.onAny((_event, ...args) => rememberErrandReferences(args));
 
     socket.on("order:new", (newOrder: any) => {
       console.log("[Socket.io] Received order:new:", newOrder);
@@ -430,9 +434,46 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     setSelectedErrandId(orderId);
   }, []);
 
+  /**
+   * Opens a live conversation to answer it, from a read-only list (Customer
+   * Chat History). The tab moves to Dispatch Management in the same URL update,
+   * so the order opens editable (readOnly follows the tab) and closes back there.
+   * One update: two setSearchParams calls in a row can drop the first.
+   */
+  const openChatToReply = useCallback(
+    (orderId: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", "queue");
+          next.set("errand", orderId);
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  /**
+   * "Back to queue" (and every other way out of an order): to Dispatch
+   * Management. It only cleared the errand before, so an order opened with no
+   * tab in the URL (the bell, a deep link) closed onto the Dashboard, the
+   * default tab (2026-10-25). History and Recent chats open finished orders
+   * read-only and stay where the dispatcher came from.
+   */
   const handleCloseChat = useCallback(() => {
-    setSelectedErrandId(null);
-  }, []);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("errand");
+        const from = next.get("tab");
+        if (from !== "history" && from !== "recent_chats") next.set("tab", "queue");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
 
   const handleUpdateStatus = async (errandId: string, targetStatus: ErrandStatus) => {
     setActionError(null);
@@ -504,6 +545,7 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     handleDeclineOrder,
     handleOpenChat,
     handleCloseChat,
+    openChatToReply,
     handleUpdateStatus,
   };
 }

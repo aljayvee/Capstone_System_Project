@@ -1,0 +1,10 @@
+{
+  "baselineFiles": 127,
+  "allBaselineFilesIdentical": true,
+  "expectedLiveIndexHash": "b57f04064d720241cce422d618e8cfedba2e7b4039e5b4393cac815a4ca7a277",
+  "scope": [
+    "src/components/LoginPage.tsx presentation only",
+    "src/components/login/login-page.css",
+    "src/assets/login/scooter-fullscreen.jpg"
+  ]
+}

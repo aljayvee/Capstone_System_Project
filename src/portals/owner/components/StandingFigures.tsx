@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * What is true right now, read as one band rather than as tiles.
@@ -70,7 +71,7 @@ export function StandingFigures({
       data-on-field
       aria-label={label}
       className={cn(
-        "grid grid-cols-1 overflow-hidden rounded-plate bg-board-field",
+        "grid grid-cols-2 overflow-hidden rounded-plate bg-board-field",
         columns === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3",
         className,
       )}
@@ -78,7 +79,7 @@ export function StandingFigures({
       {figures.map((f) => {
         const isClickable = Boolean(f.onClick);
         const cellClassName = cn(
-          "min-w-0 border-t border-field-line px-4 py-3 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0 text-left transition-colors relative",
+          "min-w-0 border-t border-field-line px-3 py-2 sm:px-4 sm:py-3 first:border-t-0 sm:border-t-0 sm:border-l sm:first:border-l-0 text-left transition-colors relative",
           columns === 4 && "sm:odd:border-l-0 lg:odd:border-l lg:first:border-l-0",
           isClickable && "hover:bg-white/5 cursor-pointer focus:outline-none focus:bg-white/10",
           f.active && "bg-white/10 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-board-plate",
@@ -87,21 +88,25 @@ export function StandingFigures({
         const content = (
           <>
             <div className="flex items-center justify-between">
-              <p className="truncate text-micro uppercase text-board-trim">{f.label}</p>
+              <p className="text-micro uppercase text-board-trim [overflow-wrap:anywhere]">{f.label}</p>
               {f.active && (
                 <span className="w-1.5 h-1.5 rounded-full bg-board-plate shrink-0" />
               )}
             </div>
-            <p
-              data-figure
-              title={f.valueTitle}
-              className={cn(
-                "truncate text-board",
-                f.urgent ? "text-signal-on-field" : "text-board-plate",
-              )}
-            >
-              {f.value}
-            </p>
+            {f.value === "…" ? (
+              <Skeleton className="my-1.5 h-7 w-14 rounded-trim bg-white/20" />
+            ) : (
+              <p
+                data-figure
+                title={f.valueTitle}
+                className={cn(
+                  "truncate text-title sm:text-board",
+                  f.urgent ? "text-signal-on-field" : "text-white",
+                )}
+              >
+                {f.value}
+              </p>
+            )}
             {f.sub ? <p className="truncate text-label text-board-trim">{f.sub}</p> : null}
           </>
         );

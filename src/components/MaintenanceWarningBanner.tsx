@@ -53,6 +53,22 @@ const TYPE_THEMES: Record<
     badgeText: "text-purple-300",
     label: "Security Protocol",
   },
+  ADVISORY: {
+    bg: "bg-red-950/95",
+    border: "border-red-700/80",
+    text: "text-red-200",
+    badgeBg: "bg-red-900/80 border-red-600 text-red-300",
+    badgeText: "text-red-300",
+    label: "Live Polish Notice",
+  },
+  LIVE_NOTICE: {
+    bg: "bg-red-950/95",
+    border: "border-red-700/80",
+    text: "text-red-200",
+    badgeBg: "bg-red-900/80 border-red-600 text-red-300",
+    badgeText: "text-red-300",
+    label: "Live Polish Notice",
+  },
 };
 
 export const MaintenanceWarningBanner: React.FC<MaintenanceWarningBannerProps> = ({
@@ -95,7 +111,7 @@ export const MaintenanceWarningBanner: React.FC<MaintenanceWarningBannerProps> =
               {header || "System Downtime Imminent"}
             </span>
             <span className="text-xs text-slate-300 hidden md:inline">
-              — Please save active changes and conclude tasks.
+              - Please save active changes and conclude tasks.
             </span>
           </div>
         </div>

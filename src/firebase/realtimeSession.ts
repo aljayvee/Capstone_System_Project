@@ -6,7 +6,7 @@ import {
   type Auth,
 } from 'firebase/auth';
 import { firebaseApp, isFirebaseAuthConfigured } from './config';
-import { apiClient } from '../services/apiClient';
+import { apiClient, getMemoryAccessToken } from '../services/apiClient';
 
 /**
  * The portal's Firebase identity, derived from the session it already holds.
@@ -54,6 +54,25 @@ function isPortalIdentity(uid: string): boolean {
   return /^staff_\d+$/.test(uid);
 }
 
+/**
+ * The uid this tab should hold: `staff_<id>` for the account in the portal's
+ * access token, or null before there is one. Any staff uid is not enough. The
+ * SDK keeps a Firebase session across reloads and sign-ins, and a customer chat
+ * opens only to the dispatcher who claimed it (`chat_access` in the rules), so
+ * another dispatcher's leftover session is refused every chat this one owns.
+ */
+function expectedPortalUid(): string | null {
+  const token = getMemoryAccessToken();
+  if (!token) return null;
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const id = JSON.parse(atob(part))?.id;
+    return typeof id === 'number' ? `staff_${id}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export type RealtimeAuthState = 'signed-in' | 'signed-out' | 'unavailable';
 
 let lastState: RealtimeAuthState = 'signed-out';
@@ -88,16 +107,19 @@ export async function ensureRealtimeSession(): Promise<boolean> {
   }
 
   const current = getFirebaseAuth().currentUser;
-  if (current && isPortalIdentity(current.uid)) {
+  const expected = expectedPortalUid();
+  if (current && isPortalIdentity(current.uid) && (!expected || current.uid === expected)) {
     publish('signed-in');
     return true;
   }
   if (current) {
     // Some other Firebase user is signed in: in practice the phone user an SMS
     // check leaves behind (signInWithPhoneNumber signs in as it verifies, and
-    // the SDK persists it across reloads). The security rules admit only the
-    // server-minted identities, so treating it as "signed in" left the map and
-    // chat denied until the next sign-out. Replace it instead.
+    // the SDK persists it across reloads), or the staff account that last
+    // signed in on this browser. The security rules admit only the server-
+    // minted identity of the account using the portal, so treating it as
+    // "signed in" left the map and chat denied until the next sign-out.
+    // Replace it instead.
     await signOut(getFirebaseAuth()).catch(() => {});
   }
 

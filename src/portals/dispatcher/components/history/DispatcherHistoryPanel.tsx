@@ -7,6 +7,7 @@ import { formatPeso } from "../../../../utils/format";
 import { PanelShell } from "@/components/panel/PanelShell";
 import { PanelState } from "@/components/panel/PanelState";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "../DispatcherFilterToolbar";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { StatusChip } from "@/components/panel/DispatcherBadge";
 import { HistoryErrandDetail } from "./HistoryErrandDetail";
@@ -257,20 +258,16 @@ export function DispatcherHistoryPanel({
   return (
     <PanelShell
       title="Errand Transaction"
-      figure={{ label: "Delivered", value: isUnknown ? "--" : String(summary.deliveredCount) }}
       detail={detailLine}
-      aside={
-        <div className="w-full sm:w-72">
+      controls={
+        <DispatcherFilterToolbar search={
           <DispatcherSearchField
             value={query}
             onChange={(event) => changeQuery(event.target.value)}
             placeholder="Search ID, customer, address or store"
             aria-label="Search errand transactions"
           />
-        </div>
-      }
-      controls={
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        } filters={
           <div className="flex flex-wrap items-center gap-1.5">
             {FILTERS.map((option) => {
               const isActive = filter === option.id;
@@ -295,7 +292,7 @@ export function DispatcherHistoryPanel({
               );
             })}
           </div>
-          <label className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
+        } sort={<label className="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">
             Sort
             <select
               value={sort}
@@ -308,8 +305,8 @@ export function DispatcherHistoryPanel({
                 </option>
               ))}
             </select>
-          </label>
-        </div>
+          </label>}
+        />
       }
     >
       {isUnknown || mine.length === 0 ? (

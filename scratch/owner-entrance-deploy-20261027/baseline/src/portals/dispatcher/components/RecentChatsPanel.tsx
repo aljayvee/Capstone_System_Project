@@ -1,0 +1,476 @@
+import { useState, useMemo } from "react";
+import { formatErrandId } from "../../../utils/formatErrandId";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "./DispatcherFilterToolbar";
+import { DispatcherButton } from "@/components/panel/DispatcherButton";
+import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
+import { PanelShell } from "@/components/panel/PanelShell";
+import { PanelState } from "@/components/panel/PanelState";
+import { MobileResponsiveTable } from "@/components/table";
+
+const STATUS_FILTERS = [
+  { id: "ALL", label: "All" },
+  // Conversations with customer messages nobody has read: what the sidebar's
+  // count is counting (2026-10-25).
+  { id: "UNREAD", label: "Unread" },
+  { id: "ASSIGNED", label: "Assigned" },
+  { id: "IN_TRANSIT", label: "In transit" },
+  { id: "DELIVERED", label: "Delivered" },
+  { id: "CANCELLED", label: "Cancelled" },
+];
+
+const ITEMS_PER_PAGE = 10;
+
+interface RecentChatsPanelProps {
+  errands: any[];
+  onOpenChat: (orderId: string) => void;
+  /** Additive, all optional. */
+  isLoading?: boolean;
+  loadError?: string | null;
+  onRetry?: () => void;
+  /**
+   * Unread customer messages per errand (useCustomerChatAlerts), the same
+   * figures as the sidebar badge. Without them the badge said "2" and this
+   * list gave no way to find which conversations it meant.
+   */
+  unreadCounts?: Record<string, number>;
+  /** Opens a conversation to answer it (not read-only), and marks it read. */
+  onReply?: (orderId: string) => void;
+}
+
+/** Underscores and spacing vary between the API and this filter's ids. */
+const normalizeStatus = (s: unknown) =>
+  String(s ?? "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+
+export function RecentChatsPanel({
+  errands,
+  onOpenChat,
+  isLoading = false,
+  loadError = null,
+  onRetry,
+  unreadCounts = {},
+  onReply,
+}: RecentChatsPanelProps) {
+  const unreadOf = (e: any) => unreadCounts[String(e.id)] ?? 0;
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyErrandId = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(formatErrandId(id));
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const closedErrands = useMemo(() => {
+    return errands.filter((e) => {
+      const s = normalizeStatus(e.status);
+      // AVAILABLE is unclaimed — no dispatcher conversation exists yet.
+      // PENDING is claimed and actively being worked (see errandService's
+      // claimErrand): the dispatcher is right now pinning stores, editing
+      // items, or otherwise mid-conversation. Neither belongs in a "recent"
+      // history list — that's ActiveErrandsPanel's job, and letting a
+      // currently-active chat also show up here made it look closed when it
+      // very much was not.
+      //
+      // Except a conversation with unread customer messages: the sidebar
+      // counts those, so this list must show them wherever the run stands.
+      if (unreadCounts[String(e.id)] > 0) return true;
+      return s !== "AVAILABLE" && s !== "PENDING";
+    });
+  }, [errands, unreadCounts]);
+
+  const unreadConversations = closedErrands.filter((e) => unreadOf(e) > 0).length;
+  const unreadMessages = closedErrands.reduce((sum, e) => sum + unreadOf(e), 0);
+
+  const filteredErrands = useMemo(() => {
+    return closedErrands.filter((e) => {
+      // Both sides normalised. The filter compared a raw value against
+      // "IN_TRANSIT", so a run the API calls "IN TRANSIT" or "IN ROUTE" was
+      // silently unmatchable by the filter offering that exact label.
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "UNREAD"
+          ? unreadOf(e) > 0
+          : normalizeStatus(e.status) === normalizeStatus(statusFilter));
+      if (!matchesStatus) return false;
+
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return (
+        String(e.id).toLowerCase().includes(query) ||
+        String(e.customerName || "").toLowerCase().includes(query) ||
+        String(e.category || "").toLowerCase().includes(query)
+      );
+    })
+      // Unread first; otherwise the order they arrived in (newest first).
+      .map((e, index) => ({ e, index }))
+      .sort((a, b) => Number(unreadOf(b.e) > 0) - Number(unreadOf(a.e) > 0) || a.index - b.index)
+      .map(({ e }) => e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closedErrands, statusFilter, search, unreadCounts]);
+
+  const handleSearchChange = (val: string) => {
+    setSearch(val);
+    setCurrentPage(1);
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredErrands.length / ITEMS_PER_PAGE));
+  const paginatedErrands = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredErrands.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredErrands, currentPage]);
+
+  const hasFilters = statusFilter !== "ALL" || search.trim().length > 0;
+
+  const resetFilters = () => {
+    setStatusFilter("ALL");
+    setSearch("");
+    setCurrentPage(1);
+  };
+
+  const pageButton = (dir: "prev" | "next") => {
+    const disabled = dir === "prev" ? currentPage <= 1 : currentPage >= totalPages;
+    return (
+      <DispatcherButton
+        variant="secondary"
+        size="sm"
+        iconOnly
+        aria-label={dir === "prev" ? "Previous page" : "Next page"}
+        disabled={disabled}
+        icon={dir === "prev" ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        onClick={() =>
+          setCurrentPage((p) => (dir === "prev" ? Math.max(1, p - 1) : Math.min(totalPages, p + 1)))
+        }
+      />
+    );
+  };
+
+  /**
+   * Unread: answer it, editable, from Dispatch Management. Otherwise: look at
+   * it, read-only, here.
+   */
+  const openButton = (e: any) =>
+    unreadOf(e) > 0 && onReply ? (
+      <DispatcherButton variant="primary" size="sm" icon={<MessageSquare size={14} />} onClick={() => onReply(e.id)}>
+        Reply
+      </DispatcherButton>
+    ) : (
+      <DispatcherButton variant="secondary" size="sm" icon={<Eye size={14} />} onClick={() => onOpenChat(e.id)}>
+        Open
+      </DispatcherButton>
+    );
+
+  return (
+    <PanelShell
+      title="Customer Chat History"
+      // Says what the filter actually does. `closedErrands` excludes only
+      // AVAILABLE and PENDING, so runs still on the road are listed here too,
+      // and describing this as finished-or-closed would have been a claim the
+      // list does not honour.
+      detail="Every run that has been claimed, unread conversations first"
+      controls={
+        <DispatcherFilterToolbar search={
+          <DispatcherSearchField
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search route number, customer, store"
+            aria-label="Search conversations"
+          />
+        } filters={
+        <div className="flex flex-wrap items-center gap-1.5">
+          {STATUS_FILTERS.map((f) => {
+            const isActive = statusFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => handleStatusFilterChange(f.id)}
+                aria-pressed={isActive}
+                className={cn(
+                  "min-h-9 cursor-pointer rounded-trim px-3.5 py-1.5 text-micro font-semibold uppercase tracking-[0.06em] transition-all",
+                  isActive
+                    ? "bg-board-field text-board-plate border border-board-field shadow-sm"
+                    : "bg-board-plate text-ink-muted hover:text-ink border border-edge hover:border-board-trim"
+                )}
+              >
+                {f.label}
+                {f.id === "UNREAD" && unreadConversations > 0 ? (
+                  <span className="ml-1.5 font-mono tabular-nums">{unreadConversations}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>}
+        />
+      }
+      footer={
+        filteredErrands.length > 0 ? (
+          <div className="flex flex-col items-center justify-between gap-2 rounded-plate border border-edge bg-board-plate px-4 py-3 sm:flex-row">
+            <p data-figure className="text-label text-ink-muted">
+              Showing <span className="font-mono tabular-nums font-semibold text-ink">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+              <span className="font-mono tabular-nums font-semibold text-ink">{Math.min(currentPage * ITEMS_PER_PAGE, filteredErrands.length)}</span> of{" "}
+              <span className="font-mono tabular-nums font-semibold text-ink">{filteredErrands.length}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              {pageButton("prev")}
+              <span data-figure className="px-2 text-label text-ink font-medium">
+                Page <span className="font-mono tabular-nums font-bold text-ink">{currentPage}</span> of <span className="font-mono tabular-nums font-bold text-ink">{totalPages}</span>
+              </span>
+              {pageButton("next")}
+            </div>
+          </div>
+        ) : null
+      }
+    >
+      {unreadConversations > 0 && statusFilter !== "UNREAD" ? (
+        <div
+          role="status"
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-plate border border-edge bg-status-act-fill px-4 py-2.5"
+        >
+          <p className="flex items-center gap-2 text-label font-semibold text-status-act-ink">
+            <MessageSquare size={15} aria-hidden />
+            {unreadMessages} unread {unreadMessages === 1 ? "message" : "messages"} in {unreadConversations}{" "}
+            {unreadConversations === 1 ? "conversation" : "conversations"}, listed first
+          </p>
+          <DispatcherButton variant="secondary" size="sm" onClick={() => handleStatusFilterChange("UNREAD")}>
+            Show only unread
+          </DispatcherButton>
+        </div>
+      ) : null}
+      <div className="overflow-hidden rounded-plate border border-edge bg-board-plate">
+        <PanelState
+          isLoading={isLoading}
+          error={loadError}
+          onRetry={onRetry}
+          isEmpty={filteredErrands.length === 0}
+          hasFilters={hasFilters}
+          onResetFilters={resetFilters}
+          emptyTitle="No conversations yet"
+          emptyBody="A conversation appears here once a run has been claimed."
+          errorTitle="The conversation history did not load"
+          loadingRows={5}
+        >
+          <MobileResponsiveTable<any>
+            data={paginatedErrands}
+            keyExtractor={(e) => e.id}
+            primaryHeader="Route & Customer"
+            secondaryHeader="Status & Payment"
+            renderPrimary={(e) => {
+              const isCopied = copiedId === e.id;
+              return (
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-mono text-body font-bold text-ink tabular-nums tracking-wide">
+                      {formatErrandId(e.id)}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(ev) => copyErrandId(e.id, ev)}
+                      aria-label={`Copy Route ID ${formatErrandId(e.id)}`}
+                      className="inline-flex items-center justify-center rounded p-1 text-ink-muted hover:bg-board-ground hover:text-ink transition-colors"
+                    >
+                      {isCopied ? (
+                        <Check size={12} className="text-signal-success" />
+                      ) : (
+                        <Copy size={12} />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-micro font-medium text-ink-muted truncate max-w-[180px] sm:max-w-none">
+                    {e.customerName || "Customer"}
+                  </p>
+                  <UnreadPill count={unreadOf(e)} />
+                </div>
+              );
+            }}
+            renderSecondary={(e) => {
+              const needsSupervision =
+                e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+              return (
+                <div className="text-right space-y-1">
+                  <StatusChip status={e.status} />
+                  {needsSupervision ? (
+                    <div>
+                      <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
+                    </div>
+                  ) : (
+                    <p className="text-micro text-ink-muted">
+                      {e.paymentSelection?.paymentMode?.name || "—"}
+                    </p>
+                  )}
+                </div>
+              );
+            }}
+            renderPreview={(e) => (
+              <div className="space-y-1.5 pt-1 text-ink-muted">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Customer:</span>
+                  <span className="text-ink font-medium">{e.customerName || "Customer"}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Category:</span>
+                  <span className="text-ink">{e.category || "General errand"}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-ink-muted">Payment:</span>
+                  <span className="text-ink">{e.paymentSelection?.paymentMode?.name || "COD"}</span>
+                </div>
+              </div>
+            )}
+            renderRowActions={(e) => (
+              <div onClick={(ev) => ev.stopPropagation()}>{openButton(e)}</div>
+            )}
+            inspectorTitle={(e) => formatErrandId(e.id)}
+            inspectorSubtitle={(e) => `${e.customerName || "Customer"} · ${e.category || "General errand"}`}
+            inspectorSections={(e) => {
+              const needsSupervision =
+                e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+              return [
+                {
+                  title: "Route Information",
+                  items: [
+                    { label: "Route ID", value: formatErrandId(e.id), copyable: true, copyValue: e.id },
+                    { label: "Customer Name", value: e.customerName || "Customer" },
+                    { label: "Category", value: e.category || "General errand" },
+                    { label: "Status", value: e.status },
+                  ],
+                },
+                {
+                  title: "Payment & Supervision",
+                  items: [
+                    { label: "Payment Mode", value: e.paymentSelection?.paymentMode?.name || "Cash on Delivery" },
+                    { label: "Supervision Flag", value: needsSupervision ? "Balance Due" : "Normal" },
+                  ],
+                },
+              ];
+            }}
+            inspectorActions={(e, onClose) => (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (unreadOf(e) > 0 && onReply) onReply(e.id);
+                  else onOpenChat(e.id);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-trim bg-signal text-board-plate font-semibold text-body hover:bg-signal-deep transition"
+              >
+                {unreadOf(e) > 0 && onReply ? <MessageSquare size={16} /> : <Eye size={16} />}
+                <span>{unreadOf(e) > 0 && onReply ? "Reply" : "Open Conversation"}</span>
+              </button>
+            )}
+            desktopView={
+              <div className="overflow-x-auto">
+                <table className="w-full table-fixed text-left">
+                  <colgroup>
+                    {/* Status is wide enough for "Waiting on customer": unread
+                        conversations still being worked are listed too. */}
+                    <col className="w-[13%]" />
+                    <col className="w-[24%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
+                  </colgroup>
+                  <thead className="border-b border-hairline bg-board-ground">
+                    <tr>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Route</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Customer</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Category</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Status</th>
+                      <th className="px-4 py-3 text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">Payment</th>
+                      <th className="px-4 py-3 text-right text-micro uppercase tracking-[0.06em] font-semibold text-ink-muted">
+                        <span className="sr-only">Open the conversation</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {paginatedErrands.map((e) => {
+                      const needsSupervision =
+                        e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
+                      const isCopied = copiedId === e.id;
+                      return (
+                        <tr
+                          key={e.id}
+                          className={cn(
+                            "transition-colors hover:bg-board-ground/60",
+                            unreadOf(e) > 0 && "bg-status-act-fill/40"
+                          )}
+                        >
+                          <td data-figure className="px-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-label font-bold tabular-nums tracking-wide text-ink">
+                                {formatErrandId(e.id)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(ev) => copyErrandId(e.id, ev)}
+                                aria-label={`Copy Route ID ${formatErrandId(e.id)}`}
+                                className="inline-flex items-center justify-center rounded p-1 text-ink-muted hover:bg-board-ground hover:text-ink transition-colors"
+                              >
+                                {isCopied ? (
+                                  <Check size={13} className="text-signal-success" />
+                                ) : (
+                                  <Copy size={13} />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3.5 text-body font-medium text-ink">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate">{e.customerName || "Customer"}</span>
+                              <UnreadPill count={unreadOf(e)} />
+                            </div>
+                          </td>
+                          <td className="truncate px-4 py-3.5 text-body text-ink-muted">
+                            {e.category || "General errand"}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <StatusChip status={e.status} />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {needsSupervision ? (
+                              <DispatcherBadge variant="warning">Balance due</DispatcherBadge>
+                            ) : (
+                              <span className="text-label text-ink-muted">
+                                {e.paymentSelection?.paymentMode?.name || "—"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">{openButton(e)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            }
+          />
+        </PanelState>
+      </div>
+    </PanelShell>
+  );
+}
+
+/** "3 unread" beside a customer's name; nothing when there is nothing to read. */
+function UnreadPill({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <DispatcherBadge
+      tone="act"
+      className="shrink-0"
+      aria-label={`${count} unread ${count === 1 ? "message" : "messages"}`}
+    >
+      {count} unread
+    </DispatcherBadge>
+  );
+}

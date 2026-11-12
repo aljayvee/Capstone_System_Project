@@ -23,11 +23,8 @@ export const DispatcherAttentionRadar: React.FC<DispatcherAttentionRadarProps> =
       <div className="flex items-center justify-between pb-3 border-b border-hairline">
         <div>
           <h2 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-            Attention & Bottleneck Radar
+            Needs Attention
           </h2>
-          <p className="text-micro text-ink-muted mt-0.5">
-            Real-time queue bottlenecks, stale pickups, and disputes requiring intervention
-          </p>
         </div>
         {items.length > 0 && (
           <span className="font-mono text-micro px-2 py-0.5 rounded-full bg-signal/10 text-signal border border-signal/20 font-bold">
@@ -42,10 +39,7 @@ export const DispatcherAttentionRadar: React.FC<DispatcherAttentionRadarProps> =
             <div className="size-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 mb-2.5">
               <ShieldCheck size={20} />
             </div>
-            <p className="text-body font-semibold text-ink">Zero Active Bottlenecks</p>
-            <p className="text-label text-ink-muted max-w-sm mt-1">
-              All active customer orders are claimed, riders are moving on schedule, and store dwells are within limits.
-            </p>
+            <p className="text-body font-semibold text-ink">No issues right now</p>
           </div>
         ) : (
           items.map((item) => {

@@ -1,4 +1,339 @@
-# 🌐 DUAL-MODEL COLLABORATION TUNNEL (CLAUDE ◄► GEMINI)
+# 🌐 TRI-AGENT COLLABORATION TUNNEL (CLAUDE CODE ◄► OPENAI CODEX ◄► ANTIGRAVITY)
+
+## 2026-11-09 - Dual-zone service area: dispatcher can pin Banga stores (Claude Code)
+- Full entry in C:\Capstone_Server\server\AGENT_HANDSHAKE.md (server: zone engine, intra-zone 400s, zone-isolated dispatch; tsc 0, vitest 161 files / 2067 PASS) and in CustomerApp's. This web half was not in the mission's list, but Stage 2 would otherwise refuse every Banga pin, drop Banga search results, and tell the dispatcher to decline every Banga drop-off.
+- `src/constants/serviceArea.ts`: NEW `BANGA_BOUNDS`, `BANGA_CENTER`, `BANGA_POLYGON_COORDINATES` (generated from the server's GeoJSON, 88 points, same winding as Tacurong's), `ServiceZone`, `SERVICE_ZONES`, `detectServiceZone(lat, lng, bufferKm)`, `SERVICE_AREA_MASK_PATHS` (world ring plus both holes). `isWithinServiceArea` now means any zone (so `useStageModel`'s drop-off check accepts Banga); `isWithinTacurong` and `TACURONG_MASK_PATHS` unchanged.
+- `src/portals/dispatcher/components/order-chat/hooks/useStorePins.ts` (already carried others' uncommitted work): the order's zone is the drop-off's, else the first pin's, else Tacurong. Pins outside every zone or in the other zone are blocked with a message; predicted stores, catalogue and Google text search are scoped to that zone (Google query suffix, centre and bounds per zone); map centre and mask follow it. `copy.ts`: outside-area copy names both towns.
+- Verification: `tsc --noEmit` exit 0. A node check of `detectServiceZone` (Tacurong, Banga, 50 m and 200 m past Banga's west vertex, Koronadal, GenSan) all correct. A throwaway harness page (deleted) drew `SERVICE_AREA_MASK_PATHS` on Google Maps: both towns clear, Koronadal, Isulan and Surallah dimmed. The full Stage 2 flow was not driven (needs a live order).
+- **Web DEPLOYED 2026-11-09 21:22 (+08)** on the user's "Yes, deploy web". Entry `index-e4ljJuOU.js` -> `index-CagKvu69.js`. Nothing committed. The SERVER half was DEPLOYED 2026-11-09 19:49 (+08), backup `/root/deploy-backups/server-banga-20261109-1955`. The CustomerApp half shipped as OTA group `2fb978cd-c3ea-4071-a002-c8d6977098aa` at 21:52 (+08), verified by its served bundle hashes (see the CustomerApp handshake, including a 3-minute bad publish that was rolled back).
+  - **Scope proof**: every input in Codex's saved live-release source manifest (`scratch/responsive-20261104/deployment/source-manifest.json`, 379 files) still matched the working tree by sha256 except these three files, with no new files in `src` or `public`. Rebuilding that saved release source reproduced live byte for byte (191/191 files, entry `index-e4ljJuOU.js`), so the build is deterministic and the 49 differing outputs (entry, `index.html`, and chunks that import the entry by its hashed name) come only from this change. Built to scratch with `vite build --outDir`, so the shared `dist/` was not touched.
+  - **Method** (not `deploy-web.sh`, which deletes): upload only the 49 differing files to a new `/root/deploy-staging/web-banga-20261109-212208`; guards on the live entry, staged checksums, and every unshipped release file already live with the same bytes; assets first with `rsync -c`, no deletion; `index.html` last (atomic rename); no asset purge; staging moved into the backup.
+  - **Live checks**: all 191 release files match live; every referenced chunk resolves; `/`, `/dispatcher`, `/owner` 200 at nginx and through Cloudflare; the edge serves `index-CagKvu69.js` and `OrderChatScreen-Cmne908l.js` with the release checksum (it carries the Banga copy). The built-in browser loaded the sign-in page on the new entry with no console errors and imported the order-chat chunk. Stage 2 with a live Banga order was not driven (needs a signed-in dispatcher).
+  - **Backup and rollback**: `/root/deploy-backups/web-banga-20261109-212208` (`replaced/index.html`, `staged/`, `rollback.sh`, which puts the old `index.html` back and deletes nothing).
+- Left as is: RiderFleetRoster and the owner's RiderTrackingModule still open centred on Tacurong, so Banga riders sit off the first view.
+
+## 2026-11-09 - Google sign-in token hardened against replay (Claude Code)
+- Server only; full entry in C:\Capstone_Server\server\AGENT_HANDSHAKE.md. No web change. `/customers/google-login` and `/google-register` now accept only a `google.com` Firebase token, check revocation, and spend the token once (409 on reuse); `google-register` refuses an account that already has a phone. Server tsc exit 0; vitest 159 files / 2034 PASS. Server DEPLOYED 2026-11-09 02:58 (+08), backup `/root/deploy-backups/server-googletoken-20261109-025734`; nothing committed.
+
+## 2026-11-06 - Mobile apps: hidden screens' Android Back listeners (Claude Code)
+- Mobile only; full entries in each app's AGENT_HANDSHAKE.md. Each finding was reproduced in a failing test first. CustomerApp: EditAccount and LocationWizard now ignore Back while another screen (a push-opened chat) is in front; PabiliReview/Editor were withdrawn, since their goBack pops the top screen correctly. Rider: TaskScreen ignores Back under DispatcherChat. Two pre-existing rider test failures (updatesService mock export; time-of-day notification fixture) fixed in the tests. CustomerApp 1105 tests, Rider 577 vitest + 253 jest, both tsc 0. Not committed, not device-verified.
+
+## 2026-11-06 - CustomerApp chat push tap, then Back, bounced into the chat (Claude Code)
+- Mobile only; full entry in CustomerApp/AGENT_HANDSHAKE.md. The back arrow pushed a second portal (React Navigation 7 `navigate` pushes unless `pop: true`). That portal replayed the stored last push tap (`getLastNotificationResponseAsync`, never cleared) back into the chat. The hidden portal's Android Back listener also swallowed Back. All three fixed; new PushTapBackNavigation.test.tsx (8 tests); tsc exit 0. Not committed, not device-verified.
+
+## 2026-11-06 - CustomerApp rating prompt moved to Track tab (Claude Code)
+- Mobile only (C:\Capstone_Project_Mobile_App\CustomerApp); no web, server or DB change. Full entry with paths and verification is in that repo's AGENT_HANDSHAKE.md.
+- The rating prompt now opens on the Track tab for a recent delivered, unrated errand, and never in the dispatcher chat. The rating sheet scrolls instead of clipping when the keyboard is up. tsc exit 0; jest 95 suites / 1090 tests pass. Not committed, not device-verified.
+
+## 2026-11-05 - Responsive portal deployment (Codex)
+- User explicitly requested deployment of the responsive Dispatcher and Owner changes. DEPLOYED and verified at 2026-11-05T02:03:51.387607+08:00 (+08).
+- URL: https://portal.sugo-express.org. Entry changed from index-DeXauquc.js to index-e4ljJuOU.js.
+- Scope proof: all 191 files in the saved RBAC release matched production byte for byte. Current src/public/config/env inputs differ from that source only in the 19 responsive source files plus the new portal-responsive.css; no deletions or unrelated changes. The isolated release in scratch/responsive-20261104/deployment/release produced 191 files, byte-identical to the tested workspace build.
+- Preflight: isolated npm run build and npx tsc --noEmit PASS; all 536 local JS/CSS references resolve. Uploaded to unique staging and verified every staged file checksum before changing production.
+- Activation: live-index SHA guard; full previous-release backup; checksum rsync of assets with no deletion; staged-asset checksum verification; atomic index replacement; origin HTTPS 200 with the expected entry. Staging moved into the backup as staged/. No asset purge, rm, server restart, configuration change or database change.
+- Backup: /root/deploy-backups/web-responsive-20261105-015317/dist-before (all previous files).
+- Rollback: rsync -rlpt /root/deploy-backups/web-responsive-20261105-015317/dist-before/ /var/www/web/dist/ (new hashed assets can remain unreferenced).
+- Verification: all 191 release checksums match production. All 592 previous non-HTML files retained unchanged; live tree now has 648 files. Public /, /owner and /dispatcher give 200 and the current entry. Public entry, main CSS, both portal chunks and shared sidebar chunk give 200, correct MIME types and matching checksums through Cloudflare.
+- Chrome at 390x844 against actual public assets: both portals fit; drawer, Escape/backdrop/close/selection, focus return, breakpoint resizing and notification panels PASS with zero uncaught page errors. Private API, Firebase, Maps and WebSocket traffic was intercepted with local fixtures; no production account actions were performed.
+- Deployment scripts, manifests, checksum proof, public/browser results and screenshots: scratch/responsive-20261104/deployment/. No commit created.
+
+## 2026-11-05 - Dispatcher and Owner responsive layouts (Codex)
+- Implemented the approved frontend-only responsive plan. Existing uncommitted work was preserved. Deployment is recorded above; no commit was created.
+- Phones use the existing Sidebar Sheet as a hamburger drawer below 768px; bottom navigation and its reserved padding were removed from both portals. The drawer carries the portal palette and Owner appearance, closes after navigation, returns focus, and unmounts immediately on close so a delayed exit transition cannot block the page.
+- Portal sizing uses dynamic viewport heights and shrinking flex/grid descendants. Shared panels, record actions, forms and tabs fit narrow widths. Operational records retain expandable details; report tables retain their local horizontal scrolling.
+- Rider Messages uses a list/conversation switch below 1024px. Drafts and selection survive switching; repeated notification requests reopen the selected conversation. The alert hook receives an active rider only while the conversation is visible (or both desktop panes are shown). Narrow metadata and history share a scroller, with Back and the composer pinned. Auto-scroll is confined to the conversation rather than scrolling page ancestors.
+- Both tracking views stack a bounded map over the roster below 1024px. Owner user forms have bounded dvh heights and named dialog roles. Weekly hours and shared record actions wrap on phones.
+- Short landscape users at 125% text exposed a zero-height list. The scoped media query now puts the title/action/bell on one row and search plus a horizontally scrollable filter strip on another. Verified list height: 136px at 667x375 and 218px at 844x375 (Owner dark, 125% text).
+- No server routes, schemas, permissions rules, auth, subscriptions or service hooks changed. Additive UI props: Sidebar.surface; DispatcherRiderMessagesPanel.openRequest and onConversationVisibleChange.
+- Modified source paths:
+  - src/portals/dispatcher/DispatcherPortal.tsx
+  - src/portals/dispatcher/components/DispatcherRiderMessagesPanel.tsx
+  - src/portals/dispatcher/components/RiderFleetRoster.tsx
+  - src/portals/dispatcher/components/order-chat/OrderChatScreen.tsx
+  - src/portals/owner/OwnerPortal.tsx
+  - src/portals/owner/components/OwnerTabs.tsx
+  - src/portals/owner/components/StandingFigures.tsx
+  - src/portals/owner/modules/tracking/RiderTrackingModule.tsx
+  - src/portals/owner/modules/merchants/components/WeeklyHoursEditor.tsx
+  - src/portals/owner/modules/users/components/AddUserModal.tsx
+  - src/portals/owner/modules/users/components/EditUserModal.tsx
+  - src/components/ui/sidebar.tsx
+  - src/components/navigation/MobileHeader.tsx
+  - src/components/common/ScrollToTopButton.tsx
+  - src/components/panel/PanelShell.tsx
+  - src/components/panel/DispatcherSearchField.tsx
+  - src/components/table/MobileResponsiveTable.tsx
+  - src/components/table/RecordInspectorView.tsx
+  - src/styles/index.css
+  - src/styles/portal-responsive.css (new)
+- Tests:
+  - scripts/portal-responsive-layout.test.cjs (new)
+  - scripts/layout-interactions.cjs (new): verifies visible geometry and an unobscured hit target, then sends real pointer clicks; avoids headless RAF scheduling stalls without forcing clicks through overlays.
+  - scripts/dispatcher-header-layout.test.cjs
+  - scripts/owner-header-layout.test.cjs
+- Verification:
+  - npm run build: PASS. npx tsc --noEmit: PASS, including cleanup of the unused tracking MapPin import.
+  - Full responsive matrix: PASS at 320, 360, 390, 640, 767, 768, 1023, 1024 and 1440px for both portals, report/settings tabs, populated records, drawer navigation/focus/dismissal/resizing, draft retention and repeated rider notifications.
+  - Dispatcher header/notifications: PASS at 320, 360, 390, 640, 768, 1024, 1440 and 1920px, including deferred loading, errors, unread updates and notification links.
+  - Owner header/notifications: PASS at 360, 390, 640, 768, 1024, 1440 and 1920px, including merchant tabs, add-user form and client navigation.
+  - Final follow-up after the short-landscape and immediate-close fixes: PASS for both portals at 390px plus 667x375 and 844x390 landscape, empty/error states, Owner dark/125% appearance and restricted navigation. Also checked 844x375 manually with fixtures; both drawers detach immediately, restore focus and leave notification controls unobscured.
+  - Reviewed representative phone, tablet, desktop and short-landscape screenshots.
+- Artifacts: scratch/responsive-20261104/ contains logs, screenshots and pre-edit copies. Playwright is supplied through the bundled runtime's NODE_PATH; the tests use installed Chrome and intercept API, Firebase, Maps and WebSocket traffic.
+- Limits: physical iOS Safari/Android browser-toolbar and keyboard behavior and live Maps/Firebase behavior were not exercised. No production session or deployment was used.
+
+## 2026-11-04 - Customer photo now a signed link, not inline base64 (server only) (Claude Code)
+* Profile, login and refresh responses carried the customer's photo as base64, up to 740 KB each. They now carry a signed link (`/api/customers/:id/photo?v=&sig=`), deployed 23:25 (+08). Customer 7's profile went from ~740 KB to 678 bytes. Details are at the top of the server handshake.
+* **Web portal**: no change; it never reads customer avatars. Files modified in this repo: this handshake only.
+
+## 2026-11-04 - Fixed: Cloudflare p99 origin response of 25 s (server only) (Claude Code)
+* The 25 s tail was Socket.IO long-polling, not slow API code. The mobile apps' WebSocket upgrades were refused because React Native sends `Origin: https://api.sugo-express.org`. The fix is in `C:/Capstone_Server/server/src/lib/socket.ts` (same-origin accepted), deployed 22:56 (+08). Full notes are at the top of the server handshake.
+* **Web portal**: no change. Chrome upgrades already succeeded (portal origin is allow-listed). Files modified in this repo: this handshake only.
+
+## 2026-11-04 - Owner Settings: access groups (RBAC), Main Owner, per-browser Appearance (Claude Code)
+* **Request**: a Settings button in the Owner sidebar with RBAC (group access + control access) and an Admin's own Appearance (theme, colors, font size), saved per browser and per account. User's decisions:
+  - Admin + Dispatcher groups, plus per-account overrides.
+  - A custom color picker.
+  - The Settings button in the footer, with the old "Settings" section renamed "Configuration".
+  - Access tabs for the **Main Owner only** (first OWNER account, id 1 on prod).
+* **Server half**: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`, including an additive `[LOCKED]` schema change (approved with the plan). **Server first, then web.**
+* **Overrides part of `[LOCKED]` Impeccable "SUGO red = act only"** on the user's request: an Admin's own accent replaces the red on the active nav row, primary buttons, focus, caret and selection. Status-act tokens stay fixed.
+* **Files (web)**:
+  - Appearance: NEW `src/portals/owner/appearance/` (`colorMath.ts` contrast guard and derived shades, `appearancePrefs.ts` localStorage `sugo:owner-appearance:v1:<userId>`, `OwnerAppearanceContext.tsx` applying to `<html>` and cleaning up on unmount). NEW `src/styles/owner-appearance.css` (text scale via the `--text-*` roles, dark tokens, custom accent and sidebar), imported in `index.css`.
+  - Settings: NEW `src/portals/owner/modules/settings/` (`SettingsModule`, `settingsTabs`, `ChoiceGroup`, `AppearanceSettings`, `AccessGroupsSettings`, `AccountAccessSettings`, `accessShared`).
+  - Access: NEW `src/services/accessApi.ts`, NEW `src/context/PermissionsContext.tsx`. `AuthContext.tsx` relays socket `permissions:changed` as window event `sugo:permissions-changed`.
+  - `OwnerPortal.tsx`:
+    - Split into an outer component (providers) and a shell.
+    - Workspaces gated per key; a denied deep link lands on the first permitted one with a notice.
+    - Nav placeholders while access loads, and an error banner with Retry.
+    - Footer Settings row; `?module=security` aliased to Settings > Account & security.
+    - Kuya Sugo needs `copilot.use`.
+    - The sidebar reads `--owner-sidebar`.
+    - Mojibake "â€¢" fixed to "•".
+  - Users: Access Group column and Main Owner badge. Edit is disabled on Admin rows for non-Main-Owners (own row allowed). Add User needs `users.manage`. The Admin role option is shown to the Main Owner only (`AddUserModal`, `EditUserModal`).
+  - Dispatcher:
+    - `DispatcherPortal.tsx`: tabs hidden per key (`queue.view`, `exceptions.resolve`), with a `LockedTab` panel.
+    - `useOpenExceptions(pollMs, enabled)`: stops polling without the key.
+    - `useRiderDispatch`, `PaymentLedgerPanel`: assign and refund say why before the request.
+    - `OrderChatScreen`: the passing-by close shows the server's 403 sentence.
+  - Dual-use tokens: NEW `--color-signal-ink` and `--color-field-ink` (`tailwind.css`, `portal-palette.css`), equal to today's values in light. In owner and shared files, `text-board-plate` became `text-white` and navy/red-as-text became `*-field-ink` / `text-signal-ink`. Visually identical in light, the Dispatcher included.
+  - `HeaderClock`, `NotificationBell`: `dark:` variants (only the Owner dark theme sets `.dark`).
+  - Owner chart chrome hex values moved to `var(--color-*)`.
+* **Verification**:
+  - `npx tsc --noEmit` PASS (0 errors).
+  - Browser pane, throwaway harness with a mocked axios adapter (sockets, XHR and fetch blocked; nothing reached production; harness deleted):
+    - Appearance: light, dark and device; `#FFE600` refused at 1.3:1, `#827500` offered and applied; 125% text; prefs isolated between user 1 and user 2; blocked localStorage shows defaults plus a notice.
+    - Access groups: built-in group read-only; requires chain; 409 conflict keeps the draft ("Save mine over theirs" and "Use their version"); delete refused while the group has members.
+    - Account access: `?account=` preselect; tri-state overrides with a live preview; "Unsaved" markers.
+    - As a restricted Admin: nav filtered, deep-link notice, no Kuya, `/users` never called; live `permissions:changed` both ways; Access tabs absent and `?tab=groups` lands on Appearance.
+    - Users: edit rules as specified.
+    - Dispatcher: Help Desk hidden, no exception polling, LockedTab shown.
+    - Failed permissions load: banner shown.
+    - 375px at 125% dark: no horizontal overflow, after adding `min-w-0` to both grid columns.
+  - **Not verified**: a production `npm run build`; dark mode on data-heavy screens with real data (charts, report tables, maps); the Kuya Sugo drawer stays light in dark mode.
+* **DEPLOYED 2026-11-04 ~08:47 (+08)** on the user's "Yes, deploy", after the server (top of the server handshake). The live entry is now `index-DeXauquc.js`; it was `index-4zDNJx0S.js`.
+  - **Proof of scope**: the MFA deploy's scratch copy `e916b2ed-.../scratchpad/web-mfa/base` built to exactly `index-4zDNJx0S.js`, so its source is live. Against the working tree, `public/` and the root config files were identical. All 45 differing `src` files were mine: 25 equal the live copy with my token swap replayed, and the other 20 hold only my hunks, checked line by line. So the release is live plus this change and nothing else.
+  - **Build**: a scratch copy of the working tree (`29694b31-.../scratchpad/web-rbac/rel`, `node_modules` as a junction) gave 191 files. 131 are byte-identical to live; 60 are renamed or changed chunks plus `index.html`.
+  - **Sync** (not `deploy-site.sh`, which deletes): uploaded to a new `/root/deploy-staging/web-rbac-20261104-084722`, guarded on the live entry and 191 files, ran the script's `rsync --backup` with no purge and no rm, then moved staging aside to `/root/deploy-backups/web-rbac-20261104-084722-staged`.
+  - **Backup**: `/root/deploy-backups/web-rbac-20261104-084722` holds the 67 parked files. **Rollback**: `rsync -rlpt /root/deploy-backups/web-rbac-20261104-084722/ /var/www/web/dist/`.
+  - **Live checks**: every referenced chunk resolves. nginx direct and Cloudflare give 200, and both serve `index-DeXauquc.js` and `SettingsModule-BR8iZUkk.js`. In the browser pane the sign-in page renders, unthemed, with no console errors.
+  - **Not exercised live**: a signed-in session. Nothing is committed.
+
+## 2026-11-04 - Fixed: switching accounts on one browser re-asked for the MFA code (Claude Code)
+- Server-only fix, deployed ~09:20 (+08). The portal's HttpOnly `mfaTrust` cookie now holds one trust per account (up to 5), so the owner and a dispatcher sharing a browser both stay trusted. No web change; nothing for the portal to store.
+- Details and rollback: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`.
+
+## 2026-11-04 - Web portal MFA is now ON (Claude Code)
+- **~03:37 (+08)**: the server's `.env` now has `MFA_ENFORCED_AUDIENCES=WEB_PORTAL`, and the API was restarted, healthy and stable. The next owner or dispatcher sign-in on each browser gets the two-step screen, then 30 days of trust (HttpOnly `mfaTrust` cookie).
+- Rollback and details: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`. Rider and customer apps are still not enforced.
+- A real sign-in through the challenge has not been tried yet.
+
+## 2026-11-04 - Web MFA deployed to the portal; MFA still switched off (Claude Code)
+- **Deployed 2026-11-04 ~03:30 (+08)** on the user's "deploy it". Live entry is now `index-4zDNJx0S.js`; it was `index-BnwmoGTL.js`.
+- **Scope**: live plus exactly the 5 web MFA files: `LoginPage.tsx`, `login/OtpStep.tsx`, `PhoneVerificationPage.tsx`, `apiClient.ts`, `apiService.ts`.
+  - **Proof**: a scratch copy of the tree, with those 5 set to their pre-edit versions (Claude Code file-history backups, all saved before the 11-03 14:18 build), built to **190/190 files byte-identical to live**.
+  - **Release**: the same copy with the current 5 files, identical to this working tree. 54 hashed files were renamed (the entry hash cascade) and `index.html` changed.
+  - **Other files**: no other file in `src`, `public` or config was newer than the live build.
+- **How (NOT `scripts/deploy-site.sh`)**: that script runs `rm -rf` on the VPS staging folder and permanently deletes assets older than 2 days. The user forbids `rm -rf` on production, so this deploy did the same steps by hand:
+  1. Uploaded to a new `/root/deploy-staging/web-mfa-20261104-032917`.
+  2. Guarded on the live entry and the 190-file count.
+  3. Ran the script's own `rsync -rlpt --delete-after --filter='P /assets/**' --backup --backup-dir=...` sync.
+  4. Ran no asset purge and no rm. Moved staging aside to `/root/deploy-backups/web-mfa-20261104-032917-staged`.
+- **Backup**: `/root/deploy-backups/web-mfa-20261104-032917` holds 71 parked files: the old `index.html`, plus 70 assets rsync re-copied for new timestamps, all byte-identical to live. **Rollback**: `rsync -rlpt /root/deploy-backups/web-mfa-20261104-032917/ /var/www/web/dist/`; the new chunks stay, unreferenced.
+- **Live checks**:
+  - Every referenced chunk resolves; nginx direct gives 200.
+  - Through Cloudflare, `/`, the new entry and `/verify-phone?purpose=mfa&hint=1234` all give 200. The entry contains `x-sugo-mfa`.
+  - In the browser pane, the sign-in form renders on `/` with no console errors. `/verify-phone?purpose=mfa&hint=1234` shows "Confirm it's you / Enter the number ending in 1234".
+  - Not exercised live: an actual MFA sign-in, since `MFA_ENFORCED_AUDIENCES` is still empty.
+- **`scripts/deploy-site.sh` still contains `rm -rf` and `-delete`.** Do not run it as-is (user's rule).
+- **Next**: with the user's OK, set `MFA_ENFORCED_AUDIENCES=WEB_PORTAL` in `/var/www/server/.env` and `pm2 restart capstone-backend`. The first staff sign-in on each browser will then be asked for SMS or email. Nothing committed.
+
+## 2026-11-04 - MFA server deployed with MFA switched off (Claude Code)
+- **Server only. This repo changed only in this note and a new `api-server-mfa` entry in `.claude/launch.json`**, which runs the local API with `MFA_ENFORCED_AUDIENCES=WEB_PORTAL`.
+- **Deployed 2026-11-04 ~00:20 (+08)** on the user's go-ahead: `mfa_trusted_devices` table and 11 server files, with nothing in `MFA_ENFORCED_AUDIENCES`, so no sign-in is asked for MFA yet. Rollback: `/root/deploy-backups/server-mfa-20261103-172011/rollback.sh`. Full entry: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`.
+- **Portal impact today**: the deployed web bundle still works. Its first-login staff challenge loses the SMS tab, because the server no longer sends the raw phone; email still works. The web MFA work below is **not deployed**. Next step: deploy it, then set `MFA_ENFORCED_AUDIENCES=WEB_PORTAL` in the server `.env` and restart. Check other sessions' uncommitted work in this tree before the web deploy.
+
+## 2026-11-03 - Web side of recurring two-step sign-in (MFA) (Claude Code)
+- **Contract** (server built in parallel by another session; server stays the identity authority): after a correct password the API answers 200 with `{ otpRequired, mfaRequired, reason: FIRST_LOGIN|NEW_DEVICE, factors: (SMS|EMAIL)[], challengeToken, maskedEmail, maskedPhone, phoneHint (last 4), role, expiresInSeconds }`. The raw `phone` is gone. Clients sending `x-sugo-mfa: 1` get no automatic email; they call `POST /auth/resend-login-otp` ("Send code"), which returns a fresh challengeToken. Verify with `{ challengeToken, code }` or `{ challengeToken, firebaseIdToken }`; web gets an HttpOnly `mfaTrust` cookie, nothing to store.
+- **Files**: `src/services/apiClient.ts` (`deviceHeaders()` adds `x-sugo-mfa: 1`, so the raw refresh carries it too), `src/services/apiService.ts` (`LoginChallengeResponse` gains `mfaRequired/reason/factors/phoneHint`, loses `phone`; `ChallengeError.statusCode`), `src/components/LoginPage.tsx` (OTP heading "Two-step verification", subline by reason; `endChallengeIfGone` maps 401/403 to an ended state; duplicate banner over the OTP step removed; `handleChallengeExpired` removed, expiry is shown in place), `src/components/login/OtpStep.tsx` (rebuilt: SMS tab only when `factors` has SMS and a 4-digit hint; user types the number, last 4 checked before any reCAPTCHA/SMS; email tab has an explicit Send code; states: sending, wrong code (boxes cleared + refocused), expired/ended with Start over, SMS quota/too-many-requests with "Use email instead"), `src/pages/PhoneVerificationPage.tsx` (`purpose=mfa&hint=1234`: no prefilled phone, last-4 check, skips and never writes the `sugo_otp_consumed_*` 2-hour lock, redirects with `token` only; `trustedAppRedirect` accepts `sugorider://` and `exp+ridermobileapp://`).
+- **Older server compatibility**: a challenge without `mfaRequired` is treated as before (code already mailed, resend cooldown running, email only).
+- **Verification**: `npx tsc --noEmit` PASS (0 errors) before and after harness removal. Browser pane with a throwaway harness mocking `apiClient.defaults.adapter` (sockets/XHR stubbed, nothing reached production): every request carried `x-sugo-mfa: 1`; credentials -> NEW_DEVICE challenge -> SMS tab refused 0917 123 9999 with no reCAPTCHA or request -> Email tab -> Send code adopted `ch-2` -> wrong code showed "Incorrect verification code.", cleared and refocused -> right code signed in with `ch-2`; `factors: ["EMAIL"]` hides the tab bar; verify 401 and the client countdown both show "This sign-in expired" + Start over (back to sign-in, username kept, focus in password); `/verify-phone?purpose=mfa&hint=1234` renders, ignores a set lock flag, refuses a wrong last-4. Harness deleted. Real Firebase SMS sending was not exercised (no test number). **Not deployed, nothing committed.**
+- **Next peer**: ship the server first (a web build against the old server still works, but the SMS tab only appears once the server sends `factors`/`phoneHint`). Rider app has no `scheme` in app.json yet; `sugorider` must be added there for the return link.
+
+## 2026-11-03 - Server security fixes from the Codex Security scan (Claude Code)
+- **Server only; nothing in this repo changed except this note.** Full entry, file list and open items: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`.
+- **Also 2026-11-03 ~16:47 (+08), on the user's instruction:** the 68 production accounts the 10-16 seed run created and that still accepted its passwords are **Suspended** (`dispatcher1`, `dispatcher2`, `rider1`-`rider5`, sysadmin `sysadminit`, 60 `customer_*`). None had been used since 10-17. Backup and rollback: `/root/deploy-backups/seed-accounts-suspend-20261103-094721`. They will show as disabled in the Owner and SysAdmin user lists; their synthetic errands remain in reports.
+- Fixed 8 of the scan's 14 findings: suspended customers signing in, Google linking by unverified email, demoted/deactivated staff keeping access through refresh, staff profile email/phone change keeping verification, Socket.IO accepting signed-out tokens (plus closing sockets on suspension/demotion), dispatcher decline skipping the claim check, payment-selection POST missing the CUSTOMER role gate, hard-coded seed passwords.
+- **Portal impact**: a demoted, deactivated or suspended staff member loses live updates at once (the server closes their socket 1 s after sending `session:revoked`), and is signed out at the next token refresh, within 15 minutes, when refresh answers 401 and `apiClient.ts` calls its logout callback. `AuthContext.tsx` acts on `session:revoked` only for `SUPERSEDED_BY_ANOTHER_DEVICE`, `REVOKED_BY_USER`, `REVOKED_ALL_OTHERS` and `PASSWORD_RESET`, so the plain-text reasons the owner edit and sysadmin status change send are ignored there (already true of sysadmin suspension before this change). Logging out on any other reason would make sign-out immediate: a web change, not made.
+- Server `tsc --noEmit` clean; server vitest 1943/1944 (1 unrelated `ownerCopilot` timeout). **Deployed to production 2026-11-03 ~16:37 (+08)** (user: "Yes, deploy"): 9 server files only, backup `/root/deploy-backups/server-security-scan-20261103-093647`; live checks and details in the server handshake. Nothing committed.
+
+## 2026-11-03 - Scoped Typography: Roboto for Owner Portal & Web Login, Urbanist for Dispatcher & Mobile (Antigravity)
+- **Request**: User specified explicit role-based typography scoping: Web Portal Owner and Web Login use Roboto, while Dispatcher, Rider, and Customer use Urbanist.
+- **Implementation**:
+  - Installed `@fontsource/roboto` (weights 400, 500, 700).
+  - `src/styles/fonts.css`: Added `@import '@fontsource/roboto/400.css'`, `500.css`, `700.css`. Defined `--font-roboto: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;`.
+  - Scoped `[data-surface="owner"]` and `.login-page` to `--font-sans: var(--font-roboto); font-family: var(--font-roboto);`.
+  - Dispatcher Portal (`[data-surface="dispatch"]`) and SysAdmin Portal (`[data-surface="sysadmin"]`) retain `--font-sans: var(--font-sans)` (`Urbanist`).
+  - `index.html`: Preloaded `/node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff2` alongside Urbanist woff2 files for instant zero-swap login rendering.
+- **Verification & Deployment**:
+  - `npx tsc --noEmit`: PASS (0 errors).
+  - Production build via `scripts/deploy-web.sh`: PASS (1m 11s).
+  - Production VPS sync to `https://portal.sugo-express.org`: PASS (HTTP 200, all referenced chunks resolve).
+
+## 2026-11-03 - Urbanist primary font migration across Web Portal (Antigravity)
+- **Request**: Adopt Urbanist as primary branding font across all platforms (Web, Rider, Customer), replacing proprietary Avenir discussion with geometric open-source Urbanist.
+- **Web Implementation**:
+  - Installed `@fontsource-variable/urbanist` (^5.3.0) and pruned dead `@fontsource-variable/geist` from `package.json`.
+  - `src/styles/fonts.css`: Imported `@fontsource-variable/urbanist`, set `--font-sans: 'Urbanist Variable', 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;`. Removed legacy Geist-specific character variant tags (`cv02-cv11`) from `body`.
+  - `src/styles/surfaces.css`: Cleaned figure font-feature-settings to `font-feature-settings: "tnum" 1;` preserving tabular numerals, and updated font comments to Urbanist.
+  - `index.html`: Preloaded both `/node_modules/@fontsource-variable/urbanist/files/urbanist-latin-wght-normal.woff2` and `urbanist-latin-ext-wght-normal.woff2` to ensure text AND Philippine Peso sign (`₱`, U+20B1) start downloading before CSS discovery.
+- **Verification**: `npx tsc --noEmit` passed (0 errors). `npm run build` passed with both font assets emitted and preloaded in `dist/index.html`.
+- **Next session**: Inspect deployed web portals across breakpoints.
+
+## 2026-11-02 - Scooter login deployed to production (Codex)
+- User explicitly requested production deployment. Deployed the login redesign only to `https://portal.sugo-express.org` through `scripts/deploy-site.sh --no-build` from `scratch/login-fullscreen-20261102/deployment/release`.
+- Scope proof: baseline built from the shared tree with login visuals removed and cookie-only auth changes reverted in the isolated copy. All 126 baseline non-HTML outputs matched live byte for byte; HTML matched after resolving the font preload URL and normalizing line endings. Release adds the login presentation, scoped CSS, and scooter JPEG. Existing production refresh-token behavior preserved; shared working files unchanged.
+- Isolated release TypeScript and Vite build passed. Entry `index-BRwfmKMv.js`. All 129 staged files deployed; all referenced chunks resolve; origin HTTPS check returned 200. Independent post-deploy hashes matched all 129 release files.
+- Rollback backup: `/root/deploy-backups/web-login-20261102-113500`; restore using `rsync -rlpt '/root/deploy-backups/web-login-20261102-113500/' '/var/www/web/dist/'`. Existing hashed chunks retained per deployment script.
+- Final public-browser verification timed out. Public HTTP root returned 200, but byte comparison differed (CDN HTML modification or caching not yet diagnosed). Further read-only verification hit automatic approval review timeouts; these do not affect the successful deployment. Local visual and interaction QA passed before deployment.
+- Deployment scripts, manifests, isolated sources, and verification script are in `scratch/login-fullscreen-20261102/`. No backend changes or commit. Root workspace `dist/` is the earlier full-working-tree build, not the isolated deployed release.
+
+## 2026-11-02 - Selected scooter login implemented locally (Codex)
+- User clarified the selection with an attachment: the red scooter close-up (round 3's On the move), with the picture filling the entire screen. That attachment supersedes the earlier numeric choice.
+- `src/components/LoginPage.tsx`: full-viewport image, shared BrandMark header, white form panel, concise sign-in heading, updated field label, keyboard-accessible password toggle, normal-flow footer. Existing authentication, cookie-only session change, maintenance, recovery, OTP, profile and takeover handlers preserved.
+- `src/components/login/login-page.css`: scoped light panel theme for credentials and shared auth steps; desktop right alignment, mobile centered layout, readable focus/error states. Background covers the viewport edge to edge with no navy frame.
+- `src/assets/login/scooter-fullscreen.jpg` (412,251 bytes) and `README.md`: built-in imagegen extended the attached photograph and removed UI; exact prompt recorded. Unused rider background moved to `public/preview/login-candidates-20261102-v3/rider-background-unused.jpg`.
+- Verification: `npx tsc --noEmit` and `npm run build` passed (existing sysAdminApiService mixed import warning). Browser verified photo load, empty-field validation, password visibility including keyboard activation, remember checkbox, password recovery entry/back, desktop rendering and widths 390/320 without horizontal overflow. No real login or password-reset request sent; authenticated OTP/profile flows not exercised end to end.
+- Local preview `http://127.0.0.1:4190/`; screenshot `scratch/login-fullscreen-20261102/desktop.png`. Not deployed or committed. Other sessions' uncommitted edits preserved; current build includes the shared working tree and is not an isolated deployment package.
+
+## 2026-11-02 - Login candidates with imagery, round 3 (Codex)
+- User requested images because the prior designs looked plain. Built-in imagegen produced 1 Local delivery (rider photo), 2 City routes (neighborhood illustration), 3 On the move (scooter photo).
+- Three PNGs, exact prompts and gallery: `public/preview/login-candidates-20261102-v3/`. Visually inspected all outputs. Preview artifacts only; application source unchanged.
+- User has not yet selected a candidate. Implement only after selection; reuse the actual shared BrandMark. User explicitly requested imagery, which takes precedence over local generic image restrictions.
+
+## 2026-11-02 - Login candidates round 2 (Codex)
+- User rejected round 1 as generic and requested regeneration. Three new built-in imagegen concepts: 1 Dispatch sheet, 2 Signal rail, 3 Night shift.
+- PNGs, full prompts and comparison gallery: `public/preview/login-candidates-20261102-v2/`. Outputs visually inspected. Preview assets only; prior TypeScript verification remains applicable because application code is unchanged.
+- Await the user's choice before implementation. Round 1 is retained for reference.
+
+## 2026-11-02 - Three login design candidates for review (Codex)
+- User requested imagegen candidates first, followed by their choice before implementation. No application source or authentication behavior changed.
+- Built-in imagegen produced 1: Light split, 2: Centered light, 3: Dark editorial. All three PNGs, exact prompts, and a numbered comparison page are saved in `public/preview/login-candidates-20261102/`.
+- Preview: `http://127.0.0.1:4190/preview/login-candidates-20261102/` (Vite on port 4190). Generation output visually inspected; `npx tsc --noEmit` passed. Await the user's selection, then implement using the existing shared BrandMark and preserve all login stages and handlers.
+
+## 2026-11-02 - Portal no longer keeps a readable refresh-token copy (Claude)
+* **Why**: the portal saved the 30-day refresh token in `sessionStorage` (`sugo_refresh_fallback`) and posted it on every refresh. Because it arrived in the body, `authController.refresh` returned the rotated token in the body too, so any script on the page could carry the session off the device. That undid the HttpOnly `refreshToken` cookie. Device binding did not help either: it is skipped when `x-device-id` is absent.
+* **Proof first** (production, read-only apart from one test session for QA dispatcher 7, revoked afterwards with reason `COOKIE_ONLY_CHECK`):
+  - Two refreshes from origin `https://portal.sugo-express.org` with the cookie only: 200, a new access token, a rotated cookie each time (`Max-Age=2592000; Domain=.sugo-express.org; Path=/; HttpOnly; Secure; SameSite=None`), and no `refreshToken` in the body.
+  - CORS allows credentials for the portal origin, and the public preflight agrees (204).
+  - After the revoke, the same cookie answers 401.
+* **Change** (portal, uncommitted; deployed 2026-11-02 13:20 (+08), see the deploy bullet):
+  - `src/context/AuthContext.tsx`: `login(user, token)` no longer takes or stores a refresh token. The load-time refresh and logout post `{}` and rely on the cookie. `LEGACY_REFRESH_COPY_KEY` is only ever removed, at load, so tabs signed in before the change drop their copy.
+  - `src/services/apiClient.ts`: the 401 interceptor refreshes with body `{}` and stores nothing. Only that block was touched; the file also carries another session's `rememberErrandReferences` edit.
+  - `src/types/auth.ts`, `src/components/LoginPage.tsx`, `src/components/auth/SessionExpiredModal.tsx`: the third `login()` argument removed. `LoginPage.tsx` also carries Codex's scooter login redesign (entry above); mine is only the one `login(...)` call.
+* **Verification**: `tsc --noEmit` clean. A throwaway harness (deleted) mounted the real `AuthProvider` with axios answered locally. A copy planted before load was gone after load, the load refresh sent `{}` with credentials, a 401 led to a cookie-only refresh and a successful retry, and nothing was stored after `login()`.
+* **Deployed** 2026-11-02 13:20 (+08) on top of Codex's scooter login, live entry `index-BB1pRm00.js`, backup `/root/deploy-backups/web-20261102-132039`. Codex shipped at 11:32 while my first release was building (on `index-CWt1FH5G.js`); the live-entry guard stopped that upload, and I rebased:
+  - Baseline: scratch copy of the working tree (the three `public/preview/login-candidates-20261102*` folders left out, they are not live) with only my edits reverted, `LoginPage.tsx` keeping Codex's redesign. It rebuilt to `index-BRwfmKMv.js`, all 129 files byte-identical to live.
+  - Release: scratch `src` equal to the working tree. Against the baseline only `LoginPage-*.js` and the entry changed in content; 46 other files differ only by renamed chunk references.
+  - Post-deploy: all 129 release files byte-identical on the VPS. In the live portal, a `sugo_refresh_fallback` value planted before a reload was gone after it; the scooter login still renders; no console errors. The entry's one remaining mention of the key is the removal. No real sign-in was made.
+* **Still open**: `respondWithAuth` (server) returns `refreshToken` in every sign-in body, for browsers too, so page code still sees it once at sign-in, though it now discards it. Withholding it when the request carries an `Origin` header (browsers do, the React Native apps do not) would close that. The SysAdmin sign-in also overwrites the shared `refreshToken` cookie, and production's access token lifetime is 30m (`JWT_EXPIRES_IN`), not the documented 15m.
+
+## 2026-11-02 - [AuthZ] log covers middleware refusals too (Claude)
+* **Why**: the OWASP A09 log line (entry below) caught only refusals thrown as `ServiceError`. `requireRole`, `authenticateToken` and the SysAdmin guards answer 401/403 themselves, so a rider probing a customer route was refused with no trace (seen live on the deploy check).
+* **Change** (server, uncommitted; deployed 2026-11-02 ~08:41 (+08), see the last bullet):
+  - New `src/lib/authzLog.ts` `logRefusal(req, status, reason)`, the one `[AuthZ] <status> on <METHOD> <path> for <ROLE #id | a signed-out caller> from <getClientIp>: <reason>` format. It never throws, and it drops the query string.
+  - `errorHandler.ts` now calls it instead of its inline copy.
+  - `middleware/auth.ts`: no token, revoked token, forged or malformed token (with the jsonwebtoken message), non-session token, and both `requireRole` refusals (with the allowed roles). **Expired tokens are deliberately not logged**: every client hits one every 15 minutes.
+  - `middleware/sysAdminSecurity.ts`: the three CSRF refusals, the anonymous-proxy block, and all four step-up refusals, including "wrong step-up password".
+  - `threatInterceptor.ts` ban responses are left alone; the threat engine already logs bans.
+* **Verification**: `tsc --noEmit` clean. `tests/securityGuards.test.ts` 23/23 (7 new: role refusal, no token, forged token, expired stays quiet, valid token quiet, wrong step-up password, CSRF). Full server suite 1915/1915. The first full run caught `req.originalUrl` missing on test fakes (16 failures in `accountOwnership`/`exceptionAccess`), which is why `logRefusal` falls back to `req.url` and swallows its own errors.
+* **Deployed** (user: "Deploy it"): only the 4 files. On the VPS `authzLog.ts` was absent, `sysAdminSecurity.ts` was at HEAD, `auth.ts`/`errorHandler.ts` were this morning's OWASP versions, everything was LF, and no source was newer than `dist`; every differing line was this change. VPS `tsc --noEmit` clean, `npm run build`, `pm2 restart`, health 200. Backup and rollback: `/root/deploy-backups/server-authzlog-20261102-014122` (VPS clock; `rm src/lib/authzLog.ts` when restoring). Live check from the VPS with 2-minute tokens against `GET /api/customer-locations/4?token=...`: rider logs `role RIDER is not one of CUSTOMER`, a forged token logs `invalid access token (invalid signature)`, an expired token and a valid customer log nothing, and no line carries the query string. The lines go to pm2's error stream (`logger.warn`). Nothing committed.
+
+## 2026-11-02 - Dispatcher chat alerts refused at page load (Claude)
+* **Report**: the live Dispatcher portal logged `[useCustomerChatAlerts] Listener error ... permission_denied at /chats/<errandId>/messages` for four errands, and the user linked it to the OWASP fixes below. It is not caused by them: none of those fixes is on the VPS (backend up since 10-30, no `algorithms`/`[AuthZ]` in `/var/www/server`).
+* **Cause**: all four errands (`261031-13525-0007`, `261027-EA9C8-0001`, `261025-031AB-0007`, `261025-67E0C-0002`) were claimed by dispatcher 13, and `chat_access` for each names `staff_13`, so the rules and grants are right. `useCustomerChatAlerts` attached its listeners as soon as `GET /errands` answered, before `ensureRealtimeSession` had signed in. A listener refused that way never retries. Reproduced against the live RTDB with a minted `staff_13` token: opened before sign-in it gets `PERMISSION_DENIED` and stays dead after sign-in, and opened after sign-in it reads the chat (7 messages). Read-only; the token was deleted.
+* **Fix** (portal, uncommitted, not deployed):
+  - `src/portals/dispatcher/hooks/useCustomerChatAlerts.ts` follows `onRealtimeAuthChange` like `useRiderFleetPresence`. It listens only while signed in, tears everything down when the session ends, and drops a refused listener so the next session can open it again. A refusal under the same session is not retried on every errand update.
+  - `src/firebase/realtimeSession.ts`: `ensureRealtimeSession` keeps a restored Firebase session only if its uid is `staff_<id>` of the account in the portal's access token (`expectedPortalUid`). Before, any `staff_` uid passed, so another dispatcher's leftover session on the same browser was refused every chat this one claimed.
+* **Verification**: `tsc --noEmit` clean. A throwaway harness (deleted) mounted the HEAD hook and the new one with the errand list present before sign-in, which then landed 3 s later with a real `staff_13` token. Old hook: one `permission_denied`, no data. New hook: no error, 2 unread customer messages. The mismatched-uid branch was not driven in the browser. The Google Maps `<gmp-pin>` `glyph`/`element` deprecations and the AdvancedMarkerElement click hint in the same console are warnings from `useRiderActiveRoute`, unrelated and unchanged.
+* **Deployed 2026-11-02 ~07:04 (+08), these two files only.** Live before was `index-DO_bxsuk.js`, built at 06:25 by another session from this tree. That build had read the source before 06:20, so it does **not** contain the OWASP `PhoneVerificationPage` redirect fix even though that file's mtime is older than `dist/index.html`. The deploy built a scratch copy of the tree with all three of my files at HEAD: 127/127 outputs identical to live. Then it built the same copy plus `realtimeSession.ts` and `useCustomerChatAlerts.ts`, and shipped it with `deploy-site.sh --no-build`. Live entry is now `index-DcP1XcDl.js`, 127/127 files equal to that build, public URL 200. Backup and rollback: `/root/deploy-backups/web-20261102-070419`. The redirect fix and the server-side OWASP fixes followed at ~07:52 and ~07:56 (see the OWASP entry below). Nothing committed.
+
+## 2026-11-02 - OWASP review: every finding checked against the code, eight fixed (Claude)
+* **Source**: Antigravity's OWASP Top 10 (2021) report, pasted by the user. Each finding was read in the code before anything changed.
+* **Fixed, server** (`C:\Capstone_Server\server`, uncommitted):
+  - **A01** `GET /api/customer-locations/:userId` is CUSTOMER only: `requireRole(["CUSTOMER"])` on the route, and `customerLocationController.listLocations` now allows only the customer the list belongs to (it used to refuse only *other customers*, so rider 9, dispatcher 9 or owner 9 could read customer 9's saved places). Only the CustomerApp calls it.
+  - **A03** `sysAdminThreatService.blockIp` and `addWhitelistedIp` refuse anything `net.isIP` rejects ("Enter a single IPv4 or IPv6 address.", 400 through the controller). `syncNginxBlocklist` skips and warns about older rows that would make `nginx -t` fail every sync.
+  - **A04** `registerCustomer` no longer copies `emailVerified` from the body. It is true only when the address's newest code (`findLatestForEmail`, customerId and userId null) was consumed in the last 30 minutes. A resend retires old codes but always leaves a newer live one, so a consumed newest code means it was typed. Otherwise the account starts unverified and the existing post-registration code goes out. The CustomerApp flow (verify OTP, password step, register) is unchanged.
+  - **A04** `customerService.updateProfile` sets `emailVerified: false` when the email changes, the rule `userService` already applies to staff. No customer flow gates on the flag today.
+  - **A07** the phone OTP stub (`sendRegistrationPhoneOtp`, unused by the app, still mounted) no longer logs the code or the full number.
+  - **A09** `errorHandler` writes `[AuthZ] <status> on <METHOD> <path> for <ROLE #id | a signed-out caller> from <getClientIp>: <message>` for every 401/403 `ServiceError`. The query string is dropped because some links carry tokens there.
+  - **A02** all 14 `jwt.verify` calls (8 files) pass `{ algorithms: ["HS256"] }`. Every `jwt.sign` uses a string secret, so tokens were already HS256.
+* **Fixed, portal**: **A01** `src/pages/PhoneVerificationPage.tsx` sends the Firebase ID token only to `customerapp://`, `exp+customerapp://`, or `exp://` on localhost or a private-network address (Expo Go against a LAN Metro). Any other `redirect` is dropped, so the page ends on "You can now close this window". This also keeps a `javascript:` redirect out of the expired screen's link. The `exp://` host is parsed by regex because older Chrome reports no hostname for non-http URLs.
+* **Not changed, each needs the user's call**:
+  1. **A02** the GoAccess iframe still takes the SysAdmin JWT as `?token=` (`getGoAccessReportUrl`), so it lands in the nginx logs GoAccess reports on. Fix is a single-use, 60-second ticket. That means editing the SysAdmin portal, which has about 2,000 lines of another session's uncommitted work in 20 files.
+  2. **A05/A08** no step-up password on backup download or APK upload/finalize. Each needs a password prompt in `BackupsTab` and the release upload UI (the same busy SysAdmin tree). Verifying APK signatures (`apksigner`) is a separate, bigger job.
+  3. **A02** the CustomerApp writes the refresh token to AsyncStorage as well as SecureStore *on purpose* (commit `0050137`, so the session survives SecureStore failing at wake-up). The Rider app's pattern (clear AsyncStorage when SecureStore succeeds) is safer but needs an app build.
+  4. **A05** the 30 MB global JSON limit. Lowering it first needs a list of which routes take base64 uploads, or those uploads start failing with 413.
+  5. **A07** 6-character customer passwords. This is a product decision, and the app checks for 6 too.
+  6. **A07** no limiter on `/auth/refresh`. Refresh tokens cannot be guessed, so a limiter adds little and could lock out customers who share a carrier NAT IP.
+  7. **A06** `npm audit` not re-run in this session.
+* **Verification**: server and web `tsc --noEmit` clean. New `tests/securityGuards.test.ts` (16: location roles, ban/whitelist input, nginx file skip, 401/403 log) and `tests/registrationEmailProof.test.ts` (6) pass. `tests/firebasePhoneAuth.test.ts`'s repository mock gained `findLatestForEmail`. Full server suite 1907/1908. The one failure is `ownerCopilot` "disabled by SysAdmin" timing out at 5 s under full-suite load. It passes alone and touches no changed file. Redirect allowlist: 19 good and hostile URLs gave the expected result. Browser (Vite 5173, expired view): no return link for `https://attacker.example/collect`, and a link to `customerapp://phone-verified`. Not committed.
+* **Deployed 2026-11-02 (user: "Deploy both")**:
+  - **Server, ~07:52 (+08).** Only the 14 `src` files. Each live copy in `/var/www/server` equalled the version my edits started from: 13 at HEAD, and `customerService.ts` already had the other session's `referenceNo` line live. My patch (28 hunks, without that line) applied to the live copies gave byte-for-byte my local files. `socket.ts` is CRLF on the VPS and the rest LF, which was kept. No source on the VPS was newer than `dist/index.js`. VPS `tsc --noEmit` clean, `npm run build` (tsc), `pm2 restart capstone-backend`, health 200. Backup and rollback: `/root/deploy-backups/server-owasp-20261102-005204` (`src-before.tar`, `dist-before.tgz`; the name uses the VPS clock).
+  - Live checks from the VPS, using 2-minute tokens signed there: rider 3 and dispatcher 4 asking for customer 4's saved places get 403, customer 4 gets their own (200), and customer 5 gets 403. That last one logged `[AuthZ] 403 on GET /api/customer-locations/4 for CUSTOMER #5 from 127.0.0.1`. **Gap**: `[AuthZ]` covers refusals thrown as `ServiceError`. `requireRole` and `authenticateToken` answer 401/403 themselves and are still not logged.
+  - **Portal, ~07:56 (+08).** A scratch copy with `PhoneVerificationPage.tsx` at HEAD rebuilt live `index-DcP1XcDl.js` 127/127. The copy with the fix (scratch `src` then equal to the working tree's `src`) became live `index-CWt1FH5G.js`, 127/127 files equal to the build. On portal.sugo-express.org the expired view shows no link for `https://attacker.example/collect` and links `customerapp://phone-verified`. Backup: `/root/deploy-backups/web-20261102-075635`.
+  - No new APK is needed. The customer APK on offer (1.2.0) returns to `customerapp://phone-verified`, which the allowlist accepts, and nothing else here changes app code.
+
+## 2026-11-02 - One app logo everywhere: the scooter mark reaches the portal (Claude)
+* **Request**: "When our logo app in customer changes, it shall change in other environment like web and rider app, even in login screen where the logo is being portrayed."
+* **Single source**: the logo master stays in CustomerApp (`artwork/kuya-sugo/logo_concepts.mjs`, `sugo-scooter`). `export_flat_logo.mjs` now copies its white mark into `RiderMobileApp/assets/brand/` and `Capstone_Project_Web/src/assets/brand/sugo-mark-white.svg`, then runs each repo's own `scripts/export-brand-icons.mjs` (`--only-customer` skips this; a missing sibling is skipped with a note). Change the logo there and run it once; do not hand-edit the generated files below.
+* **Portal** (`scripts/export-brand-icons.mjs`, new): writes `src/assets/brand/sugo-mark.svg` (the mark cropped to its bounds, viewBox `21 103 458 306`) and `public/favicon.png` (48), `logo.png` (192, also the og:image) and `apple-touch-icon.png` (192), white mark on Sugo pink `#F62459`. Old icons: `C:\Capstone_Server\character_animation\rider_brand_backup_2026-11-01\web-public\`.
+* **`<BrandMark>`** (`src/components/brand/BrandMark.tsx`, new): the mark as a CSS mask in `currentColor`, sized by width (3:2), `label` for a spoken name. The URL is quoted because Vite inlines the small SVG as a data URI. Replaces the stand-ins: "SG" tiles in `MobileHeader` (default left element), `SysAdminLoginView`, `SysAdminMagicLinkVerificationPage`, `SysAdminPortal` header; the collapsed-sidebar `BikeIcon` tiles in `OwnerPortal` and `DispatcherPortal` (the Dispatcher nav's `BikeIcon` stays); and a new 56 px `bg-signal` tile above the heading on `LoginPage`. Tile sizes and colours are unchanged. Only those lines were touched in files carrying other sessions' uncommitted work.
+* **Verification**: `tsc --noEmit` clean. Headless Chrome on a separate Vite (port 5183): staff login (`/`), `/sysadmin` and a harness with the mobile header and sidebar tile all draw the white scooter; the harness is deleted. `scripts/*-header-layout.test.cjs` not run (they need a built preview on 4173 and Playwright, and measure the bell).
+* **Favicon cache**: Cloudflare and browsers hold `/favicon.png`, `/logo.png` and `/apple-touch-icon.png` for a year (`max-age=31536000`); after the first deploy the plain URLs still served the bicycle. The exporter now stamps a content hash on them in `index.html` (`?v=33c51817`, `?v=d2ff01e8`, also the og:image), so each logo change gets new URLs.
+* **Deployed** 2026-11-02 06:25 (+08) from a scratch copy, live entry `index-DO_bxsuk.js`, backup `/root/deploy-backups/web-20261102-062550` (the first, unversioned deploy is `web-20261102-062110`). Proof it carried only this change: the same tree with only these edits reverted rebuilt to files all byte-identical to the live build of 10-31 (`index-BopZoSk6.js`), so the other sessions' uncommitted edits in the touched files were already live. Not shipped: `src/pages/PhoneVerificationPage.tsx`, edited by another session at 06:20 and not live. Local `dist/` mirrors live again. Live login at portal.sugo-express.org shows the scooter tile.
+* **Noticed, not fixed**: `OwnerPortal.tsx` sidebar subtitle reads `Owner Console â€¢ Tacurong` in the working tree (a double-encoded bullet in someone's uncommitted edit; HEAD has `•`).
+
+## 2026-11-02 - Protocol Upgrade: Distributed Tri-Agent Peer Architecture & Universal CARE Clean-Up Invariant (Antigravity, Gemini 3.8 Flash High)
+* **Goal**: Upgraded the multi-agent collaboration framework from a dual-agent tunnel into an autonomous distributed full-stack peer matrix (Claude Code, OpenAI Codex, and Antigravity) and codified Matt Pocock's CARE code-hygiene standard across all workspaces.
+* **Core Principles Established**:
+  1. **Distributed Peer Ownership ("You Touch It, You Own It")**: Eliminated rigid assembly-line silos. Every agent is a full-stack peer responsible for end-to-end delivery: context grounding, surgical delta, defensive hardening, CARE clean-up, and `tsc` verification.
+  2. **Universal "CARE" Invariant**: Banned "make it work" band-aids. Every agent must complete Phase 2 (clean up unused imports, dead variables, debug code, and non-happy-path bounds) before declaring a task complete.
+  3. **Rotating Driver & Async Peer Review**: Whichever agent is active drives the feature; subsequent agents perform async peer reviews via this ledger.
+  4. **Tri-Agent Configuration Parity**: Updated `CLAUDE.md`, `AGENTS.md`, created `.codex/instructions.md`, and added `tri-agent-collaboration-protocol.md`.
+* **Verification**:
+  - `tri-agent-collaboration-protocol.md` authored and linked.
+  - `CLAUDE.md`, `AGENTS.md`, and `.codex/instructions.md` synchronized across Web, Mobile, and Server workspaces.
+* **Modified Files**:
+  - `c:\Capstone_Project_Web\.agents\rules\tri-agent-collaboration-protocol.md` (created)
+  - `c:\Capstone_Project_Web\.agents\rules\dual-agent-handshake-protocol.md` (updated)
+  - `c:\Capstone_Project_Web\CLAUDE.md` (updated)
+  - `c:\Capstone_Project_Web\AGENTS.md` (updated)
+  - `c:\Capstone_Project_Web\.codex\instructions.md` (created)
+  - `c:\Capstone_Project_Mobile_App\RiderMobileApp\CLAUDE.md` (updated)
+  - `c:\Capstone_Project_Mobile_App\RiderMobileApp\AGENTS.md` (updated)
+  - `c:\Capstone_Server\server\CLAUDE.md` (updated)
+  - `c:\Capstone_Server\server\AGENTS.md` (updated)
+
 
 ## 2026-10-31 - Lighthouse Audit Optimization: ARD Manifest Schema Conformance, COOP Headers, and Critical Preload Tuning (Antigravity 2.0, Gemini 3.8 Flash High)
 * **Goal**: Resolved Lighthouse audit recommendations on `portal.sugo-express.org`:
@@ -5565,3 +5900,48 @@
 - **Verification**:
   - `npx tsc --noEmit` verified with 0 errors.
   - Dev server HTTP 200 OK at `http://localhost:5173/owner`.
+
+## 2026-11-10 - One route for rider, customer and dispatch: sharing the rider's line after a reroute (Claude)
+- **User request:** "In the Dispatcher Tracking and Customer tracking. The recalculating feature where the rider is bypass by the rider. Now, what should we do?" then "Yes, build it".
+- **Problem:** only Sugo Rider recalculated on purpose (reroutePolicy.ts). The customer app calculated its own line every 30 s and every ~11 m; the dispatcher/owner map drew the stored fee-pricing route (Errand.routeGeometry), which never changes. After a bypass the three screens showed three different roads.
+- **Server (`C:\Capstone_Server\server`, needs deploy; no rider APK change):**
+  - NEW `src/lib/routing/riderLiveRoute.ts`: in-memory last line per rider (version, target, coordinates, engine figures, `reroutedAt`). A new line to the same target counts as a reroute only when the rider asked from >20 m off the old line and not for a map switch (`keep`). Lines older than 3 h are dropped; a rider >250 m from the kept line is "not following" it.
+  - NEW `src/services/riderRouteService.ts`: `recordRiderRoute` runs after every rider `POST /routing/directions` (not awaited, never throws), skips degraded guesses and origins >500 m from the rider's fresh position, emits `rider:route` notice (no coordinates) to staff, and to `errand:<id>` + `customer:<id>` only for errands whose door the line ends at (15 m), one emit per errand. `riderRouteForViewer` serves the line: customer by errand only and only when it ends at their door; staff by errand or rider; `since` returns `{ unchanged: true }`.
+  - `GET /routing/rider-route?errandId|riderId&since` (authenticateToken, 120/min limiter) in `routingRoutes.ts`; `riderRouteQuerySchema` in `routingValidators.ts`; `routingController.ts` calls `recordRiderRoute` after responding.
+  - Tests: NEW `tests/riderLiveRoute.test.ts` (10), `tests/riderRouteService.test.ts` (14). Full suite 165 files / 2113 tests pass; `tsc --noEmit` exit 0.
+- **CustomerApp (`C:\Capstone_Project_Mobile_App\CustomerApp`, needs an app update / OTA):**
+  - NEW `src/hooks/useRiderLine.ts` (fetch + `rider:route` notice + 30 s poll + refetch on socket connect), `src/hooks/useRouteProgress.ts`, `src/utils/routeGeometry.ts` (port of the rider app's projection/trim maths).
+  - `src/hooks/useLiveRoute.ts`: once no store is left ahead (waypoints empty) and the rider's line is on the map's own engine, it uses the rider's line, trimmed at the rider, figures scaled to the part ahead, and does no fetching or 30 s timer. Falls back to its own calculation when the line is absent or on the other engine. New result fields `source`, `routeUpdatedAt`, `routeKey`.
+  - `src/components/LiveTrackingMap.tsx`: optional `routeKey` (camera re-frames per route, not per trimmed point), `routeUpdatedAt` ("· Route updated" in the legend for 2 min). Passed from `TrackTab.tsx` and `ErrandTrackCard.tsx`.
+  - Tests: NEW `useRiderLine.test.tsx` (7), `useLiveRouteRiderLine.test.tsx` (7); `useLiveRouteEngine.test.tsx` mocks `useRiderLine`. Full jest 100 suites / 1124 tests pass; `tsc --noEmit` exit 0.
+- **Web (this repo):**
+  - `src/hooks/useRiderFleetPresence.ts`: `acquireFleetSocket` / `releaseFleetSocket` exported (additive, unchanged behaviour).
+  - `src/hooks/useRiderActiveRoute.ts`: `liveLine` (selected ON_DELIVERY rider, by riderId, notice + 30 s poll on the shared fleet socket); `describeReroute()`.
+  - `src/components/LiveFleetMap.tsx`: optional `liveRoute` prop; when given it is the main navy line and the planned route stays underneath, faint slate.
+  - `src/portals/dispatcher/components/RiderFleetRoster.tsx`: passes `liveRoute`, shows "Rerouted N min ago" (lucide `Route`) on the selected rider card for 30 min. `src/portals/owner/modules/tracking/RiderTrackingModule.tsx`: passes `liveRoute`.
+  - `npx tsc --noEmit` exit 0. **Not verified in the browser** (needs Google Maps plus a live rider; no harness written).
+- **Not done / next:** no "off route" alert for sustained deviation (thresholds are the owner's call); the dispatcher's live line is not trimmed at the rider; the line store assumes one API process (same as riderRouteChoice). Nothing committed or deployed. Deploy order: server first; the apps fall back cleanly while the endpoint is missing.
+- **Server deployed 2026-11-10 23:02 (+08) / 16:02 CET (Claude):** code-only upload of the 5 server files above to `/var/www/server` (no schema change, no `deploy-server.sh`, no ML rebuild). Proof first: prod copies of `routingValidators.ts`, `routingController.ts`, `routingRoutes.ts` equalled local minus my edits (sha256, `\r` stripped), imported modules (`socket.ts`, `riderPositionStore.ts`, `riderWatch.ts`, `routingService.ts`) equal local, nothing in `src` newer than `dist/index.js`. VPS `tsc --noEmit` clean, `npm run build` ok, `pm2 restart capstone-backend` (single process, online, restarts 6). `GET /api/routing/rider-route` answers 401 signed-out, locally and via `https://api.sugo-express.org`. Backup + staged tar: `/root/deploy-backups/server-rider-route-20261110-230220` (rollback: copy its three `src/...` files back, move the two new files aside, rebuild, restart). The `ERR_ERL_KEY_GEN_IPV6` stack in the error log (sysAdminSecurity.js) predates this deploy (1962 occurrences). Not verified with a signed-in rider/customer request. Web portal and CustomerApp changes are still NOT deployed or committed.
+- **Web deployed 2026-11-11 04:04 (+08) (Claude):** entry `index-CagKvu69.js` -> `index-DGevIezW.js`. Scope proof: the working tree against Codex's `scratch/responsive-20261104/deployment/source-manifest.json` differed only in the 3 Banga files (unchanged since 11-09 18:58, already live) and my 5 route files, with no new files; each of my 5 files differs from the saved release copy only by my own edits. Built to scratch (`vite build --outDir`, shared `dist/` untouched); 49 of 191 outputs differ from live (entry, `index.html`, chunks that import the entry, the tracking chunks), the other 142 were already live byte for byte. Shipped with the Banga deploy script (guards on the live entry and checksums, assets first with no deletion, `index.html` swapped last). Verified: all 191 release files match live, every referenced chunk resolves, `/`, `/dispatcher`, `/owner` 200 at nginx and through Cloudflare, the edge serves the new entry, `RiderFleetRoster` and `useRiderActiveRoute` with release checksums, and the built-in browser loads sign-in on the new entry and imports the tracking chunks with no console errors. Backup and rollback: `/root/deploy-backups/web-route-20261111-040417` (`rollback.sh` puts the old `index.html` back, deletes nothing). Not driven signed in (needs a dispatcher login and a rider on delivery). CustomerApp change still NOT shipped; nothing committed.
+
+## 2026-11-12 - Settlement & Transactions Report Updates (Antigravity)
+- **User request**:
+  1. Include in Transactions the summary unremitted and uncollected (`TransactionSummaryReportView`).
+  2. Rename `"Still (Owed)"` to `"Unremitted"`, then remove the card `"Short"` (`SettlementReportView`).
+  3. Transaction for helpdesk repayment must appear on settlement modules (`SettlementReportView` / `getSettlementReport`).
+- **Web (`c:\Capstone_Project_Web`)**:
+  - `src/services/apiService.ts`: Added optional `lineKey` and `lineKind` (`"HANDOVER" | "REPAYMENT"`) on `ApiSettlementLine`, and optional `unremitted`, `unremittedCount`, `uncollected`, `uncollectedCount` on `ApiTransactionSummaryReport["totals"]`.
+  - `src/portals/owner/modules/reports/components/SettlementReportView.tsx`: Removed the `Short` summary card (`short-tile`) and unused `TrendingDown` import (4-column KPI grid), renamed `"Still owed (today)"` / `"Still owed"` to `"Unremitted"` across the summary card, `PeriodBreakdownTable`, `By rider` table/preview/inspector, `Every cash turn-over` table/preview/inspector, and CSV export; keyed turn-over rows by `lineKey` and updated `whatHappenedSince` / `plainStatus` for Help Desk repayment rows.
+  - `src/portals/owner/modules/reports/components/TransactionSummaryReportView.tsx`: Added 4-column summary strip (`Total amount`, `Service fees`, `Unremitted`, `Uncollected`) above the period breakdown table.
+- **Server (`c:\Capstone_Server\server`)**:
+  - `src/repositories/customerTransactionRepository.ts`: Selected `settlement` (`id`, `expectedAmount`, `collectedAmount`, `variance`, and standing `adjustments`) in `WITH_REPORT_DETAILS`.
+  - `src/repositories/settlementAdjustmentRepository.ts` & `src/repositories/settlementRepository.ts`: Added `findRepaymentsBetweenWithSettlement(start, end, riderId)` for standing `RIDER_PAID_BACK` / `CUSTOMER_PAID_GCASH` adjustments recorded in the window.
+  - `src/services/reportService.ts`: `getSettlementReport` includes Help Desk repayment transaction rows in `cash.lines` and updates `byRider.paidBackLater` when the original handover predates the window; `getTransactionSummary` computes `unremitted`, `unremittedCount`, `uncollected`, and `uncollectedCount` in `totals`.
+  - `src/services/pdf/reportPdfService.ts`: Updated `settlementSpec` (`Unremitted` wording, removed `Short` summary box, `whatHappenedSince` support for repayment rows) and `transactionsSpec` (`Unremitted` and `Uncollected` summary boxes).
+  - Tests: Updated `tests/reportPdfExport.test.ts`, `tests/settlementRevenueSplit.test.ts`, and `tests/transactionSummaryRider.test.ts`.
+- **Verification**:
+  - Web `npx tsc --noEmit`: exit 0 (0 errors).
+  - Server `npx tsc --noEmit`: exit 0 (0 errors).
+  - Server Vitest (`tests/reportPdfExport.test.ts`, `tests/settlementRevenueSplit.test.ts`, `tests/transactionSummaryRider.test.ts`): 3 files / 52 tests passed.
+  - Local changes only; not deployed or committed.
+

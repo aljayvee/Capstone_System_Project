@@ -128,14 +128,12 @@
 /* Figures: money, quantities, timers, route numbers, counts.
 
    src/styles/fonts.css enforces tabular numerals by setting
-   font-feature-settings: 'tnum' 1, which REPLACES the body's
-   'cv02','cv03','cv04','cv11' character variants rather than adding to them,
-   so Geist's letterforms silently differ inside tables and .font-mono. Here
-   both are declared together, so a figure keeps the same alphabet as the
-   sentence beside it. */
+   font-feature-settings: 'tnum' 1, ensuring figures keep tabular alignment
+   inside tables, badges, and .font-mono while preserving the primary
+   Urbanist font. */
 [data-surface] [data-figure] {
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum" 1;
+  font-feature-settings: "tnum" 1;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -148,7 +146,7 @@
 
    2px at size 14 is a seventh of the glyph's height. It fills the counters,
    closes the apertures, and is the main reason small icons read as clip art
-   sitting beside Geist at 600. 1.5 holds the aperture open across every size
+   sitting beside Urbanist at 600. 1.5 holds the aperture open across every size
    these consoles actually use, from the 10px evidence marks to the 28px
    empty-state figures.
 

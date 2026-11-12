@@ -76,12 +76,11 @@ export const RANGE_PRESETS: Preset[] = [
   {
     label: "This week",
     build: (t) => {
-      // Monday-based, matching the business week the settlement flow runs on
-      // (see reportPeriodStrategy). A Sunday-start week here would put a
-      // Sunday's takings in a different bucket than the reports do.
-      const dow = t.getDay();
-      const monday = addDays(t, dow === 0 ? -6 : 1 - dow);
-      return { start: monday, end: t };
+      // Sunday-based, matching the reports' Daily window (Sunday to Saturday,
+      // see reportPeriodStrategy on the server). A Monday-start week here put
+      // a Sunday's takings in a different week than the printed report did.
+      const sunday = addDays(t, -t.getDay());
+      return { start: sunday, end: t };
     },
   },
   {

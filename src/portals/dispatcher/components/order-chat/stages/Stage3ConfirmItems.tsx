@@ -22,6 +22,7 @@ import { copy, formatAgo } from "../copy";
 import type { MerchantCategory, StorePinpoint } from "../types";
 import { describeSuggestionSource, useCatalogAutocomplete } from "../hooks/useCatalogAutocomplete";
 import { ItemsByStore, StoreItemsDialog, type StoreColumn } from "../ItemsByStore";
+import { StoreSubstitutesPanel, type SubstituteEntry } from "../StoreSubstitutesPanel";
 import { newItemKey, type ItemLine } from "../itemOwnership";
 
 /*
@@ -165,9 +166,15 @@ export function Stage3ConfirmItems({
   // a "Change the list" button between the dispatcher and every edit, on the
   // one screen whose whole job is editing the list. This re-opens it from the
   // saved list after a send or an undo; an open draft is never replaced.
+  //
+  // Not before the order has loaded: opened on an empty order, the draft is
+  // empty and, never replaced, stays empty until a reload. That is what the
+  // bell's "Open Stage 2" did, since it opens this stage the moment the order
+  // screen mounts, before the errand arrives (2026-10-25).
+  const orderLoaded = Boolean(orderDetails);
   useEffect(() => {
-    if (canModifyItems && !isEditing) startEditing();
-  }, [canModifyItems, isEditing, startEditing]);
+    if (orderLoaded && canModifyItems && !isEditing) startEditing();
+  }, [orderLoaded, canModifyItems, isEditing, startEditing]);
 
   const [substituteState, setSubstituteState] = useState<
     Record<
@@ -175,20 +182,29 @@ export function Stage3ConfirmItems({
       {
         loading: boolean;
         data?: { substitutes: string[]; chatMessage: string; source: "ai" | "catalog" } | null;
-        sentChat?: boolean;
+        declined?: boolean;
       }
     >
   >({});
+  const substituteRequests = useRef(new Set<number>());
+  const substituteAction = useRef(false);
+  const currentItems = useRef(editableItems);
+  currentItems.current = editableItems;
+  const [isUpdatingSubstitutes, setIsUpdatingSubstitutes] = useState(false);
 
   const handleFetchSubstitutes = useCallback(
     async (itemId: number) => {
-      if (!itemId || itemId <= 0) return;
+      if (!itemId || itemId <= 0 || substituteRequests.current.has(itemId)) return;
+      substituteRequests.current.add(itemId);
       setSubstituteState((prev) => ({ ...prev, [itemId]: { ...prev[itemId], loading: true } }));
-      const data = await apiService.suggestItemSubstitutes(orderId, itemId);
-      setSubstituteState((prev) => ({
-        ...prev,
-        [itemId]: { loading: false, data, sentChat: prev[itemId]?.sentChat ?? false },
-      }));
+      try {
+        const data = await apiService.suggestItemSubstitutes(orderId, itemId);
+        setSubstituteState((prev) => ({ ...prev, [itemId]: { ...prev[itemId], loading: false, data } }));
+      } catch {
+        setSubstituteState((prev) => ({ ...prev, [itemId]: { ...prev[itemId], loading: false, data: null } }));
+      } finally {
+        substituteRequests.current.delete(itemId);
+      }
     },
     [orderId]
   );
@@ -208,7 +224,8 @@ export function Stage3ConfirmItems({
     });
   }, [savedItems, canModifyItems, substituteState, handleFetchSubstitutes]);
 
-  const handleSendSubstituteChat = (itemId: number, chatMessage: string) => {
+  const handleSendSubstituteChat = (chatMessage: string) => {
+    if (!canModifyItems || substituteAction.current || !chatMessage.trim()) return;
     pushMessage({
       senderId: "dispatcher",
       senderName: "Dispatcher",
@@ -217,43 +234,53 @@ export function Stage3ConfirmItems({
       timestamp: Date.now(),
       type: "text",
     });
-    setSubstituteState((prev) => ({
-      ...prev,
-      [itemId]: { ...prev[itemId], loading: false, sentChat: true },
-    }));
     feedback.showSuccess("Substitute options sent to customer chat.");
   };
 
   const handleApplySubstitute = async (itemIndex: number, itemId: number, newItemName: string) => {
-    if (!canModifyItems) return;
-    // The list is always open, and `itemIndex` is the editable row's own
-    // index, so the swap lands on the row the button sits in. Only this
-    // store's copy changes, so it becomes an item of its own.
-    updateItem(itemIndex, { itemName: newItemName, itemKey: newItemKey() });
-    if (itemId) {
+    if (!canModifyItems || substituteAction.current) return;
+    if (Number(currentItems.current[itemIndex]?.id) !== itemId) return;
+    substituteAction.current = true;
+    setIsUpdatingSubstitutes(true);
+    try {
       const res = await apiService.updateItemFulfillmentStatus(orderId, itemId, "PENDING");
+      if (!res) throw new Error("Substitute update failed");
+      // Another item can be removed while this request is in flight.
+      const currentIndex = currentItems.current.findIndex((item) => Number(item.id) === itemId);
+      if (currentIndex >= 0) updateItem(currentIndex, { itemName: newItemName, itemKey: newItemKey(), fulfillmentStatus: "PENDING" });
       if (res?.errand) onOrderUpdated(res.errand);
+      feedback.showSuccess(`Swapped to ${newItemName}. Send the updated item list when ready.`);
+    } catch {
+      feedback.showError("Could not swap this item. Please try again.");
+    } finally {
+      substituteAction.current = false;
+      setIsUpdatingSubstitutes(false);
     }
-    setSubstituteState((prev) => {
-      const copyState = { ...prev };
-      delete copyState[itemId];
-      return copyState;
-    });
   };
 
-  const handleDeclineSubstitute = async (itemId: number) => {
+  const handleDeclineSubstitute = async (itemIds: number[]) => {
+    if (!canModifyItems || substituteAction.current || !itemIds.length) return;
+    substituteAction.current = true;
+    setIsUpdatingSubstitutes(true);
+    let completed = 0;
     try {
-      const res = await apiService.declineItemSubstitute(orderId, itemId);
-      if (res?.errand) onOrderUpdated(res.errand);
-      setSubstituteState((prev) => {
-        const copyState = { ...prev };
-        delete copyState[itemId];
-        return copyState;
-      });
-      feedback.showSuccess("Substitute declined; rider notified to proceed.");
-    } catch (err) {
-      console.warn("Failed to decline substitute:", err);
-      feedback.showError("Failed to notify rider of declined substitute.");
+      for (const itemId of itemIds) {
+        const res = await apiService.declineItemSubstitute(orderId, itemId);
+        if (!res?.success) throw new Error("Substitute decline failed");
+        if (res.errand) onOrderUpdated(res.errand);
+        setSubstituteState((prev) => ({
+          ...prev, [itemId]: { ...prev[itemId], loading: false, declined: true },
+        }));
+        completed += 1;
+      }
+      feedback.showSuccess(`Substitutes declined for ${completed} ${completed === 1 ? "item" : "items"}; rider notified to proceed.`);
+    } catch {
+      feedback.showError(completed
+        ? `Rider notified for ${completed} of ${itemIds.length} items. Retry the remaining items.`
+        : "Failed to notify rider of declined substitutes. Please try again.");
+    } finally {
+      substituteAction.current = false;
+      setIsUpdatingSubstitutes(false);
     }
   };
 
@@ -426,108 +453,46 @@ export function Stage3ConfirmItems({
       </div>
     );
 
-  /** Substitute options for an out-of-stock line, swapped into that row. */
-  const renderSubstitutes = (
-    rowIndex: number,
-    itemId: number,
-    subInfo: { data?: { substitutes: string[]; chatMessage: string } | null; sentChat?: boolean }
-  ) =>
-    subInfo.data ? (
-      <div className="space-y-2 rounded-plate border border-edge bg-board-ground p-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 text-micro font-medium uppercase text-ink-muted">
-            <Sparkles size={12} />
-            Suggested Local Substitutes (Click to Swap)
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setSubstituteState((prev) => {
-                const next = { ...prev };
-                delete next[itemId];
-                return next;
-              })
-            }
-            className="text-ink-muted hover:text-ink"
-            aria-label="Close substitute suggestions"
-          >
-            <X size={13} />
-          </button>
-        </div>
+  /** One workspace per store, using each editable row's own identity. */
+  const renderStoreSubstitutes = (storeIndex: number | null) => {
+    const entries: SubstituteEntry[] = editableItems.flatMap((item, rowIndex) => {
+      const itemId = Number(item.id || 0);
+      if (itemId <= 0 || !isOutOfStock(item.fulfillmentStatus) || storeIndexOf(item) !== storeIndex) return [];
+      const info = substituteState[itemId];
+      if (info?.declined) return [];
+      return [{
+        itemId, rowIndex, itemName: item.itemName, quantity: item.quantity, size: item.size,
+        loading: !info || info.loading,
+        substitutes: info?.data?.substitutes,
+      }];
+    });
+    if (!canModifyItems || !entries.length) return null;
+    return (
+      <StoreSubstitutesPanel
+        key={storeIndex ?? "unassigned"}
+        storeName={storeIndex === null ? "unassigned store" : storeNameAt(storeIndex)}
+        customerFirstName={customerFirstName}
+        entries={entries}
+        busy={isUpdatingSubstitutes}
+        onRetry={(itemIds) => { itemIds.forEach((id) => void handleFetchSubstitutes(id)); }}
+        onSwap={(rowIndex, itemId, name) => void handleApplySubstitute(rowIndex, itemId, name)}
+        onDecline={(itemIds) => void handleDeclineSubstitute(itemIds)}
+        onSend={handleSendSubstituteChat}
+      />
+    );
+  };
 
-        <div className="flex flex-wrap gap-1.5">
-          {subInfo.data.substitutes.map((subName, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => void handleApplySubstitute(rowIndex, itemId, subName)}
-              className="cursor-pointer rounded-trim border border-edge bg-board-plate px-2.5 py-1 text-label text-ink transition-colors hover:border-board-field"
-            >
-              Swap with: {subName}
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-trim border border-edge bg-board-plate p-2">
-          <p className="m-0 text-body text-ink">{subInfo.data.chatMessage}</p>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <DispatcherButton
-              type="button"
-              size="sm"
-              variant="secondary"
-              icon={<Send size={12} />}
-              disabled={subInfo.sentChat}
-              onClick={() => handleSendSubstituteChat(itemId, subInfo.data!.chatMessage)}
-            >
-              {subInfo.sentChat ? "Sent to Customer Chat" : "Send Options to Customer Chat"}
-            </DispatcherButton>
-            <DispatcherButton
-              type="button"
-              size="sm"
-              variant="subtle"
-              icon={<X size={12} />}
-              onClick={() => void handleDeclineSubstitute(itemId)}
-            >
-              Customer Declined Substitute
-            </DispatcherButton>
-          </div>
-          <p className="mt-1.5 mb-0 text-micro text-ink opacity-50">
-            Model can make mistakes. Please verify substitute options before sending to the customer.
-          </p>
-        </div>
-      </div>
-    ) : null;
-
-  /** What the rider reported on one store's line, under it, and only when it is out of stock. */
+  /** Keep the rider's status beside the item; suggestions live at store level. */
   const renderOutOfStock = (rowIndex: number) => {
     const item = editableItems[rowIndex];
     const itemId = Number(item?.id || 0);
     if (!item || !isOutOfStock(item.fulfillmentStatus) || itemId <= 0) return null;
-    const subInfo = substituteState[itemId];
     return (
-      <div className="mt-1.5 space-y-2 pl-11">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {outOfStockChip}
-          <button
-            type="button"
-            onClick={() => void handleFetchSubstitutes(itemId)}
-            disabled={subInfo?.loading}
-            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-ink transition-colors hover:bg-board-plate"
-          >
-            <Sparkles size={11} />
-            <span>{subInfo?.loading ? copy.stage3.checkingSubstitutes : copy.stage3.suggestSubstitutes}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleDeclineSubstitute(itemId)}
-            className="flex shrink-0 cursor-pointer items-center gap-1 rounded-trim border border-edge bg-board-ground px-2 py-0.5 text-micro font-medium text-status-waiting-ink transition-colors hover:bg-board-plate"
-            title="Customer declined substitute - notify rider to proceed"
-          >
-            <X size={11} />
-            <span>{copy.stage3.declineSubstitute}</span>
-          </button>
-        </div>
-        {subInfo?.data && renderSubstitutes(rowIndex, itemId, subInfo)}
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        {outOfStockChip}
+        {substituteState[itemId]?.declined && (
+          <span className="text-micro text-ink-muted">Customer declined substitutes. Rider notified.</span>
+        )}
       </div>
     );
   };
@@ -752,8 +717,10 @@ export function Stage3ConfirmItems({
             onOpenStore={setOpenStoreIndex}
             onNameSettled={guessCategoryFor}
             renderLineExtras={renderOutOfStock}
+            renderStoreExtras={renderStoreSubstitutes}
             renderUnassignedExtras={renderUnassignedExtras}
           />
+          {renderStoreSubstitutes(null)}
           <StoreItemsDialog
             open={openStoreIndex !== null}
             onOpenChange={(open) => !open && setOpenStoreIndex(null)}

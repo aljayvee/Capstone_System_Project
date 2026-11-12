@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { formatErrandId } from "../../../utils/formatErrandId";
-import { Check, ChevronLeft, ChevronRight, Copy, Eye } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DispatcherSearchField } from "@/components/panel/DispatcherSearchField";
+import { DispatcherFilterToolbar } from "./DispatcherFilterToolbar";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { PanelShell } from "@/components/panel/PanelShell";
@@ -11,6 +12,9 @@ import { MobileResponsiveTable } from "@/components/table";
 
 const STATUS_FILTERS = [
   { id: "ALL", label: "All" },
+  // Conversations with customer messages nobody has read: what the sidebar's
+  // count is counting (2026-10-25).
+  { id: "UNREAD", label: "Unread" },
   { id: "ASSIGNED", label: "Assigned" },
   { id: "IN_TRANSIT", label: "In transit" },
   { id: "DELIVERED", label: "Delivered" },
@@ -26,6 +30,14 @@ interface RecentChatsPanelProps {
   isLoading?: boolean;
   loadError?: string | null;
   onRetry?: () => void;
+  /**
+   * Unread customer messages per errand (useCustomerChatAlerts), the same
+   * figures as the sidebar badge. Without them the badge said "2" and this
+   * list gave no way to find which conversations it meant.
+   */
+  unreadCounts?: Record<string, number>;
+  /** Opens a conversation to answer it (not read-only), and marks it read. */
+  onReply?: (orderId: string) => void;
 }
 
 /** Underscores and spacing vary between the API and this filter's ids. */
@@ -38,7 +50,10 @@ export function RecentChatsPanel({
   isLoading = false,
   loadError = null,
   onRetry,
+  unreadCounts = {},
+  onReply,
 }: RecentChatsPanelProps) {
+  const unreadOf = (e: any) => unreadCounts[String(e.id)] ?? 0;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,9 +76,16 @@ export function RecentChatsPanel({
       // history list — that's ActiveErrandsPanel's job, and letting a
       // currently-active chat also show up here made it look closed when it
       // very much was not.
+      //
+      // Except a conversation with unread customer messages: the sidebar
+      // counts those, so this list must show them wherever the run stands.
+      if (unreadCounts[String(e.id)] > 0) return true;
       return s !== "AVAILABLE" && s !== "PENDING";
     });
-  }, [errands]);
+  }, [errands, unreadCounts]);
+
+  const unreadConversations = closedErrands.filter((e) => unreadOf(e) > 0).length;
+  const unreadMessages = closedErrands.reduce((sum, e) => sum + unreadOf(e), 0);
 
   const filteredErrands = useMemo(() => {
     return closedErrands.filter((e) => {
@@ -71,7 +93,10 @@ export function RecentChatsPanel({
       // "IN_TRANSIT", so a run the API calls "IN TRANSIT" or "IN ROUTE" was
       // silently unmatchable by the filter offering that exact label.
       const matchesStatus =
-        statusFilter === "ALL" || normalizeStatus(e.status) === normalizeStatus(statusFilter);
+        statusFilter === "ALL" ||
+        (statusFilter === "UNREAD"
+          ? unreadOf(e) > 0
+          : normalizeStatus(e.status) === normalizeStatus(statusFilter));
       if (!matchesStatus) return false;
 
       const query = search.trim().toLowerCase();
@@ -81,8 +106,13 @@ export function RecentChatsPanel({
         String(e.customerName || "").toLowerCase().includes(query) ||
         String(e.category || "").toLowerCase().includes(query)
       );
-    });
-  }, [closedErrands, statusFilter, search]);
+    })
+      // Unread first; otherwise the order they arrived in (newest first).
+      .map((e, index) => ({ e, index }))
+      .sort((a, b) => Number(unreadOf(b.e) > 0) - Number(unreadOf(a.e) > 0) || a.index - b.index)
+      .map(({ e }) => e);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closedErrands, statusFilter, search, unreadCounts]);
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -125,29 +155,38 @@ export function RecentChatsPanel({
     );
   };
 
+  /**
+   * Unread: answer it, editable, from Dispatch Management. Otherwise: look at
+   * it, read-only, here.
+   */
+  const openButton = (e: any) =>
+    unreadOf(e) > 0 && onReply ? (
+      <DispatcherButton variant="primary" size="sm" icon={<MessageSquare size={14} />} onClick={() => onReply(e.id)}>
+        Reply
+      </DispatcherButton>
+    ) : (
+      <DispatcherButton variant="secondary" size="sm" icon={<Eye size={14} />} onClick={() => onOpenChat(e.id)}>
+        Open
+      </DispatcherButton>
+    );
+
   return (
     <PanelShell
       title="Customer Chat History"
-      figure={{
-        label: "Conversations",
-        value: isLoading || loadError ? "--" : String(closedErrands.length),
-      }}
       // Says what the filter actually does. `closedErrands` excludes only
       // AVAILABLE and PENDING, so runs still on the road are listed here too,
       // and describing this as finished-or-closed would have been a claim the
       // list does not honour.
-      detail="Every run that has been claimed, newest first"
-      aside={
-        <div className="w-full sm:w-72">
+      detail="Every run that has been claimed, unread conversations first"
+      controls={
+        <DispatcherFilterToolbar search={
           <DispatcherSearchField
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search route number, customer, store"
             aria-label="Search conversations"
           />
-        </div>
-      }
-      controls={
+        } filters={
         <div className="flex flex-wrap items-center gap-1.5">
           {STATUS_FILTERS.map((f) => {
             const isActive = statusFilter === f.id;
@@ -165,10 +204,14 @@ export function RecentChatsPanel({
                 )}
               >
                 {f.label}
+                {f.id === "UNREAD" && unreadConversations > 0 ? (
+                  <span className="ml-1.5 font-mono tabular-nums">{unreadConversations}</span>
+                ) : null}
               </button>
             );
           })}
-        </div>
+        </div>}
+        />
       }
       footer={
         filteredErrands.length > 0 ? (
@@ -189,6 +232,21 @@ export function RecentChatsPanel({
         ) : null
       }
     >
+      {unreadConversations > 0 && statusFilter !== "UNREAD" ? (
+        <div
+          role="status"
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-plate border border-edge bg-status-act-fill px-4 py-2.5"
+        >
+          <p className="flex items-center gap-2 text-label font-semibold text-status-act-ink">
+            <MessageSquare size={15} aria-hidden />
+            {unreadMessages} unread {unreadMessages === 1 ? "message" : "messages"} in {unreadConversations}{" "}
+            {unreadConversations === 1 ? "conversation" : "conversations"}, listed first
+          </p>
+          <DispatcherButton variant="secondary" size="sm" onClick={() => handleStatusFilterChange("UNREAD")}>
+            Show only unread
+          </DispatcherButton>
+        </div>
+      ) : null}
       <div className="overflow-hidden rounded-plate border border-edge bg-board-plate">
         <PanelState
           isLoading={isLoading}
@@ -231,6 +289,7 @@ export function RecentChatsPanel({
                   <p className="text-micro font-medium text-ink-muted truncate max-w-[180px] sm:max-w-none">
                     {e.customerName || "Customer"}
                   </p>
+                  <UnreadPill count={unreadOf(e)} />
                 </div>
               );
             }}
@@ -269,16 +328,7 @@ export function RecentChatsPanel({
               </div>
             )}
             renderRowActions={(e) => (
-              <div onClick={(ev) => ev.stopPropagation()}>
-                <DispatcherButton
-                  variant="secondary"
-                  size="sm"
-                  icon={<Eye size={14} />}
-                  onClick={() => onOpenChat(e.id)}
-                >
-                  Open
-                </DispatcherButton>
-              </div>
+              <div onClick={(ev) => ev.stopPropagation()}>{openButton(e)}</div>
             )}
             inspectorTitle={(e) => formatErrandId(e.id)}
             inspectorSubtitle={(e) => `${e.customerName || "Customer"} · ${e.category || "General errand"}`}
@@ -309,23 +359,26 @@ export function RecentChatsPanel({
                 type="button"
                 onClick={() => {
                   onClose();
-                  onOpenChat(e.id);
+                  if (unreadOf(e) > 0 && onReply) onReply(e.id);
+                  else onOpenChat(e.id);
                 }}
                 className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-trim bg-signal text-board-plate font-semibold text-body hover:bg-signal-deep transition"
               >
-                <Eye size={16} />
-                <span>Open Conversation</span>
+                {unreadOf(e) > 0 && onReply ? <MessageSquare size={16} /> : <Eye size={16} />}
+                <span>{unreadOf(e) > 0 && onReply ? "Reply" : "Open Conversation"}</span>
               </button>
             )}
             desktopView={
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed text-left">
                   <colgroup>
-                    <col className="w-[16%]" />
+                    {/* Status is wide enough for "Waiting on customer": unread
+                        conversations still being worked are listed too. */}
+                    <col className="w-[13%]" />
                     <col className="w-[24%]" />
-                    <col className="w-[16%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[22%]" />
                     <col className="w-[14%]" />
-                    <col className="w-[16%]" />
                     <col className="w-[14%]" />
                   </colgroup>
                   <thead className="border-b border-hairline bg-board-ground">
@@ -346,7 +399,13 @@ export function RecentChatsPanel({
                         e.paymentPlan?.hasLedger && e.paymentPlan?.state === "AWAITING_BALANCE";
                       const isCopied = copiedId === e.id;
                       return (
-                        <tr key={e.id} className="transition-colors hover:bg-board-ground/60">
+                        <tr
+                          key={e.id}
+                          className={cn(
+                            "transition-colors hover:bg-board-ground/60",
+                            unreadOf(e) > 0 && "bg-status-act-fill/40"
+                          )}
+                        >
                           <td data-figure className="px-4 py-3.5">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-label font-bold tabular-nums tracking-wide text-ink">
@@ -366,8 +425,11 @@ export function RecentChatsPanel({
                               </button>
                             </div>
                           </td>
-                          <td className="truncate px-4 py-3.5 text-body font-medium text-ink">
-                            {e.customerName || "Customer"}
+                          <td className="px-4 py-3.5 text-body font-medium text-ink">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="truncate">{e.customerName || "Customer"}</span>
+                              <UnreadPill count={unreadOf(e)} />
+                            </div>
                           </td>
                           <td className="truncate px-4 py-3.5 text-body text-ink-muted">
                             {e.category || "General errand"}
@@ -384,16 +446,7 @@ export function RecentChatsPanel({
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3.5 text-right">
-                            <DispatcherButton
-                              variant="secondary"
-                              size="sm"
-                              icon={<Eye size={14} />}
-                              onClick={() => onOpenChat(e.id)}
-                            >
-                              Open
-                            </DispatcherButton>
-                          </td>
+                          <td className="px-4 py-3.5 text-right">{openButton(e)}</td>
                         </tr>
                       );
                     })}
@@ -405,5 +458,19 @@ export function RecentChatsPanel({
         </PanelState>
       </div>
     </PanelShell>
+  );
+}
+
+/** "3 unread" beside a customer's name; nothing when there is nothing to read. */
+function UnreadPill({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <DispatcherBadge
+      tone="act"
+      className="shrink-0"
+      aria-label={`${count} unread ${count === 1 ? "message" : "messages"}`}
+    >
+      {count} unread
+    </DispatcherBadge>
   );
 }

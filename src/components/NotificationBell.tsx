@@ -670,7 +670,7 @@ const BellDrawer: React.FC<{ feed: NotificationFeed }> = ({ feed }) => {
             : "Notifications, none unread"
         }
         data-bell
-        className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
       >
         <Bell size={17} />
         {unreadCount > 0 && (
@@ -701,7 +701,7 @@ const BellDrawer: React.FC<{ feed: NotificationFeed }> = ({ feed }) => {
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-ink">Notifications</h3>
               {unreadCount > 0 && (
-                <span className="rounded-full bg-signal/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-signal">
+                <span className="rounded-full bg-signal/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-signal-ink">
                   {unreadCount} unread
                 </span>
               )}

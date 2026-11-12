@@ -10,6 +10,7 @@ import {
   Inbox,
   Loader2,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDeviceTier } from "../../hooks/useDeviceTier";
 import {
   RecordInspectorView,
@@ -86,6 +87,7 @@ export interface MobileResponsiveTableProps<T> {
   };
 
   className?: string;
+  appearance?: "default" | "flat";
 }
 
 export function MobileResponsiveTable<T>({
@@ -120,8 +122,10 @@ export function MobileResponsiveTable<T>({
   pagination,
   emptyState,
   className = "",
+  appearance = "default",
 }: MobileResponsiveTableProps<T>) {
   const { isMobile } = useDeviceTier();
+  const isFlat = appearance === "flat";
 
   // Mobile Single-Expand Accordion state
   const [expandedId, setExpandedId] = useState<string | number | null>(null);
@@ -143,13 +147,13 @@ export function MobileResponsiveTable<T>({
   };
 
   return (
-    <div className={`w-full flex flex-col space-y-3 ${className}`}>
+    <div className={`w-full min-w-0 flex flex-col space-y-3 ${className}`}>
       {/* Mobile Top Controls Bar: Search + Filter + HeaderAction */}
       {(onSearchChange || filterDrawerContent || headerAction) && (
         <div className="flex flex-col gap-2 shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onSearchChange && (
-              <div className="relative flex-1">
+              <div className="relative min-w-0 flex-1">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
@@ -201,9 +205,11 @@ export function MobileResponsiveTable<T>({
       )}
 
       {/* Mobile Table Container */}
-      <div className="bg-[#0B132B] border border-slate-800/90 rounded-2xl overflow-hidden shadow-sm">
+      <div className={isFlat ? "overflow-hidden" : "bg-[#0B132B] border border-slate-800/90 rounded-2xl overflow-hidden shadow-sm"}>
         {/* Compact 2-Column Header with Tap-to-Sort */}
-        <div className="grid grid-cols-2 px-4 py-2.5 bg-slate-900/90 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
+        <div className={`grid grid-cols-2 px-4 py-2.5 border-b text-[11px] font-bold uppercase tracking-wider select-none ${
+          isFlat ? "border-hairline text-ink-muted" : "bg-slate-900/90 border-slate-800/80 text-slate-400"
+        }`}>
           <div
             onClick={() => onSortChange && onSortChange("primary")}
             className={`flex items-center gap-1.5 ${
@@ -214,7 +220,7 @@ export function MobileResponsiveTable<T>({
             {onSortChange && (
               <ArrowUpDown
                 className={`w-3 h-3 ${
-                  sortColumn === "primary" ? "text-red-400" : "text-slate-600"
+                  sortColumn === "primary" ? (isFlat ? "text-field-ink" : "text-red-400") : (isFlat ? "text-ink-muted" : "text-slate-600")
                 }`}
               />
             )}
@@ -229,7 +235,7 @@ export function MobileResponsiveTable<T>({
             {onSortChange && (
               <ArrowUpDown
                 className={`w-3 h-3 ${
-                  sortColumn === "secondary" ? "text-red-400" : "text-slate-600"
+                  sortColumn === "secondary" ? (isFlat ? "text-field-ink" : "text-red-400") : (isFlat ? "text-ink-muted" : "text-slate-600")
                 }`}
               />
             )}
@@ -238,9 +244,31 @@ export function MobileResponsiveTable<T>({
 
         {/* Rows Content */}
         {isLoading ? (
-          <div className="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-red-500" />
-            <span className="text-xs font-medium">Loading records...</span>
+          <div
+            role="status"
+            aria-busy="true"
+            aria-label="Loading records"
+            className={isFlat ? "divide-y divide-hairline" : "divide-y divide-slate-800/60"}
+          >
+            <span className="sr-only">Loading records...</span>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="p-3.5 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <Skeleton className="size-8 rounded-full bg-hairline shrink-0" />
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <Skeleton className="h-3.5 w-28 rounded-trim bg-hairline" />
+                      <Skeleton className="h-2.5 w-20 rounded-trim bg-hairline/60" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full bg-hairline shrink-0" />
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <Skeleton className="h-3 w-20 rounded-trim bg-hairline/60" />
+                  <Skeleton className="h-3 w-24 rounded-trim bg-hairline font-mono" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : data.length === 0 ? (
           <div className="py-12 px-4 flex flex-col items-center justify-center text-center">
@@ -254,25 +282,36 @@ export function MobileResponsiveTable<T>({
             {emptyState?.action && <div className="mt-3">{emptyState.action}</div>}
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60">
+          <div className={isFlat ? "divide-y divide-hairline" : "divide-y divide-slate-800/60"}>
             {data.map((item, index) => {
               const id = keyExtractor(item, index);
               const isExpanded = expandedId === id;
 
               return (
-                <div key={id} className="transition-colors">
+                <div key={id} className="min-w-0 transition-colors">
                   {/* Compact 2-Column Row (Entire Row is Tappable) */}
                   <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    onKeyDown={(event) => {
+                      if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                        event.preventDefault();
+                        handleRowClick(id);
+                      }
+                    }}
                     onClick={() => handleRowClick(id)}
-                    className={`grid grid-cols-2 px-4 py-3 items-center gap-2 cursor-pointer transition-colors active:bg-slate-800/50 ${
-                      isExpanded ? "bg-slate-900/70" : "hover:bg-slate-900/40"
+                    className={`grid grid-cols-2 px-4 py-3 items-center gap-2 cursor-pointer transition-colors ${isFlat ? "active:bg-board-ground" : "active:bg-slate-800/50"} ${
+                      isExpanded
+                        ? (isFlat ? "bg-board-ground" : "bg-slate-900/70")
+                        : (isFlat ? "hover:bg-board-ground/60" : "hover:bg-slate-900/40")
                     }`}
                   >
                     {/* Primary Column (Left) */}
                     <div className="flex items-center gap-2 min-w-0 pr-1">
                       <ChevronDown
-                        className={`w-3.5 h-3.5 shrink-0 text-slate-500 transition-transform duration-200 ${
-                          isExpanded ? "rotate-180 text-red-400" : ""
+                        className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${isFlat ? "text-ink-muted" : "text-slate-500"} ${
+                          isExpanded ? (isFlat ? "rotate-180 text-field-ink" : "rotate-180 text-red-400") : ""
                         }`}
                       />
                       <div className="min-w-0 flex-1">
@@ -288,14 +327,16 @@ export function MobileResponsiveTable<T>({
 
                   {/* Expanded Accordion Drawer (Single-Expand Mode) */}
                   {isExpanded && (
-                    <div className="px-4 pt-2 pb-3.5 bg-slate-950/60 border-t border-slate-800/40 animate-in slide-in-from-top-1 duration-150 space-y-3">
+                    <div className={`px-4 pt-2 pb-3.5 border-t animate-in slide-in-from-top-1 duration-150 space-y-3 ${
+                      isFlat ? "border-hairline" : "bg-slate-950/60 border-slate-800/40"
+                    }`}>
                       {/* 3-Item Quick Preview Container */}
-                      <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs text-slate-300">
+                      <div className={isFlat ? "py-2 text-xs text-ink" : "p-3 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs text-slate-300"}>
                         {renderPreview(item, index)}
                       </div>
 
                       {/* Row Action Buttons & Full Details Inspector CTA */}
-                      <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 pt-0.5">
                         {(inspectorSections || renderInspectorCustom) && (
                           <button
                             type="button"
@@ -303,9 +344,13 @@ export function MobileResponsiveTable<T>({
                               e.stopPropagation();
                               setInspectingItem(item);
                             }}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95 transition-all text-xs font-semibold min-h-[44px] cursor-pointer"
+                            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold min-h-[44px] cursor-pointer ${
+                              isFlat
+                                ? "rounded-plate bg-board-field text-white hover:bg-board-field-deep transition-colors"
+                                : "rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 active:scale-95 transition-all"
+                            }`}
                           >
-                            <Maximize2 className="w-3.5 h-3.5 text-red-400" />
+                            <Maximize2 className={`w-3.5 h-3.5 ${isFlat ? "text-white" : "text-red-400"}`} />
                             <span>View Full Details</span>
                           </button>
                         )}
@@ -313,7 +358,7 @@ export function MobileResponsiveTable<T>({
                         {renderRowActions && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="flex items-center gap-2 shrink-0"
+                            className="flex min-w-0 flex-wrap items-center gap-2"
                           >
                             {renderRowActions(item, index)}
                           </div>
@@ -329,7 +374,7 @@ export function MobileResponsiveTable<T>({
 
         {/* Mobile Pagination Toolbar (44px touch targets) */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="px-4 py-3 bg-slate-900/90 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs select-none">
+          <div className="px-4 py-3 bg-slate-900/90 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs select-none">
             <button
               type="button"
               disabled={pagination.currentPage <= 1}

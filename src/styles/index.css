@@ -15,6 +15,13 @@
 @import './surfaces.css';
 /* The Owner portal's eight-token re-skin of that same system. */
 @import './owner.css';
+/* Light Dispatcher palette and navigation, scoped away from the Owner portal. */
+@import './dispatch-light.css';
+/* Shared palette takes precedence over historical portal skin values. */
+@import './portal-palette.css';
+/* An Admin's own theme, colours and type size, set in Owner Settings. */
+@import './owner-appearance.css';
+@import './portal-responsive.css';
 
 /* Scrollbars are hidden app-wide, and handed back only inside a surface that
    opts in above. The login page and the marketing shell keep them hidden. */

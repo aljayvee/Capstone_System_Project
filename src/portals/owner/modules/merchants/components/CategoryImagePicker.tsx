@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Camera, Loader2, Trash2, Upload, AlertCircle } from "lucide-react";
 import { apiService, type ApiStoreCategoryImageMeta } from "../../../../../services/apiService";
 import { ConfirmDialog } from "@/components/panel";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   prepareCategoryImage,
   formatImageSize,
@@ -134,9 +135,7 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
         }`}
       >
         {isLoadingPreview && !previewSrc ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-board-ground">
-            <Loader2 size={18} className="animate-spin text-ink-muted" />
-          </div>
+          <Skeleton className="absolute inset-0 bg-hairline rounded-none" />
         ) : previewSrc ? (
           <>
             <img
@@ -149,7 +148,7 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
                 unknown photo. The caption now sits on a solid band below the
                 image, where it is legible whatever the photo contains. */}
             <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-board-field-deep px-2 py-1">
-              <span className="truncate text-micro uppercase text-board-plate">{categoryName}</span>
+              <span className="truncate text-micro uppercase text-white">{categoryName}</span>
               {imageMeta && (
                 <span data-figure className="shrink-0 font-mono text-micro text-board-trim">
                   {formatImageSize(imageMeta.fileSize)}
@@ -162,7 +161,7 @@ export const CategoryImagePicker: React.FC<CategoryImagePickerProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isBusy}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-ink-muted hover:text-board-field hover:bg-board-ground transition p-2 text-center"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-ink-muted hover:text-field-ink hover:bg-board-ground transition p-2 text-center"
           >
             <Camera size={18} />
             <span className="text-label">Add Photo</span>

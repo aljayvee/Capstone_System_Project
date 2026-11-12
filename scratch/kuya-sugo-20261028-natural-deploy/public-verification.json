@@ -1,0 +1,26 @@
+[
+  {
+    "path": "index.html",
+    "status": 200,
+    "contentType": "text/html",
+    "verification": "HTML matches after removing known Cloudflare scripts"
+  },
+  {
+    "path": "assets/index-B_r3Rt79.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "verification": "byte-for-byte match"
+  },
+  {
+    "path": "assets/OwnerPortal-DI7fCn1H.js",
+    "status": 200,
+    "contentType": "application/javascript",
+    "verification": "byte-for-byte match"
+  },
+  {
+    "path": "assets/OwnerPortal-BX-D3c7Z.css",
+    "status": 200,
+    "contentType": "text/css",
+    "verification": "byte-for-byte match"
+  }
+]

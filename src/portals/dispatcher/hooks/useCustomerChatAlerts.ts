@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { ref, onValue, off, Unsubscribe } from "firebase/database";
 import { database } from "../../../firebase/config";
+import {
+  onRealtimeAuthChange,
+  realtimeAuthState,
+  type RealtimeAuthState,
+} from "../../../firebase/realtimeSession";
 import { playNotificationChime } from "../../../utils/notificationAudio";
 import { Errand } from "../../../types/errand";
 
@@ -62,6 +67,14 @@ export function useCustomerChatAlerts({
   const processedMessageIdsRef = useRef<Set<string>>(new Set());
   const initialLoadCompletedRef = useRef<Set<string>>(new Set());
   const subscriptionsRef = useRef<Map<string, Unsubscribe>>(new Map());
+  // Chats the database refused under the current Firebase session. Left alone
+  // until the session changes, rather than re-asked on every errand update.
+  const refusedRef = useRef<Set<string>>(new Set());
+
+  // `chats/` opens only to a signed-in Firebase identity, so listening has to
+  // wait for the session, the same way useRiderFleetPresence does.
+  const [realtimeAuth, setRealtimeAuth] = useState<RealtimeAuthState>(realtimeAuthState());
+  useEffect(() => onRealtimeAuthChange(setRealtimeAuth), []);
 
   // Errands whose chat this dispatcher may read: claimed and not finished. The
   // list holds the unclaimed queue as well, and since 2026-10-07 a customer's
@@ -113,7 +126,14 @@ export function useCustomerChatAlerts({
     if (!database) return;
 
     const currentSubscriptions = subscriptionsRef.current;
-    const currentActiveIds = new Set(activeErrands.map((e) => e.id));
+    // A listener opened before the Firebase sign-in finishes is refused, and a
+    // refused RTDB listener never retries: the errand list usually arrives from
+    // the API first, which silenced every chat alert for the life of the page.
+    // So nothing listens until the session is signed in, and everything is torn
+    // down when it ends.
+    const signedIn = realtimeAuth === "signed-in";
+    if (!signedIn) refusedRef.current.clear();
+    const currentActiveIds = new Set(signedIn ? activeErrands.map((e) => e.id) : []);
 
     // 1. Teardown subscriptions for errands that are no longer active
     currentSubscriptions.forEach((unsub, errandId) => {
@@ -135,11 +155,13 @@ export function useCustomerChatAlerts({
       }
     });
 
+    if (!signedIn) return;
+
     // 2. Attach new subscriptions for newly appeared active errands
     activeErrands.forEach((errand) => {
       const errandId = errand.id;
-      if (currentSubscriptions.has(errandId)) {
-        return; // Already actively subscribed
+      if (currentSubscriptions.has(errandId) || refusedRef.current.has(errandId)) {
+        return; // Already actively subscribed, or refused under this session
       }
 
       const messagesRef = ref(database, `chats/${errandId}/messages`);
@@ -284,13 +306,18 @@ export function useCustomerChatAlerts({
           }
         },
         (error) => {
+          // The SDK has already dropped this listener. Forget it, so the next
+          // Firebase session can open it again.
+          currentSubscriptions.delete(errandId);
+          initialLoadCompletedRef.current.delete(errandId);
+          refusedRef.current.add(errandId);
           console.warn(`[useCustomerChatAlerts] Listener error for ${errandId}:`, error);
         }
       );
 
       currentSubscriptions.set(errandId, unsubscribe);
     });
-  }, [activeErrands, markErrandAsRead]);
+  }, [activeErrands, markErrandAsRead, realtimeAuth]);
 
   // Clean up all subscriptions on unmount
   useEffect(() => {

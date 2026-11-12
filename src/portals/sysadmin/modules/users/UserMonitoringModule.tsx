@@ -159,26 +159,26 @@ export const UserMonitoringModule: React.FC = () => {
       case "OWNER":
         return "bg-purple-950/80 text-purple-300 border-purple-800/60";
       case "DISPATCHER":
-        return "bg-amber-950/80 text-amber-300 border-amber-800/60";
+        return "bg-status-waiting-fill text-status-waiting-ink border-status-waiting-ink/30";
       case "RIDER":
-        return "bg-emerald-950/80 text-emerald-300 border-emerald-800/60";
+        return "bg-status-done-fill text-status-done-ink border-status-done-ink/30";
       case "CUSTOMER":
-        return "bg-sky-950/80 text-sky-300 border-sky-800/60";
+        return "bg-status-moving-fill text-status-moving-ink border-status-moving-ink/30";
       default:
-        return "bg-slate-800 text-slate-300 border-slate-700";
+        return "bg-board-ground text-ink border-edge";
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
-        return "bg-emerald-950/70 text-emerald-400 border-emerald-800/50";
+        return "bg-status-done-fill text-status-done-ink border-status-done-ink/30";
       case "suspended":
-        return "bg-amber-950/70 text-amber-400 border-amber-800/50";
+        return "bg-status-waiting-fill text-status-waiting-ink border-status-waiting-ink/30";
       case "locked":
-        return "bg-rose-950/70 text-rose-400 border-rose-800/50";
+        return "bg-status-act-fill text-status-act-ink border-status-act-ink/30";
       default:
-        return "bg-slate-800 text-slate-400 border-slate-700";
+        return "bg-board-ground text-ink-muted border-edge";
     }
   };
 
@@ -187,8 +187,8 @@ export const UserMonitoringModule: React.FC = () => {
       {/* Header & Mission Subtitle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-white tracking-wide">{t("usersHeaderTitle")}</h2>
-          <p className="text-xs text-slate-400">
+          <h2 className="text-base font-bold text-ink tracking-wide">{t("usersHeaderTitle")}</h2>
+          <p className="text-xs text-ink-muted">
             {t("usersHeaderSubtitle")}
           </p>
         </div>
@@ -196,64 +196,64 @@ export const UserMonitoringModule: React.FC = () => {
         <button
           onClick={fetchAccounts}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0F1A30] hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 transition-colors self-start sm:self-auto"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-board-plate hover:bg-board-ground border border-edge text-xs font-medium text-ink transition-colors self-start sm:self-auto"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-red-400" : "text-slate-400"}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-status-act-ink" : "text-ink-muted"}`} />
           <span>Refresh Data</span>
         </button>
       </div>
 
       {/* Quick Metrics Bar */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800">
-          <div className="text-[11px] font-medium text-slate-400 mb-1">Total Monitored</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-white">
+        <div className="p-3.5 rounded-xl bg-board-plate border border-edge">
+          <div className="text-[11px] font-medium text-ink-muted mb-1">Total Monitored</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-ink">
             {data ? data.counts.all.toLocaleString() : "--"}
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Across 4 System Roles</div>
+          <div className="text-[10px] text-ink-muted mt-1">Across 4 System Roles</div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800">
-          <div className="text-[11px] font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="p-3.5 rounded-xl bg-board-plate border border-edge">
+          <div className="text-[11px] font-medium text-ink-muted mb-1 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-status-done-fill animate-pulse" />
             <span>Online Presence</span>
           </div>
-          <div className="text-xl font-bold font-mono tabular-nums text-emerald-400">
+          <div className="text-xl font-bold font-mono tabular-nums text-status-done-ink">
             {data ? data.counts.onlineTotal.toLocaleString() : "--"}
           </div>
-          <div className="text-[10px] text-emerald-400/80 mt-1">Live Sockets &amp; Telemetry</div>
+          <div className="text-[10px] text-status-done-ink mt-1">Live Sockets &amp; Telemetry</div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800">
-          <div className="text-[11px] font-medium text-slate-400 mb-1">Staff Fleet</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-white">
+        <div className="p-3.5 rounded-xl bg-board-plate border border-edge">
+          <div className="text-[11px] font-medium text-ink-muted mb-1">Staff Fleet</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-ink">
             {data ? (data.counts.owners + data.counts.dispatchers + data.counts.riders).toLocaleString() : "--"}
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">
+          <div className="text-[10px] text-ink-muted mt-1">
             {data ? `${data.counts.owners} Owners • ${data.counts.dispatchers} Disp • ${data.counts.riders} Riders` : "Loading..."}
           </div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800">
-          <div className="text-[11px] font-medium text-slate-400 mb-1">Registered Customers</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-sky-400">
+        <div className="p-3.5 rounded-xl bg-board-plate border border-edge">
+          <div className="text-[11px] font-medium text-ink-muted mb-1">Registered Customers</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-status-moving-ink">
             {data ? data.counts.customers.toLocaleString() : "--"}
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Verified App Accounts</div>
+          <div className="text-[10px] text-ink-muted mt-1">Verified App Accounts</div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800 col-span-2 lg:col-span-1">
-          <div className="text-[11px] font-medium text-slate-400 mb-1">System Security</div>
-          <div className="text-xs font-semibold text-white flex items-center gap-1.5 mt-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+        <div className="p-3.5 rounded-xl bg-board-plate border border-edge col-span-2 lg:col-span-1">
+          <div className="text-[11px] font-medium text-ink-muted mb-1">System Security</div>
+          <div className="text-xs font-semibold text-ink flex items-center gap-1.5 mt-2">
+            <ShieldCheck className="w-4 h-4 text-status-done-ink" />
             <span>IDOR &amp; BOLA Protected</span>
           </div>
-          <div className="text-[10px] text-slate-400 mt-1">Audit Trail Enabled</div>
+          <div className="text-[10px] text-ink-muted mt-1">Audit Trail Enabled</div>
         </div>
       </div>
 
       {/* Role Tabs */}
-      <div className="flex items-center gap-1 bg-[#0B132B] p-1 rounded-xl border border-slate-800 overflow-x-auto">
+      <div className="flex items-center gap-1 bg-board-ground p-1 rounded-xl border border-edge overflow-x-auto">
         <button
           onClick={() => {
             setRoleFilter("ALL");
@@ -261,13 +261,13 @@ export const UserMonitoringModule: React.FC = () => {
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
             roleFilter === "ALL"
-              ? "bg-[#0F1A30] text-white border border-slate-700 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-board-plate text-ink border border-edge shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
           <span>{t("usersTabAll")}</span>
           {data && (
-            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-board-ground text-ink">
               {data.counts.all}
             </span>
           )}
@@ -280,13 +280,13 @@ export const UserMonitoringModule: React.FC = () => {
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
             roleFilter === "OWNER"
-              ? "bg-[#0F1A30] text-white border border-slate-700 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-board-plate text-ink border border-edge shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
           <span>{t("usersTabOwner")}</span>
           {data && (
-            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-board-ground text-ink">
               {data.counts.owners}
             </span>
           )}
@@ -299,13 +299,13 @@ export const UserMonitoringModule: React.FC = () => {
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
             roleFilter === "DISPATCHER"
-              ? "bg-[#0F1A30] text-white border border-slate-700 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-board-plate text-ink border border-edge shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
           <span>{t("usersTabDispatcher")}</span>
           {data && (
-            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-board-ground text-ink">
               {data.counts.dispatchers}
             </span>
           )}
@@ -318,13 +318,13 @@ export const UserMonitoringModule: React.FC = () => {
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
             roleFilter === "RIDER"
-              ? "bg-[#0F1A30] text-white border border-slate-700 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-board-plate text-ink border border-edge shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
           <span>{t("usersTabRider")}</span>
           {data && (
-            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-board-ground text-ink">
               {data.counts.riders}
             </span>
           )}
@@ -337,13 +337,13 @@ export const UserMonitoringModule: React.FC = () => {
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
             roleFilter === "CUSTOMER"
-              ? "bg-[#0F1A30] text-white border border-slate-700 shadow-sm"
-              : "text-slate-400 hover:text-slate-200"
+              ? "bg-board-plate text-ink border border-edge shadow-sm"
+              : "text-ink-muted hover:text-ink"
           }`}
         >
           <span>{t("usersTabCustomer")}</span>
           {data && (
-            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-board-ground text-ink">
               {data.counts.customers}
             </span>
           )}
@@ -359,21 +359,21 @@ export const UserMonitoringModule: React.FC = () => {
         renderPrimary={(acc) => (
           <div className="flex items-center gap-2 min-w-0">
             <div className="relative shrink-0">
-              <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[11px] font-bold text-slate-300">
+              <div className="w-7 h-7 rounded-full bg-board-ground border border-edge flex items-center justify-center text-[11px] font-bold text-ink">
                 {acc.firstName ? acc.firstName[0].toUpperCase() : acc.username[0].toUpperCase()}
               </div>
               <span
-                className={`w-2 h-2 rounded-full absolute -bottom-0.5 -right-0.5 border border-[#0F1A30] ${
-                  acc.isOnline ? "bg-emerald-500" : "bg-slate-600"
+                className={`w-2 h-2 rounded-full absolute -bottom-0.5 -right-0.5 border border-board-plate ${
+                  acc.isOnline ? "bg-go" : "bg-board-ground"
                 }`}
               />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="font-semibold text-white text-xs truncate flex items-center gap-1">
+              <div className="font-semibold text-ink text-xs truncate flex items-center gap-1">
                 <span>{acc.name || `${acc.firstName} ${acc.lastName}`}</span>
-                {acc.emailVerified && <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
+                {acc.emailVerified && <CheckCircle2 className="w-3 h-3 text-status-done-ink shrink-0" />}
               </div>
-              <div className="text-[10px] font-mono text-slate-400 truncate">@{acc.username}</div>
+              <div className="text-[10px] font-mono text-ink-muted truncate">@{acc.username}</div>
             </div>
           </div>
         )}
@@ -398,20 +398,20 @@ export const UserMonitoringModule: React.FC = () => {
         renderPreview={(acc) => (
           <div className="space-y-1.5 text-xs">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Email:</span>
-              <span className="text-slate-200 truncate max-w-[180px]">{acc.email || "No email"}</span>
+              <span className="text-ink-muted">Email:</span>
+              <span className="text-ink truncate max-w-[180px]">{acc.email || "No email"}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Phone:</span>
-              <span className="text-slate-200 font-mono">{acc.phone || "No phone"}</span>
+              <span className="text-ink-muted">Phone:</span>
+              <span className="text-ink font-mono">{acc.phone || "No phone"}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Active Sessions:</span>
-              <span className="font-mono font-bold text-white">{acc.activeSessionsCount} active</span>
+              <span className="text-ink-muted">Active Sessions:</span>
+              <span className="font-mono font-bold text-ink">{acc.activeSessionsCount} active</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Presence:</span>
-              <span className={`font-medium ${acc.isOnline ? "text-emerald-400" : "text-slate-500"}`}>
+              <span className="text-ink-muted">Presence:</span>
+              <span className={`font-medium ${acc.isOnline ? "text-status-done-ink" : "text-ink-muted"}`}>
                 {acc.isOnline ? "Online Now" : "Offline"}
               </span>
             </div>
@@ -422,17 +422,17 @@ export const UserMonitoringModule: React.FC = () => {
             <button
               type="button"
               onClick={() => openSessionsDrawer(acc)}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-ink text-xs font-semibold border border-edge active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
             >
-              <Monitor className="w-3.5 h-3.5 text-slate-400" />
+              <Monitor className="w-3.5 h-3.5 text-ink-muted" />
               <span>Sessions ({acc.activeSessionsCount})</span>
             </button>
             <button
               type="button"
               onClick={() => openStatusModal(acc)}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-ink text-xs font-semibold border border-edge active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
             >
-              <Shield className="w-3.5 h-3.5 text-slate-400" />
+              <Shield className="w-3.5 h-3.5 text-ink-muted" />
               <span>Status</span>
             </button>
           </div>
@@ -498,9 +498,9 @@ export const UserMonitoringModule: React.FC = () => {
                 onClose();
                 openSessionsDrawer(acc);
               }}
-              className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="py-2.5 px-3 rounded-xl bg-board-ground hover:bg-board-ground text-ink font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Monitor className="w-4 h-4 text-slate-300" />
+              <Monitor className="w-4 h-4 text-ink" />
               <span>Manage Sessions</span>
             </button>
             <button
@@ -509,7 +509,7 @@ export const UserMonitoringModule: React.FC = () => {
                 onClose();
                 openStatusModal(acc);
               }}
-              className="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-lg cursor-pointer"
+              className="py-2.5 px-3 rounded-xl bg-signal hover:bg-signal-deep text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-lg cursor-pointer"
             >
               <Shield className="w-4 h-4" />
               <span>Change Status</span>
@@ -532,14 +532,14 @@ export const UserMonitoringModule: React.FC = () => {
         filterDrawerContent={
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">User Role</label>
+              <label className="text-xs font-semibold text-ink block mb-1.5">User Role</label>
               <select
                 value={roleFilter}
                 onChange={(e) => {
                   setRoleFilter(e.target.value as RoleFilter);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border border-slate-800 text-white min-h-[44px]"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-board-ground border border-edge text-ink min-h-[44px]"
               >
                 <option value="ALL">All Roles</option>
                 <option value="OWNER">Owner</option>
@@ -549,14 +549,14 @@ export const UserMonitoringModule: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1.5">Security Status</label>
+              <label className="text-xs font-semibold text-ink block mb-1.5">Security Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value as StatusFilter);
                   setPage(1);
                 }}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-900 border border-slate-800 text-white min-h-[44px]"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-board-ground border border-edge text-ink min-h-[44px]"
               >
                 <option value="ALL">All Statuses</option>
                 <option value="Active">Active</option>
@@ -582,7 +582,7 @@ export const UserMonitoringModule: React.FC = () => {
             {/* Desktop Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -591,12 +591,12 @@ export const UserMonitoringModule: React.FC = () => {
                     setPage(1);
                   }}
                   placeholder="Search accounts by username, name, email, or phone..."
-                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500/60"
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                 />
               </div>
 
               <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-500" />
+                <Filter className="w-3.5 h-3.5 text-ink-muted" />
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -604,7 +604,7 @@ export const UserMonitoringModule: React.FC = () => {
                     setPage(1);
                   }}
                   aria-label="Filter accounts by status"
-                  className="px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-red-500/60"
+                  className="px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink focus:outline-none focus:border-status-act-ink/30"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="Active">Active</option>
@@ -616,11 +616,11 @@ export const UserMonitoringModule: React.FC = () => {
             </div>
 
             {/* Desktop Table Work Surface */}
-            <div className="rounded-xl bg-[#0F1A30] border border-slate-800 overflow-hidden shadow-sm">
+            <div className="rounded-xl bg-board-plate border border-edge overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="bg-[#0B132B] border-b border-slate-800 text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+                    <tr className="bg-board-ground border-b border-edge text-ink-muted font-mono text-[11px] uppercase tracking-wider">
                       <th className="py-3 px-4">Account User</th>
                       <th className="py-3 px-4">Role</th>
                       <th className="py-3 px-4">Contact Info</th>
@@ -629,57 +629,57 @@ export const UserMonitoringModule: React.FC = () => {
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-hairline">
                     {isLoading ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center text-slate-400 font-mono text-xs">
-                          <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        <td colSpan={6} className="py-16 text-center text-ink-muted font-mono text-xs">
+                          <div className="w-6 h-6 border-2 border-status-act-ink/30 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                           Querying account database...
                         </td>
                       </tr>
                     ) : !data || data.accounts.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center text-slate-400">
-                          <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                          <p className="text-xs font-medium text-slate-300">
+                        <td colSpan={6} className="py-16 text-center text-ink-muted">
+                          <Users className="w-8 h-8 text-ink-muted mx-auto mb-2" />
+                          <p className="text-xs font-medium text-ink">
                             No accounts match the active filter criteria
                           </p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
+                          <p className="text-[11px] text-ink-muted mt-0.5">
                             Try widening your search terms or role filters
                           </p>
                         </td>
                       </tr>
                     ) : (
                       data.accounts.map((acc) => (
-                        <tr key={`${acc.role}-${acc.id}`} className="hover:bg-slate-800/30 transition-colors">
+                        <tr key={`${acc.role}-${acc.id}`} className="hover:bg-board-ground transition-colors">
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
                               <div className="relative">
-                                <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                                <div className="w-8 h-8 rounded-full bg-board-ground border border-edge flex items-center justify-center text-xs font-bold text-ink">
                                   {acc.firstName ? acc.firstName[0].toUpperCase() : acc.username[0].toUpperCase()}
                                 </div>
                                 {acc.isOnline ? (
                                   <span
-                                    className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0F1A30] absolute -bottom-0.5 -right-0.5"
+                                    className="w-2.5 h-2.5 rounded-full bg-go border-2 border-board-plate absolute -bottom-0.5 -right-0.5"
                                     title="Online now"
                                   />
                                 ) : (
                                   <span
-                                    className="w-2.5 h-2.5 rounded-full bg-slate-600 border-2 border-[#0F1A30] absolute -bottom-0.5 -right-0.5"
+                                    className="w-2.5 h-2.5 rounded-full bg-board-ground border-2 border-board-plate absolute -bottom-0.5 -right-0.5"
                                     title="Offline"
                                   />
                                 )}
                               </div>
                               <div>
-                                <div className="font-semibold text-white flex items-center gap-1.5">
+                                <div className="font-semibold text-ink flex items-center gap-1.5">
                                   <span>{acc.name || `${acc.firstName} ${acc.lastName}`}</span>
                                   {acc.emailVerified && (
                                     <span title="Email verified">
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-status-done-ink" />
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-[11px] font-mono text-slate-400">@{acc.username}</div>
+                                <div className="text-[11px] font-mono text-ink-muted">@{acc.username}</div>
                               </div>
                             </div>
                           </td>
@@ -695,22 +695,22 @@ export const UserMonitoringModule: React.FC = () => {
                           </td>
 
                           <td className="py-3 px-4">
-                            <div className="text-slate-300">{acc.email || "No email"}</div>
-                            <div className="text-[11px] font-mono text-slate-400">{acc.phone || "No phone"}</div>
+                            <div className="text-ink">{acc.email || "No email"}</div>
+                            <div className="text-[11px] font-mono text-ink-muted">{acc.phone || "No phone"}</div>
                           </td>
 
                           <td className="py-3 px-4 text-center">
                             <div className="inline-flex flex-col items-center">
                               <button
                                 onClick={() => openSessionsDrawer(acc)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0B132B] hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-300 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-board-ground hover:bg-board-ground border border-edge text-[11px] font-mono text-ink transition-colors"
                                 title="View active JWT sessions and devices"
                               >
-                                <Monitor className="w-3 h-3 text-slate-400" />
-                                <span className="font-bold tabular-nums text-white">
+                                <Monitor className="w-3 h-3 text-ink-muted" />
+                                <span className="font-bold tabular-nums text-ink">
                                   {acc.activeSessionsCount}
                                 </span>
-                                <span className="text-slate-500 text-[10px]">active</span>
+                                <span className="text-ink-muted text-[10px]">active</span>
                               </button>
                             </div>
                           </td>
@@ -729,7 +729,7 @@ export const UserMonitoringModule: React.FC = () => {
                             <div className="inline-flex items-center gap-1.5">
                               <button
                                 onClick={() => openSessionsDrawer(acc)}
-                                className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                                className="p-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-ink hover:text-ink transition-colors"
                                 title="Inspect active sessions & kick out"
                               >
                                 <Monitor className="w-3.5 h-3.5" />
@@ -737,7 +737,7 @@ export const UserMonitoringModule: React.FC = () => {
 
                               <button
                                 onClick={() => openStatusModal(acc)}
-                                className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+                                className="p-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-ink hover:text-ink transition-colors"
                                 title="Change account security status (Active / Suspended / Locked)"
                               >
                                 <Shield className="w-3.5 h-3.5" />
@@ -753,28 +753,28 @@ export const UserMonitoringModule: React.FC = () => {
 
               {/* Desktop Pagination Footer */}
               {data && data.totalPages > 1 && (
-                <div className="px-4 py-3 bg-[#0B132B] border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+                <div className="px-4 py-3 bg-board-ground border-t border-edge flex items-center justify-between text-xs text-ink-muted">
                   <div>
-                    Showing <span className="font-mono text-white">{(page - 1) * limit + 1}</span> to{" "}
-                    <span className="font-mono text-white">{Math.min(page * limit, data.total)}</span> of{" "}
-                    <span className="font-mono text-white">{data.total}</span> accounts
+                    Showing <span className="font-mono text-ink">{(page - 1) * limit + 1}</span> to{" "}
+                    <span className="font-mono text-ink">{Math.min(page * limit, data.total)}</span> of{" "}
+                    <span className="font-mono text-ink">{data.total}</span> accounts
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="p-1.5 rounded-lg bg-[#0F1A30] border border-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 text-slate-300"
+                      className="p-1.5 rounded-lg bg-board-plate border border-edge disabled:opacity-40 disabled:cursor-not-allowed hover:bg-board-ground text-ink"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                    <span className="font-mono text-[11px] text-slate-300">
+                    <span className="font-mono text-[11px] text-ink">
                       Page {page} of {data.totalPages}
                     </span>
                     <button
                       onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
                       disabled={page === data.totalPages}
-                      className="p-1.5 rounded-lg bg-[#0F1A30] border border-slate-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800 text-slate-300"
+                      className="p-1.5 rounded-lg bg-board-plate border border-edge disabled:opacity-40 disabled:cursor-not-allowed hover:bg-board-ground text-ink"
                     >
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
@@ -789,65 +789,65 @@ export const UserMonitoringModule: React.FC = () => {
       {/* Slide-over Drawer: Active Sessions */}
       {selectedUserForSessions && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-none">
-          <div className="w-full max-w-md bg-[#0B132B] border-l border-slate-800 h-full flex flex-col p-6 overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+          <div className="w-full max-w-md bg-board-ground border-l border-edge h-full flex flex-col p-6 overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-edge mb-4">
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Monitor className="w-4 h-4 text-emerald-400" />
+                <h3 className="text-sm font-bold text-ink flex items-center gap-2">
+                  <Monitor className="w-4 h-4 text-status-done-ink" />
                   <span>Active Device Sessions</span>
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-ink-muted">
                   {selectedUserForSessions.name} (@{selectedUserForSessions.username}) &bull;{" "}
-                  <span className="uppercase font-mono text-[10px] text-slate-300">{selectedUserForSessions.role}</span>
+                  <span className="uppercase font-mono text-[10px] text-ink">{selectedUserForSessions.role}</span>
                 </p>
               </div>
 
               <button
                 onClick={() => setSelectedUserForSessions(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-board-ground"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {sessionActionMessage && (
-              <div className="p-3 mb-4 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-200 font-mono">
+              <div className="p-3 mb-4 rounded-lg bg-board-ground border border-edge text-xs text-ink font-mono">
                 {sessionActionMessage}
               </div>
             )}
 
             {isLoadingSessions ? (
-              <div className="py-12 text-center text-slate-400 text-xs font-mono">
-                <div className="w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="py-12 text-center text-ink-muted text-xs font-mono">
+                <div className="w-5 h-5 border-2 border-status-act-ink/30 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 Querying session store...
               </div>
             ) : sessions.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                <Smartphone className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-xs font-medium text-slate-300">No active device sessions found</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">The user is currently signed out on all devices.</p>
+              <div className="py-12 text-center text-ink-muted">
+                <Smartphone className="w-8 h-8 text-ink-muted mx-auto mb-2" />
+                <p className="text-xs font-medium text-ink">No active device sessions found</p>
+                <p className="text-[11px] text-ink-muted mt-0.5">The user is currently signed out on all devices.</p>
               </div>
             ) : (
               <div className="space-y-3 flex-1">
-                <div className="text-[11px] font-mono text-slate-400">
+                <div className="text-[11px] font-mono text-ink-muted">
                   Found {sessions.length} active JWT {sessions.length === 1 ? "session" : "sessions"}
                 </div>
                 {sessions.map((sess) => (
-                  <div key={sess.id} className="p-3.5 rounded-xl bg-[#0F1A30] border border-slate-800 space-y-2">
+                  <div key={sess.id} className="p-3.5 rounded-xl bg-board-plate border border-edge space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="text-xs font-semibold text-white flex items-center gap-1.5">
-                          <Monitor className="w-3.5 h-3.5 text-slate-400" />
+                        <div className="text-xs font-semibold text-ink flex items-center gap-1.5">
+                          <Monitor className="w-3.5 h-3.5 text-ink-muted" />
                           <span>{sess.userAgent || "Unknown Device / Browser"}</span>
                         </div>
-                        <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                        <div className="text-[10px] font-mono text-ink-muted mt-0.5">
                           IP: {sess.ipAddress || "Unknown"}
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleTerminateSession(sess.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-800 text-[10px] font-medium text-red-300 transition-colors shrink-0"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-[10px] font-medium text-status-act-ink transition-colors shrink-0"
                         title="Invalidate session and kick out"
                       >
                         <LogOut className="w-3 h-3" />
@@ -855,7 +855,7 @@ export const UserMonitoringModule: React.FC = () => {
                       </button>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    <div className="pt-2 border-t border-edge flex items-center justify-between text-[10px] font-mono text-ink-muted">
                       <span>Issued: {new Date(sess.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       <span>Expires: {new Date(sess.expiresAt).toLocaleDateString()}</span>
                     </div>
@@ -864,10 +864,10 @@ export const UserMonitoringModule: React.FC = () => {
               </div>
             )}
 
-            <div className="pt-4 border-t border-slate-800 mt-4">
+            <div className="pt-4 border-t border-edge mt-4">
               <button
                 onClick={() => setSelectedUserForSessions(null)}
-                className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition-colors"
+                className="w-full py-2 rounded-xl bg-board-ground hover:bg-board-ground text-xs font-semibold text-ink transition-colors"
               >
                 Done
               </button>
@@ -879,15 +879,15 @@ export const UserMonitoringModule: React.FC = () => {
       {/* Modal: Account Security Status */}
       {selectedUserForStatus && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-none">
-          <div className="w-full max-w-md rounded-2xl bg-[#0B132B] border border-slate-800 p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+          <div className="w-full max-w-md rounded-2xl bg-board-ground border border-edge p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-edge mb-4">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-amber-400" />
-                <h3 className="text-sm font-bold text-white">Modify Account Status</h3>
+                <ShieldAlert className="w-5 h-5 text-status-waiting-ink" />
+                <h3 className="text-sm font-bold text-ink">Modify Account Status</h3>
               </div>
               <button
                 onClick={() => setSelectedUserForStatus(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                className="p-1 rounded-lg text-ink-muted hover:text-ink"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -895,17 +895,17 @@ export const UserMonitoringModule: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <div className="text-xs text-slate-400">Target Account:</div>
-                <div className="text-sm font-bold text-white">
+                <div className="text-xs text-ink-muted">Target Account:</div>
+                <div className="text-sm font-bold text-ink">
                   {selectedUserForStatus.name} (@{selectedUserForStatus.username})
                 </div>
-                <div className="text-[11px] font-mono text-slate-400">
+                <div className="text-[11px] font-mono text-ink-muted">
                   Role: {selectedUserForStatus.role} &bull; Current Status: {selectedUserForStatus.status}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-ink mb-1.5">
                   Select New Security Status
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -914,8 +914,8 @@ export const UserMonitoringModule: React.FC = () => {
                     onClick={() => setNewStatus("Active")}
                     className={`py-2 px-3 rounded-lg text-xs font-semibold border text-center transition-colors ${
                       newStatus === "Active"
-                        ? "bg-emerald-950/80 border-emerald-600 text-emerald-300"
-                        : "bg-[#0F1A30] border-slate-800 text-slate-400 hover:text-white"
+                        ? "bg-status-done-fill border-status-done-ink/30 text-status-done-ink"
+                        : "bg-board-plate border-edge text-ink-muted hover:text-ink"
                     }`}
                   >
                     Active
@@ -925,8 +925,8 @@ export const UserMonitoringModule: React.FC = () => {
                     onClick={() => setNewStatus("Suspended")}
                     className={`py-2 px-3 rounded-lg text-xs font-semibold border text-center transition-colors ${
                       newStatus === "Suspended"
-                        ? "bg-amber-950/80 border-amber-600 text-amber-300"
-                        : "bg-[#0F1A30] border-slate-800 text-slate-400 hover:text-white"
+                        ? "bg-status-waiting-fill border-status-waiting-ink/30 text-status-waiting-ink"
+                        : "bg-board-plate border-edge text-ink-muted hover:text-ink"
                     }`}
                   >
                     Suspended
@@ -936,8 +936,8 @@ export const UserMonitoringModule: React.FC = () => {
                     onClick={() => setNewStatus("Locked")}
                     className={`py-2 px-3 rounded-lg text-xs font-semibold border text-center transition-colors ${
                       newStatus === "Locked"
-                        ? "bg-rose-950/80 border-rose-600 text-rose-300"
-                        : "bg-[#0F1A30] border-slate-800 text-slate-400 hover:text-white"
+                        ? "bg-status-act-fill border-status-act-ink/30 text-status-act-ink"
+                        : "bg-board-plate border-edge text-ink-muted hover:text-ink"
                     }`}
                   >
                     Locked
@@ -946,8 +946,8 @@ export const UserMonitoringModule: React.FC = () => {
               </div>
 
               {newStatus !== "Active" && (
-                <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/60 text-[11px] text-amber-300 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="p-3 rounded-lg bg-status-waiting-fill border border-status-waiting-ink/30 text-[11px] text-status-waiting-ink flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-status-waiting-ink shrink-0 mt-0.5" />
                   <span>
                     Setting status to <strong>{newStatus}</strong> will immediately revoke all active JWT sessions and kick the user off all devices.
                   </span>
@@ -955,7 +955,7 @@ export const UserMonitoringModule: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-ink mb-1">
                   Reason for Status Modification (Optional / Audit Trail)
                 </label>
                 <textarea
@@ -963,32 +963,32 @@ export const UserMonitoringModule: React.FC = () => {
                   onChange={(e) => setStatusReason(e.target.value)}
                   placeholder="e.g., Investigating suspicious activity or account requested deactivation"
                   rows={2}
-                  className="w-full px-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                  className="w-full px-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Administrator Step-Up Password <span className="text-red-400">*</span>
+                <label className="block text-xs font-medium text-ink mb-1">
+                  Administrator Step-Up Password <span className="text-status-act-ink">*</span>
                 </label>
                 <div className="relative">
-                  <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-3" />
                   <input
                     type="password"
                     value={stepUpPassword}
                     onChange={(e) => setStepUpPassword(e.target.value)}
                     placeholder="Enter current administrator password..."
                     disabled={isUpdatingStatus}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#0F1A30] border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-board-plate border border-edge text-xs text-ink placeholder-ink-muted focus:outline-none focus:border-status-act-ink/30"
                   />
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-ink-muted mt-1">
                   Required to authorize modifying live user operational status.
                 </p>
               </div>
 
               {statusActionMessage && (
-                <div className="p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white font-mono">
+                <div className="p-2.5 rounded-lg bg-board-ground border border-edge text-xs text-ink font-mono">
                   {statusActionMessage}
                 </div>
               )}
@@ -997,7 +997,7 @@ export const UserMonitoringModule: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSelectedUserForStatus(null)}
-                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-xs font-semibold text-ink transition-colors"
                 >
                   Cancel
                 </button>
@@ -1005,7 +1005,7 @@ export const UserMonitoringModule: React.FC = () => {
                   type="button"
                   onClick={handleUpdateStatus}
                   disabled={isUpdatingStatus || !stepUpPassword}
-                  className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 text-xs font-semibold text-white transition-colors"
+                  className="flex-1 py-2 rounded-xl bg-signal hover:bg-signal-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors"
                 >
                   {isUpdatingStatus ? "Applying..." : "Confirm Change"}
                 </button>

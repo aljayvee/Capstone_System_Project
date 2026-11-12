@@ -62,7 +62,7 @@ export const ReportState: React.FC<ReportStateProps> = ({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-board-plate transition-colors hover:bg-signal-deep"
+          className="mt-2 inline-flex min-h-9 items-center gap-1.5 rounded-plate bg-signal px-4 text-micro uppercase text-white transition-colors hover:bg-signal-deep"
         >
           <RotateCcw size={14} />
           <span>Try again</span>

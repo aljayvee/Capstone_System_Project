@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import {
   Building2,
   Compass,
-  Loader2,
   MapPin,
   Plus,
   RefreshCw,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 import { PlacesMiniMap } from "../../../../../components/PlacesMiniMap";
 import { apiService, type ApiVerifiedPlace } from "../../../../../services/apiService";
+import { CategoryPlacesSkeleton } from "../../../components/OwnerSkeletons";
 
 interface CategoryPlacesPanelProps {
   categoryId: number;
@@ -56,12 +56,7 @@ export const CategoryPlacesPanel: React.FC<CategoryPlacesPanelProps> = ({
   }, [load]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-4 text-ink-muted bg-board-ground rounded-plate border border-edge">
-        <Loader2 size={15} className="animate-spin text-board-field" />
-        <span className="text-body">Loading location stores…</span>
-      </div>
-    );
+    return <CategoryPlacesSkeleton count={3} />;
   }
 
   if (loadError) {

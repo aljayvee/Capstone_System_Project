@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { apiService, type ApiErrandException, type ExceptionKind } from "../../../services/apiService";
+import {
+  apiService,
+  type ApiCashOutcome,
+  type ApiErrandException,
+  type ExceptionKind,
+} from "../../../services/apiService";
 
 /**
  * Every open exception of one kind on one errand, as the single queue row it is.
@@ -84,7 +89,12 @@ export function groupExceptions(exceptions: ApiErrandException[]): ExceptionGrou
  * two are now different states, and a failure keeps the last known list rather
  * than replacing it with a reassuring zero.
  */
-export function useOpenExceptions(pollMs = 60_000) {
+/**
+ * `enabled` false (an access group without exceptions.resolve) skips the
+ * fetch and the poll: the server would refuse every one, and each refusal is
+ * a line in its [AuthZ] log.
+ */
+export function useOpenExceptions(pollMs = 60_000, enabled = true) {
   const [exceptions, setExceptions] = useState<ApiErrandException[]>([]);
   const [totalAtRisk, setTotalAtRisk] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,15 +129,28 @@ export function useOpenExceptions(pollMs = 60_000) {
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setExceptions([]);
+      setTotalAtRisk(0);
+      setLoadError(null);
+      setIsLoading(false);
+      return;
+    }
     void reload();
     if (pollMs <= 0) return;
     const timer = setInterval(() => void reload(), pollMs);
     return () => clearInterval(timer);
-  }, [reload, pollMs]);
+  }, [reload, pollMs, enabled]);
 
   const resolve = useCallback(
-    async (errandId: string, kind: ExceptionKind, reason: string, amountAtRisk: number) => {
-      await apiService.resolveException(errandId, { kind, reason, amountAtRisk });
+    async (
+      errandId: string,
+      kind: ExceptionKind,
+      reason: string,
+      amountAtRisk: number,
+      cashOutcome?: ApiCashOutcome | null
+    ) => {
+      await apiService.resolveException(errandId, { kind, reason, amountAtRisk, cashOutcome });
       await reload();
     },
     [reload]

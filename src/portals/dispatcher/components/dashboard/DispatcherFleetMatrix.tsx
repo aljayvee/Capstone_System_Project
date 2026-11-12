@@ -28,10 +28,6 @@ export const DispatcherFleetMatrix: React.FC<DispatcherFleetMatrixProps> = ({
   riders,
   onNavigateTab,
 }) => {
-  const onlineCount = riders.filter((r) => r.presence === "AVAILABLE_ONLINE").length;
-  const onDeliveryCount = riders.filter((r) => r.presence === "ON_DELIVERY").length;
-  const lostCount = riders.filter((r) => r.presence === "AVAILABLE_SIGNAL_LOST").length;
-
   // Prioritize active & online riders first
   const sortedRiders = React.useMemo(() => {
     return [...riders].sort((a, b) => {
@@ -50,11 +46,8 @@ export const DispatcherFleetMatrix: React.FC<DispatcherFleetMatrixProps> = ({
       <div className="flex items-center justify-between pb-3 border-b border-hairline">
         <div>
           <h2 className="text-label uppercase tracking-[0.06em] font-bold text-ink">
-            Live Fleet Matrix
+            Riders
           </h2>
-          <p className="text-micro text-ink-muted mt-0.5">
-            {onlineCount} Available • {onDeliveryCount} on Delivery • {lostCount} Lost
-          </p>
         </div>
         <span className="font-mono text-micro px-2 py-0.5 rounded-full bg-board-ground text-ink font-bold border border-edge">
           {riders.length} total
@@ -65,7 +58,7 @@ export const DispatcherFleetMatrix: React.FC<DispatcherFleetMatrixProps> = ({
         {riders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center px-4">
             <Bike size={24} className="text-ink-muted mb-2 opacity-50" />
-            <p className="text-label font-medium text-ink-muted">No riders registered in fleet</p>
+            <p className="text-label font-medium text-ink-muted">No riders registered</p>
           </div>
         ) : (
           sortedRiders.slice(0, 8).map((rider) => {
@@ -173,7 +166,7 @@ export const DispatcherFleetMatrix: React.FC<DispatcherFleetMatrixProps> = ({
           icon={<ArrowRight size={13} />}
           onClick={() => onNavigateTab("riders")}
         >
-          View Full Fleet Tracking & Map
+          View Riders & Map
         </DispatcherButton>
       </div>
     </div>

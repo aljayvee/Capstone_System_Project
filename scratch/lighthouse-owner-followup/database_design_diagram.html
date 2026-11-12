@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SUGO Express - Logical Database Design Diagram</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+    .badge-pk { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }
+    .badge-fk { background: #E0F2FE; color: #075985; border: 1px solid #BAE6FD; }
+    .badge-idx { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+    .badge-enum { background: #F3E8FF; color: #6B21A8; border: 1px solid #E9D5FF; }
+  </style>
+</head>
+<body class="bg-[var(--background,#0B132B)] text-[var(--foreground,#E2E8F0)] antialiased min-h-screen flex flex-col font-sans">
+
+  <!-- TOP HEADER / CONTROL BAR -->
+  <header class="sticky top-0 z-30 bg-[var(--card,#111C44)]/95 backdrop-blur border-b border-[var(--border,#1E293B)] px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></div>
+          <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Tacurong City Logistics Architecture</span>
+        </div>
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-[var(--foreground,#F8FAFC)]">
+          SUGO Database Design Diagram (3NF Logical Schema)
+        </h1>
+        <p class="text-xs text-[var(--muted-foreground,#94A3B8)] mt-0.5">
+          MariaDB / MySQL Normalized Engine - 46 Tables, 45 Relational Constraints, Atomic Lifecycle Isolation
+        </p>
+      </div>
+
+      <!-- Quick Metrics & Search -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div class="relative">
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search table, column, or foreign key..."
+            class="bg-[var(--background,#0B132B)] text-xs text-[var(--foreground,#E2E8F0)] border border-[var(--border,#1E293B)] rounded-lg px-3 py-2 pl-9 w-64 md:w-80 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+            oninput="handleSearch(this.value)"
+          />
+          <svg class="w-4 h-4 absolute left-2.5 top-2.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+        </div>
+
+        <div class="flex items-center gap-1.5 bg-[var(--background,#0B132B)] border border-[var(--border,#1E293B)] rounded-lg px-2.5 py-1.5 text-xs">
+          <span class="font-bold text-red-500" id="tableCountDisplay">46</span>
+          <span class="text-slate-400">Tables</span>
+          <span class="text-slate-600">•</span>
+          <span class="font-bold text-sky-400">45</span>
+          <span class="text-slate-400">FKs</span>
+        </div>
+
+        <button onclick="toggleView('canvas')" id="btnViewCanvas" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+          ERD Cards
+        </button>
+        <button onclick="toggleView('matrix')" id="btnViewMatrix" class="bg-[var(--background,#0B132B)] hover:bg-slate-800 text-[var(--foreground,#E2E8F0)] border border-[var(--border,#1E293B)] text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+          Relationship Matrix
+        </button>
+      </div>
+    </div>
+
+    <!-- DOMAIN NAVIGATION TABS -->
+    <div class="max-w-7xl mx-auto mt-4 flex items-center gap-2 overflow-x-auto pb-1 text-xs" id="domainTabs">
+      <button onclick="filterDomain('ALL')" class="domain-tab active px-3 py-1.5 rounded-md font-medium transition-colors bg-red-600/15 text-red-400 border border-red-500/30">
+        All Domains (46)
+      </button>
+      <button onclick="filterDomain('ERRANDS')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Errand Fulfillment (7)
+      </button>
+      <button onclick="filterDomain('CUSTOMERS')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Customer Accounts (6)
+      </button>
+      <button onclick="filterDomain('STAFF')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Staff & Fleet Telemetry (7)
+      </button>
+      <button onclick="filterDomain('FINANCE')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Finance & Settlement (8)
+      </button>
+      <button onclick="filterDomain('MERCHANTS')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Stores & Merchants (4)
+      </button>
+      <button onclick="filterDomain('SECURITY')" class="domain-tab px-3 py-1.5 rounded-md font-medium transition-colors bg-[var(--background,#0B132B)] text-slate-400 hover:text-white border border-[var(--border,#1E293B)]">
+        Security & SysAdmin (14)
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6">
+
+    <!-- CANVAS VIEW: HIGH-DENSITY ERD CARDS GRID -->
+    <div id="viewCanvas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <!-- Tables injected by JavaScript -->
+    </div>
+
+    <!-- MATRIX VIEW: RELATIONAL CONSTRAINTS TABLE -->
+    <div id="viewMatrix" class="hidden bg-[var(--card,#111C44)] border border-[var(--border,#1E293B)] rounded-xl overflow-hidden shadow-sm">
+      <div class="p-4 border-b border-[var(--border,#1E293B)] flex items-center justify-between">
+        <div>
+          <h2 class="font-bold text-sm text-[var(--foreground,#F8FAFC)]">Relational Integrity Matrix (Foreign Keys)</h2>
+          <p class="text-xs text-[var(--muted-foreground,#94A3B8)]">All 45 declared foreign key bindings, child-parent linkages, and referential actions</p>
+        </div>
+        <span class="text-xs font-mono bg-sky-950 text-sky-400 border border-sky-800 px-2 py-1 rounded">45 Active Foreign Keys</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-[var(--background,#0B132B)]/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-[var(--border,#1E293B)]">
+            <tr>
+              <th class="py-2.5 px-4">Child Table (Source)</th>
+              <th class="py-2.5 px-4">Foreign Key Field</th>
+              <th class="py-2.5 px-4">References</th>
+              <th class="py-2.5 px-4">Parent Table (Target)</th>
+              <th class="py-2.5 px-4">On Delete</th>
+              <th class="py-2.5 px-4">On Update</th>
+            </tr>
+          </thead>
+          <tbody id="matrixTableBody" class="divide-y divide-[var(--border,#1E293B)] font-mono">
+            <!-- Injected by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- TABLE INSPECTOR MODAL -->
+  <div id="tableModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[var(--card,#111C44)] border border-[var(--border,#1E293B)] rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-[var(--border,#1E293B)] flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="modalDomainBadge" class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-800">DOMAIN</span>
+            <span class="text-xs text-slate-400 font-mono">Table Schema</span>
+          </div>
+          <h2 id="modalTableName" class="text-lg font-bold text-white font-mono mt-1">table_name</h2>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-lg bg-[var(--background,#0B132B)] hover:bg-slate-800 text-slate-300 flex items-center justify-center transition-colors">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-5 text-xs flex-1">
+        <!-- Relationships Summary -->
+        <div>
+          <h3 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-2 flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+            Relational Connections
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="modalRelations">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <!-- Full Column Specification -->
+        <div>
+          <h3 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-2">Column Definitions & Data Types</h3>
+          <div class="border border-[var(--border,#1E293B)] rounded-lg overflow-hidden">
+            <table class="w-full text-left">
+              <thead class="bg-[var(--background,#0B132B)] text-slate-400 uppercase font-semibold border-b border-[var(--border,#1E293B)]">
+                <tr>
+                  <th class="py-2 px-3">Column Name</th>
+                  <th class="py-2 px-3">Data Type</th>
+                  <th class="py-2 px-3">Nullable</th>
+                  <th class="py-2 px-3">Key / Index</th>
+                  <th class="py-2 px-3">Default</th>
+                </tr>
+              </thead>
+              <tbody id="modalColumnsBody" class="divide-y divide-[var(--border,#1E293B)] font-mono">
+                <!-- Injected by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 bg-[var(--background,#0B132B)]/80 border-t border-[var(--border,#1E293B)] flex items-center justify-between">
+        <span class="text-xs text-slate-400">Strict 3NF Normalization - MySQL InnoDB Engine</span>
+        <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold">
+          Close Inspector
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT: SCHEMA DEFINITIONS & INTERACTIVITY -->
+  <script>
+    // 46 Database Tables with full 3NF schemas and relations
+    const SCHEMA_TABLES = [
+      // 1. ERRANDS DOMAIN (7)
+      {
+        name: "errands",
+        domain: "ERRANDS",
+        description: "Master errand lifecycle table. Preserves pricing formulas, GIS routing, and timestamps.",
+        columns: [
+          { name: "id", type: "VARCHAR(191)", pk: true, nullable: false, default: "uuid()" },
+          { name: "category", type: "VARCHAR(191)", nullable: false },
+          { name: "description", type: "VARCHAR(191)", nullable: false },
+          { name: "pickupAddress", type: "VARCHAR(191)", nullable: false },
+          { name: "deliveryAddress", type: "VARCHAR(191)", nullable: false },
+          { name: "deliveryLatitude", type: "DOUBLE", nullable: true },
+          { name: "deliveryLongitude", type: "DOUBLE", nullable: true },
+          { name: "estimatedCost", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "deliveryFee", type: "DOUBLE", nullable: false, default: "50" },
+          { name: "tip", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "totalCost", type: "DOUBLE", nullable: false, default: "50" },
+          { name: "status", type: "ENUM", isEnum: true, nullable: false, default: "'PENDING'" },
+          { name: "storeCount", type: "INTEGER", nullable: false, default: "1" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: false },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "paymentModeId", type: "INTEGER", fk: true, ref: "payment_modes.id", nullable: true },
+          { name: "paymentEnabledAt", type: "DATETIME(3)", nullable: true },
+          { name: "paymentEnabledByDispatcherId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "itemsPurchasedAt", type: "DATETIME(3)", nullable: true },
+          { name: "halfPaymentRequestedAt", type: "DATETIME(3)", nullable: true },
+          { name: "overageEscalatedAt", type: "DATETIME(3)", nullable: true },
+          { name: "overageResolvedAt", type: "DATETIME(3)", nullable: true },
+          { name: "assignedAt", type: "DATETIME(3)", nullable: true },
+          { name: "deliveredAt", type: "DATETIME(3)", nullable: true },
+          { name: "completedAt", type: "DATETIME(3)", nullable: true },
+          { name: "distanceKm", type: "DOUBLE", nullable: true },
+          { name: "routeDistanceMeters", type: "INTEGER", nullable: true },
+          { name: "routeDurationSeconds", type: "INTEGER", nullable: true },
+          { name: "quotedHandlingBasket", type: "DOUBLE", nullable: true },
+          { name: "quotedHandlingFee", type: "DOUBLE", nullable: true },
+          { name: "quotedDeliveryFee", type: "DOUBLE", nullable: true },
+          { name: "proximity_alert_sent_at", type: "DATETIME(3)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "pabili_details_tbl",
+        domain: "ERRANDS",
+        description: "Working item checklist edited and verified by dispatchers.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "itemName", type: "VARCHAR(191)", nullable: false },
+          { name: "storeCategory", type: "VARCHAR(191)", nullable: true },
+          { name: "quantity", type: "INTEGER", nullable: false, default: "1" },
+          { name: "unitPrice", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "estimatedSubtotal", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "pinpointId", type: "INTEGER", fk: true, ref: "errand_pinpoints_tbl.id", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "pabili_item_requests_tbl",
+        domain: "ERRANDS",
+        description: "Immutable customer original order request audit trail.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "itemName", type: "VARCHAR(191)", nullable: false },
+          { name: "storeCategory", type: "VARCHAR(191)", nullable: true },
+          { name: "quantity", type: "INTEGER", nullable: false, default: "1" },
+          { name: "pinpointId", type: "INTEGER", fk: true, ref: "errand_pinpoints_tbl.id", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "errand_pinpoints_tbl",
+        domain: "ERRANDS",
+        description: "Dispatcher-committed physical store stops (max 3 stops per errand).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "sequence", type: "INTEGER", nullable: false, default: "0" },
+          { name: "storeName", type: "VARCHAR(191)", nullable: false },
+          { name: "latitude", type: "DOUBLE", nullable: false },
+          { name: "longitude", type: "DOUBLE", nullable: false },
+          { name: "categoryId", type: "INTEGER", fk: true, ref: "merchant_categories.id", nullable: true },
+          { name: "placeId", type: "VARCHAR(36)", fk: true, ref: "verified_places.id", nullable: true },
+          { name: "arrivedAt", type: "DATETIME(3)", nullable: true },
+          { name: "departedAt", type: "DATETIME(3)", nullable: true },
+          { name: "legDistanceMeters", type: "INTEGER", nullable: true },
+          { name: "legDurationSeconds", type: "INTEGER", nullable: true },
+          { name: "sequenceLocked", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "dispatch_logs",
+        domain: "ERRANDS",
+        description: "Dispatcher assignment, verification timestamp, and audit trail.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "dispatcherId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "notes", type: "VARCHAR(191)", nullable: true },
+          { name: "dispatchedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "verifiedAt", type: "DATETIME(3)", nullable: true }
+        ]
+      },
+      {
+        name: "errand_decline_reasons",
+        domain: "ERRANDS",
+        description: "Structured reasons for errand rejections or cancellations.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "dispatcherId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "reason", type: "VARCHAR(255)", nullable: false },
+          { name: "isCustom", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "ratings",
+        domain: "ERRANDS",
+        description: "Customer star ratings and service comments for completed deliveries.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "stars", type: "INTEGER", nullable: false },
+          { name: "comment", type: "VARCHAR(191)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+
+      // 2. CUSTOMERS DOMAIN (6)
+      {
+        name: "customer_accounts",
+        domain: "CUSTOMERS",
+        description: "Customer authentication and identity accounts.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "username", type: "VARCHAR(191)", nullable: false },
+          { name: "passwordHash", type: "VARCHAR(191)", nullable: false },
+          { name: "email", type: "VARCHAR(191)", nullable: false },
+          { name: "status", type: "VARCHAR(191)", nullable: false, default: "'Active'" },
+          { name: "emailVerified", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "expoPushToken", type: "VARCHAR(191)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "customer_information",
+        domain: "CUSTOMERS",
+        description: "Customer personal profile details (3NF separated from auth).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: false },
+          { name: "firstName", type: "VARCHAR(191)", nullable: false },
+          { name: "middleName", type: "VARCHAR(191)", nullable: true },
+          { name: "lastName", type: "VARCHAR(191)", nullable: false },
+          { name: "birthdate", type: "DATE", nullable: true },
+          { name: "phone", type: "VARCHAR(191)", nullable: false },
+          { name: "avatar", type: "LONGTEXT", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "customer_profile_photos",
+        domain: "CUSTOMERS",
+        description: "Dedicated binary image storage for customer avatars.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: false },
+          { name: "photoData", type: "LONGTEXT", nullable: false },
+          { name: "mimeType", type: "VARCHAR(50)", nullable: false },
+          { name: "fileSize", type: "INTEGER", nullable: false },
+          { name: "fileName", type: "VARCHAR(255)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "customer_transactions",
+        domain: "CUSTOMERS",
+        description: "Customer ledger of completed order expenditures and payment modes.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: false },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "amount", type: "DOUBLE", nullable: false },
+          { name: "paymentMethod", type: "VARCHAR(191)", nullable: false, default: "'COD'" },
+          { name: "status", type: "VARCHAR(191)", nullable: false, default: "'PENDING'" },
+          { name: "paidAt", type: "DATETIME(3)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "saved_delivery_locations",
+        domain: "CUSTOMERS",
+        description: "Customer saved GPS delivery presets (Home, Work, etc., max 5).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: false },
+          { name: "label", type: "VARCHAR(191)", nullable: false },
+          { name: "address", type: "VARCHAR(191)", nullable: false },
+          { name: "latitude", type: "DOUBLE", nullable: false },
+          { name: "longitude", type: "DOUBLE", nullable: false },
+          { name: "isDefault", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "password_reset_attempts",
+        domain: "CUSTOMERS",
+        description: "Security logging for customer password reset requests and OTP challenges.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "identifier", type: "VARCHAR(255)", nullable: false },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: true },
+          { name: "outcome", type: "VARCHAR(32)", nullable: false },
+          { name: "ipAddress", type: "VARCHAR(64)", nullable: true },
+          { name: "userAgent", type: "TEXT", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+
+      // 3. STAFF & FLEET TELEMETRY (7)
+      {
+        name: "users",
+        domain: "STAFF",
+        description: "Operational staff accounts (Owner, Dispatcher, Rider).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "username", type: "VARCHAR(191)", nullable: false },
+          { name: "passwordHash", type: "VARCHAR(191)", nullable: false },
+          { name: "role", type: "ENUM", isEnum: true, nullable: false },
+          { name: "firstName", type: "VARCHAR(191)", nullable: false },
+          { name: "middleName", type: "VARCHAR(191)", nullable: true },
+          { name: "lastName", type: "VARCHAR(191)", nullable: false },
+          { name: "email", type: "VARCHAR(191)", nullable: false },
+          { name: "phone", type: "VARCHAR(191)", nullable: false },
+          { name: "avatar", type: "VARCHAR(191)", nullable: true },
+          { name: "status", type: "VARCHAR(191)", nullable: false, default: "'Active'" },
+          { name: "version", type: "INTEGER", nullable: false, default: "1" },
+          { name: "updatedBy", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "emailVerified", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "profileCompleted", type: "BOOLEAN", nullable: false, default: "true" },
+          { name: "expoPushToken", type: "VARCHAR(191)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "rider_presence",
+        domain: "STAFF",
+        description: "Real-time durable mirror of rider duty status, beacon cadence, and GPS.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "latitude", type: "DOUBLE", nullable: true },
+          { name: "longitude", type: "DOUBLE", nullable: true },
+          { name: "accuracyMeters", type: "DOUBLE", nullable: true },
+          { name: "headingDeg", type: "DOUBLE", nullable: true },
+          { name: "onDuty", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "backgroundLocation", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "connectivity", type: "VARCHAR(16)", nullable: true },
+          { name: "beaconIntervalMs", type: "INTEGER", nullable: true },
+          { name: "lastBeaconAt", type: "DATETIME(3)", nullable: true },
+          { name: "shutdownAt", type: "DATETIME(3)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "rider_profile_photos",
+        domain: "STAFF",
+        description: "Staff and rider avatar photo binary repository.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "userId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "photoData", type: "LONGTEXT", nullable: false },
+          { name: "mimeType", type: "VARCHAR(50)", nullable: false },
+          { name: "fileSize", type: "INTEGER", nullable: false },
+          { name: "fileName", type: "VARCHAR(255)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "errand_track_points",
+        domain: "STAFF",
+        description: "Immutable high-rate GPS breadcrumb trail during active delivery runs.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "latitude", type: "DOUBLE", nullable: false },
+          { name: "longitude", type: "DOUBLE", nullable: false },
+          { name: "accuracyMeters", type: "DOUBLE", nullable: true },
+          { name: "speedMps", type: "DOUBLE", nullable: true },
+          { name: "headingDeg", type: "DOUBLE", nullable: true },
+          { name: "recordedAt", type: "DATETIME(3)", nullable: false },
+          { name: "receivedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "isMapMatched", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "clientPointId", type: "VARCHAR(36)", nullable: false }
+        ]
+      },
+      {
+        name: "dwell_observations",
+        domain: "STAFF",
+        description: "Learned store dwell and queuing times recorded by geofence triggers.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "pinpointId", type: "INTEGER", fk: true, ref: "errand_pinpoints_tbl.id", nullable: false },
+          { name: "categoryId", type: "INTEGER", fk: true, ref: "merchant_categories.id", nullable: true },
+          { name: "placeId", type: "VARCHAR(36)", fk: true, ref: "verified_places.id", nullable: true },
+          { name: "dwellSeconds", type: "INTEGER", nullable: false },
+          { name: "arrivedAt", type: "DATETIME(3)", nullable: false },
+          { name: "departedAt", type: "DATETIME(3)", nullable: false },
+          { name: "stalled", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "rider_login_sessions",
+        domain: "STAFF",
+        description: "Audit ledger of rider shift clock-ins, clock-outs, and active durations.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "loginAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "logoutAt", type: "DATETIME(3)", nullable: true },
+          { name: "durationSeconds", type: "INTEGER", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "rider_status_logs",
+        domain: "STAFF",
+        description: "State-transition logs recording when riders switch between Online and Offline.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "status", type: "ENUM", isEnum: true, nullable: false },
+          { name: "recordedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+
+      // 4. FINANCE & SETTLEMENT DOMAIN (8)
+      {
+        name: "errand_payments",
+        domain: "FINANCE",
+        description: "Multi-stage payment tracking (UPFRONT 50%, TOP_UP, FINAL, REFUND).",
+        columns: [
+          { name: "id", type: "VARCHAR(191)", pk: true, nullable: false },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "kind", type: "ENUM", isEnum: true, nullable: false },
+          { name: "amount", type: "DOUBLE", nullable: false },
+          { name: "confirmedByUserId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "confirmedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "note", type: "VARCHAR(255)", nullable: true },
+          { name: "proofImageId", type: "INTEGER", fk: true, ref: "errand_proof_images.id", nullable: true }
+        ]
+      },
+      {
+        name: "settlement_records",
+        domain: "FINANCE",
+        description: "End-of-day rider cash reconciliation, cash handovers, and variance tracking.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "expectedAmount", type: "DOUBLE", nullable: false },
+          { name: "collectedAmount", type: "DOUBLE", nullable: false },
+          { name: "variance", type: "DOUBLE", nullable: false },
+          { name: "status", type: "VARCHAR(191)", nullable: false },
+          { name: "shortReason", type: "VARCHAR(300)", nullable: true },
+          { name: "proofImageId", type: "INTEGER", fk: true, ref: "errand_proof_images.id", nullable: true },
+          { name: "settledAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "rider_commissions",
+        domain: "FINANCE",
+        description: "Delivery fee revenue split: rider share vs business share (excludes item cost).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "deliveryFee", type: "DOUBLE", nullable: false },
+          { name: "tip", type: "DOUBLE", nullable: false },
+          { name: "commissionRate", type: "DOUBLE", nullable: false },
+          { name: "riderShare", type: "DOUBLE", nullable: false },
+          { name: "businessShare", type: "DOUBLE", nullable: false },
+          { name: "itemCostExcluded", type: "DOUBLE", nullable: false },
+          { name: "computedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "rate_configs",
+        domain: "FINANCE",
+        description: "Official service rates: base fee, per-km rate, grocery handling, and non-COD rules.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "1" },
+          { name: "baseFee", type: "DOUBLE", nullable: false },
+          { name: "perKmRate", type: "DOUBLE", nullable: false, default: "10" },
+          { name: "multiStoreFeePerStore", type: "DOUBLE", nullable: false, default: "30" },
+          { name: "maxAdditionalStores", type: "INTEGER", nullable: false, default: "2" },
+          { name: "groceryFeeThreshold", type: "DOUBLE", nullable: false, default: "1001" },
+          { name: "groceryFeePercent", type: "DOUBLE", nullable: false, default: "10" },
+          { name: "groceryFeeFlat", type: "DOUBLE", nullable: false, default: "50" },
+          { name: "nonCodThreshold", type: "DOUBLE", nullable: false, default: "3000" },
+          { name: "nonCodFeeHigh", type: "DOUBLE", nullable: false, default: "15" },
+          { name: "nonCodFeeLow", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "payment_modes",
+        domain: "FINANCE",
+        description: "Master list of supported payment methods (COD, GCash, PayMaya).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "name", type: "VARCHAR(191)", nullable: false },
+          { name: "description", type: "VARCHAR(191)", nullable: true },
+          { name: "status", type: "VARCHAR(191)", nullable: false, default: "'Active'" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "payment_selections",
+        domain: "FINANCE",
+        description: "Errand-specific payment selection confirmed by the customer.",
+        columns: [
+          { name: "id", type: "VARCHAR(191)", pk: true, nullable: false },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "paymentModeId", type: "INTEGER", fk: true, ref: "payment_modes.id", nullable: false },
+          { name: "confirmedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "errand_proof_images",
+        domain: "FINANCE",
+        description: "Official store receipts, bank transfers, and delivery handover photos.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "pinpointId", type: "INTEGER", fk: true, ref: "errand_pinpoints_tbl.id", nullable: true },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: true },
+          { name: "kind", type: "ENUM", isEnum: true, nullable: false },
+          { name: "imageData", type: "LONGTEXT", nullable: false },
+          { name: "mimeType", type: "VARCHAR(30)", nullable: false },
+          { name: "byteSize", type: "INTEGER", nullable: false },
+          { name: "clarityScore", type: "DOUBLE", nullable: true },
+          { name: "clarityVerdict", type: "ENUM", isEnum: true, nullable: true },
+          { name: "declaredTotal", type: "DOUBLE", nullable: true },
+          { name: "capturedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "receipt_extractions",
+        domain: "FINANCE",
+        description: "MLKit and Cloud Vision OCR extractions from store purchase receipts.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "proofImageId", type: "INTEGER", fk: true, ref: "errand_proof_images.id", nullable: false },
+          { name: "engine", type: "ENUM", isEnum: true, nullable: false },
+          { name: "rawText", type: "LONGTEXT", nullable: true },
+          { name: "extractedTotal", type: "DOUBLE", nullable: true },
+          { name: "confidence", type: "DOUBLE", nullable: true },
+          { name: "status", type: "ENUM", isEnum: true, nullable: false, default: "'NEEDS_REVIEW'" },
+          { name: "referenceNo", type: "VARCHAR(40)", nullable: true },
+          { name: "confirmedTotal", type: "DOUBLE", nullable: true },
+          { name: "extractedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+
+      // 5. MERCHANTS & PLACES (4)
+      {
+        name: "merchant_categories",
+        domain: "MERCHANTS",
+        description: "Store types (Supermarket, Pharmacy, Fast Food) with dwell ETA thresholds.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "name", type: "VARCHAR(191)", nullable: false },
+          { name: "description", type: "VARCHAR(191)", nullable: true },
+          { name: "handlingFeeMode", type: "ENUM", isEnum: true, nullable: false, default: "'THRESHOLD'" },
+          { name: "dwellP50Seconds", type: "INTEGER", nullable: false, default: "600" },
+          { name: "dwellP80Seconds", type: "INTEGER", nullable: false, default: "1200" },
+          { name: "geofenceRadiusMeters", type: "INTEGER", nullable: false, default: "75" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "store_cat_image",
+        domain: "MERCHANTS",
+        description: "Single hero image for customer Bento store grid (3NF isolated from metadata).",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "categoryId", type: "INTEGER", fk: true, ref: "merchant_categories.id", nullable: false },
+          { name: "imageData", type: "LONGTEXT", nullable: false },
+          { name: "mimeType", type: "VARCHAR(50)", nullable: false },
+          { name: "fileSize", type: "INTEGER", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "verified_places",
+        domain: "MERCHANTS",
+        description: "Official landmark and store catalog within Tacurong service area.",
+        columns: [
+          { name: "id", type: "VARCHAR(36)", pk: true, nullable: false },
+          { name: "name", type: "VARCHAR(150)", nullable: false },
+          { name: "categoryId", type: "INTEGER", fk: true, ref: "merchant_categories.id", nullable: false },
+          { name: "address", type: "VARCHAR(255)", nullable: false },
+          { name: "barangay", type: "VARCHAR(80)", nullable: true },
+          { name: "latitude", type: "DOUBLE", nullable: false },
+          { name: "longitude", type: "DOUBLE", nullable: false },
+          { name: "isActive", type: "BOOLEAN", nullable: false, default: "true" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "updatedAt", type: "DATETIME(3)", nullable: false }
+        ]
+      },
+      {
+        name: "exception_reviews",
+        domain: "MERCHANTS",
+        description: "Reconciliation dispute reviews resolving cash shortages or price overages.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: false },
+          { name: "kind", type: "VARCHAR(40)", nullable: false },
+          { name: "reviewerId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "reason", type: "VARCHAR(500)", nullable: false },
+          { name: "amountAtRisk", type: "DOUBLE", nullable: false, default: "0" },
+          { name: "resolvedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+
+      // 6. SECURITY & SYSADMIN DOMAIN (14)
+      {
+        name: "user_sessions",
+        domain: "SECURITY",
+        description: "JWT refresh token rotation and active device session management.",
+        columns: [
+          { name: "id", type: "VARCHAR(36)", pk: true, nullable: false },
+          { name: "subjectId", type: "INTEGER", nullable: false },
+          { name: "subjectType", type: "VARCHAR(16)", nullable: false },
+          { name: "role", type: "VARCHAR(20)", nullable: false },
+          { name: "tokenHash", type: "CHAR(64)", nullable: false },
+          { name: "deviceId", type: "VARCHAR(80)", nullable: true },
+          { name: "expiresAt", type: "DATETIME(3)", nullable: false },
+          { name: "revokedAt", type: "DATETIME(3)", nullable: true }
+        ]
+      },
+      {
+        name: "account_login_logs",
+        domain: "SECURITY",
+        description: "Staff and operator login history, IP address tracking, and presence state.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "userId", type: "INTEGER", nullable: false },
+          { name: "role", type: "VARCHAR(20)", nullable: false },
+          { name: "ipAddress", type: "VARCHAR(64)", nullable: false },
+          { name: "isOnline", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "status", type: "VARCHAR(32)", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "token_blocklist",
+        domain: "SECURITY",
+        description: "Revoked JWT access and refresh tokens to prevent reuse.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "token", type: "VARCHAR(500)", nullable: false },
+          { name: "expiresAt", type: "DATETIME(3)", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_sys_admin",
+        domain: "SECURITY",
+        description: "Master system administrators with 2FA protection.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "username", type: "VARCHAR(50)", nullable: false },
+          { name: "passwordHash", type: "VARCHAR(255)", nullable: false },
+          { name: "email", type: "VARCHAR(191)", nullable: true },
+          { name: "role", type: "VARCHAR(20)", nullable: false, default: "'SYSADMIN'" },
+          { name: "enforceTwoFactor", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_sys_admin_trusted_devices",
+        domain: "SECURITY",
+        description: "Hardware device fingerprints approved for SysAdmin access.",
+        columns: [
+          { name: "id", type: "VARCHAR(191)", pk: true, nullable: false },
+          { name: "adminId", type: "INTEGER", fk: true, ref: "tbl_sys_admin.id", nullable: false },
+          { name: "deviceFingerprint", type: "VARCHAR(128)", nullable: false },
+          { name: "ipAddress", type: "VARCHAR(45)", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_sys_admin_password_history",
+        domain: "SECURITY",
+        description: "Historical password hashes to enforce non-repeating credentials.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "adminId", type: "INTEGER", fk: true, ref: "tbl_sys_admin.id", nullable: false },
+          { name: "passwordHash", type: "VARCHAR(255)", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_blocked_ips",
+        domain: "SECURITY",
+        description: "Rate-limit and abuse firewall: automatically or manually banned IP addresses.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "ipAddress", type: "VARCHAR(45)", nullable: false },
+          { name: "reason", type: "VARCHAR(255)", nullable: false },
+          { name: "banType", type: "ENUM", isEnum: true, nullable: false, default: "'AUTOMATIC'" },
+          { name: "status", type: "ENUM", isEnum: true, nullable: false, default: "'ACTIVE'" },
+          { name: "bannedById", type: "INTEGER", fk: true, ref: "tbl_sys_admin.id", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_whitelisted_ips",
+        domain: "SECURITY",
+        description: "Exempt internal IPs immune to automated firewall blocking.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "ipAddress", type: "VARCHAR(45)", nullable: false },
+          { name: "description", type: "VARCHAR(255)", nullable: false },
+          { name: "isImmune", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdById", type: "INTEGER", fk: true, ref: "tbl_sys_admin.id", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_database_backups",
+        domain: "SECURITY",
+        description: "Automated and manual MariaDB physical dump archive records.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "fileName", type: "VARCHAR(255)", nullable: false },
+          { name: "fileSizeBytes", type: "BIGINT", nullable: false, default: "0" },
+          { name: "status", type: "VARCHAR(50)", nullable: false, default: "'COMPLETED'" },
+          { name: "createdById", type: "INTEGER", fk: true, ref: "tbl_sys_admin.id", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "tbl_sysadmin_alerts",
+        domain: "SECURITY",
+        description: "High-priority security telemetry pushed to Telegram/SMS.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "alertType", type: "VARCHAR(50)", nullable: false },
+          { name: "severity", type: "VARCHAR(20)", nullable: false, default: "'HIGH'" },
+          { name: "title", type: "VARCHAR(255)", nullable: false },
+          { name: "message", type: "TEXT", nullable: false },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "email_verification_codes",
+        domain: "SECURITY",
+        description: "Single-use 6-digit OTP verification codes for email proofing.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: true },
+          { name: "userId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "codeHash", type: "VARCHAR(191)", nullable: false },
+          { name: "expiresAt", type: "DATETIME(3)", nullable: false },
+          { name: "consumedAt", type: "DATETIME(3)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "connectivity_incidents",
+        domain: "SECURITY",
+        description: "Rider network signal drops and background GPS reconnection events.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "riderId", type: "INTEGER", fk: true, ref: "users.id", nullable: false },
+          { name: "errandId", type: "VARCHAR(191)", fk: true, ref: "errands.id", nullable: true },
+          { name: "disconnectedAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" },
+          { name: "reconnectedAt", type: "DATETIME(3)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "notifications",
+        domain: "SECURITY",
+        description: "System notifications dispatched to mobile apps and staff dashboards.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "userId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: true },
+          { name: "title", type: "VARCHAR(191)", nullable: false },
+          { name: "body", type: "VARCHAR(191)", nullable: false },
+          { name: "isRead", type: "BOOLEAN", nullable: false, default: "false" },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      },
+      {
+        name: "account_modification_logs",
+        domain: "SECURITY",
+        description: "Immutable audit trail of profile and credential edits.",
+        columns: [
+          { name: "id", type: "INTEGER", pk: true, nullable: false, default: "AUTO_INCREMENT" },
+          { name: "role", type: "VARCHAR(191)", nullable: false },
+          { name: "userId", type: "INTEGER", fk: true, ref: "users.id", nullable: true },
+          { name: "customerId", type: "INTEGER", fk: true, ref: "customer_accounts.id", nullable: true },
+          { name: "fieldModified", type: "VARCHAR(191)", nullable: false },
+          { name: "ipAddress", type: "VARCHAR(191)", nullable: true },
+          { name: "createdAt", type: "DATETIME(3)", nullable: false, default: "CURRENT_TIMESTAMP(3)" }
+        ]
+      }
+    ];
+
+    let currentDomain = 'ALL';
+    let searchQuery = '';
+
+    // Render Canvas View
+    function renderCanvas() {
+      const container = document.getElementById('viewCanvas');
+      const filtered = SCHEMA_TABLES.filter(t => {
+        const matchesDomain = (currentDomain === 'ALL' || t.domain === currentDomain);
+        const matchesSearch = !searchQuery || 
+          t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          t.columns.some(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.ref && c.ref.toLowerCase().includes(searchQuery.toLowerCase())));
+        return matchesDomain && matchesSearch;
+      });
+
+      document.getElementById('tableCountDisplay').innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full py-12 text-center text-slate-400">
+            <p class="text-sm font-semibold">No tables matching "${searchQuery}"</p>
+            <p class="text-xs text-slate-500 mt-1">Try another search keyword or clear domain filters.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(table => {
+        const pkCol = table.columns.find(c => c.pk);
+        const fkCols = table.columns.filter(c => c.fk);
+        
+        return `
+          <div class="bg-[var(--card,#111C44)] border border-[var(--border,#1E293B)] hover:border-slate-600 rounded-xl overflow-hidden shadow-sm flex flex-col transition-all cursor-pointer group" onclick="openTableModal('${table.name}')">
+            <!-- Table Header -->
+            <div class="p-3.5 bg-[var(--background,#0B132B)]/70 border-b border-[var(--border,#1E293B)] flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full ${getDomainColorDot(table.domain)}"></span>
+                <span class="font-bold text-sm font-mono text-[var(--foreground,#F8FAFC)] group-hover:text-red-400 transition-colors">${table.name}</span>
+              </div>
+              <span class="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${getDomainBadge(table.domain)}">
+                ${table.domain}
+              </span>
+            </div>
+
+            <!-- Table Meta -->
+            <div class="px-3.5 py-2 text-[11px] text-[var(--muted-foreground,#94A3B8)] border-b border-[var(--border,#1E293B)]/40 bg-slate-900/30">
+              ${table.description}
+            </div>
+
+            <!-- Columns Mini-List -->
+            <div class="p-3.5 space-y-1.5 flex-1 font-mono text-xs overflow-y-auto max-h-56">
+              ${table.columns.slice(0, 8).map(col => `
+                <div class="flex items-center justify-between py-0.5">
+                  <div class="flex items-center gap-1.5 overflow-hidden">
+                    ${col.pk ? '<span class="badge-pk text-[9px] font-bold px-1 rounded">PK</span>' : ''}
+                    ${col.fk ? '<span class="badge-fk text-[9px] font-bold px-1 rounded">FK</span>' : ''}
+                    <span class="truncate ${col.pk ? 'text-amber-300 font-bold' : col.fk ? 'text-sky-300 font-medium' : 'text-slate-300'}">${col.name}</span>
+                  </div>
+                  <span class="text-[10px] text-slate-500 shrink-0 ml-2">${col.type}</span>
+                </div>
+              `).join('')}
+              ${table.columns.length > 8 ? `
+                <div class="pt-1 text-center text-[10px] text-slate-500 font-sans italic">
+                  + ${table.columns.length - 8} more columns (click to inspect)
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Table Footer -->
+            <div class="px-3.5 py-2.5 bg-[var(--background,#0B132B)]/50 border-t border-[var(--border,#1E293B)] flex items-center justify-between text-[11px] text-slate-400">
+              <span>${table.columns.length} columns</span>
+              <span class="text-sky-400 font-semibold">${fkCols.length} FK links ➔</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Relational Matrix
+    function renderMatrix() {
+      const tbody = document.getElementById('matrixTableBody');
+      const rows = [];
+
+      SCHEMA_TABLES.forEach(table => {
+        table.columns.filter(c => c.fk).forEach(col => {
+          const [parentTable, parentCol] = col.ref.split('.');
+          const isCascade = col.name.includes('errandId') || col.name.includes('customerId') || col.name.includes('adminId');
+          rows.push(`
+            <tr class="hover:bg-slate-800/40 transition-colors">
+              <td class="py-2.5 px-4 font-bold text-sky-400 cursor-pointer" onclick="openTableModal('${table.name}')">${table.name}</td>
+              <td class="py-2.5 px-4 text-amber-300">${col.name}</td>
+              <td class="py-2.5 px-4 text-slate-500 font-sans">────── ➔</td>
+              <td class="py-2.5 px-4 font-bold text-emerald-400 cursor-pointer" onclick="openTableModal('${parentTable}')">${parentTable}.${parentCol}</td>
+              <td class="py-2.5 px-4 text-slate-300"><span class="px-1.5 py-0.5 rounded text-[10px] ${isCascade ? 'bg-red-950 text-red-300 border border-red-800' : 'bg-slate-800 text-slate-400'}">${isCascade ? 'CASCADE' : 'RESTRICT / SET NULL'}</span></td>
+              <td class="py-2.5 px-4 text-slate-400">CASCADE</td>
+            </tr>
+          `);
+        });
+      });
+
+      tbody.innerHTML = rows.join('');
+    }
+
+    function getDomainColorDot(domain) {
+      switch(domain) {
+        case 'ERRANDS': return 'bg-red-500';
+        case 'CUSTOMERS': return 'bg-sky-500';
+        case 'STAFF': return 'bg-emerald-500';
+        case 'FINANCE': return 'bg-amber-500';
+        case 'MERCHANTS': return 'bg-indigo-500';
+        default: return 'bg-slate-500';
+      }
+    }
+
+    function getDomainBadge(domain) {
+      switch(domain) {
+        case 'ERRANDS': return 'bg-red-950 text-red-300 border border-red-800';
+        case 'CUSTOMERS': return 'bg-sky-950 text-sky-300 border border-sky-800';
+        case 'STAFF': return 'bg-emerald-950 text-emerald-300 border border-emerald-800';
+        case 'FINANCE': return 'bg-amber-950 text-amber-300 border border-amber-800';
+        case 'MERCHANTS': return 'bg-indigo-950 text-indigo-300 border border-indigo-800';
+        default: return 'bg-slate-800 text-slate-300 border border-slate-700';
+      }
+    }
+
+    function filterDomain(domain) {
+      currentDomain = domain;
+      document.querySelectorAll('.domain-tab').forEach(tab => {
+        tab.classList.remove('active', 'bg-red-600/15', 'text-red-400', 'border-red-500/30');
+        tab.classList.add('bg-[var(--background,#0B132B)]', 'text-slate-400', 'border-[var(--border,#1E293B)]');
+      });
+      event.currentTarget.classList.add('active', 'bg-red-600/15', 'text-red-400', 'border-red-500/30');
+      event.currentTarget.classList.remove('bg-[var(--background,#0B132B)]', 'text-slate-400');
+      renderCanvas();
+    }
+
+    function handleSearch(val) {
+      searchQuery = val;
+      renderCanvas();
+    }
+
+    function toggleView(view) {
+      const canvas = document.getElementById('viewCanvas');
+      const matrix = document.getElementById('viewMatrix');
+      const btnCanvas = document.getElementById('btnViewCanvas');
+      const btnMatrix = document.getElementById('btnViewMatrix');
+
+      if (view === 'canvas') {
+        canvas.classList.remove('hidden');
+        matrix.classList.add('hidden');
+        btnCanvas.className = "bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors";
+        btnMatrix.className = "bg-[var(--background,#0B132B)] hover:bg-slate-800 text-[var(--foreground,#E2E8F0)] border border-[var(--border,#1E293B)] text-xs font-semibold px-3 py-2 rounded-lg transition-colors";
+      } else {
+        canvas.classList.add('hidden');
+        matrix.classList.remove('hidden');
+        btnMatrix.className = "bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors";
+        btnCanvas.className = "bg-[var(--background,#0B132B)] hover:bg-slate-800 text-[var(--foreground,#E2E8F0)] border border-[var(--border,#1E293B)] text-xs font-semibold px-3 py-2 rounded-lg transition-colors";
+        renderMatrix();
+      }
+    }
+
+    function openTableModal(tableName) {
+      const table = SCHEMA_TABLES.find(t => t.name === tableName);
+      if (!table) return;
+
+      document.getElementById('modalTableName').innerText = table.name;
+      document.getElementById('modalDomainBadge').innerText = table.domain;
+
+      // Find Parents (Foreign keys in this table referencing others)
+      const outgoing = table.columns.filter(c => c.fk).map(c => {
+        return `<div class="p-2 bg-[var(--background,#0B132B)] border border-[var(--border,#1E293B)] rounded flex items-center justify-between">
+          <span class="text-amber-300 font-mono">${c.name}</span>
+          <span class="text-slate-400 font-sans text-[10px]">references ➔</span>
+          <span class="text-sky-400 font-bold font-mono cursor-pointer hover:underline" onclick="openTableModal('${c.ref.split('.')[0]}')">${c.ref}</span>
+        </div>`;
+      });
+
+      // Find Children (Other tables referencing this table)
+      const incoming = [];
+      SCHEMA_TABLES.forEach(other => {
+        other.columns.filter(c => c.fk && c.ref && c.ref.startsWith(table.name + '.')).forEach(c => {
+          incoming.push(`<div class="p-2 bg-[var(--background,#0B132B)] border border-[var(--border,#1E293B)] rounded flex items-center justify-between">
+            <span class="text-emerald-400 font-bold font-mono cursor-pointer hover:underline" onclick="openTableModal('${other.name}')">${other.name}.${c.name}</span>
+            <span class="text-slate-400 font-sans text-[10px]">references ➔</span>
+            <span class="text-amber-300 font-mono">${c.ref}</span>
+          </div>`);
+        });
+      });
+
+      document.getElementById('modalRelations').innerHTML = `
+        <div>
+          <div class="text-[10px] text-slate-400 font-semibold uppercase mb-1">Outgoing Foreign Keys (${outgoing.length})</div>
+          <div class="space-y-1.5">${outgoing.length > 0 ? outgoing.join('') : '<p class="text-slate-500 italic">None (Root Entity)</p>'}</div>
+        </div>
+        <div>
+          <div class="text-[10px] text-slate-400 font-semibold uppercase mb-1">Incoming Foreign References (${incoming.length})</div>
+          <div class="space-y-1.5">${incoming.length > 0 ? incoming.join('') : '<p class="text-slate-500 italic">None (Leaf Entity)</p>'}</div>
+        </div>
+      `;
+
+      // Columns Table
+      document.getElementById('modalColumnsBody').innerHTML = table.columns.map(col => `
+        <tr class="hover:bg-slate-800/30">
+          <td class="py-2 px-3 font-semibold ${col.pk ? 'text-amber-300' : col.fk ? 'text-sky-300' : 'text-slate-200'}">
+            ${col.name}
+          </td>
+          <td class="py-2 px-3 text-slate-400">${col.type}</td>
+          <td class="py-2 px-3">${col.nullable ? '<span class="text-slate-500">NULL</span>' : '<span class="text-emerald-400">NOT NULL</span>'}</td>
+          <td class="py-2 px-3">
+            ${col.pk ? '<span class="badge-pk text-[10px] font-bold px-1.5 py-0.5 rounded">PRIMARY KEY</span>' : ''}
+            ${col.fk ? `<span class="badge-fk text-[10px] font-bold px-1.5 py-0.5 rounded">FK ➔ ${col.ref}</span>` : ''}
+            ${!col.pk && !col.fk ? '<span class="text-slate-600">-</span>' : ''}
+          </td>
+          <td class="py-2 px-3 text-slate-500">${col.default || '-'}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('tableModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('tableModal').classList.add('hidden');
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      renderCanvas();
+    });
+  </script>
+</body>
+</html>

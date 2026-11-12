@@ -65,7 +65,7 @@ function Figure({
   const unknown = isLoading || (isStale && value === "0");
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2 sm:gap-1 sm:px-5 sm:py-2.5">
-      <span className="text-micro font-semibold uppercase tracking-[0.06em] text-board-trim">{label}</span>
+      <span className="text-micro font-semibold uppercase tracking-[0.06em] text-ink-muted">{label}</span>
       {/* Board scale is for reading across a room, which a phone held at arm's
           length is not. Three figures at 34px plus their detail lines filled
           most of a 390x844 screen before the board itself appeared. */}
@@ -73,14 +73,14 @@ function Figure({
         data-figure
         className={cn(
           "font-mono text-title font-bold tabular-nums tracking-tight sm:text-board",
-          emphasis ? "text-signal-on-field" : "text-board-plate",
-          unknown && "text-board-trim"
+          emphasis ? "text-status-act-ink" : "text-ink",
+          unknown && "text-ink-muted"
         )}
       >
         {unknown ? "--" : value}
       </span>
       {detail && !unknown ? (
-        <span className="hidden truncate text-label text-board-trim/90 sm:block">{detail}</span>
+        <span className="hidden truncate text-label text-ink-muted sm:block">{detail}</span>
       ) : null}
     </div>
   );
@@ -96,10 +96,9 @@ export const DispatchKpiCards: React.FC<DispatchBoardStripProps> = ({
 }) => {
   return (
     <div
-      data-on-field
-      className="shrink-0 overflow-hidden rounded-plate border border-white/10 bg-board-field shadow-field"
+      className="shrink-0 overflow-hidden rounded-plate border border-edge bg-board-plate"
     >
-      <div className="flex divide-x divide-white/10 py-1">
+      <div className="flex divide-x divide-hairline py-1">
         {/* Emphasised only when something is actually waiting: red means "you
             must act" on this surface, so an empty queue must not wear it. */}
         <Figure
@@ -135,7 +134,7 @@ export const DispatchKpiCards: React.FC<DispatchBoardStripProps> = ({
       {isStale ? (
         <p
           role="status"
-          className="border-t border-white/10 px-4 py-2 text-label text-board-trim sm:px-5"
+          className="border-t border-hairline px-4 py-2 text-label text-ink-muted sm:px-5"
         >
           These figures could not be refreshed. Anything showing is the last
           number anyone had, and a dash means there is none to show.

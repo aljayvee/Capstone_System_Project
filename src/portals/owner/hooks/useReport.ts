@@ -29,7 +29,7 @@ export function useReport<T>(fetcher: ReportFetcher<T>, range: ApiDateRange): Us
 
   // Depended on by value rather than by identity: `range` is rebuilt on every
   // render by the views, so an object-identity dependency would refetch forever.
-  const key = `${range.period ?? ""}|${range.date ?? ""}|${range.start ?? ""}|${range.end ?? ""}`;
+  const key = `${range.period ?? ""}|${range.date ?? ""}|${range.start ?? ""}|${range.end ?? ""}|${range.riderId ?? ""}`;
 
   useEffect(() => {
     let cancelled = false;

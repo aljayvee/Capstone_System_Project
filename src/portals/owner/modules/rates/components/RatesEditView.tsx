@@ -109,7 +109,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   onChange={(e) =>
                     setBaseFee(e.target.value === "" ? null : Number(e.target.value))
                   }
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -128,7 +128,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-perKmRate"
                   value={perKmRate}
                   onChange={(e) => setPerKmRate(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -161,7 +161,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-multiStoreFeePerStore"
                   value={multiStoreFeePerStore}
                   onChange={(e) => setMultiStoreFeePerStore(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -179,7 +179,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-maxAdditionalStores"
                   value={maxAdditionalStores}
                   onChange={(e) => setMaxAdditionalStores(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
                 <span className="text-ink-muted text-label shrink-0">Stops</span>
               </div>
@@ -212,7 +212,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-groceryFeeThreshold"
                   value={groceryFeeThreshold}
                   onChange={(e) => setGroceryFeeThreshold(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -230,7 +230,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-groceryFeeFlat"
                   value={groceryFeeFlat}
                   onChange={(e) => setGroceryFeeFlat(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -248,7 +248,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-groceryFeePercent"
                   value={groceryFeePercent}
                   onChange={(e) => setGroceryFeePercent(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
                 <span className="text-ink-muted text-panel shrink-0">%</span>
               </div>
@@ -288,7 +288,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-nonCodThreshold"
                   value={nonCodThreshold}
                   onChange={(e) => setNonCodThreshold(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -306,7 +306,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-nonCodFeeLow"
                   value={nonCodFeeLow}
                   onChange={(e) => setNonCodFeeLow(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>
@@ -324,7 +324,7 @@ export const RatesEditView: React.FC<RatesEditViewProps> = ({
                   id="edit-nonCodFeeHigh"
                   value={nonCodFeeHigh}
                   onChange={(e) => setNonCodFeeHigh(Number(e.target.value))}
-                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-board-field"
+                  className="w-full bg-board-ground border border-edge rounded-trim px-2.5 py-1.5 text-ink text-panel outline-none focus:ring-2 focus:ring-field-ink"
                 />
               </div>
             </div>

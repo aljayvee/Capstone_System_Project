@@ -139,7 +139,7 @@ export const AccountSecurityLogsView: React.FC<AccountSecurityLogsViewProps> = (
       {showHeader && (
         <div className="border-b border-hairline pb-4">
           <h2 className="text-xl font-bold text-ink tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="text-signal" size={24} />
+            <ShieldCheck className="text-signal-ink" size={24} />
             Account &amp; Security Logs
           </h2>
           <p className="text-body text-ink-muted mt-1">

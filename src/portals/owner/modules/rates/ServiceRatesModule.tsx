@@ -1,20 +1,28 @@
 import React, { useState, useEffect } from "react";
 import {
   CheckCircle2,
-  Loader2,
   AlertTriangle,
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { apiService, type ApiRateConfig } from "../../../../services/apiService";
 import { OwnerPanelShell } from "../../components/OwnerPanelShell";
 import { PanelButton, ConfirmDialog } from "@/components/panel";
-import { RatesOverviewView } from "./components/RatesOverviewView";
-import { RatesEditView } from "./components/RatesEditView";
+import { RatesCardsView, type RateCardId, type RateField } from "./components/RatesCardsView";
+import { ServiceRatesSkeleton } from "../../components/OwnerSkeletons";
+
+const cardDeltaLabels: Record<RateCardId, string[]> = {
+  baseFare: ["Base Delivery Fare"],
+  excessDistance: ["Excess Distance Rate (per 1km)"],
+  multiStoreFee: ["Multi-Store Stop Fee"],
+  storeLimit: ["Max Additional Stops"],
+  grocery: ["Groceries Flat Handling", "Groceries Percentage Rate", "Groceries Threshold"],
+  nonCash: ["Non-COD Surcharge Threshold", "Non-COD High Surcharge", "Non-COD Low Surcharge"],
+};
 
 export const ServiceRatesModule: React.FC = () => {
-  const [activeMode, setActiveMode] = useState<"view" | "edit">("view");
+  const [activeCard, setActiveCard] = useState<RateCardId | null>(null);
+  const [pendingCard, setPendingCard] = useState<RateCardId | null>(null);
   const [initialRates, setInitialRates] = useState<ApiRateConfig | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDiscardConfirmModal, setShowDiscardConfirmModal] = useState(false);
@@ -168,17 +176,30 @@ export const ServiceRatesModule: React.FC = () => {
     return deltas;
   };
 
-  const hasChanges = getRateDeltas().length > 0;
+  const cardDeltas = activeCard
+    ? getRateDeltas().filter((delta) => cardDeltaLabels[activeCard].includes(delta.label))
+    : [];
+  const hasChanges = cardDeltas.length > 0;
 
-  const handleModeChange = (mode: "view" | "edit") => {
-    if (mode === activeMode) return;
-
-    if (mode === "view" && hasChanges) {
+  const handleEditCard = (card: RateCardId) => {
+    if (activeCard === card) return;
+    if (hasChanges) {
+      setPendingCard(card);
       setShowDiscardConfirmModal(true);
       return;
     }
+    if (initialRates) resetFormToInitial(initialRates);
+    setActiveCard(card);
+  };
 
-    setActiveMode(mode);
+  const handleCancel = () => {
+    if (hasChanges) {
+      setPendingCard(null);
+      setShowDiscardConfirmModal(true);
+      return;
+    }
+    if (initialRates) resetFormToInitial(initialRates);
+    setActiveCard(null);
   };
 
   const handleConfirmDiscard = () => {
@@ -186,7 +207,23 @@ export const ServiceRatesModule: React.FC = () => {
       resetFormToInitial(initialRates);
     }
     setShowDiscardConfirmModal(false);
-    setActiveMode("view");
+    setActiveCard(pendingCard);
+    setPendingCard(null);
+  };
+
+  const handleFieldChange = (field: RateField, value: number | null) => {
+    switch (field) {
+      case "baseFee": setBaseFee(value); break;
+      case "perKmRate": setPerKmRate(value ?? 0); break;
+      case "multiStoreFeePerStore": setMultiStoreFeePerStore(value ?? 0); break;
+      case "maxAdditionalStores": setMaxAdditionalStores(value ?? 0); break;
+      case "groceryFeeThreshold": setGroceryFeeThreshold(value ?? 0); break;
+      case "groceryFeeFlat": setGroceryFeeFlat(value ?? 0); break;
+      case "groceryFeePercent": setGroceryFeePercent(value ?? 0); break;
+      case "nonCodThreshold": setNonCodThreshold(value ?? 0); break;
+      case "nonCodFeeLow": setNonCodFeeLow(value ?? 0); break;
+      case "nonCodFeeHigh": setNonCodFeeHigh(value ?? 0); break;
+    }
   };
 
   const handleSaveSubmit = (e: React.FormEvent) => {
@@ -212,8 +249,7 @@ export const ServiceRatesModule: React.FC = () => {
       return;
     }
 
-    const deltas = getRateDeltas();
-    if (deltas.length === 0) {
+    if (!hasChanges) {
       toast.info("No rate changes detected.");
       return;
     }
@@ -246,7 +282,7 @@ export const ServiceRatesModule: React.FC = () => {
       resetFormToInitial(saved);
       setShowConfirmModal(false);
       setSavedSuccess(true);
-      setActiveMode("view");
+      setActiveCard(null);
       toast.success("Rate configurations saved.");
       setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err: any) {
@@ -260,57 +296,26 @@ export const ServiceRatesModule: React.FC = () => {
   return (
     <OwnerPanelShell
       title="Service Rates"
-      controls={
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Segmented Mode Switcher */}
-          <div className="inline-flex rounded-plate border border-edge bg-board-plate p-0.5">
-            <button
-              type="button"
-              onClick={() => handleModeChange("view")}
-              className={cn(
-                "px-3.5 py-1.5 text-micro uppercase font-semibold rounded-trim transition-colors",
-                activeMode === "view"
-                  ? "bg-board-field text-board-plate"
-                  : "text-ink-muted hover:bg-board-ground hover:text-ink"
-              )}
-            >
-              View Rates
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange("edit")}
-              className={cn(
-                "px-3.5 py-1.5 text-micro uppercase font-semibold rounded-trim transition-colors",
-                activeMode === "edit"
-                  ? "bg-board-field text-board-plate"
-                  : "text-ink-muted hover:bg-board-ground hover:text-ink"
-              )}
-            >
-              Edit Rates
-            </button>
-          </div>
-
-          {loadError && (
-            <div
-              role="alert"
-              className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-plate bg-status-act-fill px-4 py-2 text-label text-status-act-ink"
-            >
-              <AlertTriangle size={15} className="shrink-0" />
-              <span className="flex-1">
-                {loadError} Saving is switched off until rates load.
-              </span>
-              <PanelButton
-                variant="secondary"
-                size="sm"
-                icon={<RotateCcw size={14} />}
-                onClick={() => void loadConfig()}
-              >
-                Try again
-              </PanelButton>
-            </div>
-          )}
+      className="owner-rates-enter"
+      controls={loadError ? (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-plate bg-status-act-fill px-4 py-2 text-label text-status-act-ink"
+        >
+          <AlertTriangle size={15} className="shrink-0" />
+          <span className="flex-1">
+            {loadError} Saving is switched off until rates load.
+          </span>
+          <PanelButton
+            variant="secondary"
+            size="sm"
+            icon={<RotateCcw size={14} />}
+            onClick={() => void loadConfig()}
+          >
+            Try again
+          </PanelButton>
         </div>
-      }
+      ) : undefined}
       aside={
         savedSuccess && (
           <span
@@ -321,12 +326,25 @@ export const ServiceRatesModule: React.FC = () => {
           </span>
         )
       }
+      footer={activeCard && initialRates && !isLoading ? (
+        <div className="flex items-center justify-end gap-2 border-t border-hairline bg-board-plate px-4 py-3">
+          <PanelButton type="button" variant="secondary" onClick={handleCancel} disabled={isSaving}>
+            Cancel
+          </PanelButton>
+          <PanelButton
+            type="submit"
+            form="service-rates-active-card"
+            variant="primary"
+            loading={isSaving}
+            disabled={Boolean(loadError) || !hasChanges || nonCodFeeHigh < nonCodFeeLow || groceryFeeThreshold < 1000}
+          >
+            Update
+          </PanelButton>
+        </div>
+      ) : undefined}
     >
       {isLoading ? (
-        <div className="bg-board-plate border border-edge rounded-plate p-10 flex flex-col items-center justify-center space-y-3">
-          <Loader2 size={24} className="animate-spin text-ink-muted" />
-          <p className="text-body text-ink-muted">Loading service rates configuration...</p>
-        </div>
+        <ServiceRatesSkeleton />
       ) : loadError && !initialRates ? (
         <div className="bg-board-plate border border-edge rounded-plate p-10 flex flex-col items-center justify-center space-y-3 text-center">
           <AlertTriangle size={32} className="text-status-act-ink" />
@@ -343,42 +361,21 @@ export const ServiceRatesModule: React.FC = () => {
             Retry Loading Rates
           </PanelButton>
         </div>
-      ) : activeMode === "view" && initialRates ? (
-        <RatesOverviewView
+      ) : initialRates ? (
+        <RatesCardsView
           rateConfig={initialRates}
-          pricingRules={pricingRules}
-        />
-      ) : (
-        <RatesEditView
-          baseFee={baseFee}
-          setBaseFee={setBaseFee}
-          perKmRate={perKmRate}
-          setPerKmRate={setPerKmRate}
-          multiStoreFeePerStore={multiStoreFeePerStore}
-          setMultiStoreFeePerStore={setMultiStoreFeePerStore}
-          maxAdditionalStores={maxAdditionalStores}
-          setMaxAdditionalStores={setMaxAdditionalStores}
-          groceryFeeThreshold={groceryFeeThreshold}
-          setGroceryFeeThreshold={setGroceryFeeThreshold}
-          groceryFeePercent={groceryFeePercent}
-          setGroceryFeePercent={setGroceryFeePercent}
-          groceryFeeFlat={groceryFeeFlat}
-          setGroceryFeeFlat={setGroceryFeeFlat}
-          nonCodThreshold={nonCodThreshold}
-          setNonCodThreshold={setNonCodThreshold}
-          nonCodFeeHigh={nonCodFeeHigh}
-          setNonCodFeeHigh={setNonCodFeeHigh}
-          nonCodFeeLow={nonCodFeeLow}
-          setNonCodFeeLow={setNonCodFeeLow}
-          pricingRules={pricingRules}
-          isLoading={isLoading}
+          draft={{ baseFee, perKmRate, multiStoreFeePerStore, maxAdditionalStores,
+            groceryFeeThreshold, groceryFeeFlat, groceryFeePercent,
+            nonCodThreshold, nonCodFeeLow, nonCodFeeHigh }}
+          baseFeeDistanceKm={pricingRules.baseFeeDistanceKm}
+          activeCard={activeCard}
           isSaving={isSaving}
-          loadError={loadError}
-          hasChanges={hasChanges}
-          onCancel={() => handleModeChange("view")}
+          isReadOnly={Boolean(loadError)}
+          onEdit={handleEditCard}
+          onFieldChange={handleFieldChange}
           onSubmit={handleSaveSubmit}
         />
-      )}
+      ) : null}
 
       {/* CONFIRMATION DIALOG BEFORE SAVING */}
       <ConfirmDialog
@@ -397,12 +394,12 @@ export const ServiceRatesModule: React.FC = () => {
               Are you sure you want to save the following updated rate configurations?
             </p>
             <div className="rounded-plate border border-edge bg-board-ground p-3.5 space-y-2 text-label divide-y divide-hairline">
-              {getRateDeltas().map((delta, idx) => (
+              {cardDeltas.map((delta, idx) => (
                 <div key={idx} className={`flex items-start justify-between gap-3 ${idx > 0 ? "pt-2" : ""}`}>
                   <span className="text-ink-muted shrink-0">{delta.label}:</span>
                   <span className="text-ink text-right font-medium">
                     <span className="line-through text-ink-muted mr-1.5">{delta.from}</span>
-                    <span className="text-board-field font-semibold font-mono">→ {delta.to}</span>
+                    <span className="text-field-ink font-semibold font-mono">→ {delta.to}</span>
                   </span>
                 </div>
               ))}
@@ -420,10 +417,10 @@ export const ServiceRatesModule: React.FC = () => {
         confirmLabel="Discard Changes"
         cancelLabel="Keep Editing"
         onConfirm={handleConfirmDiscard}
-        consequence="Any modifications made in Edit mode will be lost and reverted back to live database rates."
+        consequence="Your unsaved edits to this rate card will be lost."
         body={
           <p className="text-body text-ink">
-            You have unsaved changes to your rate schedule. Are you sure you want to discard them and return to View mode?
+            Discard the unsaved changes to this rate card?
           </p>
         }
       />

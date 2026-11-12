@@ -109,7 +109,10 @@ let sharedSocket: Socket | null = null;
 let sharedSocketUsers = 0;
 let stopWaitingForToken: (() => void) | null = null;
 
-function acquireFleetSocket(): Socket {
+// Exported (ADDITIVE, 2026-11-10) so useRiderActiveRoute hears `rider:route`
+// on this same connection instead of opening a third. Every acquire must be
+// paired with one release.
+export function acquireFleetSocket(): Socket {
   if (!sharedSocket) {
     const socket = io(BACKEND_URL, {
       // A function, not a value. It is re-read on every reconnect; a token
@@ -135,7 +138,7 @@ function acquireFleetSocket(): Socket {
   return sharedSocket;
 }
 
-function releaseFleetSocket(): void {
+export function releaseFleetSocket(): void {
   sharedSocketUsers -= 1;
   if (sharedSocketUsers <= 0 && sharedSocket) {
     stopWaitingForToken?.();
