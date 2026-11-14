@@ -417,9 +417,44 @@ export interface DatabaseBackupRecord {
   fileSizeBytes: number;
   fileSizeFormatted: string;
   backupType: "AUTOMATED" | "MANUAL";
-  status: "SUCCESS" | "FAILED";
+  /** The server writes COMPLETED; SUCCESS is kept for older rows and clients. */
+  status: "COMPLETED" | "SUCCESS" | "FAILED";
   createdBy: string;
   createdAt: string;
+  /** Encrypted copy in Cloudflare R2; null = not attempted (before 2026-11-15, or still uploading). */
+  offsiteStatus?: "UPLOADED" | "FAILED" | "SKIPPED" | null;
+  offsiteAt?: string | null;
+  offsiteError?: string | null;
+}
+
+export interface BackupRestoreCheckRecord {
+  id: number;
+  trigger: "SCHEDULED" | "MANUAL";
+  status: "RUNNING" | "PASSED" | "FAILED";
+  backupFile: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  tablesRestored: number | null;
+  rowsRestored: number | null;
+  error: string | null;
+  triggeredBy: string | null;
+  details?: {
+    keyTables?: Record<string, { restored: number; live: number }>;
+    missingTables?: string[];
+  } | null;
+}
+
+export interface OffsiteBackupStatus {
+  configured: boolean;
+  bucket: string | null;
+  keyFileOk: boolean | null;
+  keyFileProblem: string | null;
+  lastUploadedAt: string | null;
+  lastUploadedFile: string | null;
+  lastFailedAt: string | null;
+  lastError: string | null;
+  restoreChecks: BackupRestoreCheckRecord[];
 }
 
 export type SysAdminAlertType =
@@ -427,6 +462,9 @@ export type SysAdminAlertType =
   | "SERVICE_RESTART"
   | "DB_DISCONNECT"
   | "DISK_WARNING"
+  | "BACKEND_CRASH"
+  | "SERVICE_RECOVERED"
+  | "BACKUP_FAILURE"
   | "TEST_ALERT";
 
 export interface SysAdminAlertRecord {
@@ -446,6 +484,73 @@ export interface AlertStatusResponse {
   maskedChatId: string | null;
   totalAlertsSent: number;
   recentAlerts: SysAdminAlertRecord[];
+}
+
+// Incident records (server sysAdminIncidentService.ts). OPEN = broken,
+// MONITORING = working again with the report pending, RESOLVED = report done.
+export type IncidentStatus = "OPEN" | "MONITORING" | "RESOLVED";
+export type IncidentSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type IncidentView = "active" | "resolved" | "all";
+
+export interface SysAdminIncident {
+  id: number;
+  title: string;
+  severity: IncidentSeverity;
+  status: IncidentStatus;
+  /** "DB_DOWN" | "DISK" | "BACKEND_CRASH" when opened by the health watch; null when by hand. */
+  sourceKey: string | null;
+  startedAt: string;
+  detectedAt: string;
+  recoveredAt: string | null;
+  resolvedAt: string | null;
+  impact: string | null;
+  cause: string | null;
+  fix: string | null;
+  prevention: string | null;
+  openedBy: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  alertCount: number;
+}
+
+export interface SysAdminIncidentAlert {
+  id: number;
+  alertType: SysAdminAlertType;
+  severity: IncidentSeverity;
+  title: string;
+  status: SysAdminAlertRecord["status"];
+  createdAt: string;
+}
+
+export interface SysAdminIncidentDetail extends SysAdminIncident {
+  alerts: SysAdminIncidentAlert[];
+}
+
+export interface IncidentListResponse {
+  incidents: SysAdminIncident[];
+  total: number;
+  activeCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface CreateIncidentPayload {
+  title: string;
+  severity: IncidentSeverity;
+  startedAt: string;
+  impact?: string | null;
+}
+
+export interface UpdateIncidentPayload {
+  title?: string;
+  severity?: IncidentSeverity;
+  status?: IncidentStatus;
+  impact?: string | null;
+  cause?: string | null;
+  fix?: string | null;
+  prevention?: string | null;
+  recoveredAt?: string | null;
 }
 
 export type LogSource = "pm2_out" | "pm2_error" | "nginx_access" | "nginx_error";

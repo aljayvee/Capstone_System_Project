@@ -40,6 +40,13 @@ import type {
   WhitelistInput,
   DatabaseBackupRecord,
   AlertStatusResponse,
+  IncidentListResponse,
+  IncidentView,
+  SysAdminIncident,
+  SysAdminIncidentDetail,
+  CreateIncidentPayload,
+  UpdateIncidentPayload,
+  OffsiteBackupStatus,
   LogSource,
   LogTailResult,
   ServiceControlResponse,
@@ -516,6 +523,42 @@ export const sysAdminApiService = {
   async sendTestAlert(): Promise<{ success: boolean; message: string }> {
     const response = await sysAdminAxios.post<{ success: boolean; message: string }>("/sysadmin/devops/alerts/test");
     return response.data;
+  },
+
+  async getOffsiteBackupStatus(): Promise<OffsiteBackupStatus> {
+    const response = await sysAdminAxios.get<OffsiteBackupStatus>("/sysadmin/devops/backups/offsite");
+    return response.data;
+  },
+
+  /** 202: runs 5 to 15 minutes in the background; poll getOffsiteBackupStatus for the result. */
+  async startRestoreCheck(stepUpPassword: string): Promise<{ check: { id: number; status: string; startedAt: string } }> {
+    const response = await sysAdminAxios.post<{ check: { id: number; status: string; startedAt: string } }>(
+      "/sysadmin/devops/backups/restore-check",
+      { stepUpPassword }
+    );
+    return response.data;
+  },
+
+  async listIncidents(view: IncidentView, page = 1): Promise<IncidentListResponse> {
+    const response = await sysAdminAxios.get<IncidentListResponse>("/sysadmin/devops/incidents", {
+      params: { view, page },
+    });
+    return response.data;
+  },
+
+  async getIncident(id: number): Promise<SysAdminIncidentDetail> {
+    const response = await sysAdminAxios.get<{ incident: SysAdminIncidentDetail }>(`/sysadmin/devops/incidents/${id}`);
+    return response.data.incident;
+  },
+
+  async createIncident(payload: CreateIncidentPayload): Promise<SysAdminIncident> {
+    const response = await sysAdminAxios.post<{ incident: SysAdminIncident }>("/sysadmin/devops/incidents", payload);
+    return response.data.incident;
+  },
+
+  async updateIncident(id: number, payload: UpdateIncidentPayload): Promise<SysAdminIncident> {
+    const response = await sysAdminAxios.patch<{ incident: SysAdminIncident }>(`/sysadmin/devops/incidents/${id}`, payload);
+    return response.data.incident;
   },
 
   async getItAdmins(): Promise<ItAdminUser[]> {

@@ -15,6 +15,10 @@ import {
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import type { DatabaseBackupRecord } from "../../../../types/sysAdmin";
 import { MobileResponsiveTable } from "../../../../components/table";
+import { OffsiteBackupPanel, OffsiteChip } from "./OffsiteBackupPanel";
+
+/** The server writes COMPLETED; until 2026-11-15 this tab only knew SUCCESS and showed every good backup red. */
+const isGood = (b: DatabaseBackupRecord) => b.status === "COMPLETED" || b.status === "SUCCESS";
 
 export const BackupsTab: React.FC = () => {
   const [backups, setBackups] = useState<DatabaseBackupRecord[]>([]);
@@ -123,7 +127,7 @@ export const BackupsTab: React.FC = () => {
               Automated Gzip Database Backup Engine
             </h3>
             <p className="text-xs text-ink leading-relaxed">
-              Nightly compressed snapshots (<code className="text-status-moving-ink font-mono">.sql.gz</code>) execute automatically at 02:00 AM Manila Time (18:00 UTC). Backups older than 7 days are automatically pruned to preserve server storage.
+              Nightly compressed snapshots (<code className="text-status-moving-ink font-mono">.sql.gz</code>) run automatically at 02:00 AM Manila time without locking tables. Copies on this server are kept 7 days; encrypted off-site copies are kept longer (below).
             </p>
           </div>
         </div>
@@ -146,6 +150,8 @@ export const BackupsTab: React.FC = () => {
           </button>
         </div>
       </div>
+
+      <OffsiteBackupPanel />
 
       {/* Action Messages */}
       {actionSuccess && (
@@ -249,15 +255,18 @@ export const BackupsTab: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span
-                            className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
-                              b.status === "SUCCESS"
-                                ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
-                                : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
-                            }`}
-                          >
-                            {b.status}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
+                                isGood(b)
+                                  ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
+                                  : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
+                              }`}
+                            >
+                              {b.status}
+                            </span>
+                            <OffsiteChip backup={b} />
+                          </div>
                         </td>
                         <td className="py-3 px-3 font-mono text-ink">
                           {b.createdBy}
@@ -322,13 +331,16 @@ export const BackupsTab: React.FC = () => {
                 </div>
                 <span
                   className={`inline-block text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded border ${
-                    b.status === "SUCCESS"
+                    isGood(b)
                       ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
                       : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
                   }`}
                 >
                   {b.status}
                 </span>
+                <div className="mt-1 flex justify-end">
+                  <OffsiteChip backup={b} />
+                </div>
               </div>
             )}
             renderPreview={(b) => (
@@ -375,7 +387,7 @@ export const BackupsTab: React.FC = () => {
             inspectorStatusBadge={(b) => (
               <span
                 className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded border ${
-                  b.status === "SUCCESS"
+                  isGood(b)
                     ? "bg-status-done-fill text-status-done-ink border-status-done-ink/30"
                     : "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
                 }`}
