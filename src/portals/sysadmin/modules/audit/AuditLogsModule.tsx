@@ -18,11 +18,15 @@ import {
   Smartphone,
   Monitor,
   Printer,
+  ListTree,
+  Bike,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { formatErrandId } from "../../../../utils/formatErrandId";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
 import { MobileResponsiveTable } from "../../../../components/table";
+import { ActivityTimelineTab } from "./ActivityTimelineTab";
+import { RiderActivityTab } from "./RiderActivityTab";
 import type {
   AuthAuditLog,
   ModificationAuditLog,
@@ -31,7 +35,7 @@ import type {
   ReportPrintLog,
 } from "../../../../types/sysAdmin";
 
-type AuditCategory = "auth" | "modifications" | "security" | "lifecycle" | "prints";
+type AuditCategory = "timeline" | "riders" | "auth" | "modifications" | "security" | "lifecycle" | "prints";
 
 /** The six Owner reports, as the Owner portal's tabs name them. */
 const REPORT_TYPE_OPTIONS = [
@@ -60,7 +64,8 @@ const getStatusBadge = (status: string) => {
 
 export const AuditLogsModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
-  const [activeCategory, setActiveCategory] = useState<AuditCategory>("auth");
+  const [activeCategory, setActiveCategory] = useState<AuditCategory>("timeline");
+  const isNewTab = activeCategory === "timeline" || activeCategory === "riders";
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
@@ -261,6 +266,7 @@ export const AuditLogsModule: React.FC = () => {
           </p>
         </div>
 
+        {!isNewTab && (
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
             onClick={handleExportCSV}
@@ -280,6 +286,7 @@ export const AuditLogsModule: React.FC = () => {
             <span>Refresh</span>
           </button>
         </div>
+        )}
       </div>
 
       {/* Privacy Guarantee Invariant Banner */}
@@ -293,6 +300,22 @@ export const AuditLogsModule: React.FC = () => {
 
       {/* Category Sub-Tabs */}
       <div className="flex items-center gap-1 bg-board-ground p-1 rounded-xl border border-edge overflow-x-auto">
+        {([
+          ["timeline", ListTree, t("auditTabTimeline")],
+          ["riders", Bike, t("auditTabRiders")],
+        ] as const).map(([key, Icon, label]) => (
+          <button
+            key={key}
+            onClick={() => setActiveCategory(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+              activeCategory === key ? "bg-board-plate text-ink border border-edge shadow-sm" : "text-ink-muted hover:text-ink"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5 text-ink-muted" />
+            <span>{label}</span>
+          </button>
+        ))}
+        <span className="w-px h-5 bg-edge mx-1 shrink-0" aria-hidden="true" />
         <button
           onClick={() => {
             setActiveCategory("auth");
@@ -369,6 +392,11 @@ export const AuditLogsModule: React.FC = () => {
         </button>
       </div>
 
+      {activeCategory === "timeline" && <ActivityTimelineTab />}
+      {activeCategory === "riders" && <RiderActivityTab />}
+
+      {!isNewTab && (
+      <>
       {/* Filter Row */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div className="relative flex-1">
@@ -1327,6 +1355,8 @@ export const AuditLogsModule: React.FC = () => {
           />
         );
       })()}
+      </>
+      )}
     </div>
   );
 };

@@ -16,6 +16,14 @@
 import axios from "axios";
 import type { IntegrationReport } from "../types/sysAdminIntegrations";
 import type {
+  AuditEventDetail,
+  AuditInsights,
+  AuditSourceKey,
+  AuditTimelinePage,
+  AuditTimelineQuery,
+  RiderActivityResponse,
+} from "../types/sysAdminAuditTimeline";
+import type {
   SysAdminUser,
   SysAdminLoginResult,
   SysAdminLoginSuccess,
@@ -379,6 +387,65 @@ export const sysAdminApiService = {
     const response = await sysAdminAxios.get<ReportPrintLogResponse>("/sysadmin/audit/report-prints", {
       params,
     });
+    return response.data;
+  },
+
+  // ── Activity timeline over every log table (2026-11-15) ─────────────────
+
+  async getAuditTimeline(query: AuditTimelineQuery, cursor?: string | null, limit = 50): Promise<AuditTimelinePage> {
+    const response = await sysAdminAxios.get<AuditTimelinePage>("/sysadmin/audit/timeline", {
+      params: { ...query, sources: query.sources?.join(",") || undefined, cursor: cursor || undefined, limit },
+    });
+    return response.data;
+  },
+
+  async getAuditEvent(source: AuditSourceKey, rowId: string): Promise<AuditEventDetail> {
+    const response = await sysAdminAxios.get<AuditEventDetail>(`/sysadmin/audit/timeline/${source}/${encodeURIComponent(rowId)}`);
+    return response.data;
+  },
+
+  async getAuditInsights(): Promise<AuditInsights> {
+    const response = await sysAdminAxios.get<AuditInsights>("/sysadmin/audit/insights");
+    return response.data;
+  },
+
+  /** Downloads every matching entry as CSV (server-built, up to 20,000 rows). Returns the row count. */
+  async exportAuditTimeline(query: AuditTimelineQuery): Promise<number> {
+    let response;
+    try {
+      response = await sysAdminAxios.get<Blob>("/sysadmin/audit/timeline/export", {
+        params: { ...query, sources: query.sources?.join(",") || undefined },
+        responseType: "blob",
+        timeout: 120000,
+      });
+    } catch (err: unknown) {
+      // A refused export comes back as a Blob too: read its { error } so the message is the server's.
+      const data = (err as { response?: { data?: unknown } })?.response?.data;
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text()) as { error?: string };
+          if (parsed.error) (err as { response: { data: unknown } }).response.data = parsed;
+        } catch {
+          /* not JSON: keep the original error */
+        }
+      }
+      throw err;
+    }
+    const text = await response.data.text();
+    const rows = Math.max(0, text.split(/\r?\n/).filter((l) => l.length > 0).length - 1);
+    const url = window.URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sugo-activity-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    return rows;
+  },
+
+  async getRiderActivity(date: string): Promise<RiderActivityResponse> {
+    const response = await sysAdminAxios.get<RiderActivityResponse>("/sysadmin/audit/riders", { params: { date } });
     return response.data;
   },
 
