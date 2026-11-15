@@ -1,4 +1,11 @@
 import { apiClient } from "./apiClient";
+import type {
+  SysAdminAccessGroupSummary,
+  SysAdminAccountAccessSummary,
+  SysAdminOverrideEntry,
+  SysAdminPermissionCatalog,
+  SysAdminPmaAuditResponse,
+} from "../types/sysAdmin";
 
 /**
  * Access groups (RBAC). The server owns every rule: which keys exist
@@ -132,5 +139,55 @@ export const accessApi = {
     call(
       () => apiClient.put<AccessAccount>(`/access/accounts/${userId}`, input),
       "This account's access could not be saved.",
+    ),
+
+  // ── Dual-Governance SysAdmin PMA (Main Owner only; isolated from Staff) ──
+  getSysAdminCatalog: () =>
+    call(() => apiClient.get<SysAdminPermissionCatalog>("/access/sysadmin/catalog"), "SysAdmin permissions could not be loaded."),
+
+  listSysAdminGroups: async () =>
+    (await call(() => apiClient.get<{ groups: SysAdminAccessGroupSummary[] }>("/access/sysadmin/groups"), "SysAdmin access groups could not be loaded."))
+      .groups,
+
+  createSysAdminGroup: async (input: { name: string; description: string | null; permissions: string[] }) =>
+    (await call(() => apiClient.post<{ group: SysAdminAccessGroupSummary }>("/access/sysadmin/groups", input), "SysAdmin access group could not be created."))
+      .group,
+
+  updateSysAdminGroup: async (
+    groupId: number,
+    input: { name: string; description: string | null; permissions: string[]; version: number },
+  ) =>
+    (await call(() => apiClient.put<{ group: SysAdminAccessGroupSummary }>(`/access/sysadmin/groups/${groupId}`, input), "SysAdmin access group could not be saved."))
+      .group,
+
+  deleteSysAdminGroup: (groupId: number) =>
+    call(() => apiClient.delete<{ deleted: boolean; id: number }>(`/access/sysadmin/groups/${groupId}`), "SysAdmin access group could not be deleted."),
+
+  listSysAdminAccounts: async () =>
+    (await call(() => apiClient.get<{ accounts: SysAdminAccountAccessSummary[] }>("/access/sysadmin/accounts"), "IT Administrator accounts could not be loaded."))
+      .accounts,
+
+  updateSysAdminAccountAccess: (
+    sysAdminId: number,
+    input: { accessGroupId: number | null; overrides: SysAdminOverrideEntry[] },
+  ) =>
+    call(
+      () => apiClient.put(`/access/sysadmin/accounts/${sysAdminId}`, input),
+      "IT Administrator access could not be saved.",
+    ),
+
+  updateSysAdminAccountStatus: (
+    sysAdminId: number,
+    input: { status: "Active" | "Suspended" | "Inactive"; reason?: string },
+  ) =>
+    call(
+      () => apiClient.patch(`/access/sysadmin/accounts/${sysAdminId}/status`, input),
+      "IT Administrator status could not be updated.",
+    ),
+
+  listSysAdminPmaAuditLogs: (params?: { page?: number; limit?: number }) =>
+    call(
+      () => apiClient.get<SysAdminPmaAuditResponse>("/access/sysadmin/audit", { params }),
+      "SysAdmin PMA audit history could not be loaded.",
     ),
 };

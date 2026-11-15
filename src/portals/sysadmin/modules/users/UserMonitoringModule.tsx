@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import { MobileResponsiveTable } from "../../../../components/table";
 import type {
   MonitoredAccount,
@@ -34,6 +35,9 @@ type StatusFilter = "ALL" | "Active" | "Suspended" | "Locked" | "Inactive";
 
 export const UserMonitoringModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
+  const { can } = useSysAdminPermissions();
+  const canTerminateSessions = can("users.sessions");
+  const canChangeStatus = can("users.status");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -427,14 +431,24 @@ export const UserMonitoringModule: React.FC = () => {
               <Monitor className="w-3.5 h-3.5 text-ink-muted" />
               <span>Sessions ({acc.activeSessionsCount})</span>
             </button>
-            <button
-              type="button"
-              onClick={() => openStatusModal(acc)}
-              className="px-3 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-ink text-xs font-semibold border border-edge active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
-            >
-              <Shield className="w-3.5 h-3.5 text-ink-muted" />
-              <span>Status</span>
-            </button>
+            {acc.isMainOwner ? (
+              <span
+                className="px-2.5 py-2 rounded-xl bg-status-done-fill text-status-done-ink border border-status-done-ink/30 text-[11px] font-mono inline-flex items-center gap-1 min-h-[44px]"
+                title="Main Owner account is root-protected and cannot be suspended or locked"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Protected</span>
+              </span>
+            ) : canChangeStatus ? (
+              <button
+                type="button"
+                onClick={() => openStatusModal(acc)}
+                className="px-3 py-2 rounded-xl bg-board-ground hover:bg-board-ground text-ink text-xs font-semibold border border-edge active:scale-95 transition-all min-h-[44px] flex items-center gap-1.5 cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5 text-ink-muted" />
+                <span>Status</span>
+              </button>
+            ) : null}
           </div>
         )}
         inspectorTitle={(acc) => acc.name || `${acc.firstName} ${acc.lastName}`}
@@ -501,19 +515,33 @@ export const UserMonitoringModule: React.FC = () => {
               className="py-2.5 px-3 rounded-xl bg-board-ground hover:bg-board-ground text-ink font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Monitor className="w-4 h-4 text-ink" />
-              <span>Manage Sessions</span>
+              <span>{canTerminateSessions ? "Manage Sessions" : "View Sessions"}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                openStatusModal(acc);
-              }}
-              className="py-2.5 px-3 rounded-xl bg-signal hover:bg-signal-deep text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-lg cursor-pointer"
-            >
-              <Shield className="w-4 h-4" />
-              <span>Change Status</span>
-            </button>
+            {acc.isMainOwner ? (
+              <div
+                className="py-2.5 px-3 rounded-xl bg-status-done-fill text-status-done-ink border border-status-done-ink/30 font-semibold text-xs min-h-[48px] flex items-center justify-center gap-1.5"
+                title="Main Owner account is root-protected and cannot be suspended or locked"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Root Protected</span>
+              </div>
+            ) : canChangeStatus ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  openStatusModal(acc);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-signal hover:bg-signal-deep text-white font-semibold text-xs min-h-[48px] active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-lg cursor-pointer"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Change Status</span>
+              </button>
+            ) : (
+              <div className="py-2.5 px-3 rounded-xl bg-board-ground text-ink-muted font-mono text-[11px] min-h-[48px] flex items-center justify-center border border-edge">
+                Read-only
+              </div>
+            )}
           </div>
         )}
         searchPlaceholder="Search accounts by username, name, email..."
@@ -685,13 +713,23 @@ export const UserMonitoringModule: React.FC = () => {
                           </td>
 
                           <td className="py-3 px-4">
-                            <span
-                              className={`inline-block text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded border ${getRoleBadge(
-                                acc.role
-                              )}`}
-                            >
-                              {acc.role}
-                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-block text-[10px] font-mono font-semibold uppercase px-2 py-0.5 rounded border ${getRoleBadge(
+                                  acc.role
+                                )}`}
+                              >
+                                {acc.role}
+                              </span>
+                              {acc.isMainOwner && (
+                                <span
+                                  className="inline-block text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-status-done-fill text-status-done-ink border border-status-done-ink/30"
+                                  title="Main Owner account is root-protected"
+                                >
+                                  MAIN OWNER
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           <td className="py-3 px-4">
@@ -730,18 +768,28 @@ export const UserMonitoringModule: React.FC = () => {
                               <button
                                 onClick={() => openSessionsDrawer(acc)}
                                 className="p-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-ink hover:text-ink transition-colors"
-                                title="Inspect active sessions & kick out"
+                                title={canTerminateSessions ? "Inspect active sessions & kick out" : "Inspect active sessions"}
                               >
                                 <Monitor className="w-3.5 h-3.5" />
                               </button>
 
-                              <button
-                                onClick={() => openStatusModal(acc)}
-                                className="p-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-ink hover:text-ink transition-colors"
-                                title="Change account security status (Active / Suspended / Locked)"
-                              >
-                                <Shield className="w-3.5 h-3.5" />
-                              </button>
+                              {acc.isMainOwner ? (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-status-done-fill text-status-done-ink border border-status-done-ink/30 text-[10px] font-mono"
+                                  title="Main Owner account is protected and cannot be suspended or locked"
+                                >
+                                  <ShieldCheck className="w-3 h-3" />
+                                  <span>Protected</span>
+                                </span>
+                              ) : canChangeStatus ? (
+                                <button
+                                  onClick={() => openStatusModal(acc)}
+                                  className="p-1.5 rounded-lg bg-board-ground hover:bg-board-ground text-ink hover:text-ink transition-colors"
+                                  title="Change account security status (Active / Suspended / Locked)"
+                                >
+                                  <Shield className="w-3.5 h-3.5" />
+                                </button>
+                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -845,14 +893,16 @@ export const UserMonitoringModule: React.FC = () => {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleTerminateSession(sess.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-[10px] font-medium text-status-act-ink transition-colors shrink-0"
-                        title="Invalidate session and kick out"
-                      >
-                        <LogOut className="w-3 h-3" />
-                        <span>Kick Out</span>
-                      </button>
+                      {canTerminateSessions && (
+                        <button
+                          onClick={() => handleTerminateSession(sess.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-act-fill hover:bg-status-act-fill border border-status-act-ink/30 text-[10px] font-medium text-status-act-ink transition-colors shrink-0"
+                          title="Invalidate session and kick out"
+                        >
+                          <LogOut className="w-3 h-3" />
+                          <span>Kick Out</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-edge flex items-center justify-between text-[10px] font-mono text-ink-muted">

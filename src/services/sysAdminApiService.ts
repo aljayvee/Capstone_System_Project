@@ -58,6 +58,12 @@ import type {
   AppReleaseInfo,
   AppReleasesResponse,
   AppReleaseUpdateInput,
+  MySysAdminPermissionsResponse,
+  SysAdminPermissionCatalog,
+  SysAdminAccessGroupSummary,
+  SysAdminAccountAccessSummary,
+  SysAdminOverrideEntry,
+  SysAdminPmaAuditResponse,
 } from "../types/sysAdmin";
 
 // ─── Dedicated SysAdmin Axios Instance ───────────────────────────────────────
@@ -873,6 +879,96 @@ export const sysAdminApiService = {
     return this.uploadAppReleaseApkChunked(target, file, version, (p) => {
       onProgress?.(p.overallPercent, p.uploadedBytes, p.totalBytes);
     });
+  },
+
+  // ── SysAdmin PMA (Permission Management & Access) ─────────────────────────
+  async getMyPermissions(): Promise<MySysAdminPermissionsResponse> {
+    const res = await sysAdminAxios.get<MySysAdminPermissionsResponse>("/sysadmin/pma/me");
+    return res.data;
+  },
+
+  async getPmaCatalog(): Promise<SysAdminPermissionCatalog> {
+    const res = await sysAdminAxios.get<SysAdminPermissionCatalog>("/sysadmin/pma/catalog");
+    return res.data;
+  },
+
+  async listPmaGroups(): Promise<SysAdminAccessGroupSummary[]> {
+    const res = await sysAdminAxios.get<{ groups: SysAdminAccessGroupSummary[] }>("/sysadmin/pma/groups");
+    return res.data.groups;
+  },
+
+  async createPmaGroup(input: {
+    name: string;
+    description: string | null;
+    permissions: string[];
+    stepUpPassword: string;
+  }): Promise<SysAdminAccessGroupSummary> {
+    const res = await sysAdminAxios.post<{ group: SysAdminAccessGroupSummary }>("/sysadmin/pma/groups", input);
+    return res.data.group;
+  },
+
+  async updatePmaGroup(
+    groupId: number,
+    input: {
+      name: string;
+      description: string | null;
+      permissions: string[];
+      version: number;
+      stepUpPassword: string;
+    }
+  ): Promise<SysAdminAccessGroupSummary> {
+    const res = await sysAdminAxios.put<{ group: SysAdminAccessGroupSummary }>(
+      `/sysadmin/pma/groups/${groupId}`,
+      input
+    );
+    return res.data.group;
+  },
+
+  async deletePmaGroup(groupId: number, stepUpPassword: string): Promise<{ deleted: boolean; id: number }> {
+    const res = await sysAdminAxios.delete<{ deleted: boolean; id: number }>(
+      `/sysadmin/pma/groups/${groupId}`,
+      {
+        data: { stepUpPassword },
+        headers: { "x-step-up-password": stepUpPassword },
+      }
+    );
+    return res.data;
+  },
+
+  async listPmaAccounts(): Promise<SysAdminAccountAccessSummary[]> {
+    const res = await sysAdminAxios.get<{ accounts: SysAdminAccountAccessSummary[] }>("/sysadmin/pma/accounts");
+    return res.data.accounts;
+  },
+
+  async updatePmaAccountAccess(
+    sysAdminId: number,
+    input: {
+      accessGroupId: number | null;
+      overrides: SysAdminOverrideEntry[];
+      stepUpPassword: string;
+    }
+  ) {
+    const res = await sysAdminAxios.put(`/sysadmin/pma/accounts/${sysAdminId}`, input);
+    return res.data;
+  },
+
+  async updatePmaAccountStatus(
+    sysAdminId: number,
+    input: {
+      status: "Active" | "Suspended" | "Inactive";
+      reason?: string;
+      stepUpPassword: string;
+    }
+  ) {
+    const res = await sysAdminAxios.patch(`/sysadmin/pma/accounts/${sysAdminId}/status`, input);
+    return res.data;
+  },
+
+  async listPmaAuditLogs(params?: { page?: number; limit?: number }): Promise<SysAdminPmaAuditResponse> {
+    const res = await sysAdminAxios.get<SysAdminPmaAuditResponse>("/sysadmin/pma/audit", {
+      params,
+    });
+    return res.data;
   },
 };
 

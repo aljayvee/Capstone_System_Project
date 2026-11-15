@@ -9,6 +9,13 @@ import { apiService, type ApiRateConfig } from "../../../../services/apiService"
 import { OwnerPanelShell } from "../../components/OwnerPanelShell";
 import { PanelButton, ConfirmDialog } from "@/components/panel";
 import { RatesCardsView, type RateCardId, type RateField } from "./components/RatesCardsView";
+import { RatesMatrixPolicySection } from "./components/RatesMatrixPolicySection";
+import {
+  DEFAULT_RATE_POLICY_BOUNDS,
+  resolveRateBounds,
+  validateRateFields,
+  type RateBoundsMap,
+} from "./lib/priceMatrix";
 import { ServiceRatesSkeleton } from "../../components/OwnerSkeletons";
 
 const cardDeltaLabels: Record<RateCardId, string[]> = {
@@ -18,6 +25,15 @@ const cardDeltaLabels: Record<RateCardId, string[]> = {
   storeLimit: ["Max Additional Stops"],
   grocery: ["Groceries Flat Handling", "Groceries Percentage Rate", "Groceries Threshold"],
   nonCash: ["Non-COD Surcharge Threshold", "Non-COD High Surcharge", "Non-COD Low Surcharge"],
+};
+
+const cardFieldKeys: Record<RateCardId, RateField[]> = {
+  baseFare: ["baseFee"],
+  excessDistance: ["perKmRate"],
+  multiStoreFee: ["multiStoreFeePerStore"],
+  storeLimit: ["maxAdditionalStores"],
+  grocery: ["groceryFeeThreshold", "groceryFeeFlat", "groceryFeePercent"],
+  nonCash: ["nonCodThreshold", "nonCodFeeLow", "nonCodFeeHigh"],
 };
 
 export const ServiceRatesModule: React.FC = () => {
@@ -49,6 +65,7 @@ export const ServiceRatesModule: React.FC = () => {
     handlingItemUnitsThreshold: 20,
     handlingAmountThreshold: 1000,
   });
+  const [bounds, setBounds] = useState<RateBoundsMap>(DEFAULT_RATE_POLICY_BOUNDS);
 
   const resetFormToInitial = (config: ApiRateConfig) => {
     setBaseFee(config.baseFee);
@@ -76,7 +93,12 @@ export const ServiceRatesModule: React.FC = () => {
       resetFormToInitial(config);
 
       if (config.pricingRules) {
-        setPricingRules(config.pricingRules);
+        setPricingRules({
+          baseFeeDistanceKm: config.pricingRules.baseFeeDistanceKm,
+          handlingItemUnitsThreshold: config.pricingRules.handlingItemUnitsThreshold,
+          handlingAmountThreshold: config.pricingRules.handlingAmountThreshold,
+        });
+        setBounds(resolveRateBounds(config.pricingRules.bounds));
       }
     } catch (err) {
       console.warn("Failed to load rate configs:", err);
@@ -180,6 +202,21 @@ export const ServiceRatesModule: React.FC = () => {
     ? getRateDeltas().filter((delta) => cardDeltaLabels[activeCard].includes(delta.label))
     : [];
   const hasChanges = cardDeltas.length > 0;
+  const draftRecord: Record<RateField, number | null> = {
+    baseFee,
+    perKmRate,
+    multiStoreFeePerStore,
+    maxAdditionalStores,
+    groceryFeeThreshold,
+    groceryFeeFlat,
+    groceryFeePercent,
+    nonCodThreshold,
+    nonCodFeeLow,
+    nonCodFeeHigh,
+  };
+  const activeCardErrors = activeCard
+    ? validateRateFields(draftRecord, bounds, cardFieldKeys[activeCard])
+    : [];
 
   const handleEditCard = (card: RateCardId) => {
     if (activeCard === card) return;
@@ -240,12 +277,8 @@ export const ServiceRatesModule: React.FC = () => {
       toast.error("These rates were never loaded. Reload them before saving.");
       return;
     }
-    if (nonCodFeeHigh < nonCodFeeLow) {
-      toast.error("The non-COD fee at or above threshold cannot be lower than the fee below it.");
-      return;
-    }
-    if (groceryFeeThreshold < 1000) {
-      toast.error("The grocery order threshold must be at least ₱1,000.");
+    if (activeCardErrors.length > 0) {
+      toast.error(activeCardErrors[0]);
       return;
     }
 
@@ -336,7 +369,7 @@ export const ServiceRatesModule: React.FC = () => {
             form="service-rates-active-card"
             variant="primary"
             loading={isSaving}
-            disabled={Boolean(loadError) || !hasChanges || nonCodFeeHigh < nonCodFeeLow || groceryFeeThreshold < 1000}
+            disabled={Boolean(loadError) || !hasChanges || activeCardErrors.length > 0}
           >
             Update
           </PanelButton>
@@ -362,19 +395,25 @@ export const ServiceRatesModule: React.FC = () => {
           </PanelButton>
         </div>
       ) : initialRates ? (
-        <RatesCardsView
-          rateConfig={initialRates}
-          draft={{ baseFee, perKmRate, multiStoreFeePerStore, maxAdditionalStores,
-            groceryFeeThreshold, groceryFeeFlat, groceryFeePercent,
-            nonCodThreshold, nonCodFeeLow, nonCodFeeHigh }}
-          baseFeeDistanceKm={pricingRules.baseFeeDistanceKm}
-          activeCard={activeCard}
-          isSaving={isSaving}
-          isReadOnly={Boolean(loadError)}
-          onEdit={handleEditCard}
-          onFieldChange={handleFieldChange}
-          onSubmit={handleSaveSubmit}
-        />
+        <>
+          <RatesCardsView
+            rateConfig={initialRates}
+            draft={draftRecord}
+            baseFeeDistanceKm={pricingRules.baseFeeDistanceKm}
+            bounds={bounds}
+            activeCard={activeCard}
+            isSaving={isSaving}
+            isReadOnly={Boolean(loadError)}
+            onEdit={handleEditCard}
+            onFieldChange={handleFieldChange}
+            onSubmit={handleSaveSubmit}
+          />
+          <RatesMatrixPolicySection
+            rateConfig={initialRates}
+            pricingRules={pricingRules}
+            bounds={bounds}
+          />
+        </>
       ) : null}
 
       {/* CONFIRMATION DIALOG BEFORE SAVING */}

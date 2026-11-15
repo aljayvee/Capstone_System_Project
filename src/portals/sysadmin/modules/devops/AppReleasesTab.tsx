@@ -21,6 +21,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import type {
   AppReleaseTarget,
   AppReleaseInfo,
@@ -38,6 +39,8 @@ interface AppFormState {
 }
 
 export const AppReleasesTab: React.FC = () => {
+  const { can } = useSysAdminPermissions();
+  const canManageReleases = can("releases.manage");
   const [releases, setReleases] = useState<{
     customer: AppReleaseInfo;
     rider: AppReleaseInfo;
@@ -575,6 +578,7 @@ export const AppReleasesTab: React.FC = () => {
       {/* Main Grid: Upload APK Area (Left) & Edit Details / What's New (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Column: APK File Upload Box */}
+        {canManageReleases ? (
         <div className="lg:col-span-5 p-5 rounded-xl bg-board-plate border border-edge space-y-4">
           <div className="flex items-center gap-2 border-b border-edge pb-3">
             <UploadCloud className="w-4 h-4 text-status-act-ink" />
@@ -703,6 +707,19 @@ export const AppReleasesTab: React.FC = () => {
             )}
           </button>
         </div>
+        ) : (
+        <div className="lg:col-span-5 p-5 rounded-xl bg-board-plate border border-edge space-y-3">
+          <div className="flex items-center gap-2 border-b border-edge pb-3">
+            <UploadCloud className="w-4 h-4 text-ink-muted" />
+            <h4 className="text-xs font-bold uppercase tracking-wider text-ink">
+              APK Package Deployment (Read-Only)
+            </h4>
+          </div>
+          <p className="text-xs text-ink-muted leading-relaxed">
+            You have view-only access to App Releases. Uploading APK packages and editing release notes requires the Manage Releases permission.
+          </p>
+        </div>
+        )}
 
         {/* Right Column: Editable Release Details & What's New */}
         <div className="lg:col-span-7 p-5 rounded-xl bg-board-plate border border-edge space-y-5">
@@ -719,6 +736,7 @@ export const AppReleasesTab: React.FC = () => {
           </div>
 
           <form onSubmit={handleSaveDetails} className="space-y-4">
+            <fieldset disabled={!canManageReleases} className="space-y-4 disabled:opacity-80">
             {/* Version & System Specs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -920,26 +938,29 @@ export const AppReleasesTab: React.FC = () => {
               </div>
             </div>
 
+            </fieldset>
             {/* Save Button */}
-            <div className="pt-2 flex items-center justify-end">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-signal hover:bg-signal-deep text-white text-xs font-semibold shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                {isSaving ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving Release Details...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-3.5 h-3.5" />
-                    <span>Save Release Details</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {canManageReleases && (
+              <div className="pt-2 flex items-center justify-end">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-signal hover:bg-signal-deep text-white text-xs font-semibold shadow-sm transition-all active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                >
+                  {isSaving ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Release Details...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Save Release Details</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>

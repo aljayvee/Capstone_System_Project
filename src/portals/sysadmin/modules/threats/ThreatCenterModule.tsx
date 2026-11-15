@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import { MobileResponsiveTable } from "../../../../components/table";
 import type {
   ThreatOverview,
@@ -38,6 +39,8 @@ type ThreatSubTab = "blocklist" | "whitelist" | "stream" | "policies";
 
 export const ThreatCenterModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
+  const { can } = useSysAdminPermissions();
+  const canManageThreats = can("threats.manage");
   const [subTab, setSubTab] = useState<ThreatSubTab>("blocklist");
 
   // Overview Data
@@ -329,13 +332,15 @@ export const ThreatCenterModule: React.FC = () => {
             <span>Refresh</span>
           </button>
 
-          <button
-            onClick={() => setShowBanModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-signal hover:bg-signal-deep text-white text-xs font-semibold shadow-sm transition-colors"
-          >
-            <Ban className="w-3.5 h-3.5" />
-            <span>Blacklist IP</span>
-          </button>
+          {canManageThreats && (
+            <button
+              onClick={() => setShowBanModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-signal hover:bg-signal-deep text-white text-xs font-semibold shadow-sm transition-colors"
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span>Blacklist IP</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -520,7 +525,7 @@ export const ThreatCenterModule: React.FC = () => {
             </div>
           )}
           renderRowActions={(row) =>
-            row.status === "ACTIVE" ? (
+            canManageThreats && row.status === "ACTIVE" ? (
               <button
                 type="button"
                 onClick={() => {
@@ -565,7 +570,7 @@ export const ThreatCenterModule: React.FC = () => {
             },
           ]}
           inspectorActions={(row, onClose) =>
-            row.status === "ACTIVE" ? (
+            canManageThreats && row.status === "ACTIVE" ? (
               <button
                 type="button"
                 onClick={() => {
@@ -774,7 +779,7 @@ export const ThreatCenterModule: React.FC = () => {
                               </span>
                             </td>
                             <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                              {row.status === "ACTIVE" ? (
+                              {canManageThreats && row.status === "ACTIVE" ? (
                                 <button
                                   onClick={() => {
                                     setUnbanTarget(row);
@@ -883,7 +888,7 @@ export const ThreatCenterModule: React.FC = () => {
           renderRowActions={(wl) =>
             wl.isImmune ? (
               <span className="text-[11px] text-ink-muted font-mono px-2 py-1">Protected</span>
-            ) : (
+            ) : canManageThreats ? (
               <button
                 type="button"
                 onClick={() => handleRemoveWhitelist(wl.id, wl.ipAddress)}
@@ -891,6 +896,8 @@ export const ThreatCenterModule: React.FC = () => {
               >
                 Remove
               </button>
+            ) : (
+              <span className="text-[11px] text-ink-muted font-mono px-2 py-1">Read-only</span>
             )
           }
           inspectorTitle={(wl) => wl.ipAddress}
@@ -909,14 +916,16 @@ export const ThreatCenterModule: React.FC = () => {
             },
           ]}
           headerAction={
-            <button
-              type="button"
-              onClick={() => setShowWhitelistModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-go hover:bg-go-deep text-white text-xs font-semibold shadow-sm active:scale-95 transition-all min-h-[44px]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add</span>
-            </button>
+            canManageThreats ? (
+              <button
+                type="button"
+                onClick={() => setShowWhitelistModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-go hover:bg-go-deep text-white text-xs font-semibold shadow-sm active:scale-95 transition-all min-h-[44px]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add</span>
+              </button>
+            ) : undefined
           }
           desktopView={
             <div className="space-y-4">
@@ -928,13 +937,15 @@ export const ThreatCenterModule: React.FC = () => {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowWhitelistModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-go hover:bg-go-deep text-white text-xs font-semibold shadow-sm transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Whitelist Entry</span>
-                </button>
+                {canManageThreats && (
+                  <button
+                    onClick={() => setShowWhitelistModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-go hover:bg-go-deep text-white text-xs font-semibold shadow-sm transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Whitelist Entry</span>
+                  </button>
+                )}
               </div>
 
               <div className="rounded-xl border border-edge bg-board-plate overflow-hidden">
@@ -995,7 +1006,7 @@ export const ThreatCenterModule: React.FC = () => {
                               <span className="text-[11px] text-ink-muted font-mono" title="Core server IPs cannot be deleted">
                                 Protected
                               </span>
-                            ) : (
+                            ) : canManageThreats ? (
                               <button
                                 onClick={() => handleRemoveWhitelist(wl.id, wl.ipAddress)}
                                 className="p-1.5 rounded hover:bg-status-act-fill text-ink-muted hover:text-status-act-ink transition-colors"
@@ -1003,6 +1014,8 @@ export const ThreatCenterModule: React.FC = () => {
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
+                            ) : (
+                              <span className="text-[11px] text-ink-muted font-mono">Read-only</span>
                             )}
                           </td>
                         </tr>

@@ -234,14 +234,20 @@ export const AuditLogsModule: React.FC = () => {
   };
 
   const getSeverityBadge = (sev: string) => {
-    switch (sev) {
-      case "CRITICAL":
-        return "bg-status-act-fill text-status-act-ink border-status-act-ink/30";
-      case "WARNING":
-        return "bg-status-waiting-fill text-status-waiting-ink border-status-waiting-ink/30";
-      default:
-        return "bg-board-ground text-ink border-edge";
-    }
+    const toneClass =
+      sev === "CRITICAL"
+        ? "bg-status-act-fill text-status-act-ink border-status-act-ink/30"
+        : sev === "WARNING"
+          ? "bg-status-waiting-fill text-status-waiting-ink border-status-waiting-ink/30"
+          : "bg-board-ground text-ink border-edge";
+
+    return (
+      <span
+        className={`inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border whitespace-nowrap ${toneClass}`}
+      >
+        {sev || "INFO"}
+      </span>
+    );
   };
 
   return (

@@ -14,10 +14,13 @@ import {
   Code,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import type { AlertStatusResponse, SysAdminAlertRecord } from "../../../../types/sysAdmin";
 import { MobileResponsiveTable } from "../../../../components/table";
 
 export const TelegramAlertsTab: React.FC = () => {
+  const { can } = useSysAdminPermissions();
+  const canSendTestAlert = can("devops.services");
   const [alertStatus, setAlertStatus] = useState<AlertStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingTest, setIsSendingTest] = useState(false);
@@ -147,14 +150,20 @@ export const TelegramAlertsTab: React.FC = () => {
             </div>
           )}
 
-          <button
-            onClick={handleSendTestAlert}
-            disabled={isSendingTest}
-            className="w-full py-2.5 px-4 rounded-xl bg-signal hover:bg-signal-deep font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <Send className={`w-3.5 h-3.5 ${isSendingTest ? "animate-spin" : ""}`} />
-            <span>{isSendingTest ? "Dispatching..." : "Send Test Alert"}</span>
-          </button>
+          {canSendTestAlert ? (
+            <button
+              onClick={handleSendTestAlert}
+              disabled={isSendingTest}
+              className="w-full py-2.5 px-4 rounded-xl bg-signal hover:bg-signal-deep font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Send className={`w-3.5 h-3.5 ${isSendingTest ? "animate-spin" : ""}`} />
+              <span>{isSendingTest ? "Dispatching..." : "Send Test Alert"}</span>
+            </button>
+          ) : (
+            <div className="rounded-lg border border-hairline bg-board-ground px-3 py-2 text-[11px] text-ink-muted">
+              Read-only view: dispatching test alerts requires Service & Maintenance permissions.
+            </div>
+          )}
         </div>
       </div>
 

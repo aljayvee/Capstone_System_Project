@@ -7,7 +7,25 @@ import { postAccepted, postDeclined } from "../../../services/chatSystemMessages
 import { getMemoryAccessToken, onMemoryAccessTokenChange } from "../../../services/apiClient";
 import { Errand, ErrandStatus, DispatcherDashboardSummary } from "../../../types/errand";
 import { apiClient } from "../../../services/apiClient";
-import { rememberErrandReferences } from "../../../utils/formatErrandId";
+import { formatErrandId, rememberErrandReferences } from "../../../utils/formatErrandId";
+import { toast } from "sonner";
+
+/**
+ * A rider turned down an errand the server offered, and the server did not send
+ * it on (server errandService `errand:rider_declined`, outcome NEEDS_DISPATCHER).
+ * RiderDeclinedDialog asks the dispatcher to re-assign it.
+ */
+export interface RiderDeclinedAlert {
+  errandId: string;
+  riderName: string;
+  kind: "DECLINED" | "EXPIRED";
+  reason: string | null;
+  /** Declines and lapses on this errand so far, this one included. */
+  attempts: number;
+  /** After this many the server stops re-offering on its own. */
+  cap: number;
+  why: "CAP_REACHED" | "NO_RIDER" | "OFFER_TOO_OLD";
+}
 
 const BACKEND_URL = (import.meta as any).env?.VITE_API_URL
   ? (import.meta as any).env.VITE_API_URL.replace(/\/api$/, "")
@@ -119,6 +137,15 @@ function isVisibleToDispatcher(errand: Errand, dispatcherId?: number): boolean {
 export function useDispatcherPortal(currentUserId?: number, currentUserName?: string) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [errands, setErrands] = useState<Errand[]>([]);
+  // Read by socket handlers, which are bound once and would otherwise see the
+  // first render's list.
+  const errandsRef = useRef<Errand[]>(errands);
+  errandsRef.current = errands;
+  // Oldest first, one per errand: the dialog works through them in order.
+  const [declineAlerts, setDeclineAlerts] = useState<RiderDeclinedAlert[]>([]);
+  const dismissDeclineAlert = useCallback((errandId: string) => {
+    setDeclineAlerts((prev) => prev.filter((a) => a.errandId !== errandId));
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
   // Why these exist: `isLoading` was computed and returned here from the start,
   // and the portal never destructured it, so every panel rendered its empty
@@ -279,6 +306,13 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
 
     socket.on("order:updated", (updatedOrder: any) => {
       const errand = mapPrismaErrand(updatedOrder);
+      // A rider is on it again (Re-assign here, Send rider in the chat, or
+      // another dispatcher), or it was cancelled: its decline alert is answered.
+      if (errand.riderId != null || String(errand.status).toUpperCase() === "CANCELLED") {
+        setDeclineAlerts((prev) =>
+          prev.some((a) => a.errandId === errand.id) ? prev.filter((a) => a.errandId !== errand.id) : prev
+        );
+      }
       setErrands((prev) => {
         if (!isVisibleToDispatcher(errand, currentUserIdRef.current)) {
           return prev.filter((e) => e.id !== errand.id);
@@ -350,6 +384,47 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
         `[Dispatch] Errand ${payload.errandId}: rider ${payload.riderId} declared ` +
           `₱${payload.declaredTotal} at a shop that issued no receipt. Unverified: ` +
           `the photo shows the goods, not a printed total.`
+      );
+    });
+
+    // A rider declined (or let lapse) an errand the server offered them.
+    // REASSIGNED: the server already offered it to the next rider, so this is a
+    // notice only. NEEDS_DISPATCHER: it stopped (3 refusals, nobody left, or an
+    // offer too old to send on) and the dialog asks for a Re-assign. Sent to every
+    // dispatcher; only the one whose errand it is sees it here. Nobody's errand
+    // reaches everyone through the CRITICAL "No rider took an errand" bell row.
+    socket.on("errand:rider_declined", (payload: any) => {
+      if (!payload?.errandId) return;
+      const known = errandsRef.current.find((e) => e.id === payload.errandId);
+      if (!known || !isVisibleToDispatcher(known, currentUserIdRef.current)) return;
+      const riderName = String(payload.riderName || "The rider");
+      const ref = formatErrandId(payload.errandId);
+      const verb = payload.kind === "EXPIRED" ? "did not answer the offer for" : "declined";
+
+      if (payload.outcome === "REASSIGNED") {
+        toast.info(`${riderName} ${verb} order #${ref}.`, {
+          description: payload.nextRiderName
+            ? `Offered to ${payload.nextRiderName} automatically.`
+            : "Offered to the next rider automatically.",
+          action: { label: "View", onClick: () => setSelectedErrandId(payload.errandId) },
+        });
+        return;
+      }
+
+      const alert: RiderDeclinedAlert = {
+        errandId: payload.errandId,
+        riderName,
+        kind: payload.kind === "EXPIRED" ? "EXPIRED" : "DECLINED",
+        reason: typeof payload.reason === "string" && payload.reason ? payload.reason : null,
+        attempts: Number(payload.attempts) || 1,
+        cap: Number(payload.cap) || 3,
+        why: payload.why === "CAP_REACHED" || payload.why === "OFFER_TOO_OLD" ? payload.why : "NO_RIDER",
+      };
+      // A later refusal on the same errand replaces the earlier one in place.
+      setDeclineAlerts((prev) =>
+        prev.some((a) => a.errandId === alert.errandId)
+          ? prev.map((a) => (a.errandId === alert.errandId ? alert : a))
+          : [...prev, alert]
       );
     });
 
@@ -547,5 +622,8 @@ export function useDispatcherPortal(currentUserId?: number, currentUserName?: st
     handleCloseChat,
     openChatToReply,
     handleUpdateStatus,
+    /** Errands a rider declined that the server did not send on. Oldest first. */
+    declineAlerts,
+    dismissDeclineAlert,
   };
 }

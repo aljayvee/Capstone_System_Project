@@ -29,6 +29,7 @@ import { MobileResponsiveTable } from "../../../../components/table";
 import { UserTableSkeleton } from "../../components/OwnerSkeletons";
 import { AddUserModal } from "./components/AddUserModal";
 import { EditUserModal } from "./components/EditUserModal";
+import { SysAdminPmaDrawer } from "../settings/SysAdminPmaDrawer";
 import { UserRole } from "../../../../types/auth";
 import { apiService } from "../../../../services/apiService";
 import { OwnerPageHeader } from "../../components/OwnerPageHeader";
@@ -69,6 +70,7 @@ export const UserManagementModule: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSysAdminPma, setShowSysAdminPma] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -378,14 +380,28 @@ export const UserManagementModule: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────── */}
       <div className="owner-users-header-enter shrink-0 border-b border-hairline pb-3 pt-1">
         <OwnerPageHeader title="User Management" controls={
-          canManage ? (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 sm:px-4 py-2 rounded-plate transition-colors"
-          >
-            <Plus size={15} />
-            <span>Add User</span>
-          </button>
+          (canManage || access.isMainOwner) ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {access.isMainOwner && (
+                <button
+                  type="button"
+                  onClick={() => setShowSysAdminPma(true)}
+                  className="flex items-center justify-center gap-2 border border-edge bg-board-plate hover:bg-board-ground text-ink text-label px-3 sm:px-3.5 py-2 rounded-plate transition-colors"
+                >
+                  <ShieldCheck size={15} />
+                  <span>SysAdmin PMA</span>
+                </button>
+              )}
+              {canManage && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center justify-center gap-2 bg-board-field hover:bg-board-field-deep text-white text-label px-3.5 sm:px-4 py-2 rounded-plate transition-colors"
+                >
+                  <Plus size={15} />
+                  <span>Add User</span>
+                </button>
+              )}
+            </div>
           ) : undefined
         } />
       </div>
@@ -811,6 +827,14 @@ export const UserManagementModule: React.FC = () => {
           user={editingUser}
           onClose={() => setEditingUser(null)}
           onSave={handleEditUser}
+        />
+      )}
+
+      {/* Main Owner SysAdmin PMA Drawer (completely isolated from Staff list) */}
+      {access.isMainOwner && (
+        <SysAdminPmaDrawer
+          open={showSysAdminPma}
+          onClose={() => setShowSysAdminPma(false)}
         />
       )}
     </div>

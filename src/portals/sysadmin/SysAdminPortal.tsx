@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { SessionConflictScreen } from "../../components/modals/SessionConflictScreen";
 import { useSysAdminAuth } from "./context/SysAdminAuthContext";
+import { SysAdminPermissionsProvider, useSysAdminPermissions } from "./context/SysAdminPermissionsContext";
 import { useSysAdminLanguage } from "./context/SysAdminLanguageContext";
 import { SysAdminLoginView } from "./components/SysAdminLoginView";
 import { SysAdminProfileWizard } from "./components/SysAdminProfileWizard";
@@ -28,6 +29,8 @@ import {
   Cpu,
   ShieldAlert,
   AlertTriangle,
+  Lock,
+  RefreshCw,
 } from "lucide-react";
 import { sysAdminApiService } from "../../services/sysAdminApiService";
 import { useDeviceTier } from "../../hooks/useDeviceTier";
@@ -43,8 +46,44 @@ const SysAdminPortalContent: React.FC = () => {
   const { isMobile } = useDeviceTier();
   const { user: operationalUser, isAuthenticated: isOperationalAuth, logout: logoutOperational } = useAuth();
   const { admin, isAuthenticated, isLoading, challengeToken, logout } = useSysAdminAuth();
+  const pma = useSysAdminPermissions();
   const { language, setLanguage, t } = useSysAdminLanguage();
   const [activeTab, setActiveTab] = useState<SysAdminTab>("overview");
+  const [revokedNotice, setRevokedNotice] = useState<string | null>(null);
+
+  const canThreats = pma.can("threats.view");
+  const canUsers = pma.can("users.view");
+  const canAudit = pma.can("audit.view");
+  const canTraffic = pma.can("traffic.view");
+  const canDevOps = pma.canAny(
+    "telemetry.view",
+    "devops.services",
+    "devops.backups.view",
+    "logs.view",
+    "incidents.view",
+    "releases.view",
+    "devops.features"
+  );
+  const canStaff = pma.can("staff.view") || pma.isMainSysAdmin;
+  const canFeatures = pma.can("devops.features");
+
+  React.useEffect(() => {
+    if (pma.status !== "ready") return;
+    const tabAllowed: Record<SysAdminTab, boolean> = {
+      overview: true,
+      threats: canThreats,
+      users: canUsers,
+      audit: canAudit,
+      traffic: canTraffic,
+      devops: canDevOps,
+      "it-staff": canStaff,
+      settings: true,
+    };
+    if (!tabAllowed[activeTab]) {
+      setActiveTab("overview");
+      setRevokedNotice("Your SysAdmin access group changed, so you were returned to Overview.");
+    }
+  }, [pma.status, activeTab, canThreats, canUsers, canAudit, canTraffic, canDevOps, canStaff]);
 
   // 500 Server Error [nginx] Outage Simulation State
   const [isServerErrorActive, setIsServerErrorActive] = useState<boolean>(() => {
@@ -152,51 +191,63 @@ const SysAdminPortalContent: React.FC = () => {
       isActive: activeTab === "overview",
       onClick: () => setActiveTab("overview"),
     },
-    {
-      id: "threats",
-      label: t("tabThreats"),
-      icon: <ShieldAlert className="w-5 h-5 text-status-act-ink" />,
-      isActive: activeTab === "threats",
-      onClick: () => setActiveTab("threats"),
-    },
-    {
-      id: "users",
-      label: t("tabUsers"),
-      icon: <Users className="w-5 h-5" />,
-      isActive: activeTab === "users",
-      onClick: () => setActiveTab("users"),
-    },
-    {
-      id: "devops",
-      label: t("tabDevOps"),
-      icon: <Wrench className="w-5 h-5" />,
-      isActive: activeTab === "devops",
-      onClick: () => setActiveTab("devops"),
-    },
+    ...(canThreats
+      ? [{
+          id: "threats",
+          label: t("tabThreats"),
+          icon: <ShieldAlert className="w-5 h-5 text-status-act-ink" />,
+          isActive: activeTab === "threats",
+          onClick: () => setActiveTab("threats"),
+        }]
+      : []),
+    ...(canUsers
+      ? [{
+          id: "users",
+          label: t("tabUsers"),
+          icon: <Users className="w-5 h-5" />,
+          isActive: activeTab === "users",
+          onClick: () => setActiveTab("users"),
+        }]
+      : []),
+    ...(canDevOps
+      ? [{
+          id: "devops",
+          label: t("tabDevOps"),
+          icon: <Wrench className="w-5 h-5" />,
+          isActive: activeTab === "devops",
+          onClick: () => setActiveTab("devops"),
+        }]
+      : []),
   ];
 
   const sysadminMoreTabs: MobileNavTab[] = [
-    {
-      id: "audit",
-      label: t("tabAudit"),
-      icon: <FileText className="w-5 h-5" />,
-      isActive: activeTab === "audit",
-      onClick: () => setActiveTab("audit"),
-    },
-    {
-      id: "traffic",
-      label: t("tabTraffic"),
-      icon: <Globe className="w-5 h-5" />,
-      isActive: activeTab === "traffic",
-      onClick: () => setActiveTab("traffic"),
-    },
-    {
-      id: "it-staff",
-      label: t("tabStaff"),
-      icon: <UserCog className="w-5 h-5" />,
-      isActive: activeTab === "it-staff",
-      onClick: () => setActiveTab("it-staff"),
-    },
+    ...(canAudit
+      ? [{
+          id: "audit",
+          label: t("tabAudit"),
+          icon: <FileText className="w-5 h-5" />,
+          isActive: activeTab === "audit",
+          onClick: () => setActiveTab("audit"),
+        }]
+      : []),
+    ...(canTraffic
+      ? [{
+          id: "traffic",
+          label: t("tabTraffic"),
+          icon: <Globe className="w-5 h-5" />,
+          isActive: activeTab === "traffic",
+          onClick: () => setActiveTab("traffic"),
+        }]
+      : []),
+    ...(canStaff
+      ? [{
+          id: "it-staff",
+          label: t("tabStaff"),
+          icon: <UserCog className="w-5 h-5" />,
+          isActive: activeTab === "it-staff",
+          onClick: () => setActiveTab("it-staff"),
+        }]
+      : []),
     {
       id: "settings",
       label: t("tabSettings"),
@@ -330,77 +381,89 @@ const SysAdminPortalContent: React.FC = () => {
               <span>{t("tabOverview")}</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab("threats")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "threats"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <ShieldAlert className="w-4 h-4 text-status-act-ink" />
-              <span>{t("tabThreats")}</span>
-            </button>
+            {canThreats && (
+              <button
+                onClick={() => setActiveTab("threats")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "threats"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4 text-status-act-ink" />
+                <span>{t("tabThreats")}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "users"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>{t("tabUsers")}</span>
-            </button>
+            {canUsers && (
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "users"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>{t("tabUsers")}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("audit")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "audit"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>{t("tabAudit")}</span>
-            </button>
+            {canAudit && (
+              <button
+                onClick={() => setActiveTab("audit")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "audit"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>{t("tabAudit")}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("traffic")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "traffic"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <Globe className="w-4 h-4" />
-              <span>{t("tabTraffic")}</span>
-            </button>
+            {canTraffic && (
+              <button
+                onClick={() => setActiveTab("traffic")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "traffic"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>{t("tabTraffic")}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("devops")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "devops"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <Wrench className="w-4 h-4" />
-              <span>{t("tabDevOps")}</span>
-            </button>
+            {canDevOps && (
+              <button
+                onClick={() => setActiveTab("devops")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "devops"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <Wrench className="w-4 h-4" />
+                <span>{t("tabDevOps")}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("it-staff")}
-              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "it-staff"
-                  ? "border-status-act-ink/30 text-ink bg-board-ground"
-                  : "border-transparent text-ink-muted hover:text-ink"
-              }`}
-            >
-              <UserCog className="w-4 h-4" />
-              <span>{t("tabStaff")}</span>
-            </button>
+            {canStaff && (
+              <button
+                onClick={() => setActiveTab("it-staff")}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "it-staff"
+                    ? "border-status-act-ink/30 text-ink bg-board-ground"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                <UserCog className="w-4 h-4" />
+                <span>{t("tabStaff")}</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab("settings")}
@@ -419,6 +482,38 @@ const SysAdminPortalContent: React.FC = () => {
 
       {/* Main Console Work Area */}
       <main className={`flex-1 p-3.5 sm:p-6 max-w-7xl w-full mx-auto ${isMobile ? "pb-24" : ""}`}>
+        {pma.status === "error" && (
+          <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-waiting-ink/30 bg-status-waiting-fill px-4 py-3 text-xs text-status-waiting-ink">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{pma.error || "Permissions could not be loaded. Restricted modules stay hidden until verified."}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void pma.reload()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-edge bg-board-plate px-3 py-1.5 font-semibold text-ink hover:bg-board-ground"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry</span>
+            </button>
+          </div>
+        )}
+
+        {revokedNotice && (
+          <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-edge bg-board-plate px-4 py-3 text-xs text-ink">
+            <div className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-ink-muted shrink-0" />
+              <span>{revokedNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRevokedNotice(null)}
+              className="text-ink-muted hover:text-ink font-semibold"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         {/* Active 500 Server Error Outage Banner */}
         {isServerErrorActive && (
           <div className="mb-5 p-3.5 rounded-xl bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink flex items-center justify-between">
@@ -428,27 +523,35 @@ const SysAdminPortalContent: React.FC = () => {
                 <strong>Simulated 500 Server Error is ACTIVE</strong> on the public login screen (white background with "500 Server Error [nginx] error").
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleServerError}
-              disabled={isTogglingServerError}
-              className="px-3 py-1 rounded-lg bg-signal hover:bg-signal-deep text-white font-semibold text-xs transition-colors shrink-0 ml-3 cursor-pointer"
-            >
-              Turn Off 500 Error
-            </button>
+            {canFeatures && (
+              <button
+                type="button"
+                onClick={handleToggleServerError}
+                disabled={isTogglingServerError}
+                className="px-3 py-1 rounded-lg bg-signal hover:bg-signal-deep text-white font-semibold text-xs transition-colors shrink-0 ml-3 cursor-pointer"
+              >
+                Turn Off 500 Error
+              </button>
+            )}
           </div>
         )}
 
         {activeTab === "overview" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">{t("overviewTitle")}</h2>
                 <p className="text-xs text-ink-muted">{t("overviewSubtitle")}</p>
               </div>
-              <div className="text-xs font-mono text-ink-muted flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-go" />
-                <span>{t("allSystemsOperational")}</span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-edge bg-board-plate px-2.5 py-1 text-[11px] font-mono text-ink-muted">
+                  <Lock className="w-3 h-3 text-ink-muted" />
+                  <span>{pma.status === "ready" ? pma.baselineName : "Verifying access..."}</span>
+                </span>
+                <div className="text-xs font-mono text-ink-muted flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-go" />
+                  <span>{t("allSystemsOperational")}</span>
+                </div>
               </div>
             </div>
 
@@ -498,44 +601,59 @@ const SysAdminPortalContent: React.FC = () => {
                 <span>{t("diagnosticHubTitle")}</span>
               </h3>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-                <button
-                  onClick={() => setActiveTab("threats")}
-                  className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
-                >
-                  <div className="text-xs font-semibold text-ink mb-0.5 flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-status-act-ink shrink-0" />
-                    <span className="truncate">{t("threatDefenseCardTitle")}</span>
+                {canThreats && (
+                  <button
+                    onClick={() => setActiveTab("threats")}
+                    className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-ink mb-0.5 flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-status-act-ink shrink-0" />
+                      <span className="truncate">{t("threatDefenseCardTitle")}</span>
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("threatDefenseCardDesc")}</p>
+                  </button>
+                )}
+
+                {canUsers && (
+                  <button
+                    onClick={() => setActiveTab("users")}
+                    className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("userAuditCardTitle")}</div>
+                    <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("userAuditCardDesc")}</p>
+                  </button>
+                )}
+
+                {canAudit && (
+                  <button
+                    onClick={() => setActiveTab("audit")}
+                    className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("securityLogsCardTitle")}</div>
+                    <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("securityLogsCardDesc")}</p>
+                  </button>
+                )}
+
+                {canTraffic && (
+                  <button
+                    onClick={() => setActiveTab("traffic")}
+                    className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("trafficCardTitle")}</div>
+                    <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("trafficCardDesc")}</p>
+                  </button>
+                )}
+
+                {!canThreats && !canUsers && !canAudit && !canTraffic && (
+                  <div className="col-span-2 lg:col-span-4 rounded-lg border border-hairline bg-board-ground p-3 text-xs text-ink-muted">
+                    Diagnostic shortcuts match your assigned access group. Use the navigation bar above to open your permitted consoles or manage your own account security.
                   </div>
-                  <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("threatDefenseCardDesc")}</p>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("users")}
-                  className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
-                >
-                  <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("userAuditCardTitle")}</div>
-                  <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("userAuditCardDesc")}</p>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("audit")}
-                  className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
-                >
-                  <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("securityLogsCardTitle")}</div>
-                  <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("securityLogsCardDesc")}</p>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab("traffic")}
-                  className="p-2.5 sm:p-3 text-left rounded-lg bg-board-ground hover:bg-board-ground border border-edge transition-colors"
-                >
-                  <div className="text-xs font-semibold text-ink mb-0.5 truncate">{t("trafficCardTitle")}</div>
-                  <p className="text-[10px] sm:text-[11px] text-ink-muted line-clamp-2">{t("trafficCardDesc")}</p>
-                </button>
+                )}
               </div>
             </div>
 
-            {/* Outage Simulation & Error Controls Card */}
+            {/* Outage Simulation & Error Controls Card (Feature & Simulation Toggles permission) */}
+            {canFeatures && (
             <div className="p-4 sm:p-5 rounded-xl bg-board-plate border border-edge flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div
@@ -590,20 +708,21 @@ const SysAdminPortalContent: React.FC = () => {
                 </button>
               </div>
             </div>
+            )}
           </div>
         )}
 
-        {activeTab === "threats" && <ThreatCenterModule />}
+        {activeTab === "threats" && canThreats && <ThreatCenterModule />}
 
-        {activeTab === "users" && <UserMonitoringModule />}
+        {activeTab === "users" && canUsers && <UserMonitoringModule />}
 
-        {activeTab === "audit" && <AuditLogsModule />}
+        {activeTab === "audit" && canAudit && <AuditLogsModule />}
 
-        {activeTab === "traffic" && <TrafficMonitoringModule />}
+        {activeTab === "traffic" && canTraffic && <TrafficMonitoringModule />}
 
-        {activeTab === "devops" && <DevOpsModule />}
+        {activeTab === "devops" && canDevOps && <DevOpsModule />}
 
-        {activeTab === "it-staff" && <ItStaffModule />}
+        {activeTab === "it-staff" && canStaff && <ItStaffModule />}
         {activeTab === "settings" && <AccountSettingsModule />}
       </main>
 
@@ -619,7 +738,13 @@ const SysAdminPortalContent: React.FC = () => {
 };
 
 export const SysAdminPortal: React.FC = () => {
-  return <div data-surface="sysadmin" data-portal="sysadmin"><SysAdminPortalContent /></div>;
+  return (
+    <div data-surface="sysadmin" data-portal="sysadmin">
+      <SysAdminPermissionsProvider>
+        <SysAdminPortalContent />
+      </SysAdminPermissionsProvider>
+    </div>
+  );
 };
 
 export default SysAdminPortal;

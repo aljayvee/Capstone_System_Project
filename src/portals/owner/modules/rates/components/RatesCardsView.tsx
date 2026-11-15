@@ -1,20 +1,24 @@
 import React from "react";
 import { CreditCard, ListOrdered, MapPin, Pencil, Route, ShoppingBasket, Store } from "lucide-react";
 import type { ApiRateConfig } from "../../../../../services/apiService";
+import {
+  formatBoundRange,
+  validateRateFields,
+  type RateBoundsMap,
+  type RateFieldKey,
+} from "../lib/priceMatrix";
 
 export type RateCardId = "baseFare" | "excessDistance" | "multiStoreFee" | "storeLimit" | "grocery" | "nonCash";
-export type RateField = keyof Pick<ApiRateConfig,
-  "baseFee" | "perKmRate" | "multiStoreFeePerStore" | "maxAdditionalStores" |
-  "groceryFeeThreshold" | "groceryFeeFlat" | "groceryFeePercent" |
-  "nonCodThreshold" | "nonCodFeeLow" | "nonCodFeeHigh">;
+export type RateField = RateFieldKey;
 
 type Unit = "money" | "percent" | "stops" | "perKm" | "perStore";
-type Field = { key: RateField; label: string; viewLabel?: string; unit: Unit; min: number; max?: number; step?: number };
+type Field = { key: RateField; label: string; viewLabel?: string; unit: Unit; step?: number };
 
 interface RatesCardsViewProps {
   rateConfig: ApiRateConfig;
   draft: Record<RateField, number | null>;
   baseFeeDistanceKm: number;
+  bounds: RateBoundsMap;
   activeCard: RateCardId | null;
   isSaving: boolean;
   isReadOnly: boolean;
@@ -31,7 +35,7 @@ const formatRate = (value: number, unit: Unit) => {
 };
 
 export const RatesCardsView: React.FC<RatesCardsViewProps> = ({
-  rateConfig, draft, baseFeeDistanceKm, activeCard, isSaving, isReadOnly,
+  rateConfig, draft, baseFeeDistanceKm, bounds, activeCard, isSaving, isReadOnly,
   onEdit, onFieldChange, onSubmit,
 }) => {
   const [emptyFields, setEmptyFields] = React.useState<Partial<Record<RateField, boolean>>>({});
@@ -39,26 +43,26 @@ export const RatesCardsView: React.FC<RatesCardsViewProps> = ({
 
   const cards: Array<{ id: RateCardId; title: string; icon: typeof MapPin; fields: Field[] }> = [
     { id: "baseFare", title: "Base Delivery Fare", icon: MapPin, fields: [
-      { key: "baseFee", label: `Base Delivery Fare (0 - ${baseFeeDistanceKm.toFixed(1)} km)`, viewLabel: `0 - ${baseFeeDistanceKm.toFixed(1)} km`, unit: "money", min: 0, step: 0.01 },
+      { key: "baseFee", label: `Base Delivery Fare (0 - ${baseFeeDistanceKm.toFixed(1)} km)`, viewLabel: `0 - ${baseFeeDistanceKm.toFixed(1)} km`, unit: "money", step: 0.01 },
     ] },
     { id: "excessDistance", title: "Excess Distance Rate", icon: Route, fields: [
-      { key: "perKmRate", label: "Excess Distance Rate", viewLabel: "Per 1 km", unit: "perKm", min: 0, step: 0.01 },
+      { key: "perKmRate", label: "Excess Distance Rate", viewLabel: "Per 1 km", unit: "perKm", step: 0.01 },
     ] },
     { id: "multiStoreFee", title: "Multi-Store Errand Surcharge", icon: Store, fields: [
-      { key: "multiStoreFeePerStore", label: "Fee Per Additional Store", viewLabel: "Per additional store", unit: "perStore", min: 0, step: 0.01 },
+      { key: "multiStoreFeePerStore", label: "Fee Per Additional Store", viewLabel: "Per additional store", unit: "perStore", step: 0.01 },
     ] },
     { id: "storeLimit", title: "Max Additional Stores Allowed", icon: ListOrdered, fields: [
-      { key: "maxAdditionalStores", label: "Max Additional Stores Allowed", viewLabel: "Additional stops", unit: "stops", min: 1, max: 5 },
+      { key: "maxAdditionalStores", label: "Max Additional Stores Allowed", viewLabel: "Additional stops", unit: "stops" },
     ] },
     { id: "grocery", title: "Grocery & Pabili Subtotal Surcharge", icon: ShoppingBasket, fields: [
-      { key: "groceryFeeThreshold", label: "Order Threshold", unit: "money", min: 1000 },
-      { key: "groceryFeeFlat", label: "Under Threshold", unit: "money", min: 0, step: 0.01 },
-      { key: "groceryFeePercent", label: "At or Above", unit: "percent", min: 0, max: 100, step: 0.01 },
+      { key: "groceryFeeThreshold", label: "Order Threshold", unit: "money" },
+      { key: "groceryFeeFlat", label: "Under Threshold", unit: "money", step: 0.01 },
+      { key: "groceryFeePercent", label: "At or Above", unit: "percent", step: 0.01 },
     ] },
     { id: "nonCash", title: "Non-Cash Payment Surcharge", icon: CreditCard, fields: [
-      { key: "nonCodThreshold", label: "Purchase Threshold", unit: "money", min: 0 },
-      { key: "nonCodFeeLow", label: "Under Threshold", unit: "money", min: 0, step: 0.01 },
-      { key: "nonCodFeeHigh", label: "At or Above", unit: "money", min: 0, step: 0.01 },
+      { key: "nonCodThreshold", label: "Purchase Threshold", unit: "money" },
+      { key: "nonCodFeeLow", label: "Under Threshold", unit: "money", step: 0.01 },
+      { key: "nonCodFeeHigh", label: "At or Above", unit: "money", step: 0.01 },
     ] },
   ];
   const current: Record<RateField, number> = {
@@ -78,8 +82,13 @@ export const RatesCardsView: React.FC<RatesCardsViewProps> = ({
     <div className="grid max-w-5xl grid-cols-1 gap-4 lg:grid-cols-2">
       {cards.map(({ id, title, icon: Icon, fields }) => {
         const editing = activeCard === id;
-        const inverted = id === "nonCash" && (draft.nonCodFeeHigh ?? 0) < (draft.nonCodFeeLow ?? 0);
-        const lowThreshold = id === "grocery" && (draft.groceryFeeThreshold ?? 0) < 1000;
+        const fieldErrors = editing
+          ? validateRateFields(
+              draft,
+              bounds,
+              fields.map((field) => field.key)
+            )
+          : [];
         return (
           <section key={id} aria-label={title} className="min-w-0 rounded-plate border border-edge bg-board-plate p-4 sm:p-5">
             <div className="mb-5 flex items-start justify-between gap-3">
@@ -96,30 +105,37 @@ export const RatesCardsView: React.FC<RatesCardsViewProps> = ({
             {editing ? (
               <form id="service-rates-active-card" onSubmit={onSubmit} className="space-y-4">
                 <div className={`grid grid-cols-1 gap-4 ${fields.length > 1 ? "sm:grid-cols-2" : ""}`}>
-                  {fields.map((field) => (
-                    <label key={field.key} className="block min-w-0 space-y-1.5 text-body text-ink-muted">
-                      <span>{field.label}</span>
-                      <span className="flex items-center gap-2">
-                        {field.unit !== "percent" && field.unit !== "stops" && <span className="text-ink">₱</span>}
-                        <input type="number" required min={field.min} max={field.max} step={field.step ?? 1}
-                          value={emptyFields[field.key] ? "" : draft[field.key] ?? ""}
-                          disabled={isReadOnly || isSaving}
-                          onChange={(event) => {
-                            const empty = event.target.value === "";
-                            setEmptyFields((previous) => ({ ...previous, [field.key]: empty }));
-                            onFieldChange(field.key, empty ? null : Number(event.target.value));
-                          }}
-                          className="min-w-0 w-full rounded-trim border border-edge bg-board-ground px-3 py-2 text-panel tabular-nums text-ink outline-none focus:ring-2 focus:ring-field-ink" />
-                        {field.unit === "percent" && <span className="text-ink">%</span>}
-                        {field.unit === "stops" && <span className="text-label text-ink-muted">stops</span>}
-                        {field.unit === "perKm" && <span className="text-label text-ink-muted">/ km</span>}
-                        {field.unit === "perStore" && <span className="text-label text-ink-muted">/ store</span>}
-                      </span>
-                    </label>
-                  ))}
+                  {fields.map((field) => {
+                    const bound = bounds[field.key];
+                    return (
+                      <label key={field.key} className="block min-w-0 space-y-1.5 text-body text-ink-muted">
+                        <span>{field.label}</span>
+                        <span className="flex items-center gap-2">
+                          {field.unit !== "percent" && field.unit !== "stops" && <span className="text-ink">₱</span>}
+                          <input type="number" required min={bound.min} max={bound.max} step={field.step ?? 1}
+                            value={emptyFields[field.key] ? "" : draft[field.key] ?? ""}
+                            disabled={isReadOnly || isSaving}
+                            onChange={(event) => {
+                              const empty = event.target.value === "";
+                              setEmptyFields((previous) => ({ ...previous, [field.key]: empty }));
+                              onFieldChange(field.key, empty ? null : Number(event.target.value));
+                            }}
+                            className="min-w-0 w-full rounded-trim border border-edge bg-board-ground px-3 py-2 text-panel tabular-nums text-ink outline-none focus:ring-2 focus:ring-field-ink" />
+                          {field.unit === "percent" && <span className="text-ink">%</span>}
+                          {field.unit === "stops" && <span className="text-label text-ink-muted">stops</span>}
+                          {field.unit === "perKm" && <span className="text-label text-ink-muted">/ km</span>}
+                          {field.unit === "perStore" && <span className="text-label text-ink-muted">/ store</span>}
+                        </span>
+                        <span className="block text-micro text-ink-muted tabular-nums">
+                          Policy range: {formatBoundRange(field.key, bound)}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
-                {lowThreshold && <p role="alert" className="text-label text-status-act-ink">Order threshold must be at least ₱1,000.</p>}
-                {inverted && <p role="alert" className="text-label text-status-act-ink">At or Above cannot be lower than Under Threshold.</p>}
+                {fieldErrors.map((msg) => (
+                  <p key={msg} role="alert" className="text-label text-status-act-ink">{msg}</p>
+                ))}
               </form>
             ) : (
               <dl className={`grid grid-cols-1 gap-x-5 gap-y-4 ${fields.length > 1 ? "sm:grid-cols-2" : ""}`}>

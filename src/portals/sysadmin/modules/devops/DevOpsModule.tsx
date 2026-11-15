@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import type { SystemTelemetry } from "../../../../types/sysAdmin";
 import { TelemetryTab } from "./TelemetryTab";
 import { ServiceControlsTab } from "./ServiceControlsTab";
@@ -28,12 +29,46 @@ type DevOpsSubTab = "telemetry" | "services" | "backups" | "logs" | "alerts" | "
 
 export const DevOpsModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
+  const { can, canAny } = useSysAdminPermissions();
   const [activeTab, setActiveTab] = useState<DevOpsSubTab>("telemetry");
   const [telemetry, setTelemetry] = useState<SystemTelemetry | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const canTelemetry = can("telemetry.view");
+  const canServices = canAny("devops.services", "devops.features");
+  const canBackups = can("devops.backups.view");
+  const canLogs = can("logs.view");
+  const canAlerts = can("telemetry.view");
+  const canIncidents = can("incidents.view");
+  const canIntegrations = can("telemetry.view");
+  const canReleases = can("releases.view");
+
+  const allowedSubTabs = React.useMemo<DevOpsSubTab[]>(() => {
+    const tabs: DevOpsSubTab[] = [];
+    if (canTelemetry) tabs.push("telemetry");
+    if (canServices) tabs.push("services");
+    if (canBackups) tabs.push("backups");
+    if (canLogs) tabs.push("logs");
+    if (canAlerts) tabs.push("alerts");
+    if (canIncidents) tabs.push("incidents");
+    if (canIntegrations) tabs.push("integrations");
+    if (canReleases) tabs.push("releases");
+    return tabs;
+  }, [canTelemetry, canServices, canBackups, canLogs, canAlerts, canIncidents, canIntegrations, canReleases]);
+
+  React.useEffect(() => {
+    if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeTab)) {
+      setActiveTab(allowedSubTabs[0]);
+    }
+  }, [allowedSubTabs, activeTab]);
+
   const fetchTelemetry = useCallback(async () => {
+    if (!canTelemetry) {
+      setTelemetry(null);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -45,10 +80,10 @@ export const DevOpsModule: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [canTelemetry]);
 
   useEffect(() => {
-    fetchTelemetry();
+    void fetchTelemetry();
   }, [fetchTelemetry]);
 
   return (
@@ -76,8 +111,9 @@ export const DevOpsModule: React.FC = () => {
         )}
       </div>
 
-      {/* Top 5-Tab Navigation Bar */}
+      {/* Top Permission-Filtered Sub-Tab Bar */}
       <div className="flex flex-wrap items-center gap-2 border-b border-edge pb-3">
+        {canTelemetry && (
         <button
           onClick={() => setActiveTab("telemetry")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -89,7 +125,9 @@ export const DevOpsModule: React.FC = () => {
           <Activity className="w-4 h-4" />
           <span>{t("devopsTabTelemetry")}</span>
         </button>
+        )}
 
+        {canServices && (
         <button
           onClick={() => setActiveTab("services")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -101,7 +139,9 @@ export const DevOpsModule: React.FC = () => {
           <Power className="w-4 h-4" />
           <span>{t("devopsTabServices")}</span>
         </button>
+        )}
 
+        {canBackups && (
         <button
           onClick={() => setActiveTab("backups")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -113,7 +153,9 @@ export const DevOpsModule: React.FC = () => {
           <Database className="w-4 h-4" />
           <span>{t("devopsTabBackups")}</span>
         </button>
+        )}
 
+        {canLogs && (
         <button
           onClick={() => setActiveTab("logs")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -125,7 +167,9 @@ export const DevOpsModule: React.FC = () => {
           <Terminal className="w-4 h-4" />
           <span>{t("devopsTabLogs")}</span>
         </button>
+        )}
 
+        {canAlerts && (
         <button
           onClick={() => setActiveTab("alerts")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -137,7 +181,9 @@ export const DevOpsModule: React.FC = () => {
           <Bell className="w-4 h-4" />
           <span>{t("devopsTabAlerts")}</span>
         </button>
+        )}
 
+        {canIncidents && (
         <button
           onClick={() => setActiveTab("incidents")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -149,7 +195,9 @@ export const DevOpsModule: React.FC = () => {
           <ClipboardList className="w-4 h-4" />
           <span>{t("devopsTabIncidents")}</span>
         </button>
+        )}
 
+        {canIntegrations && (
         <button
           onClick={() => setActiveTab("integrations")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -161,7 +209,9 @@ export const DevOpsModule: React.FC = () => {
           <Plug className="w-4 h-4" />
           <span>{t("devopsTabIntegrations")}</span>
         </button>
+        )}
 
+        {canReleases && (
         <button
           onClick={() => setActiveTab("releases")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
@@ -173,6 +223,7 @@ export const DevOpsModule: React.FC = () => {
           <Smartphone className="w-4 h-4" />
           <span>{t("devopsTabReleases")}</span>
         </button>
+        )}
       </div>
 
       {/* Global Error Banner */}
@@ -189,7 +240,7 @@ export const DevOpsModule: React.FC = () => {
       )}
 
       {/* Active Tab Content */}
-      {activeTab === "telemetry" && (
+      {activeTab === "telemetry" && canTelemetry && (
         <TelemetryTab
           telemetry={telemetry}
           onRefresh={fetchTelemetry}
@@ -197,24 +248,24 @@ export const DevOpsModule: React.FC = () => {
         />
       )}
 
-      {activeTab === "services" && (
+      {activeTab === "services" && canServices && (
         <ServiceControlsTab
           telemetry={telemetry}
           onRefreshTelemetry={fetchTelemetry}
         />
       )}
 
-      {activeTab === "backups" && <BackupsTab />}
+      {activeTab === "backups" && canBackups && <BackupsTab />}
 
-      {activeTab === "logs" && <LogsTab />}
+      {activeTab === "logs" && canLogs && <LogsTab />}
 
-      {activeTab === "alerts" && <TelegramAlertsTab />}
+      {activeTab === "alerts" && canAlerts && <TelegramAlertsTab />}
 
-      {activeTab === "incidents" && <IncidentsTab />}
+      {activeTab === "incidents" && canIncidents && <IncidentsTab />}
 
-      {activeTab === "integrations" && <IntegrationsTab />}
+      {activeTab === "integrations" && canIntegrations && <IntegrationsTab />}
 
-      {activeTab === "releases" && <AppReleasesTab />}
+      {activeTab === "releases" && canReleases && <AppReleasesTab />}
     </div>
   );
 };

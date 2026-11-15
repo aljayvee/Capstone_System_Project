@@ -57,7 +57,7 @@ const ROSTER_REFRESH_INTERVAL_MS = 5 * 1000;
  * marker pass that often; committing them in batches keeps the pins moving
  * without spending a slow machine's frame budget on bookkeeping.
  */
-const SOCKET_FLUSH_INTERVAL_MS = 400;
+const SOCKET_FLUSH_INTERVAL_MS = 100;
 
 /**
  * Least time between roster fetches triggered by socket events. The status
@@ -96,6 +96,8 @@ interface SocketRiderLocation {
   latitude: number;
   longitude: number;
   heading: number | null;
+  speedMps?: number | null;
+  mocked?: boolean;
   recordedAt: number;
 }
 
@@ -188,6 +190,8 @@ export interface RiderFleetLocation {
   lat: number;
   lng: number;
   heading: number | null;
+  speedMps?: number | null;
+  mocked?: boolean;
   updatedAt: number;
 }
 
@@ -225,6 +229,8 @@ export interface FirebaseRiderEntry {
   latitude: number;
   longitude: number;
   heading?: number | null;
+  speedMps?: number | null;
+  mocked?: boolean;
   updatedAt: number;
   onDuty?: boolean;
   online?: boolean;
@@ -650,6 +656,8 @@ export function useRiderFleetPresence(options: {
           lat: fbEntry.latitude,
           lng: fbEntry.longitude,
           heading: fbEntry.heading ?? null,
+          speedMps: typeof fbEntry.speedMps === "number" ? fbEntry.speedMps : null,
+          mocked: Boolean(fbEntry.mocked),
           updatedAt: fbEntry.updatedAt,
         }
       : null;
@@ -658,6 +666,8 @@ export function useRiderFleetPresence(options: {
           lat: socketFix.latitude,
           lng: socketFix.longitude,
           heading: socketFix.heading ?? null,
+          speedMps: typeof socketFix.speedMps === "number" ? socketFix.speedMps : null,
+          mocked: Boolean(socketFix.mocked),
           updatedAt: socketFix.recordedAt,
         }
       : null;

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Cloud, CloudOff, FlaskConical, Lock, RefreshCw, X } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { apiErrorText } from "../../lib/apiErrorText";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import type { BackupRestoreCheckRecord, DatabaseBackupRecord, OffsiteBackupStatus } from "../../../../types/sysAdmin";
 
 /** Matches the server's FRESHNESS_HOURS: older than this and the copy is overdue. */
@@ -53,6 +54,8 @@ export function OffsiteChip({ backup }: { backup: DatabaseBackupRecord }) {
 }
 
 export const OffsiteBackupPanel: React.FC = () => {
+  const { can } = useSysAdminPermissions();
+  const canManageBackups = can("devops.backups.manage");
   const [status, setStatus] = useState<OffsiteBackupStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -212,17 +215,19 @@ export const OffsiteBackupPanel: React.FC = () => {
               ) : (
                 <p className="text-xs text-ink-muted">Never run. The first automatic test runs at 03:00 on the 1st.</p>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setStartError(null);
-                  setAskPassword(true);
-                }}
-                disabled={!!running || status.keyFileOk === false}
-                className={`${buttonBase} bg-board-plate hover:bg-board-ground border border-edge text-ink mt-1`}
-              >
-                <FlaskConical className="w-3.5 h-3.5" /> Test restore now
-              </button>
+              {canManageBackups && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartError(null);
+                    setAskPassword(true);
+                  }}
+                  disabled={!!running || status.keyFileOk === false}
+                  className={`${buttonBase} bg-board-plate hover:bg-board-ground border border-edge text-ink mt-1`}
+                >
+                  <FlaskConical className="w-3.5 h-3.5" /> Test restore now
+                </button>
+              )}
             </div>
           </div>
 

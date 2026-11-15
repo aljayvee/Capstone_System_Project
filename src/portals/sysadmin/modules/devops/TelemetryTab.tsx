@@ -21,6 +21,7 @@ import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { MaintenanceOverlay } from "../../../../components/MaintenanceOverlay";
 import { LiveEditNoticeModal } from "../../../../components/LiveEditNoticeModal";
 import type { SystemTelemetry, PortalKey, MaintenanceType } from "../../../../types/sysAdmin";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 
 const PORTALS: { key: PortalKey; label: string; description: string; badge: string }[] = [
   {
@@ -103,6 +104,8 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
   telemetry,
   onTelemetryUpdate,
 }) => {
+  const { can } = useSysAdminPermissions();
+  const canControlServices = can("devops.services");
   const [updatingPortal, setUpdatingPortal] = useState<PortalKey | null>(null);
   const [portalConfigs, setPortalConfigs] = useState<
     Record<
@@ -688,42 +691,48 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
                     <span>{config.maintenanceType === "ADVISORY" || config.maintenanceType === "LIVE_NOTICE" ? "Preview Notice" : "Preview Overlay"}</span>
                   </button>
 
-                  {portalState.isActive ? (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenStepUpModal(portal.key, false)}
-                      disabled={isUpdating}
-                      className="flex-1 py-2 px-3 rounded-lg bg-go hover:bg-go-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      {isUpdating ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Updating...</span>
-                        </>
-                      ) : (
-                        <span>{portalState.maintenanceType === "ADVISORY" || portalState.maintenanceType === "LIVE_NOTICE" ? "Deactivate Notice" : "Resume Live Ops"}</span>
-                      )}
-                    </button>
+                  {canControlServices ? (
+                    portalState.isActive ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenStepUpModal(portal.key, false)}
+                        disabled={isUpdating}
+                        className="flex-1 py-2 px-3 rounded-lg bg-go hover:bg-go-deep disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        {isUpdating ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Updating...</span>
+                          </>
+                        ) : (
+                          <span>{portalState.maintenanceType === "ADVISORY" || portalState.maintenanceType === "LIVE_NOTICE" ? "Deactivate Notice" : "Resume Live Ops"}</span>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenStepUpModal(portal.key, true)}
+                        disabled={isUpdating}
+                        className={`flex-1 py-2 px-3 rounded-lg disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                          config.maintenanceType === "ADVISORY" || config.maintenanceType === "LIVE_NOTICE"
+                            ? "bg-red-600 hover:bg-red-700"
+                            : "bg-signal hover:bg-signal-deep"
+                        }`}
+                      >
+                        {isUpdating ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Updating...</span>
+                          </>
+                        ) : (
+                          <span>{config.maintenanceType === "ADVISORY" || config.maintenanceType === "LIVE_NOTICE" ? "Publish Live Notice" : "Activate Downtime"}</span>
+                        )}
+                      </button>
+                    )
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleOpenStepUpModal(portal.key, true)}
-                      disabled={isUpdating}
-                      className={`flex-1 py-2 px-3 rounded-lg disabled:opacity-50 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                        config.maintenanceType === "ADVISORY" || config.maintenanceType === "LIVE_NOTICE"
-                          ? "bg-red-600 hover:bg-red-700"
-                          : "bg-signal hover:bg-signal-deep"
-                      }`}
-                    >
-                      {isUpdating ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          <span>Updating...</span>
-                        </>
-                      ) : (
-                        <span>{config.maintenanceType === "ADVISORY" || config.maintenanceType === "LIVE_NOTICE" ? "Publish Live Notice" : "Activate Downtime"}</span>
-                      )}
-                    </button>
+                    <span className="flex-1 text-center text-[11px] font-mono text-ink-muted py-2">
+                      Read-only
+                    </span>
                   )}
                 </div>
               </div>

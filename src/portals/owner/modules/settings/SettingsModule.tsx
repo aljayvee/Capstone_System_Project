@@ -1,11 +1,13 @@
 import * as React from "react";
-import { KeyRound, Palette, ShieldCheck, UsersRound } from "lucide-react";
+import { KeyRound, Palette, Shield, ShieldCheck, UsersRound } from "lucide-react";
 import { OwnerPanelShell } from "../../components/OwnerPanelShell";
+import { PanelButton } from "@/components/panel";
 import { OwnerTabs, type OwnerTab } from "../../components/OwnerTabs";
 import { AccountSecurityLogsView } from "../../../../components/account/AccountSecurityLogsView";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { AccessGroupsSettings } from "./AccessGroupsSettings";
 import { AccountAccessSettings } from "./AccountAccessSettings";
+import { SysAdminPmaDrawer } from "./SysAdminPmaDrawer";
 import type { SettingsTab } from "./settingsTabs";
 
 /**
@@ -39,35 +41,57 @@ interface SettingsModuleProps {
 
 export function SettingsModule({ tab, onTabChange, canManageAccess }: SettingsModuleProps) {
   const tabs = canManageAccess ? MAIN_OWNER : EVERYONE;
+  const [showSysAdminPma, setShowSysAdminPma] = React.useState(false);
+
   return (
-    <OwnerPanelShell
-      title="Settings"
-      className="owner-reports-enter"
-      controls={
-        <OwnerTabs
-          label="Settings section"
-          idPrefix="settings"
-          tabs={tabs}
-          active={tab}
-          onChange={(id) => onTabChange(id)}
-        />
-      }
-    >
-      <div
-        key={tab}
-        className="owner-report-enter"
-        role="tabpanel"
-        id={`settings-panel-${tab}`}
-        aria-labelledby={`settings-tab-${tab}`}
-        tabIndex={0}
+    <>
+      <OwnerPanelShell
+        title="Settings"
+        className="owner-reports-enter"
+        controls={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <OwnerTabs
+              label="Settings section"
+              idPrefix="settings"
+              tabs={tabs}
+              active={tab}
+              onChange={(id) => onTabChange(id)}
+            />
+            {canManageAccess && (
+              <PanelButton
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowSysAdminPma(true)}
+                icon={<Shield size={14} />}
+              >
+                SysAdmin PMA
+              </PanelButton>
+            )}
+          </div>
+        }
       >
-        {tab === "appearance" && <AppearanceSettings />}
-        {tab === "groups" && canManageAccess && (
-          <AccessGroupsSettings onOpenAccounts={() => onTabChange("accounts")} />
-        )}
-        {tab === "accounts" && canManageAccess && <AccountAccessSettings />}
-        {tab === "account" && <AccountSecurityLogsView showHeader={false} />}
-      </div>
-    </OwnerPanelShell>
+        <div
+          key={tab}
+          className="owner-report-enter"
+          role="tabpanel"
+          id={`settings-panel-${tab}`}
+          aria-labelledby={`settings-tab-${tab}`}
+          tabIndex={0}
+        >
+          {tab === "appearance" && <AppearanceSettings />}
+          {tab === "groups" && canManageAccess && (
+            <AccessGroupsSettings onOpenAccounts={() => onTabChange("accounts")} />
+          )}
+          {tab === "accounts" && canManageAccess && <AccountAccessSettings />}
+          {tab === "account" && <AccountSecurityLogsView showHeader={false} />}
+        </div>
+      </OwnerPanelShell>
+      {canManageAccess && (
+        <SysAdminPmaDrawer
+          open={showSysAdminPma}
+          onClose={() => setShowSysAdminPma(false)}
+        />
+      )}
+    </>
   );
 }

@@ -10,7 +10,9 @@
  * Kept free of JSX and HTML so React (web) and React Native (app) can both
  * render it. A block's optional `lead` is shown bold in front of its text.
  *
- * Every factual claim here was checked against the system on 2026-10-15
+ * Every factual claim here was checked against the system on 2026-10-15, and
+ * the app's side again on 2026-11-12 (permissions, device details, what is
+ * kept on the phone, the half-payment by transfer)
  * (what the server stores, which providers it calls, where it is hosted, what
  * the app asks the phone for). When a practice changes, change the text: a
  * privacy notice that describes a system that no longer exists is worse than
@@ -36,7 +38,7 @@ export interface LegalDocument {
   sections: LegalSection[];
 }
 
-export const LEGAL_EFFECTIVE_DATE = "October 15, 2026";
+export const LEGAL_EFFECTIVE_DATE = "November 12, 2026";
 
 export const LEGAL_CONTACT = {
   organization: "Sugo Express",
@@ -65,7 +67,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
         },
         {
           kind: "paragraph",
-          text: "Riders and dispatchers who use our staff tools also follow these Terms, together with their separate arrangements with Sugo Express.",
+          text: "Riders have their own Terms of Use and Privacy Policy inside the Sugo Rider app. Dispatchers who use our staff tools follow these Terms, together with their separate arrangements with Sugo Express.",
         },
       ],
     },
@@ -113,7 +115,11 @@ export const TERMS_OF_SERVICE: LegalDocument = {
             },
             {
               lead: "One person, one account.",
-              text: "Do not share your account or create accounts to get around a restriction.",
+              text: "Do not share your account or create accounts to get around a restriction. A phone stays signed in to one account at a time; sign out to switch.",
+            },
+            {
+              lead: "A second check at sign-in.",
+              text: "On a new phone, or after 30 days, we ask for a one-time code sent by text or email before signing you in.",
             },
             {
               lead: "Keep it secure.",
@@ -137,6 +143,10 @@ export const TERMS_OF_SERVICE: LegalDocument = {
             {
               lead: "Describe items clearly.",
               text: "Include the brand, size, quantity and any instructions. We buy what your list says, so a vague item may be bought differently from what you had in mind.",
+            },
+            {
+              lead: "Choosing stores.",
+              text: "Pick a store from our list or search for one on the map. Search results come from Google Maps, and a store appearing there does not mean it is connected to Sugo Express.",
             },
             {
               lead: "Review by a dispatcher.",
@@ -191,7 +201,11 @@ export const TERMS_OF_SERVICE: LegalDocument = {
             },
             {
               lead: "Transfers.",
-              text: "Send the exact amount to the account shown in the app and upload a clear screenshot of the confirmation. We read the reference number, amount and date from the image, and a payment counts only once it is confirmed. A rider may also photograph a transfer confirmation at your door.",
+              text: "For GCash, Maya and bank transfer, the app asks for half of the cost of your items once they are bought, and the rest when they arrive. Send the exact amount to the account shown in the app and upload a clear screenshot of the confirmation. We read the reference number, amount and date from the image, and a payment counts only once it is confirmed. A rider may also photograph a transfer confirmation at your door.",
+            },
+            {
+              lead: "Paying cash instead.",
+              text: "If you chose a transfer but pay the rider in cash, tell the rider. The errand is switched to cash on delivery and the online payment fee is removed.",
             },
             {
               lead: "Honest proof only.",
@@ -246,6 +260,10 @@ export const TERMS_OF_SERVICE: LegalDocument = {
             {
               lead: "Check your items.",
               text: "Please check your items and receipts when they arrive. Report a missing, wrong or damaged item through the app as soon as you can, preferably before the rider leaves.",
+            },
+            {
+              lead: "Two errands to one address.",
+              text: "If you have two errands going to the same address at the same time, they may be delivered together, so one can wait a short time for the other.",
             },
             {
               lead: "If we cannot reach you.",
@@ -347,7 +365,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       blocks: [
         {
           kind: "paragraph",
-          text: "Sugo Express, based in Tacurong City, Sultan Kudarat, is the personal information controller for the data described here. This policy covers the Sugo Express Customer App, the Rider App and the web portal at portal.sugo-express.org.",
+          text: "Sugo Express, based in Tacurong City, Sultan Kudarat, is the personal information controller for the data described here. This policy covers the Sugo Express Customer App and the web portal at portal.sugo-express.org. Riders have a fuller policy of their own inside the Sugo Rider app.",
         },
         {
           kind: "paragraph",
@@ -372,11 +390,15 @@ export const PRIVACY_POLICY: LegalDocument = {
             },
             {
               lead: "Delivery locations.",
-              text: "The addresses you save, with their map pins, landmarks and notes.",
+              text: "The addresses you save, with their map pins, landmarks and notes. The pin of the address you are delivering to is also kept in our real-time database.",
             },
             {
               lead: "Device location.",
-              text: "Only if you allow it, the Customer App reads your location once to place your delivery pin. It does not track you in the background or after you close the app.",
+              text: "Only if you allow it, the Customer App reads your location once, when you ask it to, to place your delivery pin and show its address. It does not follow you as you move, and it does not read your location in the background or after you close the app.",
+            },
+            {
+              lead: "Store searches.",
+              text: "The words you type when you search for a store, and the area of the map you are searching.",
             },
             {
               lead: "Errands.",
@@ -388,17 +410,52 @@ export const PRIVACY_POLICY: LegalDocument = {
             },
             {
               lead: "Messages.",
-              text: "Your chats with dispatchers and riders.",
+              text: "Your chats with dispatchers and riders, and, while a chat is open, whether you are online or typing.",
             },
             {
               lead: "Ratings and feedback.",
-              text: "Ratings and comments you give riders, and app feedback you send, with your phone model and operating system.",
+              text: "Ratings and comments you give riders, and app feedback you send, with your phone model, operating system and app version.",
             },
             {
               lead: "Device and security information.",
-              text: "Your IP address, a device identifier, app or browser details, sign-in times, the devices you have signed in from, password reset requests, and a token that lets us send you push notifications.",
+              text: "Your IP address; an ID the app creates for this installation, which is not your IMEI or advertising ID; your phone's brand, model and operating system version; whether the app is running on a real phone or an emulator; app or browser details; sign-in times; the devices you have signed in from; password reset requests; and a token that lets us send you push notifications.",
             },
           ],
+        },
+      ],
+    },
+    {
+      id: "on-phone",
+      title: "Kept on your phone",
+      blocks: [
+        {
+          kind: "paragraph",
+          text: "Some things stay on the phone, or stay there only to make the app faster:",
+        },
+        {
+          kind: "list",
+          items: [
+            { lead: "Your sign-in session,", text: "in the phone's secure storage, so you stay signed in." },
+            { lead: "An errand you have not sent yet,", text: "saved as a draft so a closed app or a lost signal does not lose your list." },
+            { lead: "Copies of your recent errands and of the store categories,", text: "so screens open quickly and still show something with weak signal." },
+            { lead: "Your settings,", text: "such as light or dark theme, sounds, and which alerts you want." },
+            { lead: "How you use the home screen,", text: "meaning the order of its shortcuts and which store categories you open most, used only on the phone to put those first." },
+          ],
+        },
+        {
+          kind: "paragraph",
+          text: "Signing out removes your session and the saved copies from the phone. Uninstalling the app removes everything in this list.",
+        },
+      ],
+    },
+    {
+      id: "not-collected",
+      title: "What we do not collect",
+      blocks: [
+        {
+          kind: "note",
+          lead: "Sugo Express does not collect",
+          text: "your contacts, text messages, call history, microphone or audio, your location in the background, the list of apps on your phone, your browsing, or your advertising ID. The app contains no advertising and no third-party analytics tools.",
         },
       ],
     },
@@ -408,7 +465,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       blocks: [
         {
           kind: "paragraph",
-          text: "We also collect riders' locations while they are on duty and during assigned errands, the route of each errand, shift and availability status, profile photos, ratings, and earnings and settlement records. During an active errand, the customer sees the rider's live location and name. For all staff, we keep records of sign-ins and the actions taken in the portal.",
+          text: "The Sugo Rider app has its own Privacy Policy and Permissions notice, which list everything it collects. In short, we collect riders' locations while they are online and during assigned errands, the route of each errand, shift and availability status, profile photos, ratings, and earnings and settlement records. During an active errand, the customer sees the rider's live location, name and profile photo. For all staff, we keep records of sign-ins and the actions taken in the portal.",
         },
       ],
     },
@@ -437,6 +494,30 @@ export const PRIVACY_POLICY: LegalDocument = {
       ],
     },
     {
+      id: "improve",
+      title: "How your data improves the service",
+      blocks: [
+        {
+          kind: "paragraph",
+          text: "Beyond running each errand, we use what the service records to make the next one go better:",
+        },
+        {
+          kind: "list",
+          items: [
+            { lead: "Better arrival estimates.", text: "How long past trips and store visits really took sets the times we promise you." },
+            { lead: "Better store suggestions.", text: "Which stores items were actually bought at helps us suggest the right store for an item." },
+            { lead: "Tidier item lists.", text: "Item names from past errands teach the system which category an item belongs to, so a list is sorted by store with less typing." },
+            { lead: "Better service.", text: "Ratings and comments show us where an errand fell short." },
+            { lead: "Fixing faults.", text: "Feedback, with the phone model and app version it came from, tells us which phones a problem happens on." },
+          ],
+        },
+        {
+          kind: "paragraph",
+          text: "Where a pattern is enough, we look at errands together and not at one customer. None of this is used for advertising.",
+        },
+      ],
+    },
+    {
       id: "basis",
       title: "Why we are allowed to use it",
       blocks: [
@@ -459,11 +540,15 @@ export const PRIVACY_POLICY: LegalDocument = {
             },
             {
               lead: "Google.",
-              text: "Google Maps and Places help us show maps, find stores and measure road distances. Google Cloud Vision reads the text on receipts and payment screenshots. Google's Gemini AI models tidy the item lists you type; only the item text is sent, not your name, number or address. Firebase verifies phone numbers, carries chat and live rider tracking, and delivers push notifications. We send emails, such as verification codes, through Gmail.",
+              text: "Google Maps and Places help us show maps, find stores, turn a pin into an address and measure road distances. A store search sends the words you typed and the search area, not your name or number. Google Cloud Vision reads the text on receipts and payment screenshots. Google's Gemini and Gemma AI models tidy the item lists you type and suggest store categories; only the item text is sent, not your name, number or address. Firebase verifies phone numbers, carries chat and live rider tracking, and delivers push notifications. We send emails, such as verification codes, through Gmail.",
+            },
+            {
+              lead: "OpenStreetMap.",
+              text: "Some maps and road routes are drawn from OpenStreetMap data.",
             },
             {
               lead: "Hosting and network providers.",
-              text: "Contabo hosts our servers, and Cloudflare protects and delivers our website and app traffic. Expo may deliver push notifications on some devices.",
+              text: "Contabo hosts our servers, and Cloudflare protects and delivers our website and app traffic. Expo delivers app updates and may deliver push notifications on some devices.",
             },
             {
               lead: "Authorities.",
@@ -534,16 +619,27 @@ export const PRIVACY_POLICY: LegalDocument = {
     },
     {
       id: "choices",
-      title: "Your choices",
+      title: "Phone permissions and your choices",
       blocks: [
+        {
+          kind: "paragraph",
+          text: "The Customer App asks for a permission only when a feature needs it. You can change any answer later in your phone settings.",
+        },
         {
           kind: "list",
           items: [
-            { lead: "Location:", text: "you can refuse location access and set your delivery pin on the map yourself instead." },
-            { lead: "Notifications:", text: "you can turn them off in the app's Settings or your phone's settings, though you may miss errand updates." },
-            { lead: "Camera and photos:", text: "used only when you choose to upload a photo." },
+            { lead: "Location (precise, only while using the app):", text: "asked when you tap to use your current location. It places your delivery pin. If you refuse, set the pin on the map yourself. The app never asks for background location." },
+            { lead: "Notifications:", text: "asked once, for errand updates and chat messages. You can turn each kind off in the app's Settings or all of them in your phone settings, though you may miss errand updates." },
+            { lead: "Camera:", text: "used only when you choose to photograph a payment confirmation or a profile picture. Your phone's own camera takes the picture, and the app receives that one photo." },
+            { lead: "Photos:", text: "used only when you choose a picture from your gallery. The app receives the picture you pick and never reads the rest of your gallery." },
+            { lead: "Internet access and vibration:", text: "given by Android at install, to reach our servers and to alert you." },
             { lead: "Google Sign-In:", text: "optional; you can register with your email address instead." },
           ],
+        },
+        {
+          kind: "note",
+          lead: "Never asked for:",
+          text: "contacts, microphone, text messages, call history or background location.",
         },
       ],
     },

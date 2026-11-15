@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { apiErrorText } from "../../lib/apiErrorText";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 import type {
   IncidentListResponse,
   IncidentSeverity,
@@ -125,6 +126,8 @@ const labelClass = "block text-[11px] font-semibold text-ink mb-1";
 /* ------------------------------------------------------------------ */
 
 export const IncidentsTab: React.FC = () => {
+  const { can } = useSysAdminPermissions();
+  const canManageIncidents = can("incidents.manage");
   const [view, setView] = useState<IncidentView>("active");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<IncidentListResponse | null>(null);
@@ -173,10 +176,12 @@ export const IncidentsTab: React.FC = () => {
               and fix are written down.
             </p>
           </div>
-          <button type="button" onClick={() => setIsCreating(true)} className={`${buttonPrimary} self-start shrink-0`}>
-            <Plus className="w-4 h-4" />
-            <span>Log incident</span>
-          </button>
+          {canManageIncidents && (
+            <button type="button" onClick={() => setIsCreating(true)} className={`${buttonPrimary} self-start shrink-0`}>
+              <Plus className="w-4 h-4" />
+              <span>Log incident</span>
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Incident filter">
@@ -252,7 +257,7 @@ export const IncidentsTab: React.FC = () => {
                 : "Resolved incidents and their reports will be listed here."}
             </p>
           </div>
-          {view === "active" && (
+          {view === "active" && canManageIncidents && (
             <button type="button" onClick={() => setIsCreating(true)} className={buttonSecondary}>
               <Plus className="w-4 h-4" />
               <span>Log incident</span>
@@ -420,6 +425,8 @@ const sameReport = (a: ReportFields, b: ReportFields) =>
   a.impact === b.impact && a.cause === b.cause && a.fix === b.fix && a.prevention === b.prevention;
 
 function IncidentDetailPanel({ id, onClose, onChanged }: { id: number; onClose: () => void; onChanged: () => void }) {
+  const { can } = useSysAdminPermissions();
+  const canManageIncidents = can("incidents.manage");
   const [incident, setIncident] = useState<SysAdminIncidentDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fields, setFields] = useState<ReportFields>({ impact: "", cause: "", fix: "", prevention: "" });
@@ -603,6 +610,7 @@ function IncidentDetailPanel({ id, onClose, onChanged }: { id: number; onClose: 
                 </div>
               )}
 
+              <fieldset disabled={!canManageIncidents} className="space-y-3 disabled:opacity-85">
               <ReportField
                 id={`inc-${id}-impact`}
                 label="Impact"
@@ -633,6 +641,7 @@ function IncidentDetailPanel({ id, onClose, onChanged }: { id: number; onClose: 
                 value={fields.prevention}
                 onChange={(v) => setField("prevention", v)}
               />
+              </fieldset>
 
               {saveError && (
                 <div role="alert" className="p-3 rounded-lg bg-status-act-fill border border-status-act-ink/30 text-xs text-status-act-ink flex items-start gap-2">
@@ -647,40 +656,48 @@ function IncidentDetailPanel({ id, onClose, onChanged }: { id: number; onClose: 
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button type="button" onClick={() => submit()} disabled={!dirty || saving !== null} className={buttonSecondary}>
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{saving === "save" ? "Saving..." : "Save report"}</span>
-                </button>
+              {canManageIncidents ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button type="button" onClick={() => submit()} disabled={!dirty || saving !== null} className={buttonSecondary}>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>{saving === "save" ? "Saving..." : "Save report"}</span>
+                    </button>
 
-                {incident.status === "OPEN" && (
-                  <button type="button" onClick={() => submit("MONITORING")} disabled={saving !== null} className={buttonSecondary}>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{saving === "MONITORING" ? "Saving..." : "Mark back to normal"}</span>
-                  </button>
-                )}
+                    {incident.status === "OPEN" && (
+                      <button type="button" onClick={() => submit("MONITORING")} disabled={saving !== null} className={buttonSecondary}>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{saving === "MONITORING" ? "Saving..." : "Mark back to normal"}</span>
+                      </button>
+                    )}
 
-                {incident.status !== "RESOLVED" ? (
-                  <button
-                    type="button"
-                    onClick={() => submit("RESOLVED")}
-                    disabled={!canResolve || saving !== null}
-                    className={buttonPrimary}
-                    aria-describedby={!canResolve ? `inc-${id}-resolve-hint` : undefined}
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{saving === "RESOLVED" ? "Resolving..." : "Resolve incident"}</span>
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => submit("OPEN")} disabled={saving !== null} className={buttonSecondary}>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{saving === "OPEN" ? "Reopening..." : "Reopen"}</span>
-                  </button>
-                )}
-              </div>
-              {incident.status !== "RESOLVED" && !canResolve && (
-                <p id={`inc-${id}-resolve-hint`} className="text-[11px] text-ink-muted">
-                  Write the cause and the fix to resolve this incident.
+                    {incident.status !== "RESOLVED" ? (
+                      <button
+                        type="button"
+                        onClick={() => submit("RESOLVED")}
+                        disabled={!canResolve || saving !== null}
+                        className={buttonPrimary}
+                        aria-describedby={!canResolve ? `inc-${id}-resolve-hint` : undefined}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{saving === "RESOLVED" ? "Resolving..." : "Resolve incident"}</span>
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => submit("OPEN")} disabled={saving !== null} className={buttonSecondary}>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{saving === "OPEN" ? "Reopening..." : "Reopen"}</span>
+                      </button>
+                    )}
+                  </div>
+                  {incident.status !== "RESOLVED" && !canResolve && (
+                    <p id={`inc-${id}-resolve-hint`} className="text-[11px] text-ink-muted">
+                      Write the cause and the fix to resolve this incident.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[11px] font-mono text-ink-muted">
+                  Read-only: editing or resolving incidents requires Manage Incidents permission.
                 </p>
               )}
             </section>

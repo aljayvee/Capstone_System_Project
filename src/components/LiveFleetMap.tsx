@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createRoot, Root } from "react-dom/client";
 import { createMarkerTween, type MarkerTween } from "./markerTween";
+import { computeSoftFollowCameraAction } from "./softFollowCamera";
 import { importGoogleMapsLibrary } from "../utils/loadGoogleMaps";
 import type { FleetLiveLink, RiderFleetMember, RiderPresenceState } from "../hooks/useRiderFleetPresence";
 import { RIDER_STATUS_THEMES } from "../constants/riderPresence";
@@ -106,6 +107,7 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
 
   const firstName = rider.name.split(" ")[0] || "Rider";
   const heading = rider.plottableLocation?.heading;
+  const isMocked = Boolean(rider.plottableLocation?.mocked);
 
   return (
     <div
@@ -113,13 +115,13 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
         e.stopPropagation();
         onClick();
       }}
-      className={`relative group cursor-pointer select-none transition-all duration-200 ${
+      className={`relative group cursor-pointer select-none ${
         isSelected ? "scale-125 z-50" : "hover:scale-110 z-20"
       }`}
       style={{
         opacity: isStale ? 0.75 : isOffDuty ? 0.6 : 1,
       }}
-      title={`${rider.name}: ${rider.statusText || theme.label}`}
+      title={`${rider.name}: ${rider.statusText || theme.label}${isMocked ? " (Mock GPS)" : ""}`}
     >
       {/* 1. Outer Live Pulsing Halo Ring (for AVAILABLE status) */}
       {isAvailable && (
@@ -186,6 +188,11 @@ const CustomRiderMarkerPin: React.FC<CustomMarkerContentProps> = ({
         />
         <span className="truncate max-w-[70px]">{firstName}</span>
         {isBusy && <span className="text-amber-300 text-[9px]">● #{rider.activeOrdersCount}</span>}
+        {isMocked && (
+          <span className="ml-0.5 rounded bg-amber-500/20 px-1 text-[8px] font-bold uppercase text-amber-300">
+            Mock
+          </span>
+        )}
       </div>
     </div>
   );
@@ -222,6 +229,10 @@ export default function LiveFleetMap({
   const routeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const routeCirclesRef = useRef<google.maps.Circle[]>([]);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [followSelected, setFollowSelected] = useState(true);
+  const lastSelectedRiderIdRef = useRef<number | null | undefined>(null);
+  const needsInitialZoomRef = useRef(false);
+  const dragListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   // Without this the catch below only reached the console, isMapLoaded stayed
   // false, and the "Loading Live Fleet Map..." veil span forever: a failed map
   // was indistinguishable from a slow one, on the surface whose whole job is
@@ -405,6 +416,9 @@ export default function LiveFleetMap({
         };
 
         mapInstance.current = new Map(mapRef.current, mapOptions);
+        dragListenerRef.current = mapInstance.current.addListener("dragstart", () => {
+          setFollowSelected(false);
+        });
 
         setIsMapLoaded(true);
         setMapError(null);
@@ -418,6 +432,8 @@ export default function LiveFleetMap({
 
     return () => {
       isMounted = false;
+      dragListenerRef.current?.remove();
+      dragListenerRef.current = null;
       Object.values(markersRef.current).forEach(({ marker, root, tween }) => {
         // Cancel first: an in-flight frame would otherwise write a position to
         // a marker that has already been torn down.
@@ -449,8 +465,12 @@ export default function LiveFleetMap({
 
       if (markersRef.current[idStr]) {
         // Slide to the new fix rather than assigning `position` outright, which
-        // teleported the pin between Firebase updates.
-        markersRef.current[idStr].tween.moveTo(position);
+        // teleported the pin between updates.
+        markersRef.current[idStr].tween.moveTo(position, {
+          speedMps: rider.plottableLocation!.speedMps ?? null,
+          heading: rider.plottableLocation!.heading ?? null,
+          recordedAt: rider.plottableLocation!.updatedAt,
+        });
         markersRef.current[idStr].marker.zIndex = isSelected ? 999 : 10;
         // Re-render React root content
         markersRef.current[idStr].root.render(
@@ -501,20 +521,70 @@ export default function LiveFleetMap({
     });
   }, [visibleRiders, isMapLoaded, selectedRiderId, onSelectRider]);
 
-  // Smooth Camera Panning when a rider is selected in sidebar
+  // Reset soft-follow when switching selected rider.
+  useEffect(() => {
+    if (lastSelectedRiderIdRef.current !== selectedRiderId) {
+      lastSelectedRiderIdRef.current = selectedRiderId;
+      setFollowSelected(true);
+      needsInitialZoomRef.current = selectedRiderId !== null && selectedRiderId !== undefined;
+    }
+  }, [selectedRiderId]);
+
+  // Soft-follow camera: centers on selection, then only re-centers smoothly
+  // when the rider moves near the viewport edge (and pauses if the operator drags).
   useEffect(() => {
     if (!isMapLoaded || !mapInstance.current || selectedRiderId === null || selectedRiderId === undefined) return;
     const selected = riders.find((r) => r.id === selectedRiderId);
-    if (selected && selected.plottableLocation) {
+    if (!selected?.plottableLocation) return;
+
+    const target = {
+      lat: selected.plottableLocation.lat,
+      lng: selected.plottableLocation.lng,
+    };
+
+    if (!followSelected) return;
+
+    const bounds = mapInstance.current.getBounds();
+    const ne = bounds?.getNorthEast();
+    const sw = bounds?.getSouthWest();
+    const action = computeSoftFollowCameraAction({
+      target,
+      followSelected,
+      needsInitialZoom: needsInitialZoomRef.current,
+      currentZoom: mapInstance.current.getZoom(),
+      bounds:
+        ne && sw
+          ? {
+              northEast: { lat: ne.lat(), lng: ne.lng() },
+              southWest: { lat: sw.lat(), lng: sw.lng() },
+            }
+          : null,
+    });
+
+    if (action.shouldPan) {
+      mapInstance.current.panTo(target);
+    }
+    if (action.nextZoom !== null) {
+      mapInstance.current.setZoom(action.nextZoom);
+    }
+    needsInitialZoomRef.current = false;
+  }, [selectedRiderId, isMapLoaded, riders, followSelected]);
+
+  const handleFollowSelected = useCallback(() => {
+    setFollowSelected(true);
+    needsInitialZoomRef.current = false;
+    if (!mapInstance.current || selectedRiderId == null) return;
+    const selected = riders.find((r) => r.id === selectedRiderId);
+    if (selected?.plottableLocation) {
       mapInstance.current.panTo({
         lat: selected.plottableLocation.lat,
         lng: selected.plottableLocation.lng,
       });
-      if (mapInstance.current.getZoom()! < 15) {
+      if ((mapInstance.current.getZoom() ?? 14) < 15) {
         mapInstance.current.setZoom(16);
       }
     }
-  }, [selectedRiderId, isMapLoaded, riders]);
+  }, [selectedRiderId, riders]);
 
   // Fit all active pins to screen boundary
   const handleFitBounds = useCallback(() => {
@@ -619,6 +689,24 @@ export default function LiveFleetMap({
         )}
 
         {/* Re-center / Fit Bounds Button */}
+        {selectedRiderId != null && (
+          <button
+            type="button"
+            onClick={handleFollowSelected}
+            title={followSelected ? "Following selected rider" : "Re-center and follow selected rider"}
+            data-elevate
+            className={cn(
+              "h-9 px-3.5 text-micro font-semibold uppercase tracking-[0.06em] rounded-trim border transition-all flex items-center gap-1.5 cursor-pointer shadow-sm",
+              followSelected
+                ? "bg-board-field text-white border-field-ink"
+                : "bg-white/95 hover:bg-white text-slate-700 border-slate-200/80 hover:text-[#1E3A5F] hover:border-slate-300"
+            )}
+          >
+            <Navigation size={14} />
+            <span className="hidden sm:inline">{followSelected ? "Following" : "Follow"}</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={handleFitBounds}

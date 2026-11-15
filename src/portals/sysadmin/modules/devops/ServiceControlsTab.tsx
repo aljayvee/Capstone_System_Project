@@ -14,6 +14,7 @@ import {
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { Bot } from "lucide-react";
 import type { SystemTelemetry } from "../../../../types/sysAdmin";
+import { useSysAdminPermissions } from "../../context/SysAdminPermissionsContext";
 
 interface ServiceControlsTabProps {
   telemetry: SystemTelemetry | null;
@@ -24,6 +25,9 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
   telemetry,
   onRefreshTelemetry,
 }) => {
+  const { can } = useSysAdminPermissions();
+  const canControlServices = can("devops.services");
+  const canToggleFeatures = can("devops.features");
   const [selectedService, setSelectedService] = useState<"backend" | "nginx" | null>(null);
   const [stepUpPassword, setStepUpPassword] = useState("");
   const [isRestarting, setIsRestarting] = useState(false);
@@ -268,15 +272,21 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              onClick={() => handleOpenModal("backend")}
-              className="w-full py-2.5 px-4 rounded-xl bg-signal hover:bg-signal-deep font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Restart Backend Process</span>
-            </button>
-          </div>
+          {canControlServices ? (
+            <div className="pt-2">
+              <button
+                onClick={() => handleOpenModal("backend")}
+                className="w-full py-2.5 px-4 rounded-xl bg-signal hover:bg-signal-deep font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Restart Backend Process</span>
+              </button>
+            </div>
+          ) : (
+            <div className="pt-2 text-[11px] font-mono text-ink-muted">
+              Read-only: requires Service Control permission
+            </div>
+          )}
         </div>
 
         {/* Nginx Reverse Proxy Service Card */}
@@ -323,15 +333,21 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              onClick={() => handleOpenModal("nginx")}
-              className="w-full py-2.5 px-4 rounded-xl bg-status-moving-ink hover:bg-status-moving-ink font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Verify &amp; Reload Nginx</span>
-            </button>
-          </div>
+          {canControlServices ? (
+            <div className="pt-2">
+              <button
+                onClick={() => handleOpenModal("nginx")}
+                className="w-full py-2.5 px-4 rounded-xl bg-status-moving-ink hover:bg-status-moving-ink font-semibold text-xs text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Verify &amp; Reload Nginx</span>
+              </button>
+            </div>
+          ) : (
+            <div className="pt-2 text-[11px] font-mono text-ink-muted">
+              Read-only: requires Service Control permission
+            </div>
+          )}
         </div>
       </div>
 
@@ -368,29 +384,35 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
           </div>
 
           {/* Switch Button named "Turn on 500 Server Error" */}
-          <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
-            <span className="text-xs font-semibold text-ink">
-              Turn on 500 Server Error
+          {canToggleFeatures ? (
+            <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
+              <span className="text-xs font-semibold text-ink">
+                Turn on 500 Server Error
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isServerErrorActive}
+                onClick={handleToggleServerError}
+                disabled={isTogglingServerError}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isServerErrorActive ? "bg-signal" : "bg-board-ground"
+                } ${isTogglingServerError ? "opacity-50 cursor-not-allowed" : ""}`}
+                title="Turn on 500 Server Error"
+                aria-label="Turn on 500 Server Error"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    isServerErrorActive ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          ) : (
+            <span className="text-[11px] font-mono text-ink-muted sm:self-center shrink-0">
+              Read-only
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isServerErrorActive}
-              onClick={handleToggleServerError}
-              disabled={isTogglingServerError}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isServerErrorActive ? "bg-signal" : "bg-board-ground"
-              } ${isTogglingServerError ? "opacity-50 cursor-not-allowed" : ""}`}
-              title="Turn on 500 Server Error"
-              aria-label="Turn on 500 Server Error"
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isServerErrorActive ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -426,29 +448,35 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
-            <span className="text-xs font-semibold text-ink">
-              Turn on AI suggestions
+          {canToggleFeatures ? (
+            <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
+              <span className="text-xs font-semibold text-ink">
+                Turn on AI suggestions
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isAiSuggestionsEnabled}
+                onClick={handleToggleAiSuggestions}
+                disabled={isTogglingAiSuggestions}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isAiSuggestionsEnabled ? "bg-go" : "bg-board-ground"
+                } ${isTogglingAiSuggestions ? "opacity-50 cursor-not-allowed" : ""}`}
+                title="Turn on AI suggestions"
+                aria-label="Turn on AI suggestions"
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    isAiSuggestionsEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          ) : (
+            <span className="text-[11px] font-mono text-ink-muted sm:self-center shrink-0">
+              Read-only
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isAiSuggestionsEnabled}
-              onClick={handleToggleAiSuggestions}
-              disabled={isTogglingAiSuggestions}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isAiSuggestionsEnabled ? "bg-go" : "bg-board-ground"
-              } ${isTogglingAiSuggestions ? "opacity-50 cursor-not-allowed" : ""}`}
-              title="Turn on AI suggestions"
-              aria-label="Turn on AI suggestions"
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isAiSuggestionsEnabled ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -484,29 +512,35 @@ export const ServiceControlsTab: React.FC<ServiceControlsTabProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
-            <span className="text-xs font-semibold text-ink">
-              {isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
+          {canToggleFeatures ? (
+            <div className="flex items-center gap-3 sm:self-center shrink-0 bg-board-ground px-4 py-2.5 rounded-xl border border-edge">
+              <span className="text-xs font-semibold text-ink">
+                {isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isKuyaSugoEnabled}
+                onClick={handleToggleKuyaSugo}
+                disabled={isTogglingKuyaSugo}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isKuyaSugoEnabled ? "bg-go" : "bg-board-ground"
+                } ${isTogglingKuyaSugo ? "opacity-50 cursor-not-allowed" : ""}`}
+                title={isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
+                aria-label={isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    isKuyaSugoEnabled ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          ) : (
+            <span className="text-[11px] font-mono text-ink-muted sm:self-center shrink-0">
+              Read-only
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isKuyaSugoEnabled}
-              onClick={handleToggleKuyaSugo}
-              disabled={isTogglingKuyaSugo}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                isKuyaSugoEnabled ? "bg-go" : "bg-board-ground"
-              } ${isTogglingKuyaSugo ? "opacity-50 cursor-not-allowed" : ""}`}
-              title={isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
-              aria-label={isKuyaSugoEnabled ? "Turn off Kuya Sugo" : "Turn on Kuya Sugo"}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                  isKuyaSugoEnabled ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 

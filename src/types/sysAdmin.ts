@@ -86,6 +86,7 @@ export interface MonitoredAccount {
   role: "OWNER" | "DISPATCHER" | "RIDER" | "CUSTOMER";
   status: string;
   isOnline: boolean;
+  isMainOwner?: boolean;
   activeSessionsCount: number;
   emailVerified: boolean;
   createdAt: string;
@@ -331,6 +332,10 @@ export interface ItAdminUser {
   emailVerified: boolean;
   lastLoginAt: string | null;
   createdAt: string;
+  isMainSysAdmin?: boolean;
+  accessGroupId?: number | null;
+  accessGroupName?: string | null;
+  baselineName?: string;
 }
 
 // ── Security Threat Center & IP Defense Types ────────────────────────────────
@@ -603,5 +608,100 @@ export interface AppReleaseUpdateInput {
   features?: string[];
   fixes?: string[];
   logs?: string[];
+}
+
+// ── SysAdmin Permission Management & Access (PMA) Types ──────────────────────
+
+export type SysAdminPermissionArea =
+  | "Monitoring & Logs"
+  | "Users & Sessions"
+  | "Security & Threats"
+  | "DevOps & Infrastructure"
+  | "App Releases & IT Staff";
+
+export interface SysAdminPermissionDef {
+  key: string;
+  area: SysAdminPermissionArea;
+  label: string;
+  note: string;
+  requires: string[];
+  baselineReadOnly: boolean;
+}
+
+export interface SysAdminPermissionCatalog {
+  areas: SysAdminPermissionArea[];
+  baselineKeys: string[];
+  allKeys: string[];
+  permissions: SysAdminPermissionDef[];
+}
+
+export interface SysAdminAccessGroupSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  version: number;
+  permissions: string[];
+  memberCount: number;
+  createdByActorRole?: string | null;
+  updatedByActorRole?: string | null;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export interface SysAdminOverrideEntry {
+  permissionKey: string;
+  effect: "GRANT" | "DENY";
+}
+
+export interface SysAdminAccountAccessSummary {
+  id: number;
+  username: string;
+  email: string | null;
+  nickname: string | null;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
+  status: string;
+  mfaEnabled: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  isMainSysAdmin: boolean;
+  accessGroupId: number | null;
+  accessGroupName: string | null;
+  baselineName: string;
+  overrides: SysAdminOverrideEntry[];
+  effectivePermissions: string[];
+}
+
+export interface MySysAdminPermissionsResponse {
+  sysAdminId: number;
+  isMainSysAdmin: boolean;
+  group: { id: number; name: string } | null;
+  baselineName: string;
+  permissions: string[];
+}
+
+export interface SysAdminPmaAuditRecord {
+  id: number;
+  action: string;
+  sysAdminId: number | null;
+  targetUsername: string | null;
+  groupId: number | null;
+  groupName: string | null;
+  actorRole: string;
+  actorId: number;
+  actorUsername: string;
+  fieldModified: string;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+}
+
+export interface SysAdminPmaAuditResponse {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  logs: SysAdminPmaAuditRecord[];
 }
 

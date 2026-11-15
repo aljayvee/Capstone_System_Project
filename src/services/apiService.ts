@@ -283,6 +283,20 @@ export interface ApiRateConfig {
     handlingItemUnitsThreshold: number;
     /** Basket value at or above which a handling fee applies regardless of size. */
     handlingAmountThreshold: number;
+    /** Company and national-policy numeric bounds enforced on rate edits. */
+    bounds?: Record<
+      | "baseFee"
+      | "perKmRate"
+      | "multiStoreFeePerStore"
+      | "maxAdditionalStores"
+      | "groceryFeeThreshold"
+      | "groceryFeeFlat"
+      | "groceryFeePercent"
+      | "nonCodThreshold"
+      | "nonCodFeeLow"
+      | "nonCodFeeHigh",
+      { min: number; max: number }
+    >;
   };
 }
 
@@ -1338,11 +1352,17 @@ export const apiService = {
 
   // Full object required, not partial — matches the backend, which always
   // upserts the complete RateConfig row (server/src/validators/rateConfigValidators.ts).
-  async updateRateConfig(config: Omit<ApiRateConfig, "id">): Promise<ApiRateConfig | null> {
+  async updateRateConfig(config: Omit<ApiRateConfig, "id" | "pricingRules">): Promise<ApiRateConfig | null> {
     try {
       const response = await apiClient.put<ApiRateConfig>("/rate-config", config);
       return response.data;
-    } catch (err) {
+    } catch (err: any) {
+      const serverError =
+        err?.response?.data?.error ||
+        err?.response?.data?.message;
+      if (typeof serverError === "string" && serverError.trim().length > 0) {
+        throw new Error(serverError);
+      }
       console.warn("API Error:", err);
       return null;
     }

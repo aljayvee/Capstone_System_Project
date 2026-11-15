@@ -18,6 +18,7 @@ import { useCustomerChatAlerts } from "./hooks/useCustomerChatAlerts";
 import { CustomerChatToastContainer } from "./components/CustomerChatToastContainer";
 import { useRiderChatAlerts } from "./hooks/useRiderChatAlerts";
 import { RiderChatToastContainer } from "./components/RiderChatToastContainer";
+import { RiderDeclinedDialog } from "./components/RiderDeclinedDialog";
 import { useRiderFleetPresence } from "../../hooks/useRiderFleetPresence";
 import { fetchStaffPhoto } from "../../services/staffPhotoService";
 import { useDeviceTier } from "../../hooks/useDeviceTier";
@@ -192,6 +193,8 @@ function DispatcherPortalShell() {
     handleOpenChat,
     handleCloseChat,
     openChatToReply,
+    declineAlerts,
+    dismissDeclineAlert,
   } = useDispatcherPortal(user?.id, user?.name);
   // A workspace outside the access group renders LockedTab instead.
   const visibleTab = canTab(activeTab) ? activeTab : "locked";
@@ -1122,6 +1125,11 @@ function DispatcherPortalShell() {
             toasts={riderToasts}
             onDismiss={dismissRiderToast}
             onOpenRiderChat={handleOpenRiderChat}
+          />
+          <RiderDeclinedDialog
+            alerts={declineAlerts}
+            onDismiss={dismissDeclineAlert}
+            onOpenErrand={handleOpenChat}
           />
         </SidebarInset>
       </div>
