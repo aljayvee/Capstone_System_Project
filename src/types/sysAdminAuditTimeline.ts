@@ -91,3 +91,50 @@ export interface RiderActivityResponse {
   sampleMinutes: number;
   riders: RiderDay[];
 }
+
+/* Log retention (server/src/services/logRetentionService.ts) */
+export type RetentionPolicyKey =
+  | "rider_status_samples"
+  | "notifications_read"
+  | "notifications_unread"
+  | "signin_logs"
+  | "password_resets"
+  | "ip_bans_inactive"
+  | "it_alerts";
+
+export interface RetentionPolicyStatus {
+  key: RetentionPolicyKey;
+  label: string;
+  table: string;
+  why: string;
+  days: number;
+  defaultDays: number;
+  cutoff: string;
+  rows: number;
+  dueForRemoval: number;
+  addedLast7Days: number;
+  oldest: string | null;
+  tableSizeMb: number | null;
+}
+
+export interface RetentionRunResult {
+  ranAt: string;
+  trigger: "SCHEDULED" | "MANUAL";
+  ran: boolean;
+  skippedReason: string | null;
+  removed: Partial<Record<RetentionPolicyKey, number>>;
+  totalRemoved: number;
+  capped: RetentionPolicyKey[];
+  error: string | null;
+}
+
+export interface LogRetentionStatus {
+  policies: RetentionPolicyStatus[];
+  kept: { table: string; label: string; why: string; rows: number; tableSizeMb: number | null }[];
+  limits: { minDays: number; maxDays: number };
+  schedule: string;
+  backupGate: { ok: boolean; reason: string | null; backupId: number | null };
+  lastRun: RetentionRunResult | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+}

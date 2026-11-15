@@ -20,6 +20,7 @@ import {
   Printer,
   ListTree,
   Bike,
+  HardDrive,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { formatErrandId } from "../../../../utils/formatErrandId";
@@ -27,6 +28,7 @@ import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
 import { MobileResponsiveTable } from "../../../../components/table";
 import { ActivityTimelineTab } from "./ActivityTimelineTab";
 import { RiderActivityTab } from "./RiderActivityTab";
+import { LogStorageTab } from "./LogStorageTab";
 import type {
   AuthAuditLog,
   ModificationAuditLog,
@@ -35,7 +37,7 @@ import type {
   ReportPrintLog,
 } from "../../../../types/sysAdmin";
 
-type AuditCategory = "timeline" | "riders" | "auth" | "modifications" | "security" | "lifecycle" | "prints";
+type AuditCategory = "timeline" | "riders" | "storage" | "auth" | "modifications" | "security" | "lifecycle" | "prints";
 
 /** The six Owner reports, as the Owner portal's tabs name them. */
 const REPORT_TYPE_OPTIONS = [
@@ -65,7 +67,7 @@ const getStatusBadge = (status: string) => {
 export const AuditLogsModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
   const [activeCategory, setActiveCategory] = useState<AuditCategory>("timeline");
-  const isNewTab = activeCategory === "timeline" || activeCategory === "riders";
+  const isNewTab = activeCategory === "timeline" || activeCategory === "riders" || activeCategory === "storage";
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
@@ -303,6 +305,7 @@ export const AuditLogsModule: React.FC = () => {
         {([
           ["timeline", ListTree, t("auditTabTimeline")],
           ["riders", Bike, t("auditTabRiders")],
+          ["storage", HardDrive, t("auditTabStorage")],
         ] as const).map(([key, Icon, label]) => (
           <button
             key={key}
@@ -394,6 +397,7 @@ export const AuditLogsModule: React.FC = () => {
 
       {activeCategory === "timeline" && <ActivityTimelineTab />}
       {activeCategory === "riders" && <RiderActivityTab />}
+      {activeCategory === "storage" && <LogStorageTab />}
 
       {!isNewTab && (
       <>

@@ -22,6 +22,9 @@ import type {
   AuditTimelinePage,
   AuditTimelineQuery,
   RiderActivityResponse,
+  LogRetentionStatus,
+  RetentionPolicyKey,
+  RetentionRunResult,
 } from "../types/sysAdminAuditTimeline";
 import type {
   SysAdminUser,
@@ -442,6 +445,21 @@ export const sysAdminApiService = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
     return rows;
+  },
+
+  async getLogRetention(): Promise<LogRetentionStatus> {
+    const response = await sysAdminAxios.get<LogRetentionStatus>("/sysadmin/audit/retention");
+    return response.data;
+  },
+
+  async updateLogRetention(days: Partial<Record<RetentionPolicyKey, number>>, stepUpPassword: string): Promise<LogRetentionStatus> {
+    const response = await sysAdminAxios.put<LogRetentionStatus>("/sysadmin/audit/retention", { days, stepUpPassword });
+    return response.data;
+  },
+
+  async runLogRetention(stepUpPassword: string): Promise<RetentionRunResult> {
+    const response = await sysAdminAxios.post<RetentionRunResult>("/sysadmin/audit/retention/run", { stepUpPassword }, { timeout: 300000 });
+    return response.data;
   },
 
   async getRiderActivity(date: string): Promise<RiderActivityResponse> {
