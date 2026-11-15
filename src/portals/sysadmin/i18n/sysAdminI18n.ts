@@ -90,6 +90,7 @@ export interface SysAdminTranslations {
   devopsTabAlerts: string;
   devopsTabReleases: string;
   devopsTabIncidents: string;
+  devopsTabIntegrations: string;
 
   threatsHeaderTitle: string;
   threatsHeaderSubtitle: string;
@@ -217,6 +218,7 @@ export const SYSADMIN_TRANSLATIONS: Record<SysAdminLanguage, SysAdminTranslation
     devopsTabAlerts: "Telegram 应急告警集成",
     devopsTabReleases: "App 版本与 APK 发布管理",
     devopsTabIncidents: "故障事件记录",
+    devopsTabIntegrations: "外部服务状态",
 
     threatsHeaderTitle: "网络安全威胁防御与边缘拦截中心",
     threatsHeaderSubtitle: "双层级 IP 防御引擎：Nginx 内核边缘丢弃 + Express 内存级快速拦截与恶意扫描识别",
@@ -342,6 +344,7 @@ export const SYSADMIN_TRANSLATIONS: Record<SysAdminLanguage, SysAdminTranslation
     devopsTabAlerts: "Telegram Alerts",
     devopsTabReleases: "App Releases & APKs",
     devopsTabIncidents: "Incidents",
+    devopsTabIntegrations: "Integrations",
 
     threatsHeaderTitle: "Threat Defense & Edge Intrusion Center",
     threatsHeaderSubtitle: "Dual-tier IP defense: Nginx edge drops + Express in-memory O(1) heuristic intrusion engine",

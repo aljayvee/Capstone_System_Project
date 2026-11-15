@@ -14,6 +14,7 @@
  */
 
 import axios from "axios";
+import type { IntegrationReport } from "../types/sysAdminIntegrations";
 import type {
   SysAdminUser,
   SysAdminLoginResult,
@@ -536,6 +537,12 @@ export const sysAdminApiService = {
       "/sysadmin/devops/backups/restore-check",
       { stepUpPassword }
     );
+    return response.data;
+  },
+
+  /** One live answer per outside service the API depends on (server caches 20 s). */
+  async getIntegrations(): Promise<IntegrationReport> {
+    const response = await sysAdminAxios.get<IntegrationReport>("/sysadmin/devops/integrations", { timeout: 30000 });
     return response.data;
   },
 

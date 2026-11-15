@@ -10,6 +10,7 @@ import {
   Activity,
   Smartphone,
   ClipboardList,
+  Plug,
 } from "lucide-react";
 import { sysAdminApiService } from "../../../../services/sysAdminApiService";
 import { useSysAdminLanguage } from "../../context/SysAdminLanguageContext";
@@ -21,8 +22,9 @@ import { LogsTab } from "./LogsTab";
 import { TelegramAlertsTab } from "./TelegramAlertsTab";
 import { AppReleasesTab } from "./AppReleasesTab";
 import { IncidentsTab } from "./IncidentsTab";
+import { IntegrationsTab } from "./IntegrationsTab";
 
-type DevOpsSubTab = "telemetry" | "services" | "backups" | "logs" | "alerts" | "incidents" | "releases";
+type DevOpsSubTab = "telemetry" | "services" | "backups" | "logs" | "alerts" | "incidents" | "integrations" | "releases";
 
 export const DevOpsModule: React.FC = () => {
   const { t } = useSysAdminLanguage();
@@ -149,6 +151,18 @@ export const DevOpsModule: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveTab("integrations")}
+          className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
+            activeTab === "integrations"
+              ? "bg-signal text-white font-semibold shadow-sm"
+              : "bg-board-plate text-ink-muted hover:text-white hover:bg-board-ground border border-edge"
+          }`}
+        >
+          <Plug className="w-4 h-4" />
+          <span>{t("devopsTabIntegrations")}</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab("releases")}
           className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-colors flex items-center gap-2 ${
             activeTab === "releases"
@@ -197,6 +211,8 @@ export const DevOpsModule: React.FC = () => {
       {activeTab === "alerts" && <TelegramAlertsTab />}
 
       {activeTab === "incidents" && <IncidentsTab />}
+
+      {activeTab === "integrations" && <IntegrationsTab />}
 
       {activeTab === "releases" && <AppReleasesTab />}
     </div>
