@@ -20,7 +20,8 @@ import { DispatcherInlineBanner } from "@/components/panel/DispatcherInlineBanne
 import { WaitingCard } from "../WaitingCard";
 import { copy, formatAgo } from "../copy";
 import type { MerchantCategory, StorePinpoint } from "../types";
-import { describeSuggestionSource, useCatalogAutocomplete } from "../hooks/useCatalogAutocomplete";
+import { describeSuggestionSource, saveCatalogItem, useCatalogAutocomplete } from "../hooks/useCatalogAutocomplete";
+import { catalogSaveBlock } from "../catalogSave";
 import { ItemsByStore, StoreItemsDialog, type StoreColumn } from "../ItemsByStore";
 import { StoreSubstitutesPanel, type SubstituteEntry } from "../StoreSubstitutesPanel";
 import { newItemKey, type ItemLine } from "../itemOwnership";
@@ -332,7 +333,56 @@ export function Stage3ConfirmItems({
     suggestions: catalogSuggestions,
     isLoading: isCatalogLoading,
     isError: isCatalogError,
+    refresh: refreshCatalog,
   } = useCatalogAutocomplete(catalogQuery);
+
+  // Saving an item to the catalog. The item name is the search text exactly as
+  // typed, shown in the form's heading. A failed save keeps everything typed.
+  // Both messages belong to one search and one store, so changing either
+  // clears them: a "Saved" left over from the last item reads as this one.
+  const [saveStoreIndex, setSaveStoreIndex] = useState(0);
+  const [isSavingCatalog, setIsSavingCatalog] = useState(false);
+  const [catalogSaveError, setCatalogSaveError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const clearCatalogSaveMessages = () => {
+    setLastSaved(null);
+    setCatalogSaveError(null);
+  };
+  const saveAt = Math.min(saveStoreIndex, Math.max(stores.length - 1, 0));
+  const saveStore = stores[saveAt];
+  const saveBlock = catalogSaveBlock({
+    itemName: catalogQuery,
+    storeCount: stores.length,
+    category: saveStore?.category,
+    pin: pinpoints[saveAt],
+  });
+  const canSaveToCatalog = saveBlock === null && !isSavingCatalog;
+
+  const handleSaveToCatalog = async () => {
+    if (!canSaveToCatalog || !saveStore) return;
+    const at = saveAt;
+    setIsSavingCatalog(true);
+    setCatalogSaveError(null);
+    try {
+      const { created } = await saveCatalogItem({
+        itemName: catalogQuery.trim(),
+        rawStoreName: saveStore.name,
+        categoryName: saveStore.category ?? "",
+        verifiedPlaceId: pinpoints[at]?.placeId ?? null,
+      });
+      setLastSaved(
+        created
+          ? `Saved "${catalogQuery.trim()}" under ${saveStore.name}.`
+          : `"${catalogQuery.trim()}" was already under ${saveStore.name}. Marked as seen again.`
+      );
+      // Search the same text again so the item just saved shows in the list.
+      refreshCatalog();
+    } catch (err: any) {
+      setCatalogSaveError(err?.response?.data?.error || "Could not save to the catalog. Try again.");
+    } finally {
+      setIsSavingCatalog(false);
+    }
+  };
 
   const minsAgo = sentAt ? Math.max(0, Math.floor((Date.now() - sentAt) / 60000)) : 0;
 
@@ -634,7 +684,10 @@ export function Stage3ConfirmItems({
             <input
               type="text"
               value={catalogQuery}
-              onChange={(e) => setCatalogQuery(e.target.value)}
+              onChange={(e) => {
+                setCatalogQuery(e.target.value);
+                clearCatalogSaveMessages();
+              }}
               placeholder="Search items (e.g. Burger, Chicken, Biogesic, Coffee)..."
               className="min-h-9 w-full rounded-trim border border-edge bg-board-ground pl-8 pr-3 text-body text-ink placeholder:text-ink-muted transition-colors focus:border-board-field focus:bg-board-plate focus:outline-none"
             />
@@ -692,6 +745,71 @@ export function Stage3ConfirmItems({
                 ? "Could not search the catalog. Check the connection and type the search again."
                 : <>Nothing in the catalog matches &ldquo;{catalogQuery.trim()}&rdquo;. Add it as a new item below.</>}
             </p>
+          )}
+
+          {/* Staff cataloguing: the only way items reach the catalog itself. */}
+          {catalogQuery.trim().length >= 2 && (
+            <div className="space-y-2 border-t border-hairline pt-2.5">
+              <p className="m-0 text-micro font-bold uppercase tracking-[0.06em] text-ink-muted">
+                Save &ldquo;{catalogQuery.trim()}&rdquo; to the catalog
+              </p>
+              {stores.length === 0 ? (
+                <p className="m-0 text-label text-ink-muted">Pin a store first. An item is saved against the store it is bought at.</p>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={saveAt}
+                    onChange={(e) => {
+                      setSaveStoreIndex(Number(e.target.value));
+                      clearCatalogSaveMessages();
+                    }}
+                    aria-label="Store this item is bought at"
+                    className="min-h-9 min-w-0 flex-1 rounded-trim border border-edge bg-board-ground px-2 text-body text-ink focus:border-board-field focus:outline-none"
+                  >
+                    {stores.map((s, i) => (
+                      <option key={i} value={i}>
+                        {s.name}
+                        {s.category ? ` (${s.category})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <DispatcherButton
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="font-semibold"
+                    loading={isSavingCatalog}
+                    loadingText="Saving..."
+                    disabled={!canSaveToCatalog}
+                    icon={<Plus size={13} />}
+                    onClick={() => void handleSaveToCatalog()}
+                  >
+                    Save to catalog
+                  </DispatcherButton>
+                </div>
+              )}
+              {saveBlock === "noCategory" && (
+                <p className="m-0 text-label text-status-waiting-ink">
+                  This store has no category yet. Set it in the stores step, then save.
+                </p>
+              )}
+              {saveBlock === "guessedCategory" && (
+                <p className="m-0 text-label text-status-waiting-ink">
+                  {saveStore?.category} is only a guess for this store. Confirm the category in the stores step, then save.
+                </p>
+              )}
+              {catalogSaveError && (
+                <p role="alert" className="m-0 text-label text-status-waiting-ink">
+                  {catalogSaveError}
+                </p>
+              )}
+              {lastSaved && !catalogSaveError && (
+                <p role="status" className="m-0 flex items-center gap-1.5 text-label text-status-done-ink">
+                  <Check size={13} className="shrink-0" />
+                  {lastSaved}
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

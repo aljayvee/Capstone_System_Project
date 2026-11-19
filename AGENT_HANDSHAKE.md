@@ -1,5 +1,15 @@
 # 🌐 TRI-AGENT COLLABORATION TUNNEL (CLAUDE CODE ◄► OPENAI CODEX ◄► ANTIGRAVITY)
 
+## 2026-11-19 - Staff cataloguing path, with review fixes (Claude)
+- Why: `crawled_merchant_items` had no writer, so it was always empty. Dispatchers and owners can now save an item against a pinned store from the Catalog Menu Helper (sourceType `STAFF_CATALOGUED`). Server half: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`.
+- `src/portals/dispatcher/components/order-chat/stages/Stage3ConfirmItems.tsx`: "Save to catalog" row in the helper tray (store picked from the pinned stores; name = search text as typed). Messages clear when the search or store changes; a save searches again so the item shows.
+- `.../order-chat/hooks/useCatalogAutocomplete.ts`: `saveCatalogItem()`, and `refresh()` on the hook.
+- NEW `.../order-chat/catalogSave.ts`: `isGuessedCategory` (moved out of `Stage2PinStores.tsx`, which now imports it; same rule) and `catalogSaveBlock`. A pin whose category is a guess (google/name/model) cannot be catalogued until confirmed in step 2.
+- NEW `tests/catalogSave.test.ts`.
+- **Verification**: `npm run typecheck` exit 0; `npm test` all pass; browser harness with mocked `apiClient` adapter (deleted). No `[LOCKED]` contract touched; no schema change. Not committed.
+- **DEPLOYED 2026-11-20 ~00:01 (+08), live entry `index-B1CxFW2S.js`** (was `index-B2my_uqS.js`). Release = HEAD `a4df743` + the 3 live uncommitted owner files (rates x2, Settlement) + only these 4 catalog files. Antigravity's dependency cleanup / strict-mode files (entry below) were NOT shipped. Proof: the baseline rebuilt from that source matched live 193/193 before the change; after, all 193 release files match live. 50 new files uploaded, nothing deleted, index.html last. Backup + `rollback-web.sh` + `release.md5`: `/root/deploy-backups/web-catalog-20261119-170117`. A working-tree deploy now would also ship Antigravity's 7 files.
+- **Next**: nothing in the UI calls `DELETE /api/catalog/items/:id` yet.
+
 ## 2026-11-09 - Dual-zone service area: dispatcher can pin Banga stores (Claude Code)
 - Full entry in C:\Capstone_Server\server\AGENT_HANDSHAKE.md (server: zone engine, intra-zone 400s, zone-isolated dispatch; tsc 0, vitest 161 files / 2067 PASS) and in CustomerApp's. This web half was not in the mission's list, but Stage 2 would otherwise refuse every Banga pin, drop Banga search results, and tell the dispatcher to decline every Banga drop-off.
 - `src/constants/serviceArea.ts`: NEW `BANGA_BOUNDS`, `BANGA_CENTER`, `BANGA_POLYGON_COORDINATES` (generated from the server's GeoJSON, 88 points, same winding as Tacurong's), `ServiceZone`, `SERVICE_ZONES`, `detectServiceZone(lat, lng, bufferKm)`, `SERVICE_AREA_MASK_PATHS` (world ring plus both holes). `isWithinServiceArea` now means any zone (so `useStageModel`'s drop-off check accepts Banga); `isWithinTacurong` and `TACURONG_MASK_PATHS` unchanged.

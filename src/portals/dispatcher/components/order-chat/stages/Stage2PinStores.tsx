@@ -18,6 +18,7 @@ import { useStorePredictions } from "../hooks/useStorePredictions";
 import { StorePredictionCard } from "../StorePredictionCard";
 import { useMemo, useState, useEffect } from "react";
 import type { MerchantCategory, StorePinpoint } from "../types";
+import { isGuessedCategory } from "../catalogSave";
 import type { ApiPinQuote } from "../../../../../services/apiService";
 import type { DeliveryProblem } from "../hooks/useStageModel";
 
@@ -235,11 +236,7 @@ export function Stage2PinStores({
   const perExtraStoreFee = Number(rateConfig?.multiStoreFeePerStore ?? 0);
 
   /** Inferred rather than chosen - marked as waiting until someone confirms. */
-  const isGuess = (pin: StorePinpoint) =>
-    pin.categoryId != null &&
-    (pin.categorySource === "google" ||
-      pin.categorySource === "name" ||
-      pin.categorySource === "model");
+  const isGuess = (pin: StorePinpoint) => isGuessedCategory(pin);
 
   /**
    * What the machine thought, in words, for the tooltip on a guessed category.

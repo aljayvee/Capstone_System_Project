@@ -40,6 +40,22 @@ export function describeSuggestionSource(s: CatalogItemSuggestion): string {
 const cache = new Map<string, CatalogItemSuggestion[]>();
 
 /**
+ * Staff cataloguing: saves an item against a store so the helper finds it next
+ * time. The cache is dropped on success, or the item just saved would stay
+ * invisible to a search typed again in the same session.
+ */
+export async function saveCatalogItem(input: {
+  itemName: string;
+  rawStoreName: string;
+  categoryName: string;
+  verifiedPlaceId?: string | null;
+}): Promise<{ item: CatalogItemSuggestion; created: boolean }> {
+  const response = await apiClient.post<{ item: CatalogItemSuggestion; created: boolean }>("/catalog/items", input);
+  cache.clear();
+  return response.data;
+}
+
+/**
  * Autocomplete hook for menu items.
  * Price is omitted per design invariants.
  */
@@ -48,6 +64,10 @@ export function useCatalogAutocomplete(query: string, placeId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Bumped by refresh() to search the same text again, after a save changed
+  // what the catalog holds. The cache alone cannot do it: the effect only runs
+  // when the text changes.
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -102,9 +122,13 @@ export function useCatalogAutocomplete(query: string, placeId?: string) {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [query, placeId]);
+  }, [query, placeId, refreshTick]);
 
   const clearSuggestions = () => setSuggestions([]);
+  const refresh = () => {
+    cache.clear();
+    setRefreshTick((tick) => tick + 1);
+  };
 
-  return { suggestions, isLoading, isError, clearSuggestions };
+  return { suggestions, isLoading, isError, clearSuggestions, refresh };
 }
