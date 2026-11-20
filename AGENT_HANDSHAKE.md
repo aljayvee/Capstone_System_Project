@@ -1,5 +1,30 @@
 # 🌐 TRI-AGENT COLLABORATION TUNNEL (CLAUDE CODE ◄► OPENAI CODEX ◄► ANTIGRAVITY)
 
+## 2026-11-20 - Route replay view, Owner Portal + Dispatcher (Claude, web half)
+- Why: `errand_track_points` (the rider's stored GPS trail) had a read endpoint, `GET /api/errands/:id/track`, but no screen. Owners saw "Unverified: marked delivered 450 m from address" with no way to see the trail behind it.
+- NEW `src/components/route-replay/`:
+  - `replayModel.ts`: pure. Splits the trail at gaps over 3 min and at a change of rider (never interpolated across either). Also position at a time, timeline events, summary.
+  - `RouteReplayMap.tsx`: Google map, classic markers only, so it draws without a Map ID. Faint priced route, a dot per reading (hollow = sent late after signal loss, amber edge = not snapped), dashed gaps, stop geofence circles, door pin, heading arrow.
+  - `RouteReplayDialog.tsx`: playback, scrubber, 10/30/60x, clickable timeline, facts. Loading, error (403 / 404 / offline with Retry), empty, truncated and ideal states. `live` refreshes every 60 s and follows the newest reading until the viewer scrubs.
+- `src/services/apiService.ts`: `ApiRouteReplay` types + `getRouteReplay()`. It throws (the dialog words 403/404/offline differently) and normalises an older server's `{ errandId, points }` so the view still draws the trail without stops.
+- Entry points:
+  - `owner/.../RiderPerformanceReportView.tsx` (`RiderDeliveries`): "Replay route" per delivery (desktop column, mobile row action and inspector, dark variant there). Shown only with `tracking.view`.
+  - `dispatcher/.../history/HistoryErrandDetail.tsx`: "Replay route" in the header when a rider was assigned.
+  - `dispatcher/.../workspace/DispatchDetailInspector.tsx`: "Trail so far" (live) for ASSIGNED / IN_TRANSIT.
+- NEW `tests/replayModel.test.ts` (10 tests).
+- **Verification**: `tsc --noEmit` exit 0; `npm test` 38/38; `npm run build` exit 0; 0 em dashes in new files.
+  - Browser harness (deleted), with mocked `apiClient` adapter and the real Google map: normal, empty, two riders + 7 min gap, truncated 5000, old server shape, 403, 404, network failure + Retry. Playback, scrub, jump to event, and live refresh (8 -> 10 readings, playhead followed; after a scrub it stayed put).
+  - Owner report and History detail entry points, at 800 px and 375 px (no sideways scroll). Fixed in the harness: the title cut off the reference number on phones; the mobile row button was dark-on-navy.
+- **Server half** (separate session, card "Route replay: server track response and access"): extends `GET /track` with `truncated`, `errand`, `stops`, `riders`, `nearestToDoorMeters`, adds a 404, and applies the dispatcher claim rule from `GET /:id`. **Server must deploy first** for stops/door to appear; the web view degrades to trail-only against the current server.
+- No `[LOCKED]` contract touched (no schema change). Not committed.
+- **DEPLOYED 2026-11-20 11:53 (+08), on the user's "Deploy both"; server first (11:48).**
+  - Web live entry `index-B1CxFW2S.js` -> `index-C5RiivJy.js`.
+  - Release = the 11-19 live source (scratch copy whose build is `index-B1CxFW2S.js`) + only the 7 replay files. Antigravity's undeployed files (package.json, vite.config.ts, tsconfig.json, ConversationPane, useOrderChat, useOrderItems, useCustomerChatAlerts) are still NOT live.
+  - Proof: the baseline rebuilt with current node_modules matched live 193/193. The release has 198 files: 62 new hashed files added, `index.html` swapped last, nothing deleted.
+  - Backup + `rollback-web.sh` + `release.md5`: `/root/deploy-backups/web-replay-20261120-115334`.
+  - Prod data: 13 of 69 delivered errands have a trail (largest 3221 readings). 261118-59EB9-0002 (259 readings) is a good spot check.
+
+
 ## 2026-11-19 - Staff cataloguing path, with review fixes (Claude)
 - Why: `crawled_merchant_items` had no writer, so it was always empty. Dispatchers and owners can now save an item against a pinned store from the Catalog Menu Helper (sourceType `STAFF_CATALOGUED`). Server half: top of `C:/Capstone_Server/server/AGENT_HANDSHAKE.md`.
 - `src/portals/dispatcher/components/order-chat/stages/Stage3ConfirmItems.tsx`: "Save to catalog" row in the helper tray (store picked from the pinned stores; name = search text as typed). Messages clear when the search or store changes; a save searches again so the item shows.

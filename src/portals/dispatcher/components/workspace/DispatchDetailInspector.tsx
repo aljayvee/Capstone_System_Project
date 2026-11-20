@@ -10,8 +10,10 @@ import {
   Check,
   Copy,
   Phone,
+  Route as RouteIcon,
   ShieldCheck,
 } from "lucide-react";
+import { RouteReplayDialog } from "../../../../components/route-replay/RouteReplayDialog";
 import { StatusChip, DispatcherBadge } from "@/components/panel/DispatcherBadge";
 import { DispatcherButton } from "@/components/panel/DispatcherButton";
 import { DispatcherCard } from "@/components/panel/DispatcherCard";
@@ -74,6 +76,9 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   const [copiedId, setCopiedId] = useState(false);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
+  // Holds the errand id, not a flag, so picking another errand on the board
+  // cannot leave the replay open on the wrong one.
+  const [replayErrandId, setReplayErrandId] = useState<string | null>(null);
   const [isDeclining, setIsDeclining] = useState(false);
 
   // Keyed by errand, which is the fix for a real defect: `declineReason` was a
@@ -116,6 +121,8 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
   }
 
   const isAvailable = String(errand.status).toUpperCase() === "AVAILABLE";
+  // Mirrors the server's TRACKABLE_STATUSES (trackingService.ts).
+  const isTrackable = ["ASSIGNED", "IN_TRANSIT"].includes(String(errand.status).toUpperCase());
   const orderDate = errand.createdAt ? new Date(errand.createdAt) : null;
   const formattedOrderDate = orderDate && !Number.isNaN(orderDate.getTime())
     ? new Intl.DateTimeFormat("en-PH", {
@@ -496,16 +503,39 @@ export const DispatchDetailInspector: React.FC<DispatchDetailInspectorProps> = (
             ) : null}
           </>
         ) : (
-          <DispatcherButton
-            variant="field"
-            size="lg"
-            className="w-full"
-            onClick={() => onOpenChat(errand.id)}
-          >
-            Open the dispatch console
-          </DispatcherButton>
+          <>
+            <DispatcherButton
+              variant="field"
+              size="lg"
+              className="flex-1"
+              onClick={() => onOpenChat(errand.id)}
+            >
+              Open the dispatch console
+            </DispatcherButton>
+            {/* The stored trail is recorded only while a rider has the run. */}
+            {isTrackable ? (
+              <DispatcherButton
+                variant="secondary"
+                size="lg"
+                icon={<RouteIcon size={16} />}
+                onClick={() => setReplayErrandId(errand.id)}
+              >
+                Trail so far
+              </DispatcherButton>
+            ) : null}
+          </>
         )}
       </div>
+
+      {replayErrandId === errand.id ? (
+        <RouteReplayDialog
+          errandId={errand.id}
+          referenceNo={formatErrandId(errand.id)}
+          live
+          open
+          onOpenChange={(open) => !open && setReplayErrandId(null)}
+        />
+      ) : null}
 
       {showDeclineConfirm ? (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-board-field-deep/50 p-4">

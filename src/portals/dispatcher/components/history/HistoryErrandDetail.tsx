@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, Copy, MessageCircle, RotateCcw } from "lucide-react";
+import { Check, Copy, MessageCircle, RotateCcw, Route as RouteIcon } from "lucide-react";
+import { RouteReplayDialog } from "../../../../components/route-replay/RouteReplayDialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Errand } from "../../../../types/errand";
@@ -109,6 +110,7 @@ export function HistoryErrandDetail({ errand, onOpenChat }: HistoryErrandDetailP
   const photos = useProofPhotos(errand.id);
   const decline = useDeclineReasons(errand.id, isCancelled);
   const [copied, setCopied] = useState(false);
+  const [replayOpen, setReplayOpen] = useState(false);
 
   const copyId = async () => {
     try {
@@ -152,15 +154,36 @@ export function HistoryErrandDetail({ errand, onOpenChat }: HistoryErrandDetailP
             {isCancelled ? "Closed" : "Delivered"} {formatClosedAt(errand)}
           </p>
         </div>
-        <DispatcherButton
-          variant="secondary"
-          size="sm"
-          icon={<MessageCircle size={14} />}
-          onClick={() => onOpenChat(errand.id)}
-        >
-          Open the conversation
-        </DispatcherButton>
+        <div className="flex flex-wrap gap-2">
+          {/* Only an errand a rider took has a trail to replay. */}
+          {(errand.riderId || errand.riderName) && (
+            <DispatcherButton
+              variant="secondary"
+              size="sm"
+              icon={<RouteIcon size={14} />}
+              onClick={() => setReplayOpen(true)}
+            >
+              Replay route
+            </DispatcherButton>
+          )}
+          <DispatcherButton
+            variant="secondary"
+            size="sm"
+            icon={<MessageCircle size={14} />}
+            onClick={() => onOpenChat(errand.id)}
+          >
+            Open the conversation
+          </DispatcherButton>
+        </div>
       </header>
+      {replayOpen && (
+        <RouteReplayDialog
+          errandId={errand.id}
+          referenceNo={formatErrandId(errand.id)}
+          open
+          onOpenChange={(open) => !open && setReplayOpen(false)}
+        />
+      )}
 
       <Section title="Overview">
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">

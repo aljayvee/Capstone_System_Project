@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ReportState } from "./ReportState";
-import { Star, Bike, Timer, Wallet, ChevronRight } from "lucide-react";
+import { Star, Bike, Timer, Wallet, ChevronRight, Route as RouteIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { ReportPeriodToolbar } from "./ReportPeriodToolbar";
 import { PeriodBreakdownTable } from "./PeriodBreakdownTable";
@@ -22,6 +22,8 @@ import { formatPeso } from "../../../../../utils/format";
 import { MobileResponsiveTable, TablePagination } from "../../../../../components/table";
 import { usePagination } from "../../../../../hooks/usePagination";
 import { RiderSearchPicker } from "./RiderSearchPicker";
+import { usePermissions } from "../../../../../context/PermissionsContext";
+import { RouteReplayDialog } from "../../../../../components/route-replay/RouteReplayDialog";
 
 /**
  * An absent metric, with the reason attached.
@@ -225,6 +227,42 @@ const stamp = (iso: string | null) =>
 
 /** One rider's deliveries, each with its On Time verdict: what the rate rests on. */
 const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliveries }) => {
+  // The trail is behind tracking.view, not reports.view: an Admin who can read
+  // this report but not the trail is not shown a button that would refuse them.
+  const canReplay = usePermissions().can("tracking.view");
+  const [replayFor, setReplayFor] = useState<ApiRiderDelivery | null>(null);
+
+  // "dark" for the phone layout: MobileResponsiveTable's expanded row and its
+  // inspector footer are navy here (this table does not opt into "flat"), so
+  // it matches their own View Full Details button.
+  const replayButton = (d: ApiRiderDelivery, after?: () => void, surface: "light" | "dark" = "light") => (
+    <button
+      type="button"
+      onClick={() => {
+        after?.();
+        setReplayFor(d);
+      }}
+      aria-label={`Replay the route for ${d.referenceNo ?? formatErrandId(d.errandId)}`}
+      className={
+        surface === "dark"
+          ? "inline-flex min-h-[44px] flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+          : "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-trim px-2.5 text-micro font-semibold text-ink transition-colors hover:bg-board-ground"
+      }
+    >
+      <RouteIcon size={14} aria-hidden="true" />
+      Replay route
+    </button>
+  );
+
+  const replayDialog = replayFor && (
+    <RouteReplayDialog
+      errandId={replayFor.errandId}
+      referenceNo={replayFor.referenceNo}
+      open
+      onOpenChange={(open) => !open && setReplayFor(null)}
+    />
+  );
+
   if (deliveries.length === 0) {
     return (
       <div className="bg-board-plate rounded-plate p-8 border border-edge text-center text-label text-ink-muted">
@@ -244,6 +282,11 @@ const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliver
               <th scope="col" className="text-left px-5 py-2 font-semibold">Delivered</th>
               <th scope="col" className="text-left px-5 py-2 font-semibold">Target Deadline</th>
               <th scope="col" className="text-left px-5 py-2 font-semibold">Punctuality Status</th>
+              {canReplay && (
+                <th scope="col" className="px-5 py-2">
+                  <span className="sr-only">Route</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -258,6 +301,7 @@ const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliver
                   <td className="px-5 py-2.5 text-ink whitespace-nowrap">{stamp(d.deliveredAt)}</td>
                   <td className="px-5 py-2.5 text-ink-muted whitespace-nowrap">{stamp(d.promisedBy)}</td>
                   <td className={`px-5 py-2.5 font-semibold ${verdict.tone}`}>{verdict.text}</td>
+                  {canReplay && <td className="px-3 py-1 text-right whitespace-nowrap">{replayButton(d)}</td>}
                 </tr>
               );
             })}
@@ -268,10 +312,14 @@ const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliver
   );
 
   return (
+    <>
+    {replayDialog}
     <MobileResponsiveTable<ApiRiderDelivery>
       data={deliveries}
       keyExtractor={(d) => d.errandId}
       desktopView={desktopTable}
+      renderRowActions={canReplay ? (d) => replayButton(d, undefined, "dark") : undefined}
+      inspectorActions={canReplay ? (d, onClose) => replayButton(d, onClose, "dark") : undefined}
       primaryHeader="Order"
       secondaryHeader="Punctuality Status"
       renderPrimary={(d) => (
@@ -316,6 +364,7 @@ const RiderDeliveries: React.FC<{ deliveries: ApiRiderDelivery[] }> = ({ deliver
         },
       ]}
     />
+    </>
   );
 };
 

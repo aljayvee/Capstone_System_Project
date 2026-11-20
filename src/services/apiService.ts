@@ -738,6 +738,59 @@ export interface ApiRiderDelivery {
   check: ApiDeliveryCheck | null;
 }
 
+/** One stored GPS reading from errand_track_points, in recordedAt order. */
+export interface ApiTrackPoint {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+  speedMps: number | null;
+  headingDeg: number | null;
+  /** The phone's clock when the reading was taken. The trail is ordered by it. */
+  recordedAt: string;
+  /** The server's clock when the reading arrived; hours later after a signal loss. */
+  receivedAt: string | null;
+  isMapMatched: boolean;
+  wasOffline: boolean;
+  riderId: number | null;
+}
+
+export interface ApiReplayStop {
+  id: number;
+  storeName: string;
+  sequence: number;
+  latitude: number;
+  longitude: number;
+  arrivedAt: string | null;
+  departedAt: string | null;
+  geofenceRadiusMeters: number;
+}
+
+/**
+ * GET /errands/:id/track. A server older than the replay view sends only
+ * { errandId, points }; getRouteReplay fills the rest with empty values, so
+ * the view still draws the trail, just without stops or the door.
+ */
+export interface ApiRouteReplay {
+  errandId: string;
+  points: ApiTrackPoint[];
+  /** True when the server stopped at its cap and the trail is incomplete. */
+  truncated: boolean;
+  errand: {
+    referenceNo: string | null;
+    status: string | null;
+    acceptedAt: string | null;
+    deliveredAt: string | null;
+    deliveryLatitude: number | null;
+    deliveryLongitude: number | null;
+    routeGeometry: string | null;
+    etaPromisedHighAt: string | null;
+  } | null;
+  stops: ApiReplayStop[];
+  riders: Array<{ id: number; name: string }>;
+  /** The same figure the On Time check uses, or null when there is none. */
+  nearestToDoorMeters: number | null;
+}
+
 /** One offer a rider declined or let run out, kept permanently since 2026-10-25. */
 export interface ApiRiderDecline {
   id: number;
@@ -1505,6 +1558,43 @@ export const apiService = {
       console.warn("API unavailable", err);
       return null;
     }
+  },
+
+  /**
+   * A rider's stored GPS trail for one errand, with its stops and door.
+   *
+   * Throws instead of returning null: the replay view words a 403, a 404 and
+   * no connection differently, and needs the axios error to tell them apart.
+   */
+  async getRouteReplay(errandId: string): Promise<ApiRouteReplay> {
+    const response = await apiClient.get<Partial<Omit<ApiRouteReplay, "points">> & { points?: unknown }>(
+      `/errands/${encodeURIComponent(errandId)}/track`
+    );
+    const body = response.data ?? {};
+    const points = Array.isArray(body.points) ? (body.points as Array<Record<string, unknown>>) : [];
+    const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    return {
+      errandId: typeof body.errandId === "string" ? body.errandId : errandId,
+      points: points
+        .filter((p) => num(p.latitude) !== null && num(p.longitude) !== null && typeof p.recordedAt === "string")
+        .map((p) => ({
+          latitude: p.latitude as number,
+          longitude: p.longitude as number,
+          accuracyMeters: num(p.accuracyMeters),
+          speedMps: num(p.speedMps),
+          headingDeg: num(p.headingDeg),
+          recordedAt: p.recordedAt as string,
+          receivedAt: typeof p.receivedAt === "string" ? p.receivedAt : null,
+          isMapMatched: p.isMapMatched === true,
+          wasOffline: p.wasOffline === true,
+          riderId: num(p.riderId),
+        })),
+      truncated: body.truncated === true,
+      errand: body.errand ?? null,
+      stops: Array.isArray(body.stops) ? body.stops : [],
+      riders: Array.isArray(body.riders) ? body.riders : [],
+      nearestToDoorMeters: num(body.nearestToDoorMeters),
+    };
   },
 
   /** Records that a person considered an exception and what they concluded. */
